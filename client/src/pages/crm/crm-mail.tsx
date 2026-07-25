@@ -11,6 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { cn } from "@/lib/utils";
+import { MoreIcon } from "@/components/crm/more-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import {
   Mail, Search, Loader2, Inbox, Send, Paperclip, X, Plus, Trash2, Archive,
@@ -39,6 +47,12 @@ function nameFromEmail(email: string): string {
   const cleaned = local.replace(/[._-]+/g, " ").trim();
   if (!cleaned) return email;
   return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** "ryo martin" -> "Ryo Martin" — uppercase each word's first letter, leave
+ *  the rest untouched (so ABC, McDonald survive). */
+function titleCaseName(name: string): string {
+  return name.replace(/\S+/g, (w) => (w[0] ? w[0].toUpperCase() + w.slice(1) : w));
 }
 type EmailMessage = {
   id: string;
@@ -201,6 +215,7 @@ export default function CrmMail() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [viewer, setViewer] = useState<{ url: string; name: string; mimeType: string } | null>(null);
   const [showEmailFor, setShowEmailFor] = useState<string | null>(null); // message id whose raw emails are revealed
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [replyHtml, setReplyHtml] = useState("");
   const [replyFiles, setReplyFiles] = useState<OutAttachment[]>([]);
   const replyFileInput = useRef<HTMLInputElement | null>(null);
@@ -565,7 +580,47 @@ export default function CrmMail() {
 
         {/* Right: thread detail */}
         <div className={`${selectedId ? "flex" : "hidden lg:flex"} min-h-0 flex-1 flex-col bg-slate-50`}>
-          <CommsSwitcher active="mail" />
+          {/* Switcher row — thread actions live up here, level with Messages | Mail */}
+          <div className="relative flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white px-4 pb-2.5 pt-3">
+            <CommsSwitcher active="mail" bare />
+            {selectedId && !detailLoading && threadDetail && (
+              <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+                <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                        actionsOpen
+                          ? "bg-slate-200 text-slate-900"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900",
+                      )}
+                      title="Conversation actions"
+                      data-testid="thread-actions"
+                    >
+                      <MoreIcon className={cn(actionsOpen && "ghq-more-open")} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={archiveMutation.isPending || deleteMutation.isPending}
+                      onClick={() => archiveMutation.mutate(threadDetail.thread.id)}
+                    >
+                      <Archive className="h-4 w-4 mr-2" /> Archive
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      disabled={archiveMutation.isPending || deleteMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm("Move this conversation to Trash?")) deleteMutation.mutate(threadDetail.thread.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+          </div>
           {!selectedId ? (
             <div className="flex h-full items-center justify-center text-center text-muted-foreground">
               <div>
@@ -582,52 +637,53 @@ export default function CrmMail() {
             </div>
           ) : (
             <>
-              {/* Thread header */}
-              <div className="flex items-start gap-3 border-b border-slate-200/80 bg-white px-4 py-3.5 lg:px-6">
-                <button
-                  onClick={() => setSelectedId(null)}
-                  className="mt-0.5 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
-                  aria-label="Back"
-                  data-testid="button-back"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-lg font-semibold text-slate-900">{threadDetail.thread.subject || "(no subject)"}</h2>
-                  {threadDetail.customer && (
+              {/* Identity strip — open header row with a clean full-width divider
+                  below it, matching the Messages reference style. */}
+              {(() => {
+                const inbound = threadDetail.messages.find((m) => m.direction === "inbound");
+                const counterpartEmail =
+                  inbound?.fromEmail || threadDetail.messages[0]?.toEmails?.[0] || null;
+                const counterpartName =
+                  threadDetail.customer?.name ||
+                  inbound?.fromName ||
+                  (counterpartEmail ? nameFromEmail(counterpartEmail) : "Unknown");
+                return (
+                  <div className="flex items-center gap-3 border-b border-slate-200/80 bg-white px-4 py-2.5 lg:px-6">
                     <button
-                      onClick={() => navigate(`/crm/customers/${threadDetail.customer.id}`)}
-                      className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-[#711419]/10 px-2 py-0.5 text-xs font-medium text-[#711419] hover:bg-[#711419]/15"
+                      onClick={() => setSelectedId(null)}
+                      className="h-8 w-8 shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
+                      aria-label="Back"
+                      data-testid="button-back"
                     >
-                      <Link2 className="h-3 w-3" /> {threadDetail.customer.name}
+                      <ArrowLeft className="h-4 w-4" />
                     </button>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => archiveMutation.mutate(threadDetail.thread.id)}
-                    disabled={archiveMutation.isPending || deleteMutation.isPending}
-                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
-                    title="Archive"
-                    aria-label="Archive"
-                    data-testid="button-archive"
-                  >
-                    <Archive className="h-[18px] w-[18px]" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (window.confirm("Move this conversation to Trash?")) deleteMutation.mutate(threadDetail.thread.id);
-                    }}
-                    disabled={archiveMutation.isPending || deleteMutation.isPending}
-                    className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                    title="Delete"
-                    aria-label="Delete"
-                    data-testid="button-delete"
-                  >
-                    <Trash2 className="h-[18px] w-[18px]" />
-                  </button>
-                </div>
-              </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {threadDetail.customer ? (
+                          <button
+                            onClick={() => navigate(`/crm/customers/${threadDetail.customer.id}`)}
+                            className="truncate text-sm font-semibold text-foreground hover:text-[#711419]"
+                            data-testid="thread-customer-link"
+                          >
+                            {titleCaseName(counterpartName)}
+                          </button>
+                        ) : (
+                          <h2 className="truncate text-sm font-semibold text-foreground">{titleCaseName(counterpartName)}</h2>
+                        )}
+                        {!threadDetail.customer && (
+                          <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                            Not in CRM
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {counterpartEmail || "No address"}
+                        <span className="truncate"> · {threadDetail.thread.subject || "(no subject)"}</span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Messages */}
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-6">

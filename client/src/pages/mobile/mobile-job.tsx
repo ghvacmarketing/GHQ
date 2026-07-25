@@ -628,13 +628,15 @@ export default function MobileJob() {
                   <button
                     key={tech.id}
                     onClick={() => { if (hasJobs) setSelectedTechId(tech.id); }}
-                    className={`flex flex-col items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-4 shadow-sm transition-all ${
+                    className={`flex flex-col items-center gap-1.5 rounded-[4px] border border-slate-300/70 bg-white px-2 py-4 shadow-none transition-all ${
                       hasJobs ? "active:scale-[0.98]" : "opacity-60"
                     }`}
                     data-testid={`jobs-tech-${tech.id}`}
                   >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#711419]/10 text-[#711419]">
-                      <HardHat className="h-5 w-5" />
+                    <span className="flex h-11 w-11 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-sm font-bold text-[#711419]">
+                      {tech.name
+                        ? tech.name.trim().split(/\s+/).slice(0, 2).map((p: string) => p[0]?.toUpperCase()).join("")
+                        : <HardHat className="h-5 w-5" />}
                     </span>
                     <span className="max-w-full truncate text-sm font-semibold text-slate-800">{tech.name}</span>
                     <span className="text-xs text-slate-400">{techJobs.length} job{techJobs.length !== 1 ? "s" : ""} today</span>
