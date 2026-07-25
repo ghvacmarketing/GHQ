@@ -3894,6 +3894,7 @@ export default function MobileJobDetail() {
     const dur = 200 * (1 - startP) + 40;
     setShowUnderlay(true);
     requestAnimationFrame(() => {
+      el.style.animation = "none";
       el.style.transition = `transform ${dur}ms ease-in`;
       el.style.transform = "translateX(100%)";
       pageUnderlayRef.current?.animate(
@@ -4021,6 +4022,11 @@ export default function MobileJobDetail() {
     // The edge swipe always leaves the job (whole screen slides, nav
     // included) no matter which tab is open — Overview is just a tab now.
     swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true, section: false };
+    // Mount the Jobs page underneath NOW, while the finger is still parked —
+    // mounting it mid-drag left the first exposed frames empty (the "weird
+    // vertical strip" on a fresh open). If this turns out to be a tap or a
+    // vertical scroll, onSwipeEnd unmounts it again.
+    setShowUnderlay(true);
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onSwipeMove = (e: React.PointerEvent) => {
@@ -4033,10 +4039,16 @@ export default function MobileJobDetail() {
       if (dx > 8 && dx > dy) {
         st.engaged = true;
         const target = st.section ? sectionsRef.current : el;
-        if (target) target.style.transition = "none";
+        if (target) {
+          target.style.transition = "none";
+          // The mount-time slide-in animation outranks inline transforms —
+          // if it's still running, the page ignores the finger and then
+          // jumps. Kill it before dragging.
+          target.style.animation = "none";
+        }
         if (!st.section) setShowUnderlay(true);
       }
-      else if (dy > 14) { st.active = false; return; }
+      else if (dy > 14) { st.active = false; setShowUnderlay(false); return; }
     }
     if (st.engaged) {
       const off = Math.max(0, dx);
@@ -4059,7 +4071,12 @@ export default function MobileJobDetail() {
   const onSwipeEnd = (e: React.PointerEvent) => {
     const st = swipeDrag.current;
     swipeDrag.current = null;
-    if (!st?.engaged) return;
+    if (!st?.engaged) {
+      // Edge touch that never became a back-swipe (tap / vertical scroll) —
+      // drop the pre-mounted underlay.
+      if (st) setShowUnderlay(false);
+      return;
+    }
     const dx = e.clientX - st.x;
     const commit = dx > Math.min(140, window.innerWidth * 0.33);
     if (st.section) {
@@ -4564,10 +4581,13 @@ export default function MobileJobDetail() {
       <div className="relative flex h-full flex-col bg-slate-50">
         <div className="flex-shrink-0 p-4 pb-2">
           <div className="flex items-center justify-between">
-            {/* In-flow back — tap, or swipe right from the left edge */}
+            {/* In-flow back — tap, or swipe right from the left edge. Only
+                shown on the Overview: Work/Quote/Invoice are just tabs of
+                this job, so no arrow there (the edge swipe still leaves the
+                job from any tab). */}
             <button
               onClick={() => goBackAnimated()}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
+              className={`flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95 ${activeTab !== "overview" ? "pointer-events-none invisible" : ""}`}
               data-testid="button-back"
               aria-label="Back"
             >
