@@ -16,6 +16,14 @@ services:
       - key: NODE_ENV
         value: production
 
+      # ── Weather import (NWS api.weather.gov) ────────────────────────
+      # Coordinates the forecast/alerts are fetched for. Defaults in code
+      # to Wrens, GA (the shop's home base); override here if needed.
+      - key: WEATHER_LAT
+        value: "33.2071"
+      - key: WEATHER_LON
+        value: "-82.3915"
+
       # ── Android app (Play Store / sideload) ─────────────────────────
       # Cert fingerprints are public info, safe to commit. First entry is
       # the local upload/signing key from the PWABuilder package; append

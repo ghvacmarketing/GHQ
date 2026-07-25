@@ -28,7 +28,6 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  SquarePen,
   Trash2,
   X,
 } from "lucide-react";
@@ -373,17 +372,6 @@ export default function AiAssistantModal() {
                 <PanelLeftClose className="h-4 w-4" />
               </button>
             </div>
-            <div className="px-3 pb-2">
-              <button
-                onClick={newChat}
-                className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-[#711419]/40 hover:text-[#711419]"
-                data-testid="ai-new-chat"
-              >
-                <SquarePen className="h-4 w-4" />
-                New chat
-              </button>
-            </div>
-
             {/* Spaces — named groups of conversations. New chats are filed
                 into whichever space is selected. */}
             <div className="px-2 pb-1">
@@ -454,6 +442,19 @@ export default function AiAssistantModal() {
               ))}
             </div>
             <div className="mx-3 my-1 border-t border-slate-200" />
+
+            {/* Chats — the + starts a new chat (filed into the selected space) */}
+            <div className="flex items-center justify-between px-4 pb-1 pt-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Chats</p>
+              <button
+                onClick={newChat}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-[#711419]"
+                aria-label="New chat"
+                data-testid="ai-new-chat"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
               {grouped.length === 0 ? (

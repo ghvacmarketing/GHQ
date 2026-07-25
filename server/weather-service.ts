@@ -1,8 +1,10 @@
 import { storage } from "./storage";
 import { isAppActive } from "./activity-tracker";
 
-const WEATHER_LAT = process.env.WEATHER_LAT;
-const WEATHER_LON = process.env.WEATHER_LON;
+// Default to the shop's home base — Wrens, GA (PO Box 917, Wrens, GA 30833) —
+// so weather imports work out of the box; WEATHER_LAT/LON env vars override.
+const WEATHER_LAT = process.env.WEATHER_LAT || "33.2071";
+const WEATHER_LON = process.env.WEATHER_LON || "-82.3915";
 const WEATHER_UA = process.env.WEATHER_UA || "GiesbrechHVAC-CRM/1.0 (contact@ghvac.com)";
 
 async function fetchWithUA(url: string): Promise<Response> {
@@ -15,10 +17,6 @@ async function fetchWithUA(url: string): Promise<Response> {
 }
 
 export async function refreshWeather(): Promise<{ success: boolean; error?: string }> {
-  if (!WEATHER_LAT || !WEATHER_LON) {
-    return { success: false, error: "WEATHER_LAT or WEATHER_LON not configured" };
-  }
-
   try {
     const pointsUrl = `https://api.weather.gov/points/${WEATHER_LAT},${WEATHER_LON}`;
     const pointsResponse = await fetchWithUA(pointsUrl);
