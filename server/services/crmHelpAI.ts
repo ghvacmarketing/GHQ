@@ -4,6 +4,10 @@ import { db } from "../db";
 import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmQuotes } from "@shared/schema";
 import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+
+// All business scheduling happens in the shop's local timezone.
+const BUSINESS_TIMEZONE = "America/New_York";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "sk-not-configured",
@@ -269,7 +273,9 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
 
 function formatLiveDataForPrompt(context: LiveDataContext): string {
   const sections: string[] = [];
-  const today = format(new Date(), "EEEE, MMMM d, yyyy");
+  // The server runs in UTC — format "today" in the shop's timezone or evening
+  // questions get tomorrow's date.
+  const today = formatInTimeZone(new Date(), BUSINESS_TIMEZONE, "EEEE, MMMM d, yyyy");
   
   sections.push(`\n\n## LIVE DATA (as of ${today})\n`);
   
@@ -1073,6 +1079,8 @@ export async function askCrmHelp(question: string, conversationHistory?: Array<{
     
     const systemPrompt = `You are the GHQ assistant — a sharp, friendly teammate at Giesbrecht HVAC who knows the CRM inside out and can see live business data (upcoming work orders, agreements, invoices, quotes, projects).
 
+Right now it is ${formatInTimeZone(new Date(), BUSINESS_TIMEZONE, "EEEE, MMMM d, yyyy 'at' h:mm a")} Eastern time (${BUSINESS_TIMEZONE}) — resolve every relative date the user says ("today", "tomorrow", "next Tuesday", "10 AM") against this clock.
+
 ${CRM_FUNCTIONALITY_KNOWLEDGE}
 ${liveDataSection}
 
@@ -1091,7 +1099,7 @@ You can PREPARE two kinds of actions for the user to approve, but you can NEVER 
 Pass customerName exactly as the user said or typed it, even if it looks misspelled — the server fuzzy-matches it against the CRM and will ask the user to pick when it isn't sure. Never refuse an action just because the name looks off.
 Action types and their params:
 1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
-2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — a technician's name if the user asked to assign it to someone), "scheduledStart": ISO datetime (optional) }
+2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — a technician's name if the user asked to assign it to someone), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00") }
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)

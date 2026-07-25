@@ -200,7 +200,19 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     const msg = messages[index];
     if (!msg?.proposedAction || msg.actionState === "executing" || msg.actionState === "done") return;
     setMessages((prev) => prev.map((m, j) => (
-      j === index ? { ...m, actionState: "executing" as const, actionError: null, actionCandidates: null } : m
+      j === index
+        ? {
+            ...m,
+            // Keep picked candidates (customer, tech) on the stored params so a
+            // second candidate round doesn't lose the first pick.
+            proposedAction: m.proposedAction && extraParams
+              ? { ...m.proposedAction, params: { ...m.proposedAction.params, ...extraParams } }
+              : m.proposedAction,
+            actionState: "executing" as const,
+            actionError: null,
+            actionCandidates: null,
+          }
+        : m
     )));
     fetch("/api/crm/ai/execute-action", {
       method: "POST",
@@ -220,7 +232,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           if (Array.isArray(data.candidates) && data.candidates.length > 0) {
             setMessages((prev) => prev.map((m, j) => (
               j === index
-                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which customer did you mean?", actionCandidates: data.candidates }
+                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which one did you mean?", actionCandidates: data.candidates, actionCandidateParam: data.candidateParam || "customerId" }
                 : m
             )));
           } else {
@@ -469,7 +481,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                             {msg.actionCandidates.map((cand) => (
                               <button
                                 key={cand.id}
-                                onClick={() => runProposedAction(i, { customerId: cand.id })}
+                                onClick={() => runProposedAction(i, { [msg.actionCandidateParam || "customerId"]: cand.id })}
                                 className="block w-full rounded-[3px] border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm font-medium text-slate-200 transition-all active:scale-[0.98] active:border-[#711419]"
                                 data-testid={`assistant-candidate-${cand.id}`}
                               >

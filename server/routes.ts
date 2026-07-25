@@ -100,6 +100,7 @@ import {
 } from "./services/gmailService";
 import { crmEmailThreads, crmEmailMessages } from "@shared/schema";
 import { aiConversations, aiMessages } from "@shared/schema";
+import { fromZonedTime } from "date-fns-tz";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerEsignRoutes } from "./esign-routes";
@@ -2490,6 +2491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visitType: z.enum(["SERVICE", "MAINTENANCE", "INSTALL", "SALES"]).optional(),
             workSubtype: z.string().trim().max(60).optional(),
             assignTo: z.string().trim().max(100).optional(),
+            assignedTechId: z.string().trim().min(1).max(64).optional(),
             scheduledStart: z.string().max(40).optional(),
           }).strict(),
         }),
@@ -2551,6 +2553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(422).json({
             message: `Not sure which customer you meant by "${action.params.customerName}" — pick the right one:`,
+            candidateParam: "customerId",
             candidates: scored
               .filter((c) => c.score >= 0.4)
               .slice(0, 5)
@@ -2562,10 +2565,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!property) {
         return res.status(422).json({ message: `${customer.name} has no property on file — add one on their customer page first.` });
       }
-      const scheduledStart = action.params.scheduledStart ? new Date(action.params.scheduledStart) : null;
-      if (scheduledStart && isNaN(scheduledStart.getTime())) {
-        return res.status(400).json({ message: "The proposed schedule time isn't a valid date." });
+      // Scheduling: the model emits Eastern wall-clock time ("2026-07-26T10:00",
+      // no offset). The server runs in UTC, so a bare new Date() would land the
+      // job hours off on the dispatch board — interpret naive datetimes in the
+      // business timezone. An explicit offset/Z is honored as-is.
+      let scheduledStart: Date | null = null;
+      if (action.params.scheduledStart) {
+        const raw = action.params.scheduledStart.trim();
+        const hasExplicitZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw);
+        scheduledStart = hasExplicitZone ? new Date(raw) : fromZonedTime(raw, "America/New_York");
+        if (isNaN(scheduledStart.getTime())) {
+          return res.status(400).json({ message: "The proposed schedule time isn't a valid date." });
+        }
       }
+      // Give the visit a block on the dispatch board (default 1 hour) — without
+      // scheduledEnd the board can't place it on the timeline.
+      const scheduledEnd = scheduledStart ? new Date(scheduledStart.getTime() + 60 * 60 * 1000) : null;
 
       // work_subtype is NOT NULL — use the proposed one, else a sane default
       // for the visit type.
@@ -2583,17 +2598,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         proposedSubtype ||
         subtypeDefaults[visitType];
 
-      // Optional technician assignment by name — only on a clean unique match;
-      // otherwise the work order is created unassigned.
+      // Optional technician assignment. An explicit assignedTechId (the user
+      // picked from the candidate list) wins; otherwise fuzzy-match the
+      // spoken/typed name — a confident lead auto-picks, anything unclear asks
+      // the user to pick instead of silently creating the job unassigned.
       let assignedTech: { id: string; name: string } | null = null;
-      if (action.params.assignTo) {
-        const tNeedle = action.params.assignTo.trim().toLowerCase();
-        const techMatches = await db
+      if (action.params.assignedTechId) {
+        const [picked] = await db
           .select({ id: crmUsers.id, name: crmUsers.name })
           .from(crmUsers)
-          .where(sql`LOWER(${crmUsers.name}) LIKE ${"%" + tNeedle + "%"}`)
-          .limit(2);
-        assignedTech = techMatches.length === 1 ? techMatches[0] : techMatches.find((t) => t.name.toLowerCase() === tNeedle) || null;
+          .where(eq(crmUsers.id, action.params.assignedTechId));
+        if (!picked) return res.status(422).json({ message: "That technician no longer exists." });
+        assignedTech = picked;
+      } else if (action.params.assignTo) {
+        const staff = await db
+          .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
+          .from(crmUsers)
+          .where(inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales"]));
+        const scored = staff
+          .map((t) => ({ id: t.id, name: t.name, score: aiNameSimilarity(t.name || "", action.params.assignTo!) }))
+          .sort((x, y) => y.score - x.score);
+        const best = scored[0];
+        const second = scored[1];
+        if (best && best.score >= 0.8 && (!second || best.score - second.score >= 0.15)) {
+          assignedTech = { id: best.id, name: best.name };
+        } else {
+          const shortlist = scored.some((s) => s.score >= 0.3) ? scored.filter((s) => s.score >= 0.3) : scored;
+          return res.status(422).json({
+            message: `Not sure which technician you meant by "${action.params.assignTo}" — pick the right one:`,
+            candidateParam: "assignedTechId",
+            candidates: shortlist.slice(0, 6).map((c) => ({ id: c.id, name: c.name })),
+          });
+        }
       }
 
       const existingWorkOrders = await storage.getWorkOrdersByCustomerId(customer.id);
@@ -2607,6 +2643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workSubtype,
         status: "scheduled",
         scheduledStart: scheduledStart || undefined,
+        scheduledEnd: scheduledEnd || undefined,
         assignedTechId: assignedTech?.id ?? null,
         workOrderNumber: existingWorkOrders.length + 1,
         assignedChecklistId: checklistMatches[0]?.id ?? null,

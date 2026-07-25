@@ -17,6 +17,9 @@ export type AiChatMessage = {
   actionResult?: { label: string; url: string } | null;
   actionError?: string | null;
   actionCandidates?: { id: string; name: string }[] | null;
+  /** Which param a picked candidate fills — "customerId" (default) or
+   *  "assignedTechId". Sent by the server alongside candidates. */
+  actionCandidateParam?: string;
   /** Server id of the stored assistant message — lets approvals/dismissals
    *  land on the right row. Absent on error bubbles. */
   messageId?: string;

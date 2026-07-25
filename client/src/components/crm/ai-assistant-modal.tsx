@@ -221,7 +221,19 @@ export default function AiAssistantModal() {
     const msg = messages[index];
     if (!msg?.proposedAction || msg.actionState === "executing" || msg.actionState === "done") return;
     setMessages((prev) => prev.map((m, j) => (
-      j === index ? { ...m, actionState: "executing" as const, actionError: null, actionCandidates: null } : m
+      j === index
+        ? {
+            ...m,
+            // Keep picked candidates (customer, tech) on the stored params so a
+            // second candidate round doesn't lose the first pick.
+            proposedAction: m.proposedAction && extraParams
+              ? { ...m.proposedAction, params: { ...m.proposedAction.params, ...extraParams } }
+              : m.proposedAction,
+            actionState: "executing" as const,
+            actionError: null,
+            actionCandidates: null,
+          }
+        : m
     )));
     fetch("/api/crm/ai/execute-action", {
       method: "POST",
@@ -236,11 +248,12 @@ export default function AiAssistantModal() {
       .then(async (r) => {
         const data = await r.json().catch(() => ({} as any));
         if (!r.ok) {
-          // Ambiguous customer name → the server sends candidates to pick from
+          // Ambiguous customer or technician → the server sends candidates
+          // plus which param the pick should fill.
           if (Array.isArray(data.candidates) && data.candidates.length > 0) {
             setMessages((prev) => prev.map((m, j) => (
               j === index
-                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which customer did you mean?", actionCandidates: data.candidates }
+                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which one did you mean?", actionCandidates: data.candidates, actionCandidateParam: data.candidateParam || "customerId" }
                 : m
             )));
           } else {
@@ -464,7 +477,7 @@ export default function AiAssistantModal() {
                                 {msg.actionCandidates.map((cand) => (
                                   <button
                                     key={cand.id}
-                                    onClick={() => runProposedAction(i, { customerId: cand.id })}
+                                    onClick={() => runProposedAction(i, { [msg.actionCandidateParam || "customerId"]: cand.id })}
                                     className="block w-full rounded-md border border-slate-300/70 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:border-[#711419] hover:text-[#711419]"
                                     data-testid={`ai-candidate-${cand.id}`}
                                   >

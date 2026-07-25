@@ -499,7 +499,6 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
   const needsSchedulingNow = (workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart;
-  const iconColor = statusSquircleColors[workOrder.status] || statusSquircleColors.scheduled;
 
   const isLocked = workOrder.status === "on_site";
 
@@ -515,24 +514,8 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
     zIndex: isDragging ? 1000 : undefined,
   };
 
-  const statusIcon = statusIconMap[workOrder.status] || statusIconMap.scheduled;
-
-  const statusButton = (
-    <button
-      className={`${iconColor} w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity`}
-      title={`Status: ${statusLabels[workOrder.status] || workOrder.status} — Click to change`}
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        onOpenQuickStatus?.(workOrder.id, e);
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-      data-testid={`status-icon-${workOrder.id}`}
-    >
-      {statusIcon}
-    </button>
-  );
-
+  // No status icon here — everything in the unassigned queue is by definition
+  // not yet dispatched, so the status squircle was just noise.
   if (view === "cards") {
     return (
       <div
@@ -550,7 +533,6 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
         }}
       >
         <div className="flex items-center gap-2">
-          {statusButton}
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{workOrder.customerName}</span>
           {workOrder.priority && workOrder.priority !== "normal" && (
             <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${priorityStyle.bg} ${priorityStyle.text}`}>
@@ -591,7 +573,6 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
         onClick?.(workOrder.id);
       }}
     >
-      {statusButton}
       <div className="flex flex-col min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
