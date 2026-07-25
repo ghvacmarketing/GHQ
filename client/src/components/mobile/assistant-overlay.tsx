@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import MobileShell from "@/pages/mobile/mobile-shell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { Loader2, Mic, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Loader2, Mic, RotateCcw, Send, ShieldCheck, X } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
-/** The mobile GHQ assistant — a full-screen, dark industrial chat surface.
- *  Same brain and the same hard safeguards as the desktop Ask AI: the model
- *  can only PROPOSE whitelisted actions; nothing runs until the user taps
- *  Approve, and the server re-validates every proposal. Voice input rides on
- *  the Web Speech API when the device supports it (spoken asks auto-send). */
+/** The mobile GHQ assistant — an immersive dark-industrial popup that slides
+ *  up over whatever screen you're on (not a page of its own). Same brain and
+ *  the same hard safeguards as the desktop Ask AI: the model can only PROPOSE
+ *  whitelisted actions; nothing runs until the user taps Approve, and the
+ *  server re-validates every proposal. Voice input rides on the Web Speech
+ *  API when the device supports it (spoken asks auto-send). */
 
 type ProposedAction = {
   type: "create_task" | "create_work_order";
@@ -45,7 +45,7 @@ function stripMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, "$1");
 }
 
-export default function MobileAssistant() {
+export default function AssistantOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [, navigate] = useLocation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -53,7 +53,6 @@ export default function MobileAssistant() {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -63,6 +62,7 @@ export default function MobileAssistant() {
       return res.json();
     },
     staleTime: 60 * 1000,
+    enabled: open,
   });
   const firstName = currentUser?.name?.trim().split(/\s+/)[0];
 
@@ -76,7 +76,14 @@ export default function MobileAssistant() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
 
-  useEffect(() => () => recognitionRef.current?.abort?.(), []);
+  // Kill any live recognition when the sheet closes or unmounts
+  useEffect(() => {
+    if (!open) {
+      recognitionRef.current?.abort?.();
+      setListening(false);
+    }
+    return () => recognitionRef.current?.abort?.();
+  }, [open]);
 
   const sendQuestion = (raw: string) => {
     const question = raw.trim();
@@ -175,9 +182,18 @@ export default function MobileAssistant() {
     setMessages((prev) => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
   };
 
+  if (!open) return null;
+
   return (
-    <MobileShell>
-      <div className="flex h-full flex-col bg-slate-950" data-testid="mobile-assistant">
+    <div className="fixed inset-0 z-[70]" data-testid="assistant-overlay">
+      {/* Backdrop — tap to dismiss */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+
+      {/* Sheet */}
+      <div
+        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-slate-950 shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
+        style={{ top: "calc(44px + env(safe-area-inset-top))" }}
+      >
         {/* Header — the assistant's identity strip */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-3.5">
           <div className="flex items-center gap-3">
@@ -194,16 +210,26 @@ export default function MobileAssistant() {
               <h1 className="text-sm font-semibold leading-tight text-slate-100">Assistant</h1>
             </div>
           </div>
-          {messages.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {messages.length > 0 && (
+              <button
+                onClick={() => { setMessages([]); setInput(""); }}
+                className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
+                aria-label="New conversation"
+                data-testid="assistant-new-conversation"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            )}
             <button
-              onClick={() => { setMessages([]); setInput(""); }}
+              onClick={onClose}
               className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
-              aria-label="New conversation"
-              data-testid="assistant-new-conversation"
+              aria-label="Close assistant"
+              data-testid="assistant-close"
             >
-              <RotateCcw className="h-4 w-4" />
+              <X className="h-4 w-4" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Conversation */}
@@ -304,7 +330,7 @@ export default function MobileAssistant() {
                           <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-400">
                             <span>Done — {msg.actionResult.label}</span>
                             <button
-                              onClick={() => navigate(msg.actionResult!.url)}
+                              onClick={() => { onClose(); navigate(msg.actionResult!.url); }}
                               className="text-[#e8b4b8] underline underline-offset-2"
                               data-testid={`assistant-action-open-${i}`}
                             >
@@ -342,8 +368,11 @@ export default function MobileAssistant() {
           )}
         </div>
 
-        {/* Composer — glass bar pinned above the nav */}
-        <div className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-3 pb-2 pt-2.5 backdrop-blur-xl">
+        {/* Composer */}
+        <div
+          className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-3 pt-2.5 backdrop-blur-xl"
+          style={{ paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}
+        >
           {listening && (
             <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#e8b4b8]">
               <span className="relative flex h-2 w-2">
@@ -355,7 +384,6 @@ export default function MobileAssistant() {
           )}
           <div className="flex items-center gap-2">
             <input
-              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -397,6 +425,6 @@ export default function MobileAssistant() {
           </div>
         </div>
       </div>
-    </MobileShell>
+    </div>
   );
 }

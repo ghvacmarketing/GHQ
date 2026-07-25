@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,6 +9,10 @@ import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+
+// The AI assistant popup — loaded on first open, then kept mounted so the
+// conversation survives closing and reopening the sheet.
+const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
 
 interface MobileShellProps {
   children: ReactNode;
@@ -39,7 +43,14 @@ const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantLoaded, setAssistantLoaded] = useState(false);
   const go = (path: string) => { setMoreOpen(false); navigate(path); };
+  const openAssistant = () => {
+    setMoreOpen(false);
+    setAssistantLoaded(true);
+    setAssistantOpen(true);
+  };
 
   // Suppress the browser/PWA edge-swipe history navigation inside the app.
   // Top-level tabs must not slide back; sub-pages implement their own gesture
@@ -184,7 +195,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       <DraggableSheet open={moreOpen} onOpenChange={setMoreOpen} title="More" testid="sheet-more">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Go to</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={Sparkles} label="Ask AI" onClick={() => go("/mobile/assistant")} testid="more-assistant" />
+            <SheetTile icon={Sparkles} label="Ask AI" onClick={openAssistant} testid="more-assistant" />
             <SheetTile icon={Users} label="Customers" onClick={() => go("/mobile/customers")} testid="more-customers" />
             <SheetTile icon={MessageSquare} label="Messages" onClick={() => go("/mobile/messages")} testid="more-messages" />
           </div>
@@ -200,6 +211,13 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
             </>
           )}
       </DraggableSheet>
+
+      {/* AI assistant popup — slides up over the current screen */}
+      {assistantLoaded && (
+        <Suspense fallback={null}>
+          <AssistantOverlay open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
