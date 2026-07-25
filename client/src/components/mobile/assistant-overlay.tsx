@@ -922,7 +922,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 }
               }}
               placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask or tell me what to do..."}
-              className="max-h-32 min-h-[36px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-[7px] text-sm leading-5 text-slate-100 placeholder:text-slate-600 focus:outline-none"
+              className="max-h-32 min-h-[36px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-[6px] text-[16px] leading-6 text-slate-100 placeholder:text-slate-600 focus:outline-none"
               data-testid="assistant-input"
             />
             {supportsVoice && (

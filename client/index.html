@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- maximum-scale=1 stops iOS from auto-zooming when a sub-16px input is
+         focused — that zoom got stuck in the PWA (white band at the bottom,
+         no way to pinch back out). Pinch-zoom accessibility is unaffected in
+         Safari; the app itself renders at natural scale. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     
     <!-- PWA Meta Tags -->
     <meta name="application-name" content="GHVAC Tools" />
