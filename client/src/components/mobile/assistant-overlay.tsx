@@ -4,19 +4,23 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { History, ImagePlus, Loader2, Mic, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { Folder, ImagePlus, Loader2, MessagesSquare, Mic, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import {
   AI_ACTION_LABELS,
   type AiChatMessage as ChatMessage,
   type AiConversationSummary,
+  type AiSpace,
   compressImageForAi,
+  createAiSpace,
   deleteAiConversation,
+  deleteAiSpace,
   dismissAiAction,
   fetchAiConversation,
   fetchLatestAiConversation,
   formatConversationWhen,
+  groupAiConversations,
 } from "@/lib/ai-conversations";
 
 /** The mobile GHQ assistant — an immersive dark-industrial popup that slides
@@ -50,7 +54,10 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [pending, setPending] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [activeSpace, setActiveSpace] = useState<string | null>(null);
+  const [newSpaceOpen, setNewSpaceOpen] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   // Index of the just-arrived answer — the only message that types itself in.
   const [freshIndex, setFreshIndex] = useState<number | null>(null);
@@ -149,8 +156,66 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: open && historyOpen,
+    enabled: open && panelOpen,
   });
+
+  const { data: spaces = [] } = useQuery<AiSpace[]>({
+    queryKey: ["/api/crm/ai/spaces"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/ai/spaces", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && panelOpen,
+  });
+
+  const addSpace = () => {
+    const nameVal = newSpaceName.trim();
+    setNewSpaceName("");
+    setNewSpaceOpen(false);
+    if (!nameVal) return;
+    createAiSpace(nameVal).then((created) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/spaces"] });
+      if (created) setActiveSpace(created.id);
+    });
+  };
+
+  const removeSpace = (id: string) => {
+    deleteAiSpace(id).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/spaces"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+      if (activeSpace === id) setActiveSpace(null);
+    });
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setInput("");
+    setConversationId(null);
+    setFreshIndex(null);
+    setPanelOpen(false);
+  };
+
+  const openConversationFromPanel = (id: string) => {
+    setFreshIndex(null);
+    fetchAiConversation(id).then((loaded) => {
+      if (loaded) {
+        setConversationId(loaded.id);
+        setMessages(loaded.messages);
+        setPanelOpen(false);
+      }
+    });
+  };
+
+  const removeConversation = (id: string) => {
+    deleteAiConversation(id).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+      if (id === conversationId) {
+        setConversationId(null);
+        setMessages([]);
+      }
+    });
+  };
 
   // Voice capture — Web Speech API where it works, record-then-transcribe on
   // iOS home-screen PWAs (where that API exists but the OS won't service it).
@@ -207,6 +272,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       conversationHistory: historyForApi,
       conversationId,
       images: photos.length > 0 ? photos : undefined,
+      // A brand-new chat is filed into whichever space is selected
+      spaceId: conversationId ? undefined : activeSpace ?? undefined,
     })
       .then(async (r) => {
         const data = await r.json();
@@ -339,6 +406,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
 
   if (!open) return null;
 
+  const visibleConversations = activeSpace
+    ? pastConversations.filter((c) => c.spaceId === activeSpace)
+    : pastConversations;
+  const groupedConversations = groupAiConversations(visibleConversations);
+
   return (
     <div className="fixed inset-0 z-[70]" data-testid="assistant-overlay">
       {/* Backdrop — tap to dismiss */}
@@ -371,25 +443,24 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
         >
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
-            <h1 className="text-sm font-semibold leading-tight text-slate-100">Gibbs</h1>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
+              aria-label="History and spaces"
+              data-testid="assistant-panel-open"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
+              <h1 className="text-sm font-semibold leading-tight text-slate-100">Gibbs</h1>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setHistoryOpen((v) => !v)}
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-[4px] border transition-colors active:bg-slate-800",
-                historyOpen ? "border-[#711419] text-[#e8b4b8]" : "border-slate-800 text-slate-400",
-              )}
-              aria-label="Past conversations"
-              data-testid="assistant-history"
-            >
-              <History className="h-4 w-4" />
-            </button>
             {messages.length > 0 && (
               <button
-                onClick={() => { setMessages([]); setInput(""); setConversationId(null); setFreshIndex(null); setHistoryOpen(false); }}
+                onClick={startNewChat}
                 className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
                 aria-label="New conversation"
                 data-testid="assistant-new-conversation"
@@ -408,62 +479,173 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </div>
         </div>
 
+        {/* Side panel — history + Spaces, slides in from the left like the
+            desktop sidebar. Scrim closes it; the sheet's rounded corners clip
+            it cleanly. */}
+        <div
+          className={cn(
+            "absolute inset-0 z-20 bg-black/50 transition-opacity duration-300",
+            panelOpen ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+          onClick={() => setPanelOpen(false)}
+        />
+        <aside
+          className={cn(
+            "absolute inset-y-0 left-0 z-30 flex w-72 max-w-[85%] flex-col border-r border-slate-800 bg-slate-950 shadow-[8px_0_32px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out",
+            panelOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+          data-testid="assistant-panel"
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
+              <p className="text-sm font-semibold leading-tight text-slate-100">Gibbs</p>
+            </div>
+            <button
+              onClick={() => setPanelOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
+              aria-label="Close panel"
+              data-testid="assistant-panel-close"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Spaces */}
+          <div className="shrink-0 px-3 pt-3">
+            <div className="mb-1 flex items-center justify-between px-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Spaces</p>
+              <button
+                onClick={() => setNewSpaceOpen((v) => !v)}
+                className="flex h-6 w-6 items-center justify-center rounded-[4px] text-slate-500 transition-colors active:text-[#e8b4b8]"
+                aria-label="New space"
+                data-testid="assistant-new-space"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {newSpaceOpen && (
+              <input
+                autoFocus
+                value={newSpaceName}
+                onChange={(e) => setNewSpaceName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addSpace();
+                  if (e.key === "Escape") {
+                    setNewSpaceOpen(false);
+                    setNewSpaceName("");
+                  }
+                }}
+                placeholder="Name it, press Enter"
+                className="mb-1.5 w-full rounded-[4px] border border-[#711419]/60 bg-slate-900 px-2.5 py-2 text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
+                data-testid="assistant-new-space-input"
+              />
+            )}
+            <button
+              onClick={() => setActiveSpace(null)}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-[4px] px-2 py-2 text-[13px] transition-colors",
+                activeSpace === null ? "bg-[#711419]/15 font-semibold text-[#e8b4b8]" : "font-medium text-slate-400 active:bg-slate-900",
+              )}
+              data-testid="assistant-space-all"
+            >
+              <MessagesSquare className="h-3.5 w-3.5 shrink-0" />
+              All chats
+            </button>
+            {spaces.map((s) => (
+              <div
+                key={s.id}
+                className={cn(
+                  "flex items-center gap-1 rounded-[4px] px-2 transition-colors",
+                  activeSpace === s.id ? "bg-[#711419]/15" : "",
+                )}
+              >
+                <button
+                  onClick={() => setActiveSpace(s.id)}
+                  className={cn(
+                    "flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-[13px]",
+                    activeSpace === s.id ? "font-semibold text-[#e8b4b8]" : "font-medium text-slate-400",
+                  )}
+                  data-testid={`assistant-space-${s.id}`}
+                >
+                  <Folder className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{s.name}</span>
+                </button>
+                <button
+                  onClick={() => removeSpace(s.id)}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-slate-600 transition-colors active:text-red-400"
+                  aria-label="Delete space"
+                  data-testid={`assistant-space-delete-${s.id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mx-3 my-2 shrink-0 border-t border-slate-800" />
+
+          {/* Chats */}
+          <div className="mb-1 flex shrink-0 items-center justify-between px-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Chats</p>
+            <button
+              onClick={startNewChat}
+              className="flex h-6 w-6 items-center justify-center rounded-[4px] text-slate-500 transition-colors active:text-[#e8b4b8]"
+              aria-label="New chat"
+              data-testid="assistant-panel-new-chat"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+            {groupedConversations.length === 0 ? (
+              <p className="px-2 py-6 text-center text-xs text-slate-600">
+                {activeSpace
+                  ? "No chats in this space yet — start one and it'll be filed here."
+                  : "No conversations yet — ask something and it'll be saved here."}
+              </p>
+            ) : (
+              groupedConversations.map((group) => (
+                <div key={group.label} className="mb-2">
+                  <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                    {group.label}
+                  </p>
+                  {group.items.map((c) => (
+                    <div
+                      key={c.id}
+                      className={cn(
+                        "flex items-center gap-1 rounded-[4px] px-2 py-1.5",
+                        c.id === conversationId ? "bg-[#711419]/15" : "",
+                      )}
+                    >
+                      <button
+                        onClick={() => openConversationFromPanel(c.id)}
+                        className="min-w-0 flex-1 text-left"
+                        data-testid={`assistant-conversation-${c.id}`}
+                      >
+                        <p className={cn("truncate text-[13px]", c.id === conversationId ? "font-semibold text-[#e8b4b8]" : "font-medium text-slate-300")}>
+                          {c.title || "Conversation"}
+                        </p>
+                        <p className="text-[11px] text-slate-600">{formatConversationWhen(c.updatedAt)}</p>
+                      </button>
+                      <button
+                        onClick={() => removeConversation(c.id)}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-slate-600 transition-colors active:text-red-400"
+                        aria-label="Delete conversation"
+                        data-testid={`assistant-conversation-delete-${c.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+
         {/* Conversation */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          {historyOpen ? (
-            <div className="space-y-2" data-testid="assistant-history-list">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Past conversations</p>
-              {pastConversations.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-500">
-                  Nothing saved yet — ask something and it'll show up here.
-                </p>
-              ) : (
-                pastConversations.map((c) => (
-                  <div
-                    key={c.id}
-                    className={cn(
-                      "flex items-center gap-2 rounded-[4px] border px-3 py-2.5",
-                      c.id === conversationId ? "border-[#711419]/60 bg-[#711419]/10" : "border-slate-800 bg-slate-900",
-                    )}
-                  >
-                    <button
-                      onClick={() => {
-                        setFreshIndex(null);
-                        fetchAiConversation(c.id).then((loaded) => {
-                          if (loaded) {
-                            setConversationId(loaded.id);
-                            setMessages(loaded.messages);
-                            setHistoryOpen(false);
-                          }
-                        });
-                      }}
-                      className="min-w-0 flex-1 text-left"
-                      data-testid={`assistant-conversation-${c.id}`}
-                    >
-                      <p className="truncate text-sm font-medium text-slate-200">{c.title || "Conversation"}</p>
-                      <p className="text-xs text-slate-500">{formatConversationWhen(c.updatedAt)}</p>
-                    </button>
-                    <button
-                      onClick={() => {
-                        deleteAiConversation(c.id).then(() => {
-                          queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
-                          if (c.id === conversationId) {
-                            setConversationId(null);
-                            setMessages([]);
-                          }
-                        });
-                      }}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] text-slate-500 transition-colors active:text-red-400"
-                      aria-label="Delete conversation"
-                      data-testid={`assistant-conversation-delete-${c.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : messages.length === 0 && !pending ? (
+          {messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-10 w-10 rotate-45 text-[#711419]">
                 <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />

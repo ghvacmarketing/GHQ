@@ -183,6 +183,31 @@ export async function compressImageForAi(file: File, maxDim = 1400): Promise<str
   return canvas.toDataURL("image/jpeg", 0.8);
 }
 
+/** ChatGPT-style date sections for a conversation list sidebar. */
+export function groupAiConversations(
+  list: AiConversationSummary[],
+): { label: string; items: AiConversationSummary[] }[] {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = startOfDay(new Date());
+  const oneDay = 24 * 60 * 60 * 1000;
+  const groups: Record<string, AiConversationSummary[]> = {
+    Today: [],
+    Yesterday: [],
+    "Previous 7 days": [],
+    Older: [],
+  };
+  for (const c of list) {
+    const t = c.updatedAt ? startOfDay(new Date(c.updatedAt)) : 0;
+    if (t >= today) groups.Today.push(c);
+    else if (t >= today - oneDay) groups.Yesterday.push(c);
+    else if (t >= today - 7 * oneDay) groups["Previous 7 days"].push(c);
+    else groups.Older.push(c);
+  }
+  return Object.entries(groups)
+    .map(([label, items]) => ({ label, items }))
+    .filter((g) => g.items.length > 0);
+}
+
 export function formatConversationWhen(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
