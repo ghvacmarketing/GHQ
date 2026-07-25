@@ -411,7 +411,6 @@ export default function MobileJob() {
       <div className="p-4 space-y-4" data-testid="mobile-job-page">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Wrench className="h-6 w-6 text-[#711419]" />
             <h1 className="text-xl font-semibold text-slate-800">
               {canViewFutureJobs ? "My Jobs" : "Today's Jobs"}
             </h1>
@@ -465,7 +464,7 @@ export default function MobileJob() {
                     return (
                       <Card 
                         key={job.id} 
-                        className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${colors.stripe} ${colors.bg} ${colors.border} ${isCompleted ? "opacity-75" : ""}`}
+                        className={`cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white shadow-none transition-transform active:scale-[0.99] ${colors.stripe} ${isCompleted ? "opacity-75" : ""}`}
                         onClick={() => navigate(`/mobile/job/${job.id}`)}
                         data-testid={`job-card-${job.id}`}
                       >
@@ -483,7 +482,7 @@ export default function MobileJob() {
                                 <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
                                   {job.customer?.name || "Unknown Customer"}
                                 </h3>
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
+                                <span className={`px-2 py-0.5 rounded-[3px] text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
                                   {statusLabels[job.status] || job.status}
                                 </span>
                               </div>
@@ -545,7 +544,7 @@ export default function MobileJob() {
               return (
                 <Card 
                   key={job.id} 
-                  className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${colors.stripe} ${colors.bg} ${colors.border} ${isCompleted ? "opacity-75" : ""}`}
+                  className={`cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white shadow-none transition-transform active:scale-[0.99] ${colors.stripe} ${isCompleted ? "opacity-75" : ""}`}
                   onClick={() => navigate(`/mobile/job/${job.id}`)}
                   data-testid={`job-card-${job.id}`}
                 >
@@ -563,7 +562,7 @@ export default function MobileJob() {
                           <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
                             {job.customer?.name || "Unknown Customer"}
                           </h3>
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
+                          <span className={`px-2 py-0.5 rounded-[3px] text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
                             {statusLabels[job.status] || job.status}
                           </span>
                         </div>
