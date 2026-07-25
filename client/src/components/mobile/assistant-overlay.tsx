@@ -53,6 +53,44 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ y: number; dy: number; active: boolean } | null>(null);
+
+  // Swipe down on the handle/header to dismiss — live drag follow, commit
+  // past ~110px, spring back otherwise (same feel as DraggableSheet).
+  const onDragStart = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    dragRef.current = { y: e.clientY, dy: 0, active: true };
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    const st = dragRef.current;
+    const el = sheetRef.current;
+    if (!st?.active || !el) return;
+    st.dy = Math.max(0, e.clientY - st.y);
+    el.style.transition = "none";
+    el.style.transform = `translateY(${st.dy}px)`;
+  };
+  const onDragEnd = () => {
+    const st = dragRef.current;
+    const el = sheetRef.current;
+    dragRef.current = null;
+    if (!st || !el) return;
+    if (st.dy > 110) {
+      el.style.transition = "transform 0.25s ease-in";
+      el.style.transform = "translateY(100%)";
+      setTimeout(() => {
+        onClose();
+        el.style.transition = "";
+        el.style.transform = "";
+      }, 240);
+    } else {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateY(0)";
+      setTimeout(() => {
+        if (el) el.style.transition = "";
+      }, 260);
+    }
+  };
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -193,24 +231,34 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
 
       {/* Sheet */}
       <div
+        ref={sheetRef}
         className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-slate-950 shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
         style={{ top: "calc(44px + env(safe-area-inset-top))" }}
       >
+        {/* Drag handle — swipe down anywhere on the handle/header to dismiss */}
+        <div
+          className="flex shrink-0 justify-center pt-2"
+          style={{ touchAction: "none" }}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          data-testid="assistant-drag-handle"
+        >
+          <span className="h-1 w-10 rounded-full bg-slate-700" />
+        </div>
         {/* Header — the assistant's identity strip */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-3.5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-[#711419]/60 bg-[#711419]/20">
-              <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-[18px] w-[18px] rotate-45 text-[#e8b4b8]">
-                <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
-                <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
-                <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
-                <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
-              </svg>
-            </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
-              <h1 className="text-sm font-semibold leading-tight text-slate-100">Assistant</h1>
-            </div>
+        <div
+          className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 pb-3.5 pt-2"
+          style={{ touchAction: "none" }}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+        >
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
+            <h1 className="text-sm font-semibold leading-tight text-slate-100">Assistant</h1>
           </div>
           <div className="flex items-center gap-1.5">
             {messages.length > 0 && (
