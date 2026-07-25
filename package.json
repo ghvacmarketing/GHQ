@@ -11,7 +11,8 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "check-admin": "tsx scripts/check-admin-user.ts",
-    "activate-admin": "tsx scripts/activate-admin.ts"
+    "activate-admin": "tsx scripts/activate-admin.ts",
+    "audit:gibbs": "tsx scripts/audit-gibbs-kb.ts"
   },
   "overrides": {
     "underscore": "^1.13.8"
