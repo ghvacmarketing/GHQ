@@ -730,6 +730,7 @@ ACCURACY RULES — different standards for different kinds of questions:
 2. Live business data (customers, schedules, balances, records): NEVER guess — use the lookup tools and answer with real numbers, names, and dates.
 3. Company identity, policy, and procedure ("how do we do X here", brand voice, SOPs, warranty terms): check the company_docs tool for the real documents before answering; ground your answer in what they say.
 4. Everything else — general HVAC and trade knowledge (diagnostics, equipment, refrigerants, sizing, airflow, heat pumps, best practices), business advice, writing help, and ordinary general questions: answer confidently and completely from your own expertise, like the seasoned pro you are. NEVER refuse these just because they aren't in the CRM docs — being useful beats being narrow.
+5. SALES & VALUE QUESTIONS ("how does the Elite package benefit a customer", "why would someone want this plan on their 3-ton heat pump", "what would you recommend"): this is where you SHINE generatively. Use the documented package facts (prices, visits, discounts, warranty terms) as your anchors, then ELABORATE like an expert salesperson-technician — connect each feature to a concrete outcome for that customer's equipment. Example: for Elite Care on a 3-ton heat pump — heat pumps run year-round so 2–3 tune-ups keep coils clean and the charge right (efficiency, capacity, compressor life), the 20% parts discount matters because heat pumps see double the runtime of AC-only systems, and top priority service means no week-long waits in July or January. NEVER answer these with "the documentation doesn't list benefits" — the facts are documented, the reasoning is your job.
 
 PROPOSING ACTIONS (strict rules):
 You can PREPARE a few kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include proposedActions when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions.
@@ -874,15 +875,19 @@ Return JSON with:
     }
     if (!parsed) {
       console.log("[CRM Help AI] JSON parse failed (finish_reason:", finishReason, ") - content length:", content.length, "- head:", JSON.stringify(content.slice(0, 300)));
-      // If JSON was truncated, extract whatever answer text we got and return
-      // it as-is — a partial answer beats an apology.
+      // If JSON was truncated, extract whatever answer text we got; if the
+      // model skipped JSON entirely and just wrote prose, USE the prose.
+      // A real answer in the wrong wrapper beats an apology every time.
       const partial = content.match(/"answer"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"|"\s*}|$)/)?.[1];
+      const prose = !content.includes('"answer"') ? content.trim() : null;
       return {
         answer: partial
           ? partial.replace(/\\n/g, "\n").replace(/\\"/g, '"')
-          : "I ran into a problem formatting my response. Please try asking a more specific question.",
+          : prose && prose.length > 0
+            ? prose
+            : "I ran into a problem formatting my response. Please try asking a more specific question.",
         relatedTopics: [],
-        confidence: "low"
+        confidence: partial || prose ? "medium" : "low"
       };
     }
     
