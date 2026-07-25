@@ -1411,11 +1411,11 @@ Return JSON with:
         await claudeChatWithTools({
           system:
             systemPrompt +
-            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up.\n\nYour FINAL message must be ONLY the JSON object — no prose around it.",
+            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
           messages: [...priorTurns, userTurn],
           tools: CRM_TOOLS,
           executeTool: executeCrmTool,
-          maxTokens: 2000,
+          maxTokens: 3500,
           maxIterations: 6,
         }),
       );
@@ -1455,11 +1455,27 @@ Return JSON with:
     try {
       parsed = JSON.parse(content);
     } catch {
+      // The model sometimes wraps the JSON in prose (especially after tool
+      // lookups) — extract the outermost object before giving up.
+      const start = content.indexOf("{");
+      const end = content.lastIndexOf("}");
+      if (start !== -1 && end > start) {
+        try {
+          parsed = JSON.parse(content.slice(start, end + 1));
+        } catch {
+          parsed = undefined;
+        }
+      }
+    }
+    if (!parsed) {
       console.log("[CRM Help AI] JSON parse failed (finish_reason:", finishReason, ") - content length:", content.length);
-      // If JSON was truncated, extract whatever text we got and return it
-      const partial = content.match(/"answer"\s*:\s*"([\s\S]*?)(?:"|$)/)?.[1];
+      // If JSON was truncated, extract whatever answer text we got and return
+      // it as-is — a partial answer beats an apology.
+      const partial = content.match(/"answer"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"|"\s*}|$)/)?.[1];
       return {
-        answer: partial ? partial.replace(/\\n/g, "\n").replace(/\\"/g, '"') : "I ran into a problem formatting my response. Please try asking a more specific question.",
+        answer: partial
+          ? partial.replace(/\\n/g, "\n").replace(/\\"/g, '"')
+          : "I ran into a problem formatting my response. Please try asking a more specific question.",
         relatedTopics: [],
         confidence: "low"
       };
