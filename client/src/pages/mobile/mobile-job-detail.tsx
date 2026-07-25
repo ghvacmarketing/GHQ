@@ -4528,7 +4528,13 @@ export default function MobileJobDetail() {
         onPointerUp={onSwipeEnd}
         onPointerCancel={onSwipeEnd}
       >
-      <MobileShell>
+      <MobileShell
+        customNav={{
+          tabs,
+          activeId: activeTab,
+          onSelect: (id) => switchTab(id as TabType),
+        }}
+      >
       <OfflineIndicator />
       {/* Floating back — tap, or swipe right from the left edge */}
       <button
@@ -4540,32 +4546,6 @@ export default function MobileJobDetail() {
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
-      {/* Floating job tabs — ride above the main nav and slide with the page */}
-      <div
-        className="pointer-events-none absolute inset-x-0 z-30 flex justify-center"
-        style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
-        data-testid="job-tab-rail"
-      >
-        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-slate-900/10 bg-white/90 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)] backdrop-blur-xl">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => switchTab(t.id)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  active ? "bg-[#711419] text-white" : "text-slate-600"
-                }`}
-                data-testid={`job-tab-${t.id}`}
-              >
-                <Icon className="h-4 w-4" strokeWidth={1.75} />
-                {active && t.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
       <div className="relative flex h-full flex-col bg-slate-50">
         <div className="flex-shrink-0 p-4 pb-2">
           <div className="flex items-center justify-end">
