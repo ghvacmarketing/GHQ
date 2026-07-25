@@ -2625,10 +2625,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       body: {
         message: `Not sure which customer you meant by "${params.customerName}" — pick the right one:`,
         candidateParam: "customerId",
+        // phone/email ride along so the pick list shows exactly who (and
+        // where) a text or email would go.
         candidates: scored
           .filter((c) => c.score >= 0.4)
           .slice(0, 5)
-          .map((c) => ({ id: c.id, name: c.name })),
+          .map((c) => ({ id: c.id, name: c.name, phone: c.phone, email: c.email })),
       },
     };
   };
@@ -2671,6 +2673,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           params: z.object({
             customerName: z.string().trim().min(1).max(200),
             customerId: z.string().trim().min(1).max(64).optional(),
+            // Display-only — the card shows the number; the send always uses
+            // the resolved customer's phone on file.
+            customerPhone: z.string().trim().max(40).optional(),
             message: z.string().trim().min(1).max(1000),
           }).strict(),
         }),
@@ -2681,6 +2686,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           params: z.object({
             customerName: z.string().trim().min(1).max(200).optional(),
             customerId: z.string().trim().min(1).max(64).optional(),
+            // Display-only — the card shows the address; the send uses the
+            // resolved customer's email on file (or toEmail when given).
+            customerEmail: z.string().trim().max(200).optional(),
             toEmail: z.string().trim().email().max(200).optional(),
             subject: z.string().trim().min(1).max(200),
             body: z.string().trim().min(1).max(5000),

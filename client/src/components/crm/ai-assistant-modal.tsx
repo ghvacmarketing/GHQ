@@ -405,7 +405,7 @@ export default function AiAssistantModal() {
   // Candidate pick. For sends (text/email) the pick goes BACK to the approval
   // card with the chosen customer locked in — nothing sends until the user
   // approves again. Creates (task/work order) run right after the pick.
-  const pickCandidate = (index: number, cand: { id: string; name: string }) => {
+  const pickCandidate = (index: number, cand: { id: string; name: string; phone?: string | null; email?: string | null }) => {
     const msg = messages[index];
     const param = msg?.actionCandidateParam || "customerId";
     const isSend = msg?.proposedAction?.type === "send_sms" || msg?.proposedAction?.type === "send_email";
@@ -415,7 +415,17 @@ export default function AiAssistantModal() {
           ? {
               ...m,
               proposedAction: m.proposedAction
-                ? { ...m.proposedAction, params: { ...m.proposedAction.params, customerId: cand.id, customerName: cand.name } }
+                ? {
+                    ...m.proposedAction,
+                    params: {
+                      ...m.proposedAction.params,
+                      customerId: cand.id,
+                      customerName: cand.name,
+                      // Show the picked recipient's actual destination on the card
+                      ...(m.proposedAction.type === "send_email" ? { customerEmail: cand.email ?? undefined } : {}),
+                      ...(m.proposedAction.type === "send_sms" ? { customerPhone: cand.phone ?? undefined } : {}),
+                    },
+                  }
                 : m.proposedAction,
               actionState: "pending" as const,
               actionError: null,
@@ -771,16 +781,27 @@ export default function AiAssistantModal() {
                             {msg.actionState === "choose" && msg.actionCandidates && (
                               <div className="mt-2.5 space-y-1.5">
                                 <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>
-                                {msg.actionCandidates.map((cand) => (
-                                  <button
-                                    key={cand.id}
-                                    onClick={() => pickCandidate(i, cand)}
-                                    className="block w-full rounded-md border border-slate-300/70 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:border-[#711419] hover:text-[#711419]"
-                                    data-testid={`ai-candidate-${cand.id}`}
-                                  >
-                                    {cand.name}
-                                  </button>
-                                ))}
+                                {msg.actionCandidates.map((cand) => {
+                                  // For sends, show where it would actually go
+                                  const contact = msg.proposedAction?.type === "send_email"
+                                    ? cand.email || "no email on file"
+                                    : msg.proposedAction?.type === "send_sms"
+                                      ? cand.phone || "no phone on file"
+                                      : null;
+                                  return (
+                                    <button
+                                      key={cand.id}
+                                      onClick={() => pickCandidate(i, cand)}
+                                      className="block w-full rounded-md border border-slate-300/70 bg-white px-3 py-2 text-left transition-colors hover:border-[#711419]"
+                                      data-testid={`ai-candidate-${cand.id}`}
+                                    >
+                                      <span className="block text-sm font-medium text-slate-800">{cand.name}</span>
+                                      {contact !== null && (
+                                        <span className="block text-xs text-slate-500">{contact}</span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
                                 <button
                                   onClick={() => dismissProposedAction(i)}
                                   className="mt-1 text-xs font-semibold text-slate-500 hover:text-slate-700"

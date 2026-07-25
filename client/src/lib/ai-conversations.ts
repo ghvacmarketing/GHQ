@@ -27,7 +27,7 @@ export type AiChatMessage = {
   actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose";
   actionResult?: { label: string; url: string } | null;
   actionError?: string | null;
-  actionCandidates?: { id: string; name: string }[] | null;
+  actionCandidates?: { id: string; name: string; phone?: string | null; email?: string | null }[] | null;
   /** Which param a picked candidate fills — "customerId" (default) or
    *  "assignedTechId". Sent by the server alongside candidates. */
   actionCandidateParam?: string;
