@@ -2752,16 +2752,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!conversation.customerId) updates.customerId = smsCustomer.id;
           await storage.updateMessagingConversation(conversation.id, updates);
         }
-        await storage.createMessage({
-          conversationId: conversation.id,
-          direction: "outbound" as any,
-          channel: "sms" as any,
-          body: action.params.message,
-          externalMessageId: sendResult.messageUuid || null,
-          status: "sent" as any,
-          authorUserId: user.id,
-          sentAt: new Date(),
-        });
+        // Only record the message locally when Textline returned the message
+        // uuid — that's what the auto-sync dedupes on. Without it, a local row
+        // plus the later sync row shows the same text TWICE in the thread; the
+        // sync inserts it (with its uuid) within a few seconds either way.
+        if (sendResult.messageUuid) {
+          await storage.createMessage({
+            conversationId: conversation.id,
+            direction: "outbound" as any,
+            channel: "sms" as any,
+            body: action.params.message,
+            externalMessageId: sendResult.messageUuid,
+            status: "sent" as any,
+            authorUserId: user.id,
+            sentAt: new Date(),
+          });
+        }
         await logCrmAudit(user.id, "ai_action.send_sms", "messaging_conversation", conversation.id, { customerId: smsCustomer.id }, req.ip);
         const smsLabel = `Text sent to ${smsCustomer.name}`;
         const smsUrl = `/crm/messaging?conversation=${conversation.id}`;
@@ -24555,17 +24561,21 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         await storage.updateMessagingConversation(conversation.id, updates);
       }
 
-      // Create the message record locally
-      await storage.createMessage({
-        conversationId: conversation.id,
-        direction: "outbound" as any,
-        channel: "sms" as any,
-        body: message,
-        externalMessageId: sendResult.messageUuid || null,
-        status: "sent" as any,
-        authorUserId: user.id,
-        sentAt: new Date(),
-      });
+      // Create the message record locally — but only when Textline returned
+      // the message uuid (that's what the auto-sync dedupes on; a uuid-less
+      // local row plus the sync's row would show the same text twice).
+      if (sendResult.messageUuid) {
+        await storage.createMessage({
+          conversationId: conversation.id,
+          direction: "outbound" as any,
+          channel: "sms" as any,
+          body: message,
+          externalMessageId: sendResult.messageUuid,
+          status: "sent" as any,
+          authorUserId: user.id,
+          sentAt: new Date(),
+        });
+      }
 
       return res.status(201).json({
         conversationId: conversation.id,

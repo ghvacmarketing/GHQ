@@ -45,6 +45,74 @@ export async function claudeChat(opts: {
     .join("");
 }
 
+export type ClaudeTool = {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+};
+
+/** Agentic chat: Claude may call the provided read-only tools any number of
+ *  times (executed server-side via executeTool) before its final answer.
+ *  Returns the final text. */
+export async function claudeChatWithTools(opts: {
+  system: string;
+  messages: { role: "user" | "assistant"; content: string | unknown[] }[];
+  tools: ClaudeTool[];
+  executeTool: (name: string, input: Record<string, unknown>) => Promise<string>;
+  maxTokens?: number;
+  maxIterations?: number;
+}): Promise<string> {
+  const messages: { role: "user" | "assistant"; content: string | unknown[] }[] = [...opts.messages];
+  const maxIterations = opts.maxIterations ?? 6;
+
+  for (let i = 0; i < maxIterations; i++) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        max_tokens: opts.maxTokens ?? 2000,
+        system: opts.system,
+        tools: opts.tools,
+        messages,
+      }),
+    });
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err: any = new Error(data?.error?.message || `Anthropic HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+
+    if (data.stop_reason === "tool_use") {
+      messages.push({ role: "assistant", content: data.content });
+      const results: unknown[] = [];
+      for (const block of data.content || []) {
+        if (block?.type !== "tool_use") continue;
+        let output = "";
+        try {
+          output = await opts.executeTool(block.name, block.input || {});
+        } catch (e: any) {
+          output = `Error: ${e?.message || "tool failed"}`;
+        }
+        results.push({ type: "tool_result", tool_use_id: block.id, content: output.slice(0, 15000) });
+      }
+      messages.push({ role: "user", content: results });
+      continue;
+    }
+
+    return (data?.content || [])
+      .filter((b: any) => b?.type === "text")
+      .map((b: any) => b.text)
+      .join("");
+  }
+  throw new Error("The assistant needed too many lookups for one question — try asking it more specifically.");
+}
+
 /** Strip optional ```json fences so responses parse cleanly. */
 export function stripJsonFences(s: string): string {
   return s.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");

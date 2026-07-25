@@ -1,8 +1,8 @@
 import OpenAI from "openai";
-import { claudeConfigured, claudeChat, claudeErrorHint, stripJsonFences } from "./claude";
+import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
-import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmQuotes } from "@shared/schema";
-import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull } from "drizzle-orm";
+import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmQuotes, crmUsers, tasks } from "@shared/schema";
+import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
@@ -1102,6 +1102,213 @@ export interface CrmHelpResponse {
   proposedActions?: ProposedAction[];
 }
 
+// ── Live CRM lookup tools ────────────────────────────────────────────────
+// Read-only tools the model can call mid-answer, so a question about ANY
+// customer, invoice, schedule, or record gets answered from live data instead
+// of "I don't know". Everything is capped and read-only; writes still go
+// through the approval-gated proposedActions flow.
+const CRM_TOOLS: ClaudeTool[] = [
+  {
+    name: "customer_profile",
+    description: "Full live profile for one customer by (partial) name: contact info, agreements, recent invoices with balances, recent work orders, recent quotes. Use for ANY question about a specific customer.",
+    input_schema: { type: "object", properties: { name: { type: "string", description: "Customer name or part of it" } }, required: ["name"] },
+  },
+  {
+    name: "list_work_orders",
+    description: "Live work orders with optional filters. Use for schedule questions, job status, or what a technician is doing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string", description: "scheduled | dispatched | en_route | on_site | completed | cancelled" },
+        techName: { type: "string", description: "Filter to a technician by (partial) name" },
+        date: { type: "string", description: "YYYY-MM-DD — jobs scheduled that Eastern calendar day" },
+        limit: { type: "number" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "list_invoices",
+    description: "Live invoices; filter to unpaid or by customer. Use for money, balance, and accounts-receivable questions.",
+    input_schema: {
+      type: "object",
+      properties: {
+        unpaidOnly: { type: "boolean" },
+        customerName: { type: "string" },
+        limit: { type: "number" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "list_quotes",
+    description: "Live quotes, optionally filtered by status.",
+    input_schema: { type: "object", properties: { status: { type: "string" }, limit: { type: "number" } }, required: [] },
+  },
+  {
+    name: "list_agreements",
+    description: "Live maintenance agreements, optionally by status (pending | active | grace_period | expired | cancelled).",
+    input_schema: { type: "object", properties: { status: { type: "string" }, limit: { type: "number" } }, required: [] },
+  },
+  {
+    name: "list_tasks",
+    description: "Internal team tasks (open tasks by default).",
+    input_schema: { type: "object", properties: { includeCompleted: { type: "boolean" }, limit: { type: "number" } }, required: [] },
+  },
+  {
+    name: "business_stats",
+    description: "Company-wide live totals: customer count, active agreements, upcoming scheduled work orders, unpaid invoice count and total balance due.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+];
+
+async function executeCrmTool(name: string, input: Record<string, unknown>): Promise<string> {
+  const lim = Math.min(Math.max(Number(input?.limit) || 20, 1), 50);
+
+  if (name === "customer_profile") {
+    const q = String(input?.name || "").trim();
+    if (!q) return "No customer name given.";
+    const matches = await db
+      .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, email: crmCustomers.email, fullAddress: crmCustomers.fullAddress, customerStatus: crmCustomers.customerStatus })
+      .from(crmCustomers)
+      .where(ilike(crmCustomers.name, `%${q}%`))
+      .limit(5);
+    if (matches.length === 0) return `No customer matching "${q}".`;
+    const c = matches[0];
+    const [agreements, invoices, workOrders, quotes] = await Promise.all([
+      db.select({ plan: crmAgreements.agreementPlan, status: crmAgreements.status, price: crmAgreements.price, frequency: crmAgreements.frequency, nextServiceDate: crmAgreements.nextServiceDate })
+        .from(crmAgreements).where(eq(crmAgreements.customerId, c.id)),
+      db.select({ invoiceNumber: crmInvoices.invoiceNumber, status: crmInvoices.status, total: crmInvoices.total, balanceDue: crmInvoices.balanceDue, dueDate: crmInvoices.dueDate })
+        .from(crmInvoices).where(eq(crmInvoices.customerId, c.id)).orderBy(desc(crmInvoices.createdAt)).limit(10),
+      db.select({ workOrderNumber: crmWorkOrders.workOrderNumber, title: crmWorkOrders.title, status: crmWorkOrders.status, scheduledStart: crmWorkOrders.scheduledStart })
+        .from(crmWorkOrders).where(eq(crmWorkOrders.customerId, c.id)).orderBy(desc(crmWorkOrders.createdAt)).limit(10),
+      db.select({ quoteNumber: crmQuotes.quoteNumber, title: crmQuotes.title, status: crmQuotes.status, total: crmQuotes.total })
+        .from(crmQuotes).where(eq(crmQuotes.customerId, c.id)).orderBy(desc(crmQuotes.createdAt)).limit(10),
+    ]);
+    return JSON.stringify({
+      customer: c,
+      otherNameMatches: matches.slice(1).map((m) => m.name),
+      agreements,
+      recentInvoices: invoices,
+      recentWorkOrders: workOrders,
+      recentQuotes: quotes,
+    });
+  }
+
+  if (name === "list_work_orders") {
+    const conds: any[] = [];
+    if (input?.status) conds.push(eq(crmWorkOrders.status, String(input.status) as any));
+    if (input?.date) {
+      // Eastern calendar day → UTC window (EDT offset; close enough for dispatch)
+      const dayStart = new Date(`${String(input.date)}T04:00:00Z`);
+      const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+      conds.push(gte(crmWorkOrders.scheduledStart, dayStart));
+      conds.push(lte(crmWorkOrders.scheduledStart, dayEnd));
+    }
+    let techId: string | undefined;
+    if (input?.techName) {
+      const [tech] = await db.select({ id: crmUsers.id }).from(crmUsers).where(ilike(crmUsers.name, `%${String(input.techName)}%`)).limit(1);
+      if (!tech) return `No technician matching "${input.techName}".`;
+      techId = tech.id;
+      conds.push(eq(crmWorkOrders.assignedTechId, tech.id));
+    }
+    const rows = await db
+      .select({
+        workOrderNumber: crmWorkOrders.workOrderNumber,
+        title: crmWorkOrders.title,
+        status: crmWorkOrders.status,
+        visitType: crmWorkOrders.visitType,
+        scheduledStart: crmWorkOrders.scheduledStart,
+        customerName: crmCustomers.name,
+        techName: crmUsers.name,
+      })
+      .from(crmWorkOrders)
+      .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+      .leftJoin(crmUsers, eq(crmWorkOrders.assignedTechId, crmUsers.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(crmWorkOrders.scheduledStart))
+      .limit(lim);
+    return JSON.stringify({ workOrders: rows, techFiltered: !!techId });
+  }
+
+  if (name === "list_invoices") {
+    const conds: any[] = [];
+    if (input?.unpaidOnly) conds.push(and(ne(crmInvoices.status, "paid" as any), ne(crmInvoices.status, "void" as any), ne(crmInvoices.status, "draft" as any)));
+    if (input?.customerName) {
+      const [cust] = await db.select({ id: crmCustomers.id }).from(crmCustomers).where(ilike(crmCustomers.name, `%${String(input.customerName)}%`)).limit(1);
+      if (!cust) return `No customer matching "${input.customerName}".`;
+      conds.push(eq(crmInvoices.customerId, cust.id));
+    }
+    const rows = await db
+      .select({
+        invoiceNumber: crmInvoices.invoiceNumber,
+        customerName: crmCustomers.name,
+        status: crmInvoices.status,
+        total: crmInvoices.total,
+        balanceDue: crmInvoices.balanceDue,
+        dueDate: crmInvoices.dueDate,
+      })
+      .from(crmInvoices)
+      .leftJoin(crmCustomers, eq(crmInvoices.customerId, crmCustomers.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(crmInvoices.createdAt))
+      .limit(lim);
+    return JSON.stringify({ invoices: rows });
+  }
+
+  if (name === "list_quotes") {
+    const rows = await db
+      .select({ quoteNumber: crmQuotes.quoteNumber, title: crmQuotes.title, customerName: crmCustomers.name, status: crmQuotes.status, total: crmQuotes.total })
+      .from(crmQuotes)
+      .leftJoin(crmCustomers, eq(crmQuotes.customerId, crmCustomers.id))
+      .where(input?.status ? eq(crmQuotes.status, String(input.status) as any) : undefined)
+      .orderBy(desc(crmQuotes.createdAt))
+      .limit(lim);
+    return JSON.stringify({ quotes: rows });
+  }
+
+  if (name === "list_agreements") {
+    const rows = await db
+      .select({ agreementNumber: crmAgreements.agreementNumber, customerName: crmAgreements.customerName, plan: crmAgreements.agreementPlan, status: crmAgreements.status, price: crmAgreements.price, frequency: crmAgreements.frequency, nextServiceDate: crmAgreements.nextServiceDate, nextInvoiceDate: crmAgreements.nextInvoiceDate })
+      .from(crmAgreements)
+      .where(input?.status ? eq(crmAgreements.status, String(input.status) as any) : undefined)
+      .orderBy(desc(crmAgreements.updatedAt))
+      .limit(lim);
+    return JSON.stringify({ agreements: rows });
+  }
+
+  if (name === "list_tasks") {
+    const rows = await db
+      .select({ title: tasks.title, status: tasks.status, dueAt: tasks.dueAt, assignedTo: crmUsers.name })
+      .from(tasks)
+      .leftJoin(crmUsers, eq(tasks.assignedToUserId, crmUsers.id))
+      .where(input?.includeCompleted ? undefined : ne(tasks.status, "completed" as any))
+      .orderBy(desc(tasks.createdAt))
+      .limit(lim);
+    return JSON.stringify({ tasks: rows });
+  }
+
+  if (name === "business_stats") {
+    const now = new Date();
+    const [customers] = await db.select({ n: sql<number>`count(*)::int` }).from(crmCustomers);
+    const [activeAgreements] = await db.select({ n: sql<number>`count(*)::int` }).from(crmAgreements).where(eq(crmAgreements.status, "active" as any));
+    const [upcomingWos] = await db.select({ n: sql<number>`count(*)::int` }).from(crmWorkOrders).where(and(eq(crmWorkOrders.status, "scheduled" as any), gte(crmWorkOrders.scheduledStart, now)));
+    const [unpaid] = await db
+      .select({ n: sql<number>`count(*)::int`, due: sql<number>`coalesce(sum(${crmInvoices.balanceDue}::numeric), 0)::float` })
+      .from(crmInvoices)
+      .where(and(ne(crmInvoices.status, "paid" as any), ne(crmInvoices.status, "void" as any), ne(crmInvoices.status, "draft" as any)));
+    return JSON.stringify({
+      totalCustomers: customers?.n ?? 0,
+      activeAgreements: activeAgreements?.n ?? 0,
+      upcomingScheduledWorkOrders: upcomingWos?.n ?? 0,
+      unpaidInvoices: unpaid?.n ?? 0,
+      totalBalanceDue: unpaid?.due ?? 0,
+    });
+  }
+
+  return `Unknown tool: ${name}`;
+}
+
 const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; hasLiveData: boolean }>();
 const CACHE_TTL_STATIC = 1000 * 60 * 60; // 1 hour for static help questions
 const CACHE_TTL_LIVE = 1000 * 60 * 5; // 5 minutes for live data questions
@@ -1201,10 +1408,15 @@ Return JSON with:
           }
         : { role: "user" as const, content: question };
       content = stripJsonFences(
-        await claudeChat({
-          system: systemPrompt + "\n\nRespond with ONLY the JSON object — no prose around it.",
+        await claudeChatWithTools({
+          system:
+            systemPrompt +
+            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up.\n\nYour FINAL message must be ONLY the JSON object — no prose around it.",
           messages: [...priorTurns, userTurn],
+          tools: CRM_TOOLS,
+          executeTool: executeCrmTool,
           maxTokens: 2000,
+          maxIterations: 6,
         }),
       );
     } else {
