@@ -95,9 +95,9 @@ export async function refreshWeather(): Promise<{ success: boolean; error?: stri
       id: 1,
       lat: WEATHER_LAT,
       lon: WEATHER_LON,
-      forecastJson: { properties: { periods }, current },
-      hourlyJson: { properties: { periods: hourlyPeriods } },
-      alertsJson: { features: alertFeatures },
+      forecastJson: { properties: { periods }, current } as any,
+      hourlyJson: { properties: { periods: hourlyPeriods } } as any,
+      alertsJson: { features: alertFeatures } as any,
       expiresAt,
     });
 
