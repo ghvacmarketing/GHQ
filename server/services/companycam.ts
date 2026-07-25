@@ -76,6 +76,7 @@ type CcProject = {
 type CcPhoto = {
   id: string;
   project_id: string;
+  creator_id: string | null;
   creator_name: string | null;
   captured_at: number | null; // unix seconds
   created_at?: number | null;
@@ -254,33 +255,78 @@ export async function syncCompanycam(): Promise<CompanycamSyncResult> {
   }
 }
 
-/** CompanyCam creators and CRM users are the same people — match the photo's
- *  creator_name to a crm_user so galleries credit the right tech. Exact
- *  normalized full-name match first, then first+last token containment. */
-let userMatchCache: { at: number; users: Array<{ id: string; norm: string; tokens: string[] }> } | null = null;
-async function matchCreatorToUser(creatorName: string | null): Promise<string | null> {
-  if (!creatorName?.trim()) return null;
-  if (!userMatchCache || Date.now() - userMatchCache.at > 10 * 60 * 1000) {
-    const rows = await db.select({ id: crmUsers.id, name: crmUsers.name }).from(crmUsers);
-    userMatchCache = {
-      at: Date.now(),
-      users: rows
-        .filter((u) => u.name)
-        .map((u) => {
-          const norm = u.name.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
-          return { id: u.id, norm, tokens: norm.split(" ") };
-        }),
-    };
+/** CompanyCam creators and CRM users are the same people. Matching order:
+ *  1. EMAIL — CompanyCam's user list carries emails that mirror the CRM's
+ *     (chandler@ghvacinc.com etc.); normalized compare, apostrophes stripped.
+ *  2. Exact normalized full-name match.
+ *  3. Unique FIRST-NAME match — most CRM accounts are first-name only
+ *     ("Chandler") while CompanyCam has full names ("Chandler Giesbrecht");
+ *     match only when exactly one CRM user owns that first name. */
+const normEmail = (e: string) => e.toLowerCase().replace(/'/g, "").trim();
+const normName = (n: string) => n.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+
+let ccUserCache: { at: number; byId: Map<string, { email: string | null; name: string }> } | null = null;
+async function ccUsersById(): Promise<Map<string, { email: string | null; name: string }>> {
+  if (ccUserCache && Date.now() - ccUserCache.at < 10 * 60 * 1000) return ccUserCache.byId;
+  const byId = new Map<string, { email: string | null; name: string }>();
+  try {
+    for (let page = 1; page <= 10; page++) {
+      const rows: any[] = await ccFetch(`/users?per_page=100&page=${page}`);
+      for (const u of rows) {
+        byId.set(String(u.id), {
+          email: u.email_address || null,
+          name: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
+        });
+      }
+      if (rows.length < 100) break;
+    }
+  } catch {
+    // users endpoint hiccup — name matching still works
   }
-  const norm = creatorName.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+  ccUserCache = { at: Date.now(), byId };
+  return byId;
+}
+
+let crmUserCache: {
+  at: number;
+  users: Array<{ id: string; norm: string; first: string; email: string | null }>;
+} | null = null;
+async function crmUserList() {
+  if (crmUserCache && Date.now() - crmUserCache.at < 10 * 60 * 1000) return crmUserCache.users;
+  const rows = await db.select({ id: crmUsers.id, name: crmUsers.name, email: crmUsers.email }).from(crmUsers);
+  crmUserCache = {
+    at: Date.now(),
+    users: rows
+      .filter((u) => u.name)
+      .map((u) => {
+        const norm = normName(u.name);
+        return { id: u.id, norm, first: norm.split(" ")[0] || "", email: u.email ? normEmail(u.email) : null };
+      }),
+  };
+  return crmUserCache.users;
+}
+
+async function matchCreatorToUser(creatorId: string | null, creatorName: string | null): Promise<string | null> {
+  const users = await crmUserList();
+
+  if (creatorId) {
+    const ccUser = (await ccUsersById()).get(String(creatorId));
+    if (ccUser?.email) {
+      const em = normEmail(ccUser.email);
+      const byEmail = users.find((u) => u.email === em);
+      if (byEmail) return byEmail.id;
+    }
+    if (!creatorName && ccUser?.name) creatorName = ccUser.name;
+  }
+
+  if (!creatorName?.trim()) return null;
+  const norm = normName(creatorName);
   if (!norm) return null;
-  const exact = userMatchCache.users.find((u) => u.norm === norm);
+  const exact = users.find((u) => u.norm === norm);
   if (exact) return exact.id;
-  const tokens = norm.split(" ");
-  const contained = userMatchCache.users.filter(
-    (u) => tokens.length >= 2 && tokens.every((t) => u.tokens.includes(t)),
-  );
-  return contained.length === 1 ? contained[0].id : null;
+  const first = norm.split(" ")[0];
+  const byFirst = users.filter((u) => u.first === first);
+  return byFirst.length === 1 ? byFirst[0].id : null;
 }
 
 /** Import one project's photos as reference rows on the customer. Returns the
@@ -307,7 +353,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
     if (existingRow) {
       // Backfill the uploader on rows that predate creator matching
       if (!existingRow.uploadedBy) {
-        const userId = await matchCreatorToUser(photo.creator_name);
+        const userId = await matchCreatorToUser(photo.creator_id, photo.creator_name);
         if (userId) await db.update(customerFiles).set({ uploadedBy: userId }).where(eq(customerFiles.id, existingRow.id));
       }
       continue;
@@ -322,7 +368,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
       objectPath: key,
       contentType: "image/jpeg",
       size: null,
-      uploadedBy: await matchCreatorToUser(photo.creator_name),
+      uploadedBy: await matchCreatorToUser(photo.creator_id, photo.creator_name),
       createdAt: capturedAt ? new Date(capturedAt * 1000) : new Date(),
     });
     imported++;

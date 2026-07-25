@@ -13191,9 +13191,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(customerFiles)
         .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
-        // All file types — the Media page filters photos vs documents client-side
+        // All file types — the Media page filters photos vs documents client-side.
+        // 5000 cap: the CompanyCam import brought thousands of references.
         .orderBy(desc(customerFiles.createdAt))
-        .limit(500);
+        .limit(5000);
       res.json(rows);
     } catch (error) {
       console.error("Error fetching photo feed:", error);
@@ -13335,6 +13336,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating customer file:", error);
       return res.status(500).json({ message: "Failed to save file" });
+    }
+  });
+
+  // Download any customer file through the server. External URLs (CompanyCam
+  // CDN) block cross-origin browser fetches, so the server streams the bytes
+  // with an attachment disposition; internal /objects paths just redirect.
+  app.get("/api/crm/files/:id/download", requireCrmAuth, async (req, res) => {
+    try {
+      const [file] = await db.select().from(customerFiles).where(eq(customerFiles.id, req.params.id));
+      if (!file) return res.status(404).json({ message: "File not found" });
+      if (!file.url.startsWith("http")) {
+        return res.redirect(file.url);
+      }
+      const upstream = await fetch(file.url);
+      if (!upstream.ok || !upstream.body) {
+        return res.status(502).json({ message: "The file host didn't return the file" });
+      }
+      const safeName = (file.name || "photo").replace(/[^\w.\- ()]/g, "_");
+      res.setHeader("Content-Type", upstream.headers.get("content-type") || file.contentType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+      const reader = (upstream.body as any).getReader();
+      const pump = async (): Promise<void> => {
+        const { done, value } = await reader.read();
+        if (done) {
+          res.end();
+          return;
+        }
+        res.write(Buffer.from(value));
+        return pump();
+      };
+      await pump();
+    } catch (error) {
+      console.error("Error proxying file download:", error);
+      if (!res.headersSent) res.status(500).json({ message: "Download failed" });
+      else res.end();
     }
   });
 

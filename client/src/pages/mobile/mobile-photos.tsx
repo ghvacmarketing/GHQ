@@ -223,9 +223,11 @@ export default function MobilePhotos() {
     onError: (e: any) => toast({ title: e?.message || "Couldn't delete the photo", variant: "destructive" }),
   });
 
-  const downloadPhoto = async (p: { url: string; name: string }) => {
+  const downloadPhoto = async (p: { id?: string; url: string; name: string }) => {
+    // External hosts (CompanyCam CDN) block cross-origin fetches — proxy those
+    const src = p.url.startsWith("http") && p.id ? `/api/crm/files/${p.id}/download` : p.url;
     try {
-      const res = await fetch(p.url, { credentials: "include" });
+      const res = await fetch(src, { credentials: "include" });
       if (!res.ok) throw new Error("fetch failed");
       const blob = await res.blob();
       const href = URL.createObjectURL(blob);

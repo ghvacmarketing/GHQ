@@ -872,7 +872,7 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
                             <Eye className="h-4 w-4 text-slate-700" />
                           </button>
                           <a
-                            href={file.url}
+                            href={file.url.startsWith("http") ? `/api/crm/files/${file.id}/download` : file.url}
                             download={file.name}
                             className="p-1.5 bg-white rounded-full shadow"
                           >
@@ -918,7 +918,7 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <a
-                            href={file.url}
+                            href={file.url.startsWith("http") ? `/api/crm/files/${file.id}/download` : file.url}
                             download={file.name}
                             className="p-1.5 hover:bg-slate-100 rounded"
                           >

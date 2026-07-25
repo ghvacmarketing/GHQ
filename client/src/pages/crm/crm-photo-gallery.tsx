@@ -48,11 +48,13 @@ const LARGEST = 0;
 
 type DatePreset = "all" | "today" | "7d" | "30d" | "custom";
 
-// Fetch as a blob so the browser saves the file instead of navigating to it;
-// falls back to opening in a new tab if the image host blocks the fetch.
+// Fetch as a blob so the browser saves the file instead of navigating to it.
+// External hosts (CompanyCam CDN) block cross-origin fetches, so those route
+// through the server download proxy; falls back to a new tab if all else fails.
 async function downloadPhoto(p: FeedPhoto) {
+  const src = p.url.startsWith("http") ? `/api/crm/files/${p.id}/download` : p.url;
   try {
-    const res = await fetch(p.url, { credentials: "include" });
+    const res = await fetch(src, { credentials: "include" });
     if (!res.ok) throw new Error("fetch failed");
     const blob = await res.blob();
     const href = URL.createObjectURL(blob);
