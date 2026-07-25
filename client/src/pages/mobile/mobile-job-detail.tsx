@@ -3993,9 +3993,9 @@ export default function MobileJobDetail() {
     // Wider start zone — Android's system gesture owns the outermost edge,
     // so fingers landing "near the left" must still catch our drag.
     if (e.clientX > 48) { swipeDrag.current = null; return; }
-    // In a section (Work/Quote/Invoice) the edge swipe returns to the
-    // Overview hub; on the hub itself it leaves to the jobs list.
-    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true, section: activeTab !== "overview" };
+    // The edge swipe always leaves the job (whole screen slides, nav
+    // included) no matter which tab is open — Overview is just a tab now.
+    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true, section: false };
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onSwipeMove = (e: React.PointerEvent) => {
@@ -4538,7 +4538,7 @@ export default function MobileJobDetail() {
       <OfflineIndicator />
       {/* Floating back — tap, or swipe right from the left edge */}
       <button
-        onClick={() => { if (activeTab !== "overview") closeSectionAnimated(); else goBackAnimated(); }}
+        onClick={() => goBackAnimated()}
         className="absolute left-3 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-700 shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
         style={{ top: "calc(10px + env(safe-area-inset-top))" }}
         data-testid="button-back"
