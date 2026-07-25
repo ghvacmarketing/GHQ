@@ -816,24 +816,64 @@ Return JSON with:
       };
     }
 
+    // Long answers frequently break strict JSON: prose wrapped around the
+    // object, or literal newlines/tabs INSIDE string values. Walk the string
+    // and escape control characters only within string literals.
+    const repairJson = (raw: string): string => {
+      let out = "";
+      let inStr = false;
+      let esc = false;
+      for (const ch of raw) {
+        if (inStr) {
+          if (esc) {
+            out += ch;
+            esc = false;
+          } else if (ch === "\\") {
+            out += ch;
+            esc = true;
+          } else if (ch === '"') {
+            inStr = false;
+            out += ch;
+          } else if (ch === "\n") {
+            out += "\\n";
+          } else if (ch === "\r") {
+            // drop
+          } else if (ch === "\t") {
+            out += "\\t";
+          } else {
+            out += ch;
+          }
+        } else {
+          if (ch === '"') inStr = true;
+          out += ch;
+        }
+      }
+      return out;
+    };
+
     let parsed: any;
     try {
       parsed = JSON.parse(content);
     } catch {
-      // The model sometimes wraps the JSON in prose (especially after tool
-      // lookups) — extract the outermost object before giving up.
+      // Attempt 2: outermost object (strips prose around the JSON).
       const start = content.indexOf("{");
       const end = content.lastIndexOf("}");
-      if (start !== -1 && end > start) {
+      const sliced = start !== -1 && end > start ? content.slice(start, end + 1) : null;
+      if (sliced) {
         try {
-          parsed = JSON.parse(content.slice(start, end + 1));
+          parsed = JSON.parse(sliced);
         } catch {
-          parsed = undefined;
+          // Attempt 3: repair control characters inside string values.
+          try {
+            parsed = JSON.parse(repairJson(sliced));
+          } catch {
+            parsed = undefined;
+          }
         }
       }
     }
     if (!parsed) {
-      console.log("[CRM Help AI] JSON parse failed (finish_reason:", finishReason, ") - content length:", content.length);
+      console.log("[CRM Help AI] JSON parse failed (finish_reason:", finishReason, ") - content length:", content.length, "- head:", JSON.stringify(content.slice(0, 300)));
       // If JSON was truncated, extract whatever answer text we got and return
       // it as-is — a partial answer beats an apology.
       const partial = content.match(/"answer"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"|"\s*}|$)/)?.[1];

@@ -42,6 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TypewriterText } from "@/components/crm/typewriter-text";
 
 /** The desktop GHQ assistant — a full-size ChatGPT-style modal: conversation
  *  history lives in a left sidebar grouped by date section (Today, Yesterday,
@@ -117,6 +118,8 @@ export default function AiAssistantModal() {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
+  // Index of the just-arrived answer — the only message that types itself in.
+  const [freshIndex, setFreshIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -217,6 +220,9 @@ export default function AiAssistantModal() {
     const question = raw.trim() || (photos.length > 0 ? "Take a look at this photo." : "");
     if (question.length < 3 || pending) return;
     const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
+    // Where the answer will land (after the user message we're about to add) —
+    // that message, and only that one, animates in.
+    const assistantIndex = messages.length + 1;
     setMessages((prev) => [...prev, { role: "user", content: question, attachments: photos.length > 0 ? photos : undefined }]);
     setInput("");
     setAttachments([]);
@@ -234,6 +240,7 @@ export default function AiAssistantModal() {
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
         const extras = (data.extraActions || []).filter((e) => e.proposedAction);
+        setFreshIndex(assistantIndex);
         setMessages((prev) => [
           ...prev,
           {
@@ -287,6 +294,7 @@ export default function AiAssistantModal() {
   }, [open, cancelVoice]);
 
   const openConversation = (id: string) => {
+    setFreshIndex(null);
     fetchAiConversation(id).then((loaded) => {
       if (loaded) {
         setConversationId(loaded.id);
@@ -308,6 +316,7 @@ export default function AiAssistantModal() {
   const newChat = () => {
     setMessages([]);
     setConversationId(null);
+    setFreshIndex(null);
     setInput("");
     inputRef.current?.focus();
   };
@@ -688,7 +697,11 @@ export default function AiAssistantModal() {
                       <div className="min-w-0 flex-1 space-y-2">
                         {msg.content.trim() !== "" && (
                           <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
-                            {cleanAnswer(msg.content)}
+                            <TypewriterText
+                              text={cleanAnswer(msg.content)}
+                              animate={i === freshIndex}
+                              onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                            />
                           </div>
                         )}
                         {msg.proposedAction && msg.actionState !== "dismissed" && (
@@ -900,11 +913,15 @@ export default function AiAssistantModal() {
                 <button
                   onClick={() => sendQuestion(input)}
                   disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-colors hover:bg-[#8a1a1f] disabled:opacity-40"
+                  className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-[#711419] text-white shadow-sm transition-all duration-150 ease-out hover:bg-[#5a1014] hover:shadow-md active:scale-90 disabled:opacity-30 disabled:shadow-none disabled:hover:bg-[#711419]"
                   aria-label="Send"
                   data-testid="ai-send"
                 >
-                  <Send className="h-4.5 w-4.5" />
+                  {pending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 transition-transform duration-200 ease-out group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  )}
                 </button>
               </div>
             </div>

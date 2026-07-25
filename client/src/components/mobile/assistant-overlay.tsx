@@ -5,6 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { History, ImagePlus, Loader2, Mic, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import {
   AI_ACTION_LABELS,
@@ -51,6 +52,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [hydrated, setHydrated] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
+  // Index of the just-arrived answer — the only message that types itself in.
+  const [freshIndex, setFreshIndex] = useState<number | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   // Long questions (typed or dictated) wrap onto new lines: grow the box up
@@ -193,6 +196,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     const question = raw.trim() || (photos.length > 0 ? "Take a look at this photo." : "");
     if (question.length < 3 || pending) return;
     const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
+    // Where the answer will land — that message, and only it, animates in.
+    const assistantIndex = messages.length + 1;
     setMessages((prev) => [...prev, { role: "user", content: question, attachments: photos.length > 0 ? photos : undefined }]);
     setInput("");
     setAttachments([]);
@@ -207,6 +212,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         const data = await r.json();
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+        setFreshIndex(assistantIndex);
         // One spoken message can carry several creation requests — each extra
         // action renders as its own approval card.
         const extras = (Array.isArray(data.extraActions) ? data.extraActions : []).filter((e: any) => e.proposedAction);
@@ -383,7 +389,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             </button>
             {messages.length > 0 && (
               <button
-                onClick={() => { setMessages([]); setInput(""); setConversationId(null); setHistoryOpen(false); }}
+                onClick={() => { setMessages([]); setInput(""); setConversationId(null); setFreshIndex(null); setHistoryOpen(false); }}
                 className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
                 aria-label="New conversation"
                 data-testid="assistant-new-conversation"
@@ -422,6 +428,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                   >
                     <button
                       onClick={() => {
+                        setFreshIndex(null);
                         fetchAiConversation(c.id).then((loaded) => {
                           if (loaded) {
                             setConversationId(loaded.id);
@@ -515,7 +522,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                   <div key={i} className="space-y-2">
                     {msg.content.trim() !== "" && (
                       <div className="max-w-[92%] whitespace-pre-wrap rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-relaxed text-slate-200">
-                        {stripMarkdown(msg.content)}
+                        <TypewriterText
+                          text={stripMarkdown(msg.content)}
+                          animate={i === freshIndex}
+                          onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                        />
                       </div>
                     )}
                     {msg.proposedAction && msg.actionState !== "dismissed" && (
@@ -716,11 +727,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             <button
               onClick={() => sendQuestion(input)}
               disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-all active:scale-95 disabled:opacity-40"
+              className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:opacity-30"
               aria-label="Send"
               data-testid="assistant-send"
             >
-              <Send className="h-5 w-5" />
+              {pending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-4.5 w-4.5 transition-transform duration-200 ease-out group-active:-translate-y-0.5 group-active:translate-x-0.5" />
+              )}
             </button>
           </div>
         </div>
