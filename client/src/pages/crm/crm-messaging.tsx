@@ -160,6 +160,7 @@ export default function CrmMessaging() {
   const [messageText, setMessageText] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
   const [contextSheetOpen, setContextSheetOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [contextCollapsed, setContextCollapsed] = useState(
     () => typeof window !== "undefined" && localStorage.getItem("crm_msg_context_collapsed") === "1"
   );
@@ -707,7 +708,43 @@ export default function CrmMessaging() {
         <div className="relative flex shrink-0 items-center justify-center border-b border-slate-200/80 px-4 pb-2.5 pt-3">
           <CommsSwitcher active="messages" bare />
           {selectedConversationId && !loadingDetail && (
-            <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+              <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                      actionsOpen
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900",
+                    )}
+                    title="Conversation actions"
+                    data-testid="thread-actions"
+                  >
+                    <MoreIcon className={cn(actionsOpen && "ghq-more-open")} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
+                    <MessageSquare className="h-4 w-4 mr-2" /> Reopen
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
+                    <Check className="h-4 w-4 mr-2" /> Resolve
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
+                    <BellOff className="h-4 w-4 mr-2" /> Snooze
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
+                    <Archive className="h-4 w-4 mr-2" /> Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="sm"
@@ -794,33 +831,6 @@ export default function CrmMessaging() {
                     {(headerCtx!.balanceDue).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} due
                   </span>
                 )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="thread-actions">
-                      <MoreIcon direction="h" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
-                      <MessageSquare className="h-4 w-4 mr-2" /> Reopen
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
-                      <Check className="h-4 w-4 mr-2" /> Resolve
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
-                      <BellOff className="h-4 w-4 mr-2" /> Snooze
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
-                      <Archive className="h-4 w-4 mr-2" /> Archive
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-red-600 focus:text-red-600"
-                      onClick={() => setDeleteDialogOpen(true)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
 

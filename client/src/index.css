@@ -495,7 +495,8 @@ input.rounded-full:focus {
 }
 button:hover .ghq-more,
 [role="button"]:hover .ghq-more,
-.ghq-more:hover {
+.ghq-more:hover,
+.ghq-more-open {
   transform: rotate(90deg);
 }
 
