@@ -7,6 +7,7 @@ import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { History, ImagePlus, Loader2, Mic, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import {
+  AI_ACTION_LABELS,
   type AiChatMessage as ChatMessage,
   type AiConversationSummary,
   compressImageForAi,
@@ -486,7 +487,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                       <div className="max-w-[92%] rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3" data-testid={`assistant-action-card-${i}`}>
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e8b4b8]">
                           <ShieldCheck className="h-3.5 w-3.5" />
-                          {msg.proposedAction.type === "create_task" ? "New task" : "New work order"} — needs your approval
+                          {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
                         </p>
                         <p className="mt-1.5 text-sm text-slate-200">{msg.proposedAction.summary}</p>
                         <div className="mt-1.5 space-y-0.5">

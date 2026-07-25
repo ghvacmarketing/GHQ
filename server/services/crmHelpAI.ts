@@ -1070,7 +1070,7 @@ The Install Planner (/crm/install-planner) is a capacity-planning board for tent
 // /api/crm/ai/execute-action, which re-validates against a strict whitelist
 // and runs under the approving user's session with an audit log.
 export interface ProposedAction {
-  type: "create_task" | "create_work_order";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -1145,12 +1145,15 @@ Voice and formatting — these matter as much as accuracy:
 CRITICAL ACCURACY RULE: Only describe features, settings pages, navigation paths, and URLs that are explicitly documented in the knowledge base above. If something is not listed there — especially settings pages, admin panels, or configuration screens — do NOT invent or assume it exists. Respond with: "I don't have specific information about that in this CRM — it may not exist or may not be documented." NEVER invent settings pages, URLs, configuration screens, or features that are not documented above. Pay special attention to the "FEATURES THAT DO NOT EXIST" section — if a user asks about one of those items, clearly state it does not exist in this system.
 
 PROPOSING ACTIONS (strict rules):
-You can PREPARE two kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include proposedActions when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions.
+You can PREPARE a few kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include proposedActions when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions.
 MULTIPLE REQUESTS IN ONE MESSAGE: voice users often ask for several things in one breath ("create a work order for the Smiths tomorrow at 10, add a task to order filters, and who hasn't paid?"). Handle ALL of them: answer every question asked, and include one proposedActions entry PER thing to create — never silently drop or merge requests. Say in your answer what each prepared action is. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
 Pass customerName exactly as the user said or typed it, even if it looks misspelled — the server fuzzy-matches it against the CRM and will ask the user to pick when it isn't sure. Never refuse an action just because the name looks off.
 Action types and their params:
 1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
 2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — a technician's name if the user asked to assign it to someone), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00") }
+3. send_sms — texts a customer through the CRM's messaging line. params: { "customerName": string (required), "message": string (required — write the COMPLETE, ready-to-send text exactly as it should go out: friendly, professional, concise, signed "— Giesbrecht HVAC"; no placeholders like [time] unless the user left the detail out) }
+4. send_email — emails a customer from the approving user's connected Gmail. params: { "customerName": string (required), "subject": string (required), "body": string (required — the COMPLETE plain-text email body, ready to send: professional and warm, proper greeting and sign-off as Giesbrecht HVAC, no markdown, no placeholders unless a detail is genuinely unknown) }
+When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
@@ -1249,7 +1252,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&

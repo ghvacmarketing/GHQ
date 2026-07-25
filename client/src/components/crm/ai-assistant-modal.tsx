@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import {
+  AI_ACTION_LABELS,
   type AiChatMessage,
   type AiConversationSummary,
   type AiProposedAction,
@@ -659,7 +660,7 @@ export default function AiAssistantModal() {
                           <div className="rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3" data-testid={`ai-action-card-${i}`}>
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
-                              {msg.proposedAction.type === "create_task" ? "New task" : "New work order"} — needs your approval
+                              {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
                             </p>
                             <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                             <div className="mt-1.5 space-y-0.5">

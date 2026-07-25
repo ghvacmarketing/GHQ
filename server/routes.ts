@@ -2589,6 +2589,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return Math.max(tokenScore, levScore) * 0.98;
   };
 
+  // Shared customer resolution for AI actions: an explicit customerId (the
+  // user picked from the candidate list) wins; otherwise fuzzy-match the
+  // spoken/typed name — a confident lead auto-picks, too-close-to-call
+  // returns candidates for the user to choose from.
+  const resolveAiCustomer = async (params: { customerId?: string; customerName: string }): Promise<
+    | { ok: true; customer: { id: string; name: string; phone: string | null; email: string | null } }
+    | { ok: false; status: number; body: Record<string, unknown> }
+  > => {
+    if (params.customerId) {
+      const [picked] = await db
+        .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, email: crmCustomers.email })
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, params.customerId));
+      if (!picked) return { ok: false, status: 422, body: { message: "That customer no longer exists." } };
+      return { ok: true, customer: picked };
+    }
+    const allCustomers = await db
+      .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, email: crmCustomers.email })
+      .from(crmCustomers);
+    const scored = allCustomers
+      .map((c) => ({ ...c, score: aiNameSimilarity(c.name || "", params.customerName) }))
+      .sort((x, y) => y.score - x.score);
+    const best = scored[0];
+    const second = scored[1];
+    if (!best || best.score < 0.5) {
+      return { ok: false, status: 422, body: { message: `No customer found matching "${params.customerName}".` } };
+    }
+    if (best.score >= 0.85 && (!second || best.score - second.score >= 0.15)) {
+      return { ok: true, customer: { id: best.id, name: best.name, phone: best.phone, email: best.email } };
+    }
+    return {
+      ok: false,
+      status: 422,
+      body: {
+        message: `Not sure which customer you meant by "${params.customerName}" — pick the right one:`,
+        candidateParam: "customerId",
+        candidates: scored
+          .filter((c) => c.score >= 0.4)
+          .slice(0, 5)
+          .map((c) => ({ id: c.id, name: c.name })),
+      },
+    };
+  };
+
   // Execute an AI-proposed action AFTER explicit user approval. The model can
   // only propose; nothing runs until a signed-in user clicks Approve, and only
   // these whitelisted action types exist. Everything is re-validated with zod
@@ -2622,6 +2666,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             scheduledStart: z.string().max(40).optional(),
           }).strict(),
         }),
+        z.object({
+          type: z.literal("send_sms"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            message: z.string().trim().min(1).max(1000),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("send_email"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            subject: z.string().trim().min(1).max(200),
+            body: z.string().trim().min(1).max(5000),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -2653,41 +2714,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(201).json({ ok: true, entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
       }
 
-      // create_work_order — resolve the customer. An explicit customerId (the
-      // user picked from the candidate list) wins; otherwise fuzzy-match the
-      // spoken/typed name: confident lead auto-picks, too-close-to-call
-      // returns candidates for the user to choose from.
-      let customer: { id: string; name: string } | undefined;
-      if (action.params.customerId) {
-        const [picked] = await db
-          .select({ id: crmCustomers.id, name: crmCustomers.name })
-          .from(crmCustomers)
-          .where(eq(crmCustomers.id, action.params.customerId));
-        if (!picked) return res.status(422).json({ message: "That customer no longer exists." });
-        customer = picked;
-      } else {
-        const allCustomers = await db.select({ id: crmCustomers.id, name: crmCustomers.name }).from(crmCustomers);
-        const scored = allCustomers
-          .map((c) => ({ ...c, score: aiNameSimilarity(c.name || "", action.params.customerName) }))
-          .sort((x, y) => y.score - x.score);
-        const best = scored[0];
-        const second = scored[1];
-        if (!best || best.score < 0.5) {
-          return res.status(422).json({ message: `No customer found matching "${action.params.customerName}".` });
+      // send_sms — text a customer through the CRM messaging line (Textline).
+      // The message text was reviewed on the approval card word for word.
+      if (action.type === "send_sms") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const smsCustomer = resolved.customer;
+        const phone = (smsCustomer.phone || "").replace(/[^\d+]/g, "");
+        if (!phone || phone.length < 10) {
+          return res.status(422).json({ message: `${smsCustomer.name} has no phone number on file.` });
         }
-        if (best.score >= 0.85 && (!second || best.score - second.score >= 0.15)) {
-          customer = { id: best.id, name: best.name };
-        } else {
-          return res.status(422).json({
-            message: `Not sure which customer you meant by "${action.params.customerName}" — pick the right one:`,
-            candidateParam: "customerId",
-            candidates: scored
-              .filter((c) => c.score >= 0.4)
-              .slice(0, 5)
-              .map((c) => ({ id: c.id, name: c.name })),
+        if (!textlineClient.isConfigured()) {
+          return res.status(400).json({ message: "Texting isn't configured on this server (Textline)." });
+        }
+        const sendResult = await textlineClient.sendMessage({ phoneNumber: phone, body: action.params.message });
+        if (!sendResult.success) {
+          return res.status(500).json({ message: sendResult.errorMessage || "Failed to send the text." });
+        }
+        let conversation = await storage.getMessagingConversationByPhone(phone);
+        if (!conversation) {
+          conversation = await storage.createMessagingConversation({
+            customerId: smsCustomer.id,
+            phoneNumber: phone,
+            customerName: smsCustomer.name,
+            subject: smsCustomer.name,
+            externalSource: "textline" as any,
+            externalConversationId: sendResult.conversationUuid || null,
+            status: "open" as any,
+            lastMessageAt: new Date(),
           });
+        } else {
+          const updates: Record<string, any> = { status: "open", lastMessageAt: new Date() };
+          if (sendResult.conversationUuid && !conversation.externalConversationId) {
+            updates.externalConversationId = sendResult.conversationUuid;
+            updates.externalSource = "textline";
+          }
+          if (!conversation.customerId) updates.customerId = smsCustomer.id;
+          await storage.updateMessagingConversation(conversation.id, updates);
         }
+        await storage.createMessage({
+          conversationId: conversation.id,
+          direction: "outbound" as any,
+          channel: "sms" as any,
+          body: action.params.message,
+          externalMessageId: sendResult.messageUuid || null,
+          status: "sent" as any,
+          authorUserId: user.id,
+          sentAt: new Date(),
+        });
+        await logCrmAudit(user.id, "ai_action.send_sms", "messaging_conversation", conversation.id, { customerId: smsCustomer.id }, req.ip);
+        const smsLabel = `Text sent to ${smsCustomer.name}`;
+        const smsUrl = `/crm/messaging?conversation=${conversation.id}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "sms", id: conversation.id, label: smsLabel, url: smsUrl });
+        return res.status(201).json({ ok: true, entity: "sms", id: conversation.id, label: smsLabel, url: smsUrl });
       }
+
+      // send_email — email a customer from the APPROVING USER'S own connected
+      // Gmail, so it lands in their sent mail like anything else they send.
+      if (action.type === "send_email") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const emailCustomer = resolved.customer;
+        if (!emailCustomer.email) {
+          return res.status(422).json({ message: `${emailCustomer.name} has no email address on file.` });
+        }
+        if (!user.gmailRefreshTokenEnc) {
+          return res.status(400).json({ message: "Connect your Gmail on the Mail page first — Gibbs sends email through your own account." });
+        }
+        const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1e293b;">${esc(action.params.body).replace(/\n/g, "<br>")}</div>`;
+        try {
+          const { sendEmail } = await import("./services/gmailService");
+          await sendEmail(user, { to: [emailCustomer.email], subject: action.params.subject, html });
+        } catch (e: any) {
+          const detail = e?.message === "gmail_not_connected"
+            ? "Connect your Gmail on the Mail page first — Gibbs sends email through your own account."
+            : e?.message || "Failed to send the email.";
+          return res.status(500).json({ message: detail });
+        }
+        await logCrmAudit(user.id, "ai_action.send_email", "crm_customer", emailCustomer.id, { subject: action.params.subject }, req.ip);
+        const emailLabel = `Email sent to ${emailCustomer.name}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "email", id: emailCustomer.id, label: emailLabel, url: "/crm/mail" });
+        return res.status(201).json({ ok: true, entity: "email", id: emailCustomer.id, label: emailLabel, url: "/crm/mail" });
+      }
+
+      // create_work_order — resolve the customer via the shared helper.
+      const resolvedCustomer = await resolveAiCustomer(action.params);
+      if (!resolvedCustomer.ok) return res.status(resolvedCustomer.status).json(resolvedCustomer.body);
+      const customer: { id: string; name: string } = resolvedCustomer.customer;
       const [property] = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customer.id)).limit(1);
       if (!property) {
         return res.status(422).json({ message: `${customer.name} has no property on file — add one on their customer page first.` });

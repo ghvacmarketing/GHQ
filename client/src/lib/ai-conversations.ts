@@ -3,9 +3,17 @@
 // conversation started on one surface resumes on the other.
 
 export type AiProposedAction = {
-  type: "create_task" | "create_work_order";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email";
   summary: string;
   params: Record<string, unknown>;
+};
+
+/** Approval-card titles per action type. */
+export const AI_ACTION_LABELS: Record<string, string> = {
+  create_task: "New task",
+  create_work_order: "New work order",
+  send_sms: "Text message",
+  send_email: "Email",
 };
 
 export type AiChatMessage = {
