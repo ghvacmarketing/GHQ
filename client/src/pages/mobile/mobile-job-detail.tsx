@@ -4561,19 +4561,18 @@ export default function MobileJobDetail() {
         }}
       >
       <OfflineIndicator />
-      {/* Floating back — tap, or swipe right from the left edge */}
-      <button
-        onClick={() => goBackAnimated()}
-        className="absolute left-3 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-700 shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
-        style={{ top: "calc(10px + env(safe-area-inset-top))" }}
-        data-testid="button-back"
-        aria-label="Back"
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </button>
       <div className="relative flex h-full flex-col bg-slate-50">
         <div className="flex-shrink-0 p-4 pb-2">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            {/* In-flow back — tap, or swipe right from the left edge */}
+            <button
+              onClick={() => goBackAnimated()}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
+              data-testid="button-back"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
             <div className="flex items-center gap-2">
               {isSupervisor && !isAssignedToMe && (
                 <Button

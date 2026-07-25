@@ -26,9 +26,11 @@ import {
   Wrench,
   X,
   MessageSquarePlus,
+  Mic,
   ShieldCheck,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 
 interface SearchResultItem {
   id: number;
@@ -306,6 +308,32 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   };
 
   const handleAskHelp = () => askQuestion(searchQuery);
+
+  // Voice input for Ask AI — Web Speech API where it works, record-then-
+  // transcribe where it doesn't (Safari, iOS PWA). Spoken asks auto-send
+  // when the mic is tapped off.
+  const {
+    supported: voiceSupported,
+    listening,
+    processing: transcribing,
+    start: startVoice,
+    stop: stopVoice,
+    cancel: cancelVoice,
+  } = useVoiceDictation({
+    onTranscript: setSearchQuery,
+    onFinal: (spoken) => {
+      if (spoken.length >= 3) askQuestion(spoken);
+      else if (spoken) setSearchQuery(spoken);
+    },
+    onError: (message) => {
+      setConversationMessages((prev) => [...prev, { role: "assistant", content: message }]);
+    },
+  });
+
+  // Kill any live capture when the dialog closes or leaves AI mode.
+  useEffect(() => {
+    if (!open || mode !== "help") cancelVoice();
+  }, [open, mode, cancelVoice]);
 
   // Execute an AI-proposed action — only ever called from the Approve button
   // (or a candidate pick when the customer name was too close to call).
@@ -781,24 +809,48 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                 placeholder={
                   mode === "search"
                     ? "Search customers, work orders, invoices..."
+                    : listening
+                    ? "Listening..."
+                    : transcribing
+                    ? "Transcribing..."
                     : conversationMessages.length > 0
                     ? "Ask a follow-up question..."
                     : "Ask about CRM features..."
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-20 h-12 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                className={`pl-10 h-12 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none ${mode === "help" ? "pr-28" : "pr-20"}`}
                 data-testid="input-ghq-search"
               />
-              {mode === "help" && searchQuery.trim().length >= 3 && (
-                <button
-                  onClick={handleAskHelp}
-                  disabled={helpMutation.isPending}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
-                >
-                  <Send className="h-3 w-3" />
-                  Ask
-                </button>
+              {mode === "help" && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  {voiceSupported && (
+                    <button
+                      onClick={listening ? stopVoice : startVoice}
+                      disabled={transcribing}
+                      className={`relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${
+                        listening
+                          ? "border-[#711419] bg-[#711419] text-white"
+                          : "border-border bg-background text-muted-foreground hover:text-[#711419] hover:border-[#711419]/50"
+                      }`}
+                      aria-label={listening ? "Stop listening" : "Speak your question"}
+                      data-testid="ai-mic"
+                    >
+                      {listening && <span className="absolute inset-0 animate-ping rounded-md border border-[#711419]" />}
+                      {transcribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+                    </button>
+                  )}
+                  {searchQuery.trim().length >= 3 && (
+                    <button
+                      onClick={handleAskHelp}
+                      disabled={helpMutation.isPending}
+                      className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
+                    >
+                      <Send className="h-3 w-3" />
+                      Ask
+                    </button>
+                  )}
+                </div>
               )}
               {mode === "search" && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">

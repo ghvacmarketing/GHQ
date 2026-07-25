@@ -125,10 +125,13 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       style={{ paddingTop: "env(safe-area-inset-top)" }}
       data-testid="mobile-shell"
     >
-      {/* Content scrolls underneath the bottom tab bar */}
+      {/* Content scrolls underneath the bottom tab bar. Pages with a custom
+          nav fill the shell with their own scroll layers and handle their own
+          bottom clearance — reserving padding here would end their container
+          in a visible band above the tabs. */}
       <main
         className="flex-1 overflow-auto"
-        style={{ paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}
+        style={customNav ? undefined : { paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
       >
         {children}
