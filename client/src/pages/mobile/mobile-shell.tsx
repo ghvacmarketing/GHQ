@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   ClipboardList, Wrench, Clock, ShieldX, MessageSquare, Users, Plus,
-  FileText, Receipt, Camera,
+  FileText, Receipt, Camera, Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
@@ -184,6 +184,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       <DraggableSheet open={moreOpen} onOpenChange={setMoreOpen} title="More" testid="sheet-more">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Go to</p>
           <div className="grid grid-cols-4 gap-3">
+            <SheetTile icon={Sparkles} label="Ask AI" onClick={() => go("/mobile/assistant")} testid="more-assistant" />
             <SheetTile icon={Users} label="Customers" onClick={() => go("/mobile/customers")} testid="more-customers" />
             <SheetTile icon={MessageSquare} label="Messages" onClick={() => go("/mobile/messages")} testid="more-messages" />
           </div>

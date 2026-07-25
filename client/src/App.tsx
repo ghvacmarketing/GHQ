@@ -114,6 +114,7 @@ const CrmEsignEditor = lazy(() => import("@/pages/crm/crm-esign-editor"));
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
 const MobileJobDetail = lazy(() => import("@/pages/mobile/mobile-job-detail"));
 const MobileTime = lazy(() => import("@/pages/mobile/mobile-time"));
+const MobileAssistant = lazy(() => import("@/pages/mobile/mobile-assistant"));
 const MobilePhotos = lazy(() => import("@/pages/mobile/mobile-photos"));
 const MobileJob = lazy(() => import("@/pages/mobile/mobile-job"));
 const MobileProfile = lazy(() => import("@/pages/mobile/mobile-profile"));
@@ -394,6 +395,7 @@ function Router() {
       <Route path="/mobile/quotes/:id/present">{() => <MobileWrapper><MobileQuotePresent /></MobileWrapper>}</Route>
       <Route path="/mobile/quotes/:id">{() => <MobileWrapper><MobileQuoteDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/invoices/:id">{() => <MobileWrapper><MobileInvoiceDetail /></MobileWrapper>}</Route>
+      <Route path="/mobile/assistant">{() => <MobileWrapper><MobileAssistant /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/photos">{() => <MobileWrapper><MobilePhotos /></MobileWrapper>}</Route>
       <Route path="/mobile/messages">{() => <MobileWrapper><MobileMessages /></MobileWrapper>}</Route>
