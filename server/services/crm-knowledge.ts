@@ -405,6 +405,20 @@ Integration with Bouncie GPS devices for real-time vehicle tracking of company t
 
 ---
 
+## COMPANYCAM INTEGRATION
+
+### What is the CompanyCam integration?
+CompanyCam projects sync into the CRM as photo references (Settings > CompanyCam, URL: /crm/settings/companycam). Projects are matched to CRM customers BY ADDRESS (the street number must match); each matched project's photos appear in that customer's Files/Photos everywhere in the CRM and mobile app. The images stay hosted on CompanyCam's CDN — nothing bulky is copied into the database.
+
+### How it works
+- An hourly background sync (plus a "Sync now" button) pulls all CompanyCam projects, auto-matches them to customers by address, and imports photo references
+- Projects the auto-matcher isn't sure about show as "unmatched" on the settings page — an admin picks the right customer manually ("Match" button), or marks the project "Ignore"
+- Two-way: new photos uploaded in the CRM/mobile app for a linked customer are pushed up to the matching CompanyCam project automatically
+- Deletes never propagate in either direction
+- Requires the COMPANYCAM_API_TOKEN environment variable on the server
+
+---
+
 ## QUICKBOOKS INTEGRATION
 
 ### What Syncs
@@ -668,6 +682,7 @@ The Settings page at /crm/settings contains these sub-sections:
 **Data & System**
 - **Import Data** — import customer or equipment data from CSV
 - **Fleet Tracking** — Bouncie GPS vehicle tracking integration
+- **CompanyCam** — address-matched CompanyCam project/photo sync (two-way references)
 - **Salesbook Directory** — manage the table of contents entries for the digital salesbook
 - **Customer Portal** — control whether portal profile edits sync straight into the CRM or wait for review
 - **Appearance** — light/dark theme for the CRM

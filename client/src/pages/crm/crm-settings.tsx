@@ -23,6 +23,7 @@ import {
   CalendarClock,
   Palette,
   Globe,
+  Camera,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { PageHeader, SectionCard } from "@/components/crm/ui-kit";
@@ -75,6 +76,7 @@ const sections: SettingsSection[] = [
       { name: "Appearance", href: "/crm/settings/appearance", icon: Palette },
       { name: "Import Data", href: "/crm/settings/import", icon: Upload },
       { name: "Fleet Tracking", href: "/crm/settings/fleet", icon: Truck },
+      { name: "CompanyCam", href: "/crm/settings/companycam", icon: Camera },
       { name: "Salesbook Directory", href: "/crm/settings/salesbook", icon: BookOpen },
       { name: "System Tools", href: "/crm/settings/system-tools", icon: Wrench },
     ],

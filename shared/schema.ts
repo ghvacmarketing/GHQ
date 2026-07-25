@@ -3987,6 +3987,32 @@ export const customerFiles = pgTable("customer_files", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CompanyCam integration — projects matched to CRM customers by address.
+// Photos are REFERENCE rows in customer_files (url = CompanyCam CDN,
+// objectPath = "companycam:<photoId>" as the dedupe key); the binaries never
+// enter our database.
+export const companycamProjectLinks = pgTable("companycam_project_links", {
+  ccProjectId: varchar("cc_project_id").primaryKey(),
+  ccProjectName: text("cc_project_name"),
+  ccAddress: text("cc_address"),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "set null" }),
+  matchType: text("match_type").notNull().default("unmatched"), // auto | manual | unmatched | ignored
+  matchScore: integer("match_score"), // 0-100, for the settings UI
+  photoCount: integer("photo_count").default(0),
+  importedCount: integer("imported_count").default(0),
+  archived: boolean("archived").default(false),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Photos WE pushed up to CompanyCam — skipped on import so a push never
+// boomerangs back as a duplicate customer_files row.
+export const companycamPushedPhotos = pgTable("companycam_pushed_photos", {
+  ccPhotoId: varchar("cc_photo_id").primaryKey(),
+  customerFileId: varchar("customer_file_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertCustomerFileSchema = createInsertSchema(customerFiles).omit({
   id: true,
   createdAt: true,

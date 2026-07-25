@@ -417,6 +417,28 @@ async function runDocsAndAccountingMigrations() {
     await db.execute(sql`ALTER TABLE pin_comments ADD COLUMN IF NOT EXISTS edited_at timestamp`);
     await db.execute(sql`ALTER TABLE crm_time_entries ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'job'`);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS companycam_project_links (
+        cc_project_id varchar PRIMARY KEY,
+        cc_project_name text,
+        cc_address text,
+        customer_id varchar REFERENCES crm_customers(id) ON DELETE SET NULL,
+        match_type text NOT NULL DEFAULT 'unmatched',
+        match_score integer,
+        photo_count integer DEFAULT 0,
+        imported_count integer DEFAULT 0,
+        archived boolean DEFAULT false,
+        last_synced_at timestamp,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS companycam_pushed_photos (
+        cc_photo_id varchar PRIMARY KEY,
+        customer_file_id varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS mkt_templates (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,
@@ -988,6 +1010,11 @@ async function runWaterHeaterSeeds() {
 
     // Start Govee sensor polling (humidity/temperature) every minute
     startGoveeBackgroundSync(1);
+
+    // CompanyCam reference sync (address-matched projects -> customer photos)
+    import("./services/companycam")
+      .then(({ scheduleCompanycamSync }) => scheduleCompanycamSync())
+      .catch((err) => console.error("CompanyCam scheduler import failed:", err));
 
     // Gmail (Workspace) two-way inbox sync for connected CRM users
     import("./services/gmailService")

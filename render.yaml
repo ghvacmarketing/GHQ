@@ -28,6 +28,13 @@ services:
       - key: WEATHERAPI_KEY
         sync: false
 
+      # ── CompanyCam (photo sync) ──────────────────────────────────────
+      # Access token from CompanyCam → Settings → API. Enables the hourly
+      # reference sync (address-matched projects → customer photos) and the
+      # push of new CRM photos to the linked project.
+      - key: COMPANYCAM_API_TOKEN
+        sync: false
+
       # ── Android app (Play Store / sideload) ─────────────────────────
       # Cert fingerprints are public info, safe to commit. First entry is
       # the local upload/signing key from the PWABuilder package; append
