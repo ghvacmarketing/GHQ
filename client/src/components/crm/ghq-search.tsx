@@ -8,7 +8,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  History,
   Search,
+  Trash2,
   Users,
   ClipboardList,
   Receipt,
@@ -31,6 +33,16 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
+import {
+  type AiChatMessage,
+  type AiConversationSummary,
+  type AiProposedAction,
+  deleteAiConversation,
+  dismissAiAction,
+  fetchAiConversation,
+  fetchLatestAiConversation,
+  formatConversationWhen,
+} from "@/lib/ai-conversations";
 
 interface SearchResultItem {
   id: number;
@@ -170,30 +182,18 @@ function useDebounce<T>(value: T, delay: number): T {
 
 // An action the AI proposed. NOTHING runs until the user clicks Approve —
 // the server re-validates every proposal against a strict whitelist and
-// executes under the approving user's own session.
-type ProposedAction = {
-  type: "create_task" | "create_work_order";
-  summary: string;
-  params: Record<string, unknown>;
-};
-
+// executes under the approving user's own session. Conversations persist
+// server-side (shared with the mobile assistant) via @/lib/ai-conversations.
 interface HelpResponse {
   answer: string;
   relatedTopics: string[];
   confidence: "high" | "medium" | "low";
-  proposedAction?: ProposedAction | null;
+  proposedAction?: AiProposedAction | null;
+  conversationId?: string;
+  messageId?: string;
 }
 
-type ConversationMessage = {
-  role: "user" | "assistant";
-  content: string;
-  relatedTopics?: string[];
-  proposedAction?: ProposedAction | null;
-  actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose";
-  actionResult?: { label: string; url: string } | null;
-  actionError?: string | null;
-  actionCandidates?: { id: string; name: string }[] | null;
-};
+type ConversationMessage = AiChatMessage;
 
 /** The assistant answers in plain prose, but strip any markdown that slips
  *  through so the chat never shows raw asterisks or hash signs. */
@@ -219,6 +219,9 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [mode, setMode] = useState<"search" | "help">("search");
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const debouncedQuery = useDebounce(searchQuery, 300);
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -230,18 +233,39 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
     enabled: debouncedQuery.length >= 2 && mode === "search",
   });
 
+  // Resume the most recent stored thread the first time Ask AI opens —
+  // conversations persist server-side and are shared with the mobile app.
+  useEffect(() => {
+    if (!open || mode !== "help" || hydrated) return;
+    setHydrated(true);
+    fetchLatestAiConversation().then((latest) => {
+      if (latest) {
+        setConversationId(latest.id);
+        setConversationMessages((prev) => (prev.length === 0 ? latest.messages : prev));
+      }
+    });
+  }, [open, mode, hydrated]);
+
+  const { data: pastConversations = [] } = useQuery<AiConversationSummary[]>({
+    queryKey: ["/api/crm/ai/conversations"],
+    enabled: open && mode === "help" && historyOpen,
+  });
+
   const helpMutation = useMutation({
     mutationFn: async ({ question, conversationHistory }: { question: string; conversationHistory: Array<{role: string; content: string}> }) => {
-      const response = await apiRequest("POST", "/api/crm/help", { question, conversationHistory });
+      const response = await apiRequest("POST", "/api/crm/help", { question, conversationHistory, conversationId });
       return response.json() as Promise<HelpResponse>;
     },
     onSuccess: (data) => {
+      if (data.conversationId) setConversationId(data.conversationId);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
       setConversationMessages(prev => [...prev, {
         role: "assistant",
         content: data.answer,
         relatedTopics: data.relatedTopics,
         proposedAction: data.proposedAction || null,
         actionState: data.proposedAction ? "pending" : undefined,
+        messageId: data.messageId,
       }]);
     },
     onError: (e: any) => {
@@ -350,6 +374,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
       body: JSON.stringify({
         type: msg.proposedAction.type,
         params: { ...msg.proposedAction.params, ...extraParams },
+        messageId: msg.messageId,
       }),
     })
       .then(async (r) => {
@@ -385,11 +410,14 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   };
 
   const dismissProposedAction = (index: number) => {
+    dismissAiAction(conversationMessages[index]?.messageId);
     setConversationMessages(prev => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
   };
 
   const handleNewConversation = () => {
     setConversationMessages([]);
+    setConversationId(null);
+    setHistoryOpen(false);
     setSearchQuery("");
     setTimeout(() => inputRef.current?.focus(), 50);
   };
@@ -551,6 +579,61 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   };
 
   const renderHelpResults = () => {
+    if (historyOpen) {
+      return (
+        <div className="p-4 space-y-2" data-testid="ai-history-list">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Past conversations</p>
+          {pastConversations.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nothing saved yet — ask something and it'll show up here.
+            </p>
+          ) : (
+            pastConversations.map((c) => (
+              <div
+                key={c.id}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                  c.id === conversationId ? "border-[#711419]/40 bg-[#711419]/[0.04]" : "border-border bg-card"
+                }`}
+              >
+                <button
+                  onClick={() => {
+                    fetchAiConversation(c.id).then((loaded) => {
+                      if (loaded) {
+                        setConversationId(loaded.id);
+                        setConversationMessages(loaded.messages);
+                        setHistoryOpen(false);
+                      }
+                    });
+                  }}
+                  className="min-w-0 flex-1 text-left"
+                  data-testid={`ai-conversation-${c.id}`}
+                >
+                  <p className="truncate text-sm font-medium text-foreground">{c.title || "Conversation"}</p>
+                  <p className="text-xs text-muted-foreground">{formatConversationWhen(c.updatedAt)}</p>
+                </button>
+                <button
+                  onClick={() => {
+                    deleteAiConversation(c.id).then(() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+                      if (c.id === conversationId) {
+                        setConversationId(null);
+                        setConversationMessages([]);
+                      }
+                    });
+                  }}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-red-600"
+                  aria-label="Delete conversation"
+                  data-testid={`ai-conversation-delete-${c.id}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      );
+    }
+
     if (conversationMessages.length === 0 && !helpMutation.isPending) {
       return (
         <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
@@ -898,6 +981,16 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                   <Sparkles className="h-3 w-3" />
                   <span>AI-powered CRM help</span>
                 </div>
+                <button
+                  onClick={() => setHistoryOpen((v) => !v)}
+                  className={`flex items-center gap-1.5 transition-colors ml-2 ${
+                    historyOpen ? "text-[#711419]" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="ai-history-toggle"
+                >
+                  <History className="h-3 w-3" />
+                  <span>History</span>
+                </button>
                 {conversationMessages.length > 0 && (
                   <button
                     onClick={handleNewConversation}

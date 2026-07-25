@@ -259,6 +259,39 @@ async function runChecklistPhotoStepsMigration() {
   }
 }
 
+async function runAiConversationMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_conversations (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+        title text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_messages (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id varchar NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+        role text NOT NULL,
+        content text NOT NULL,
+        related_topics json DEFAULT '[]'::json,
+        proposed_action json,
+        action_status text,
+        action_result json,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_conversations_user_updated_idx ON ai_conversations(user_id, updated_at)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_messages_conversation_idx ON ai_messages(conversation_id, created_at)`);
+  } catch (err) {
+    console.error("AI conversation migration error (non-fatal):", err);
+  }
+}
+
 async function runGmailMigration() {
   try {
     const { db } = await import("./db");
@@ -873,6 +906,7 @@ async function runWaterHeaterSeeds() {
   await runTaggedCommentMigrations();
   await runInstallPlannerMigrations();
   await runChecklistPhotoStepsMigration();
+  await runAiConversationMigrations();
   await runGmailMigration();
   await runDocsAndAccountingMigrations();
   await runCampaignMigrations();

@@ -4,32 +4,25 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { Loader2, Mic, RotateCcw, Send, ShieldCheck, X } from "lucide-react";
+import { History, Loader2, Mic, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
+import {
+  type AiChatMessage as ChatMessage,
+  type AiConversationSummary,
+  deleteAiConversation,
+  dismissAiAction,
+  fetchAiConversation,
+  fetchLatestAiConversation,
+  formatConversationWhen,
+} from "@/lib/ai-conversations";
 
 /** The mobile GHQ assistant — an immersive dark-industrial popup that slides
  *  up over whatever screen you're on (not a page of its own). Same brain and
  *  the same hard safeguards as the desktop Ask AI: the model can only PROPOSE
  *  whitelisted actions; nothing runs until the user taps Approve, and the
  *  server re-validates every proposal. Voice input rides on Web Speech where
- *  it works and record-then-transcribe on iOS PWAs (spoken asks auto-send). */
-
-type ProposedAction = {
-  type: "create_task" | "create_work_order";
-  summary: string;
-  params: Record<string, unknown>;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-  relatedTopics?: string[];
-  proposedAction?: ProposedAction | null;
-  actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose";
-  actionResult?: { label: string; url: string } | null;
-  actionError?: string | null;
-  actionCandidates?: { id: string; name: string }[] | null;
-};
+ *  it works and record-then-transcribe on iOS PWAs (spoken asks auto-send).
+ *  Conversations persist server-side and are shared with desktop Ask AI. */
 
 const STARTERS = [
   "What's on the schedule today?",
@@ -52,6 +45,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const composerRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -105,6 +101,29 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   });
   const firstName = currentUser?.name?.trim().split(/\s+/)[0];
 
+  // Resume the most recent stored thread the first time the sheet opens —
+  // conversations survive app restarts and are shared with desktop Ask AI.
+  useEffect(() => {
+    if (!open || hydrated) return;
+    setHydrated(true);
+    fetchLatestAiConversation().then((latest) => {
+      if (latest) {
+        setConversationId(latest.id);
+        setMessages((prev) => (prev.length === 0 ? latest.messages : prev));
+      }
+    });
+  }, [open, hydrated]);
+
+  const { data: pastConversations = [] } = useQuery<AiConversationSummary[]>({
+    queryKey: ["/api/crm/ai/conversations"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/ai/conversations", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && historyOpen,
+  });
+
   // Voice capture — Web Speech API where it works, record-then-transcribe on
   // iOS home-screen PWAs (where that API exists but the OS won't service it).
   // Either way YOU control how long the mic listens; stopping it sends.
@@ -151,9 +170,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     setMessages((prev) => [...prev, { role: "user", content: question }]);
     setInput("");
     setPending(true);
-    apiRequest("POST", "/api/crm/help", { question, conversationHistory: historyForApi })
+    apiRequest("POST", "/api/crm/help", { question, conversationHistory: historyForApi, conversationId })
       .then(async (r) => {
         const data = await r.json();
+        if (data.conversationId) setConversationId(data.conversationId);
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
         setMessages((prev) => [
           ...prev,
           {
@@ -162,6 +183,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             relatedTopics: data.relatedTopics,
             proposedAction: data.proposedAction || null,
             actionState: data.proposedAction ? ("pending" as const) : undefined,
+            messageId: data.messageId,
           },
         ]);
       })
@@ -187,6 +209,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       body: JSON.stringify({
         type: msg.proposedAction.type,
         params: { ...msg.proposedAction.params, ...extraParams },
+        messageId: msg.messageId,
       }),
     })
       .then(async (r) => {
@@ -224,6 +247,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   };
 
   const dismissProposedAction = (index: number) => {
+    dismissAiAction(messages[index]?.messageId);
     setMessages((prev) => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
   };
 
@@ -266,9 +290,20 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             <h1 className="text-sm font-semibold leading-tight text-slate-100">Assistant</h1>
           </div>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-[4px] border transition-colors active:bg-slate-800",
+                historyOpen ? "border-[#711419] text-[#e8b4b8]" : "border-slate-800 text-slate-400",
+              )}
+              aria-label="Past conversations"
+              data-testid="assistant-history"
+            >
+              <History className="h-4 w-4" />
+            </button>
             {messages.length > 0 && (
               <button
-                onClick={() => { setMessages([]); setInput(""); }}
+                onClick={() => { setMessages([]); setInput(""); setConversationId(null); setHistoryOpen(false); }}
                 className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
                 aria-label="New conversation"
                 data-testid="assistant-new-conversation"
@@ -289,7 +324,59 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
 
         {/* Conversation */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          {messages.length === 0 && !pending ? (
+          {historyOpen ? (
+            <div className="space-y-2" data-testid="assistant-history-list">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Past conversations</p>
+              {pastConversations.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-500">
+                  Nothing saved yet — ask something and it'll show up here.
+                </p>
+              ) : (
+                pastConversations.map((c) => (
+                  <div
+                    key={c.id}
+                    className={cn(
+                      "flex items-center gap-2 rounded-[4px] border px-3 py-2.5",
+                      c.id === conversationId ? "border-[#711419]/60 bg-[#711419]/10" : "border-slate-800 bg-slate-900",
+                    )}
+                  >
+                    <button
+                      onClick={() => {
+                        fetchAiConversation(c.id).then((loaded) => {
+                          if (loaded) {
+                            setConversationId(loaded.id);
+                            setMessages(loaded.messages);
+                            setHistoryOpen(false);
+                          }
+                        });
+                      }}
+                      className="min-w-0 flex-1 text-left"
+                      data-testid={`assistant-conversation-${c.id}`}
+                    >
+                      <p className="truncate text-sm font-medium text-slate-200">{c.title || "Conversation"}</p>
+                      <p className="text-xs text-slate-500">{formatConversationWhen(c.updatedAt)}</p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        deleteAiConversation(c.id).then(() => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+                          if (c.id === conversationId) {
+                            setConversationId(null);
+                            setMessages([]);
+                          }
+                        });
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] text-slate-500 transition-colors active:text-red-400"
+                      aria-label="Delete conversation"
+                      data-testid={`assistant-conversation-delete-${c.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-10 w-10 rotate-45 text-[#711419]">
                 <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />

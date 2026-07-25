@@ -4578,3 +4578,39 @@ export const insertSignatureFieldSchema = createInsertSchema(signatureFields).om
 });
 export type InsertSignatureField = z.infer<typeof insertSignatureFieldSchema>;
 export type SignatureField = typeof signatureFields.$inferSelect;
+
+// ── AI assistant conversations ──────────────────────────────────────────
+// Persistent chat history for the GHQ assistant (desktop Ask AI + mobile
+// overlay share these). Messages also record any AI-proposed action and what
+// the user did with it, so every AI-created task/work order has a traceable
+// "who asked for what, who approved it" trail.
+export const aiConversations = pgTable("ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  title: text("title"), // first question, trimmed for the history list
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const aiMessages = pgTable("ai_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => aiConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user' | 'assistant'
+  content: text("content").notNull(),
+  relatedTopics: json("related_topics").$type<string[]>().default([]),
+  proposedAction: json("proposed_action").$type<{ type: string; summary: string; params: Record<string, unknown> } | null>(),
+  actionStatus: text("action_status"), // null (pending) | 'approved' | 'dismissed'
+  actionResult: json("action_result").$type<{ entity: string; id: string; label: string; url: string } | null>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiConversationSchema = createInsertSchema(aiConversations).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertAiMessageSchema = createInsertSchema(aiMessages).omit({
+  id: true, createdAt: true,
+});
+export type InsertAiConversation = z.infer<typeof insertAiConversationSchema>;
+export type AiConversation = typeof aiConversations.$inferSelect;
+export type InsertAiMessage = z.infer<typeof insertAiMessageSchema>;
+export type AiMessage = typeof aiMessages.$inferSelect;

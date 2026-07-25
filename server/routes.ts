@@ -99,6 +99,7 @@ import {
   disconnectGmail,
 } from "./services/gmailService";
 import { crmEmailThreads, crmEmailMessages } from "@shared/schema";
+import { aiConversations, aiMessages } from "@shared/schema";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerEsignRoutes } from "./esign-routes";
@@ -2238,7 +2239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/crm/help", requireCrmAuth, async (req, res) => {
     try {
-      const { question, conversationHistory } = req.body;
+      const { question, conversationHistory, conversationId } = req.body;
       if (!question || typeof question !== "string") {
         return res.status(400).json({ message: "Question is required" });
       }
@@ -2247,15 +2248,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "AI isn't configured on this server — add ANTHROPIC_API_KEY in the Render environment and redeploy.",
         });
       }
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      // A conversationId means we replay the stored thread server-side (last
+      // 10 turns) — the client-shipped history is only a fallback for the
+      // first turn or if persistence ever fails.
+      let convoId: string | undefined;
+      let history: Array<{ role: "user" | "assistant"; content: string }> | undefined =
+        Array.isArray(conversationHistory) ? conversationHistory : undefined;
+      if (conversationId && typeof conversationId === "string") {
+        const [found] = await db
+          .select({ id: aiConversations.id })
+          .from(aiConversations)
+          .where(and(eq(aiConversations.id, conversationId), eq(aiConversations.userId, user.id)));
+        if (found) {
+          convoId = found.id;
+          const stored = await db
+            .select({ role: aiMessages.role, content: aiMessages.content })
+            .from(aiMessages)
+            .where(eq(aiMessages.conversationId, found.id))
+            .orderBy(desc(aiMessages.createdAt))
+            .limit(10);
+          history = stored.reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+        }
+      }
 
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question, Array.isArray(conversationHistory) ? conversationHistory : undefined);
-      res.json(result);
+      const result = await askCrmHelp(question, history);
+
+      // Persist the exchange — non-fatal, answering still works if it fails.
+      let messageId: string | undefined;
+      try {
+        if (!convoId) {
+          const [created] = await db
+            .insert(aiConversations)
+            .values({ userId: user.id, title: question.trim().slice(0, 80) })
+            .returning({ id: aiConversations.id });
+          convoId = created.id;
+        } else {
+          await db.update(aiConversations).set({ updatedAt: new Date() }).where(eq(aiConversations.id, convoId));
+        }
+        await db.insert(aiMessages).values({ conversationId: convoId, role: "user", content: question.trim() });
+        const [assistantMsg] = await db
+          .insert(aiMessages)
+          .values({
+            conversationId: convoId,
+            role: "assistant",
+            content: result.answer,
+            relatedTopics: result.relatedTopics || [],
+            proposedAction: result.proposedAction || null,
+          })
+          .returning({ id: aiMessages.id });
+        messageId = assistantMsg.id;
+      } catch (persistErr) {
+        console.error("AI conversation persist error (non-fatal):", persistErr);
+      }
+
+      res.json({ ...result, conversationId: convoId, messageId });
     } catch (error: any) {
       console.error("Error in CRM help:", error);
       const detail = error?.message || error?.error?.message || "";
       res.status(500).json({ message: `AI request failed${detail ? `: ${detail}` : ""}` });
     }
+  });
+
+  // ── Assistant conversation history ─────────────────────────────────────
+  // Every route is scoped to the signed-in user; nobody can read anyone
+  // else's threads.
+  app.get("/api/crm/ai/conversations", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const convos = await db
+        .select({ id: aiConversations.id, title: aiConversations.title, updatedAt: aiConversations.updatedAt })
+        .from(aiConversations)
+        .where(eq(aiConversations.userId, user.id))
+        .orderBy(desc(aiConversations.updatedAt))
+        .limit(30);
+      res.json(convos);
+    } catch (error) {
+      console.error("Error listing AI conversations:", error);
+      res.status(500).json({ message: "Error listing conversations" });
+    }
+  });
+
+  const getOwnedAiConversation = async (userId: string, conversationId: string) => {
+    const [convo] = await db
+      .select()
+      .from(aiConversations)
+      .where(and(eq(aiConversations.id, conversationId), eq(aiConversations.userId, userId)));
+    return convo;
+  };
+
+  const getAiConversationPayload = async (conversationId: string) => {
+    const messages = await db
+      .select()
+      .from(aiMessages)
+      .where(eq(aiMessages.conversationId, conversationId))
+      .orderBy(asc(aiMessages.createdAt));
+    return messages;
+  };
+
+  // /latest must register before /:id or "latest" would match as an id.
+  app.get("/api/crm/ai/conversations/latest", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const [convo] = await db
+        .select()
+        .from(aiConversations)
+        .where(eq(aiConversations.userId, user.id))
+        .orderBy(desc(aiConversations.updatedAt))
+        .limit(1);
+      if (!convo) return res.json(null);
+      res.json({ conversation: convo, messages: await getAiConversationPayload(convo.id) });
+    } catch (error) {
+      console.error("Error loading latest AI conversation:", error);
+      res.status(500).json({ message: "Error loading conversation" });
+    }
+  });
+
+  app.get("/api/crm/ai/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const convo = await getOwnedAiConversation(user.id, req.params.id);
+      if (!convo) return res.status(404).json({ message: "Conversation not found" });
+      res.json({ conversation: convo, messages: await getAiConversationPayload(convo.id) });
+    } catch (error) {
+      console.error("Error loading AI conversation:", error);
+      res.status(500).json({ message: "Error loading conversation" });
+    }
+  });
+
+  app.delete("/api/crm/ai/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const convo = await getOwnedAiConversation(user.id, req.params.id);
+      if (!convo) return res.status(404).json({ message: "Conversation not found" });
+      await db.delete(aiConversations).where(eq(aiConversations.id, convo.id));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting AI conversation:", error);
+      res.status(500).json({ message: "Error deleting conversation" });
+    }
+  });
+
+  // Record what the user did with an AI-proposed action, so restored threads
+  // show the real outcome (and approvals leave a trail on the message row).
+  const recordAiActionOutcome = async (
+    userId: string,
+    messageId: string | undefined,
+    status: "approved" | "dismissed",
+    result?: { entity: string; id: string; label: string; url: string },
+  ) => {
+    if (!messageId || typeof messageId !== "string") return;
+    try {
+      const [row] = await db
+        .select({ id: aiMessages.id, ownerId: aiConversations.userId })
+        .from(aiMessages)
+        .innerJoin(aiConversations, eq(aiMessages.conversationId, aiConversations.id))
+        .where(eq(aiMessages.id, messageId));
+      if (!row || row.ownerId !== userId) return;
+      await db
+        .update(aiMessages)
+        .set({ actionStatus: status, ...(result ? { actionResult: result } : {}) })
+        .where(eq(aiMessages.id, messageId));
+    } catch (err) {
+      console.error("AI action outcome record error (non-fatal):", err);
+    }
+  };
+
+  app.post("/api/crm/ai/messages/:id/dismiss", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    await recordAiActionOutcome(user.id, req.params.id, "dismissed");
+    res.json({ ok: true });
   });
 
   // Fuzzy customer-name scoring for AI actions — voice transcription mangles
@@ -2350,6 +2520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           afterJson: JSON.stringify({ ...task, source: "ai_approved" }),
         });
         await logCrmAudit(user.id, "ai_action.create_task", "task", task.id, { params: action.params }, req.ip);
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
         return res.status(201).json({ ok: true, entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
       }
 
@@ -2463,6 +2634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await logCrmAudit(user.id, "ai_action.create_work_order", "work_order", workOrder.id, { params: action.params, customerId: customer.id, assignedTechId: assignedTech?.id ?? null }, req.ip);
       const label = `${workOrder.title} for ${customer.name}${assignedTech ? ` (assigned to ${assignedTech.name})` : ""}`;
+      await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "work_order", id: workOrder.id, label, url: `/crm/work-orders/${workOrder.id}` });
       return res.status(201).json({ ok: true, entity: "work_order", id: workOrder.id, label, url: `/crm/work-orders/${workOrder.id}` });
     } catch (error: any) {
       console.error("Error executing AI action:", error);
