@@ -644,6 +644,7 @@ function OverviewTab({
 function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail; template: AssignedChecklistTemplate }) {
   const { toast } = useToast();
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
+  const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
 
   const answeredCount = template.questions.filter((q) => {
     const a = answers[q.id];
@@ -739,22 +740,45 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
             />
           </div>
         </CardHeader>
-        <CardContent className="space-y-5 pt-4">
-          {sections.map((section, si) => (
-            <div key={si} className="space-y-3">
-              {showSectionHeaders && (
-                <div className="flex items-center gap-2 border-b border-slate-300/70 pb-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-[3px] bg-slate-900 text-[11px] font-bold text-white">
-                    {si + 1}
-                  </span>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                    {section.name || `Section ${si + 1}`}
-                  </p>
-                  <span className="ml-auto text-[11px] font-semibold text-slate-400">
-                    {answeredIn(section.qs)} of {section.qs.length}
-                  </span>
-                </div>
-              )}
+      </Card>
+
+      {/* Each section is its own collapsible card — the bold slate header
+          band stays visible even collapsed, so a section can't be missed. */}
+      {sections.map((section, si) => {
+        const collapsed = collapsedSections.has(si);
+        const done = answeredIn(section.qs);
+        const complete = section.qs.length > 0 && done === section.qs.length;
+        return (
+          <div key={si} className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid={`checklist-section-${si}`}>
+            {showSectionHeaders && (
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsedSections((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(si)) next.delete(si);
+                    else next.add(si);
+                    return next;
+                  })
+                }
+                className={`flex w-full items-center gap-2.5 bg-slate-100 px-3.5 py-3 text-left ${collapsed ? "" : "border-b border-slate-300/70"}`}
+                data-testid={`checklist-section-toggle-${si}`}
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] bg-slate-900 text-xs font-bold text-white">
+                  {si + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wider text-slate-800">
+                  {section.name || `Section ${si + 1}`}
+                </span>
+                <span className={`flex shrink-0 items-center gap-1 text-[11px] font-semibold ${complete ? "text-green-600" : "text-slate-500"}`}>
+                  {complete && <CheckCircle2 className="h-3.5 w-3.5" />}
+                  {done} of {section.qs.length}
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${collapsed ? "" : "rotate-180"}`} />
+              </button>
+            )}
+            {!collapsed && (
+              <div className="space-y-3 p-3.5">
               {section.qs.map((q) => {
             const value = answers[q.id];
             const linkedPhotos = photosByQuestion.get(q.id) ?? [];
@@ -867,8 +891,11 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
               </div>
             );
           })}
-            </div>
-          ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
           {generalPhotos.length > 0 && (
             <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="fill-photo-steps">
@@ -902,8 +929,6 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                 ? `${missingRequired} required ${missingRequired === 1 ? "answer" : "answers"} left`
                 : "Submit checklist"}
           </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
