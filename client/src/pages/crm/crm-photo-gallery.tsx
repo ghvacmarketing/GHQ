@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
-import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, Loader2, Filter, Upload, Search, FileText } from "lucide-react";
+import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, ChevronLeft, ChevronRight, Loader2, Filter, Upload, Search, FileText } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -290,13 +290,68 @@ export default function CrmPhotoGallery() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
-  // Escape closes the lightbox
+  // Lightbox navigation — tab through everything viewable in the current
+  // filter, in grid order.
+  const lightboxItems = useMemo(() => filtered.filter(isViewableFile), [filtered]);
+  const lightboxIndex = lightbox ? lightboxItems.findIndex((p) => p.id === lightbox.id) : -1;
+  const stepLightbox = (delta: number) => {
+    if (lightboxIndex < 0) return;
+    const next = lightboxItems[lightboxIndex + delta];
+    if (next) setLightbox(next);
+  };
+  // Swipe (finger) / drag (cursor) left-right to flip photos. The image
+  // follows the pointer; releasing past ~70px commits the flip.
+  const lightboxSwipe = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
+  const lightboxImgRef = useRef<HTMLImageElement | null>(null);
+  const suppressLightboxClose = useRef(false);
+  const onLightboxPointerDown = (e: React.PointerEvent) => {
+    lightboxSwipe.current = { x: e.clientX, y: e.clientY, dragging: false };
+  };
+  const onLightboxPointerMove = (e: React.PointerEvent) => {
+    const st = lightboxSwipe.current;
+    if (!st) return;
+    const dx = e.clientX - st.x;
+    const dy = e.clientY - st.y;
+    if (!st.dragging && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      st.dragging = true;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // pointer may already be gone — the drag still tracks
+      }
+    }
+    if (st.dragging && lightboxImgRef.current) {
+      lightboxImgRef.current.style.transform = `translateX(${dx}px)`;
+      lightboxImgRef.current.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 600));
+    }
+  };
+  const onLightboxPointerUp = (e: React.PointerEvent) => {
+    const st = lightboxSwipe.current;
+    lightboxSwipe.current = null;
+    if (!st?.dragging) return;
+    // The drag's release must not double as a tap on the backdrop
+    suppressLightboxClose.current = true;
+    window.setTimeout(() => { suppressLightboxClose.current = false; }, 150);
+    if (lightboxImgRef.current) {
+      lightboxImgRef.current.style.transform = "";
+      lightboxImgRef.current.style.opacity = "";
+    }
+    const dx = e.clientX - st.x;
+    if (Math.abs(dx) > 70) stepLightbox(dx < 0 ? 1 : -1);
+  };
+
+  // Escape closes the lightbox; arrow keys flip through it
   useEffect(() => {
     if (!lightbox) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(null);
+      if (e.key === "ArrowRight") stepLightbox(1);
+      if (e.key === "ArrowLeft") stepLightbox(-1);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightbox]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightbox, lightboxIndex, lightboxItems]);
 
   if (authLoading || !currentUser) return null;
 
@@ -696,11 +751,19 @@ export default function CrmPhotoGallery() {
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox */}
+      {/* Lightbox — arrows, ←/→ keys, or a swipe/drag flip through the grid */}
       {lightbox && (
         <div
           className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/90 p-6"
-          onClick={() => setLightbox(null)}
+          style={{ touchAction: "pan-y" }}
+          onClick={() => {
+            if (suppressLightboxClose.current) return;
+            setLightbox(null);
+          }}
+          onPointerDown={onLightboxPointerDown}
+          onPointerMove={onLightboxPointerMove}
+          onPointerUp={onLightboxPointerUp}
+          onPointerCancel={onLightboxPointerUp}
           data-testid="gallery-lightbox"
         >
           {isPdfFile(lightbox) ? (
@@ -713,7 +776,33 @@ export default function CrmPhotoGallery() {
               />
             </div>
           ) : (
-            <img src={lightbox.url} alt={lightbox.name} className="max-h-[80vh] max-w-full rounded-lg object-contain" />
+            <img
+              ref={lightboxImgRef}
+              src={lightbox.url}
+              alt={lightbox.name}
+              draggable={false}
+              className="max-h-[80vh] max-w-full select-none rounded-lg object-contain"
+            />
+          )}
+          {lightboxIndex > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); stepLightbox(-1); }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
+              aria-label="Previous photo"
+              data-testid="lightbox-prev"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+          {lightboxIndex >= 0 && lightboxIndex < lightboxItems.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); stepLightbox(1); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
+              aria-label="Next photo"
+              data-testid="lightbox-next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
           )}
           <div className="mt-3 text-center text-sm text-white/80">
             <p className="font-semibold text-white">{lightbox.name}</p>
@@ -721,6 +810,7 @@ export default function CrmPhotoGallery() {
               {lightbox.customerName && `${lightbox.customerName} · `}
               {lightbox.uploadedByName || "Unknown"}
               {lightbox.createdAt && ` · ${format(new Date(lightbox.createdAt), "EEE, MMM d yyyy · h:mm a")}`}
+              {lightboxIndex >= 0 && ` · ${lightboxIndex + 1} of ${lightboxItems.length}`}
             </p>
           </div>
           <div className="mt-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
