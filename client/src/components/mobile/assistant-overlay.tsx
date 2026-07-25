@@ -132,7 +132,6 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   // panel or scrim to push it back. Direction-locked so vertical scrolling in
   // the message list is untouched.
   const panelRef = useRef<HTMLElement>(null);
-  const mainRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const hDragRef = useRef<{ x: number; y: number; locked: boolean; opening: boolean; p: number; lastX: number; lastT: number; vx: number } | null>(null);
   const suppressClickRef = useRef(false);
@@ -144,12 +143,6 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       panelRef.current.style.transition = move;
       panelRef.current.style.transform = `translateX(${(p - 1) * w}px)`;
     }
-    if (mainRef.current) {
-      // The chat page recedes rather than getting pushed: a short slide plus
-      // a scale-down, so the panel reads as a layer sweeping over it.
-      mainRef.current.style.transition = move;
-      mainRef.current.style.transform = `translateX(${p * w * 0.25}px) scale(${1 - 0.05 * p})`;
-    }
     if (scrimRef.current) {
       scrimRef.current.style.transition = animate ? "opacity 0.28s ease-out" : "none";
       scrimRef.current.style.opacity = String(p);
@@ -157,7 +150,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   };
 
   const clearPanelDragStyles = () => {
-    for (const el of [panelRef.current, mainRef.current, scrimRef.current]) {
+    for (const el of [panelRef.current, scrimRef.current]) {
       if (!el) continue;
       el.style.transition = "";
       el.style.transform = "";
@@ -548,19 +541,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-black shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
+        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-slate-950 shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
         style={{ top: "calc(44px + env(safe-area-inset-top))" }}
       >
-        {/* Chat page — one solid card holding the whole conversation. As the
-            panel sweeps over it, it recedes into the background (slides a
-            little and scales down) for a layered, 3D feel. Swipe right
-            anywhere on it to pull the panel in. */}
+        {/* Chat page — stays planted. The panel is a layer that slides in ON
+            TOP of it (deep shadow + dim underneath), so it overlaps the chat
+            instead of pushing it off screen. Swipe right anywhere here to
+            pull the panel in. */}
         <div
-          ref={mainRef}
-          className={cn(
-            "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-slate-950 shadow-[0_8px_48px_rgba(0,0,0,0.8)] ring-1 ring-slate-800 transition-transform duration-300 ease-out",
-            panelOpen ? "translate-x-[min(21.5%,85px)] scale-[0.95]" : "translate-x-0 scale-100",
-          )}
+          className="relative flex min-h-0 flex-1 flex-col"
           style={{ touchAction: "pan-y" }}
           onPointerDown={(e) => onHStart(e, true)}
           onPointerMove={onHMove}
@@ -924,9 +913,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         </div>
         </div>
 
-        {/* Side panel — history + Spaces. Feels like its own page: swipe
-            right on the chat to pull it in, swipe left (or tap the dimmed
-            chat) to push it away; the chat slides over in step. */}
+        {/* Side panel — history + Spaces. A layer that slides in OVER the
+            chat: swipe right on the chat to pull it in, swipe left (or tap
+            the dimmed chat) to push it away. */}
         <div
           ref={scrimRef}
           className={cn(
