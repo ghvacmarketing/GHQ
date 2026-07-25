@@ -63,9 +63,13 @@ export async function claudeChatWithTools(opts: {
   maxIterations?: number;
 }): Promise<string> {
   const messages: { role: "user" | "assistant"; content: string | unknown[] }[] = [...opts.messages];
-  const maxIterations = opts.maxIterations ?? 6;
+  const maxIterations = opts.maxIterations ?? 8;
 
   for (let i = 0; i < maxIterations; i++) {
+    // On the last allowed round, forbid further tool calls so the model must
+    // answer with what it has — running out of lookups must NEVER surface as
+    // an error to the user.
+    const finalTurn = i === maxIterations - 1;
     const res = await fetch(API_URL, {
       method: "POST",
       headers: {
@@ -78,6 +82,7 @@ export async function claudeChatWithTools(opts: {
         max_tokens: opts.maxTokens ?? 2000,
         system: opts.system,
         tools: opts.tools,
+        ...(finalTurn ? { tool_choice: { type: "none" } } : {}),
         messages,
       }),
     });
@@ -88,7 +93,7 @@ export async function claudeChatWithTools(opts: {
       throw err;
     }
 
-    if (data.stop_reason === "tool_use") {
+    if (!finalTurn && data.stop_reason === "tool_use") {
       messages.push({ role: "assistant", content: data.content });
       const results: unknown[] = [];
       for (const block of data.content || []) {
@@ -110,7 +115,8 @@ export async function claudeChatWithTools(opts: {
       .map((b: any) => b.text)
       .join("");
   }
-  throw new Error("The assistant needed too many lookups for one question — try asking it more specifically.");
+  // Unreachable (the final turn always returns), but never throw at the user.
+  return "";
 }
 
 /** Strip optional ```json fences so responses parse cleanly. */
