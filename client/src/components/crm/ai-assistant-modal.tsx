@@ -9,10 +9,12 @@ import {
   type AiConversationSummary,
   type AiProposedAction,
   type AiSpace,
+  applyActionEdits,
   compressImageForAi,
   createAiSpace,
   customerUpdateRows,
   deleteAiConversation,
+  editableActionFields,
   deleteAiSpace,
   fetchAiConversation,
   fetchLatestAiConversation,
@@ -126,6 +128,19 @@ export default function AiAssistantModal() {
   // Approval cards and topic chips wait until the fresh answer finishes
   // typing — Gibbs shouldn't drop a card mid-sentence.
   const [typedOut, setTypedOut] = useState(true);
+  // Inline edit of a pending approval card (fix a typo'd name/address/message
+  // without re-asking Gibbs). draft holds only the touched fields.
+  const [editing, setEditing] = useState<{ index: number; draft: Record<string, string> } | null>(null);
+  const saveEdit = () => {
+    const cur = editing;
+    if (!cur) return;
+    setMessages((prev) => prev.map((m, j) => (
+      j === cur.index && m.proposedAction
+        ? { ...m, proposedAction: { ...m.proposedAction, params: applyActionEdits(m.proposedAction.params, cur.draft) } }
+        : m
+    )));
+    setEditing(null);
+  };
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -257,6 +272,12 @@ export default function AiAssistantModal() {
           const steps = Math.ceil(answerText.length / Math.max(2, Math.ceil(answerText.length / 150)));
           window.setTimeout(() => setTypedOut(true), steps * 16 + 400);
         }
+        // Several actions in one reply run as an ordered batch — step 2 can't
+        // be approved before step 1 completes (a work order or text for a
+        // customer being created needs the customer to exist first).
+        const totalActions = (data.proposedAction ? 1 : 0) + extras.length;
+        const batchId = totalActions > 1 ? String(data.messageId || `batch-${assistantIndex}`) : null;
+        const extraStepStart = data.proposedAction ? 2 : 1;
         setMessages((prev) => [
           ...prev,
           {
@@ -266,13 +287,15 @@ export default function AiAssistantModal() {
             proposedAction: data.proposedAction || null,
             actionState: data.proposedAction ? ("pending" as const) : undefined,
             messageId: data.messageId,
+            actionBatch: batchId && data.proposedAction ? { id: batchId, step: 1, total: totalActions } : null,
           },
-          ...extras.map((e) => ({
+          ...extras.map((e, k) => ({
             role: "assistant" as const,
             content: "",
             proposedAction: e.proposedAction || null,
             actionState: "pending" as const,
             messageId: e.messageId,
+            actionBatch: batchId ? { id: batchId, step: extraStepStart + k, total: totalActions } : null,
           })),
         ]);
       })
@@ -390,6 +413,15 @@ export default function AiAssistantModal() {
         )));
         queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
         queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+        // Customer creates/edits must show up instantly in lists, detail
+        // pages, and search — their keys come in several shapes, so match by
+        // substring instead of prefix.
+        queryClient.invalidateQueries({
+          predicate: (q) => {
+            const key = JSON.stringify(q.queryKey);
+            return key.includes("/api/crm/customers") || key.includes("/api/mobile/customers") || key.includes("/api/crm/ghq/search");
+          },
+        });
       })
       .catch((e: any) => {
         setMessages((prev) => prev.map((m, j) => (
@@ -746,9 +778,14 @@ export default function AiAssistantModal() {
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
                               {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
+                              {msg.actionBatch && (
+                                <span className="ml-auto rounded bg-[#711419]/10 px-1.5 py-0.5 tracking-normal text-[#711419]">
+                                  Step {msg.actionBatch.step} of {msg.actionBatch.total}
+                                </span>
+                              )}
                             </p>
                             <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
-                            <div className="mt-1.5 space-y-0.5">
+                            {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
                               {msg.proposedAction.type === "update_customer"
                                 ? customerUpdateRows(msg.proposedAction.params).map((row) => (
                                     <p key={row.label} className="text-xs text-slate-500">
@@ -770,30 +807,88 @@ export default function AiAssistantModal() {
                                       {String(v)}
                                     </p>
                                   ))}
-                            </div>
-                            {(msg.actionState === "pending" || msg.actionState === "error") && (
-                              <>
-                                {msg.actionState === "error" && (
-                                  <p className="mt-2 text-xs font-medium text-red-600">{msg.actionError}</p>
-                                )}
-                                <div className="mt-2.5 flex gap-2">
+                            </div>}
+                            {editing?.index === i && msg.proposedAction && (
+                              <div className="mt-2 space-y-2">
+                                {editableActionFields(msg.proposedAction.params).map((f) => (
+                                  <label key={f.path} className="block">
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{f.label}</span>
+                                    {f.multiline ? (
+                                      <textarea
+                                        rows={3}
+                                        value={editing.draft[f.path] ?? f.value}
+                                        onChange={(e) => setEditing((prev) => prev && { ...prev, draft: { ...prev.draft, [f.path]: e.target.value } })}
+                                        className="mt-0.5 w-full resize-none rounded-md border border-slate-300/70 bg-white px-2.5 py-2 text-sm leading-5 text-slate-800 focus:border-[#711419] focus:outline-none"
+                                      />
+                                    ) : (
+                                      <input
+                                        value={editing.draft[f.path] ?? f.value}
+                                        onChange={(e) => setEditing((prev) => prev && { ...prev, draft: { ...prev.draft, [f.path]: e.target.value } })}
+                                        className="mt-0.5 w-full rounded-md border border-slate-300/70 bg-white px-2.5 py-2 text-sm leading-5 text-slate-800 focus:border-[#711419] focus:outline-none"
+                                      />
+                                    )}
+                                  </label>
+                                ))}
+                                <div className="flex gap-2 pt-0.5">
                                   <button
-                                    onClick={() => runProposedAction(i)}
+                                    onClick={saveEdit}
                                     className="rounded-md bg-[#711419] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#8a1a1f]"
-                                    data-testid={`ai-action-approve-${i}`}
+                                    data-testid={`ai-action-save-edit-${i}`}
                                   >
-                                    {msg.actionState === "error" ? "Try again" : "Approve & run"}
+                                    Save changes
                                   </button>
                                   <button
-                                    onClick={() => dismissProposedAction(i)}
+                                    onClick={() => setEditing(null)}
                                     className="rounded-md border border-slate-300/70 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                                    data-testid={`ai-action-dismiss-${i}`}
                                   >
-                                    Dismiss
+                                    Cancel
                                   </button>
                                 </div>
-                              </>
+                              </div>
                             )}
+                            {(msg.actionState === "pending" || msg.actionState === "error") && editing?.index !== i && (() => {
+                              // A later step of a batch stays locked until every
+                              // earlier step is done or dismissed.
+                              const waitingOn = msg.actionBatch
+                                ? messages.find((m) => m.actionBatch?.id === msg.actionBatch!.id && (m.actionBatch?.step ?? 0) < msg.actionBatch!.step && m.actionState !== "done" && m.actionState !== "dismissed")
+                                : undefined;
+                              return (
+                                <>
+                                  {msg.actionState === "error" && (
+                                    <p className="mt-2 text-xs font-medium text-red-600">{msg.actionError}</p>
+                                  )}
+                                  <div className="mt-2.5 flex flex-wrap gap-2">
+                                    <button
+                                      onClick={() => runProposedAction(i)}
+                                      disabled={!!waitingOn}
+                                      className="rounded-md bg-[#711419] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#8a1a1f] disabled:opacity-40 disabled:hover:bg-[#711419]"
+                                      data-testid={`ai-action-approve-${i}`}
+                                    >
+                                      {msg.actionState === "error" ? "Try again" : "Approve & run"}
+                                    </button>
+                                    <button
+                                      onClick={() => setEditing({ index: i, draft: {} })}
+                                      className="rounded-md border border-slate-300/70 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                                      data-testid={`ai-action-edit-${i}`}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => dismissProposedAction(i)}
+                                      className="rounded-md border border-slate-300/70 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                                      data-testid={`ai-action-dismiss-${i}`}
+                                    >
+                                      Dismiss
+                                    </button>
+                                  </div>
+                                  {waitingOn && (
+                                    <p className="mt-1.5 text-[11px] font-medium text-slate-500">
+                                      Locked — approve step {msg.actionBatch!.step - 1} first; this step needs it done before it can run.
+                                    </p>
+                                  )}
+                                </>
+                              );
+                            })()}
                             {msg.actionState === "choose" && msg.actionCandidates && (
                               <div className="mt-2.5 space-y-1.5">
                                 <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>

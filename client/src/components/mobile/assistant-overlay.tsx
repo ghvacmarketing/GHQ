@@ -12,9 +12,11 @@ import {
   type AiChatMessage as ChatMessage,
   type AiConversationSummary,
   type AiSpace,
+  applyActionEdits,
   compressImageForAi,
   createAiSpace,
   customerUpdateRows,
+  editableActionFields,
   deleteAiConversation,
   deleteAiSpace,
   dismissAiAction,
@@ -65,6 +67,19 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   // Approval cards and topic chips wait until the fresh answer finishes
   // typing — Gibbs shouldn't drop a card mid-sentence.
   const [typedOut, setTypedOut] = useState(true);
+  // Inline edit of a pending approval card (fix a typo'd name/address/message
+  // without re-asking Gibbs). draft holds only the touched fields.
+  const [editing, setEditing] = useState<{ index: number; draft: Record<string, string> } | null>(null);
+  const saveEdit = () => {
+    const cur = editing;
+    if (!cur) return;
+    setMessages((prev) => prev.map((m, j) => (
+      j === cur.index && m.proposedAction
+        ? { ...m, proposedAction: { ...m.proposedAction, params: applyActionEdits(m.proposedAction.params, cur.draft) } }
+        : m
+    )));
+    setEditing(null);
+  };
   // Live message count — voice sends go through callbacks that can hold a
   // stale `messages`, so the answer's landing index must come from here, not
   // the closure (a wrong freshIndex strands the approval cards unrevealed).
@@ -460,6 +475,12 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         // One spoken message can carry several creation requests — each extra
         // action renders as its own approval card.
         const extras = (Array.isArray(data.extraActions) ? data.extraActions : []).filter((e: any) => e.proposedAction);
+        // Several actions in one reply run as an ordered batch — step 2 can't
+        // be approved before step 1 completes (a work order or text for a
+        // customer being created needs the customer to exist first).
+        const totalActions = (data.proposedAction ? 1 : 0) + extras.length;
+        const batchId = totalActions > 1 ? String(data.messageId || `batch-${assistantIndex}`) : null;
+        const extraStepStart = data.proposedAction ? 2 : 1;
         setMessages((prev) => [
           ...prev,
           {
@@ -469,13 +490,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             proposedAction: data.proposedAction || null,
             actionState: data.proposedAction ? ("pending" as const) : undefined,
             messageId: data.messageId,
+            actionBatch: batchId && data.proposedAction ? { id: batchId, step: 1, total: totalActions } : null,
           },
-          ...extras.map((e: any) => ({
+          ...extras.map((e: any, k: number) => ({
             role: "assistant" as const,
             content: "",
             proposedAction: e.proposedAction || null,
             actionState: "pending" as const,
             messageId: e.messageId,
+            actionBatch: batchId ? { id: batchId, step: extraStepStart + k, total: totalActions } : null,
           })),
         ]);
       })
@@ -542,6 +565,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
         queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
         queryClient.invalidateQueries({ queryKey: ["/api/mobile/work-orders"] });
+        // Customer creates/edits must show up instantly in lists, detail
+        // pages, and search — their keys come in several shapes, so match by
+        // substring instead of prefix.
+        queryClient.invalidateQueries({
+          predicate: (q) => {
+            const key = JSON.stringify(q.queryKey);
+            return key.includes("/api/crm/customers") || key.includes("/api/mobile/customers") || key.includes("/api/crm/ghq/search");
+          },
+        });
       })
       .catch((e: any) => {
         setMessages((prev) => prev.map((m, j) => (
@@ -777,9 +809,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e8b4b8]">
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
+                          {msg.actionBatch && (
+                            <span className="ml-auto rounded-[3px] bg-[#711419]/30 px-1.5 py-0.5 tracking-normal text-[#e8b4b8]">
+                              Step {msg.actionBatch.step} of {msg.actionBatch.total}
+                            </span>
+                          )}
                         </p>
                         <p className="mt-1.5 text-sm text-slate-200">{msg.proposedAction.summary}</p>
-                        <div className="mt-1.5 space-y-0.5">
+                        {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
                           {msg.proposedAction.type === "update_customer"
                             ? customerUpdateRows(msg.proposedAction.params).map((row) => (
                                 <p key={row.label} className="text-xs text-slate-400">
@@ -801,30 +838,88 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                                   {String(v)}
                                 </p>
                               ))}
-                        </div>
-                        {(msg.actionState === "pending" || msg.actionState === "error") && (
-                          <>
-                            {msg.actionState === "error" && (
-                              <p className="mt-2 text-xs font-medium text-red-400">{msg.actionError}</p>
-                            )}
-                            <div className="mt-2.5 flex gap-2">
+                        </div>}
+                        {editing?.index === i && msg.proposedAction && (
+                          <div className="mt-2 space-y-2">
+                            {editableActionFields(msg.proposedAction.params).map((f) => (
+                              <label key={f.path} className="block">
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{f.label}</span>
+                                {f.multiline ? (
+                                  <textarea
+                                    rows={3}
+                                    value={editing.draft[f.path] ?? f.value}
+                                    onChange={(e) => setEditing((prev) => prev && { ...prev, draft: { ...prev.draft, [f.path]: e.target.value } })}
+                                    className="mt-0.5 w-full resize-none rounded-[3px] border border-slate-700 bg-slate-950 px-2.5 py-2 text-[16px] leading-5 text-slate-100 focus:border-[#711419] focus:outline-none"
+                                  />
+                                ) : (
+                                  <input
+                                    value={editing.draft[f.path] ?? f.value}
+                                    onChange={(e) => setEditing((prev) => prev && { ...prev, draft: { ...prev.draft, [f.path]: e.target.value } })}
+                                    className="mt-0.5 w-full rounded-[3px] border border-slate-700 bg-slate-950 px-2.5 py-2 text-[16px] leading-5 text-slate-100 focus:border-[#711419] focus:outline-none"
+                                  />
+                                )}
+                              </label>
+                            ))}
+                            <div className="flex gap-2 pt-0.5">
                               <button
-                                onClick={() => runProposedAction(i)}
+                                onClick={saveEdit}
                                 className="rounded-[3px] bg-[#711419] px-3.5 py-2 text-xs font-semibold text-white transition-transform active:scale-95"
-                                data-testid={`assistant-action-approve-${i}`}
+                                data-testid={`assistant-action-save-edit-${i}`}
                               >
-                                {msg.actionState === "error" ? "Try again" : "Approve & run"}
+                                Save changes
                               </button>
                               <button
-                                onClick={() => dismissProposedAction(i)}
+                                onClick={() => setEditing(null)}
                                 className="rounded-[3px] border border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-400 transition-transform active:scale-95"
-                                data-testid={`assistant-action-dismiss-${i}`}
                               >
-                                Dismiss
+                                Cancel
                               </button>
                             </div>
-                          </>
+                          </div>
                         )}
+                        {(msg.actionState === "pending" || msg.actionState === "error") && editing?.index !== i && (() => {
+                          // A later step of a batch stays locked until every
+                          // earlier step is done or dismissed.
+                          const waitingOn = msg.actionBatch
+                            ? messages.find((m) => m.actionBatch?.id === msg.actionBatch!.id && (m.actionBatch?.step ?? 0) < msg.actionBatch!.step && m.actionState !== "done" && m.actionState !== "dismissed")
+                            : undefined;
+                          return (
+                            <>
+                              {msg.actionState === "error" && (
+                                <p className="mt-2 text-xs font-medium text-red-400">{msg.actionError}</p>
+                              )}
+                              <div className="mt-2.5 flex flex-wrap gap-2">
+                                <button
+                                  onClick={() => runProposedAction(i)}
+                                  disabled={!!waitingOn}
+                                  className="rounded-[3px] bg-[#711419] px-3.5 py-2 text-xs font-semibold text-white transition-transform active:scale-95 disabled:opacity-40"
+                                  data-testid={`assistant-action-approve-${i}`}
+                                >
+                                  {msg.actionState === "error" ? "Try again" : "Approve & run"}
+                                </button>
+                                <button
+                                  onClick={() => setEditing({ index: i, draft: {} })}
+                                  className="rounded-[3px] border border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-400 transition-transform active:scale-95"
+                                  data-testid={`assistant-action-edit-${i}`}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => dismissProposedAction(i)}
+                                  className="rounded-[3px] border border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-400 transition-transform active:scale-95"
+                                  data-testid={`assistant-action-dismiss-${i}`}
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                              {waitingOn && (
+                                <p className="mt-1.5 text-[11px] font-medium text-slate-500">
+                                  Locked — approve step {msg.actionBatch!.step - 1} first; this step needs it done before it can run.
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                         {msg.actionState === "choose" && msg.actionCandidates && (
                           <div className="mt-2.5 space-y-1.5">
                             <p className="text-xs font-medium text-slate-300">{msg.actionError}</p>

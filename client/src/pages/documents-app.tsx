@@ -214,8 +214,9 @@ export default function DocumentsApp() {
   const childFolders = useMemo(() => {
     if (!isBrowse || searching || starOnly) return [];
     const kids = foldersByParent.get(folderId ?? null) ?? [];
-    // Category roots only surface in Library and their own tabs, not the Drive root
-    if (tab === "drive" && !folderId) return kids.filter((f) => !f.category);
+    // The Drive root stays clean: only the category tiles and the documents
+    // below — no folders. Loose folders remain reachable through Library.
+    if (tab === "drive" && !folderId) return [];
     return kids;
   }, [foldersByParent, folderId, tab, isBrowse, searching, starOnly]);
 
@@ -712,8 +713,10 @@ export default function DocumentsApp() {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canUpload && e.dataTransfer.types.includes("Files")) uploadFiles(e.dataTransfer.files); }}
           data-testid="docs-main"
         >
-          {/* Toolbar — folder/upload actions (search lives in the top bar) */}
-          <div className="mb-3 flex items-center gap-2">
+          {/* Toolbar — folder/upload actions (search lives in the top bar).
+              Hidden on the Drive home: that view is just the category tiles
+              and the documents below; files are managed inside categories. */}
+          <div className={`mb-3 flex items-center gap-2 ${showCatTiles ? "hidden" : ""}`}>
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} data-testid="input-doc-upload" />
             <div className="ml-auto flex shrink-0 gap-2">
               <Button

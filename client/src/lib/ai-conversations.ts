@@ -52,7 +52,52 @@ export type AiChatMessage = {
   /** Server id of the stored assistant message — lets approvals/dismissals
    *  land on the right row. Absent on error bubbles. */
   messageId?: string;
+  /** Sequencing when one reply proposes several dependent actions (create
+   *  customer → work order → text): later steps can only be approved after
+   *  the earlier ones complete. */
+  actionBatch?: { id: string; step: number; total: number } | null;
 };
+
+/** Editable fields of a proposed action's params — lets the user fix a typo
+ *  (customer name, address, message wording) right on the approval card
+ *  instead of re-asking Gibbs. Nested update_customer changes edit too. */
+export type AiEditableField = { path: string; label: string; value: string; multiline: boolean };
+
+const MULTILINE_PARAM_KEYS = new Set(["message", "body", "description", "notes"]);
+const paramLabel = (k: string) => k.replace(/([A-Z])/g, " $1").toLowerCase();
+
+export function editableActionFields(params: Record<string, unknown>): AiEditableField[] {
+  const rows: AiEditableField[] = [];
+  for (const [k, v] of Object.entries(params)) {
+    if (k === "customerId" || k === "current") continue;
+    if (typeof v === "string") {
+      rows.push({ path: k, label: paramLabel(k), value: v, multiline: MULTILINE_PARAM_KEYS.has(k) });
+    } else if (k === "changes" && v && typeof v === "object" && !Array.isArray(v)) {
+      for (const [ck, cv] of Object.entries(v as Record<string, unknown>)) {
+        if (typeof cv === "string") {
+          rows.push({ path: `changes.${ck}`, label: `new ${paramLabel(ck)}`, value: cv, multiline: MULTILINE_PARAM_KEYS.has(ck) });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+export function applyActionEdits(params: Record<string, unknown>, draft: Record<string, string>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...params };
+  const changes = { ...((params.changes as Record<string, unknown> | undefined) ?? {}) };
+  let changesTouched = false;
+  for (const [path, value] of Object.entries(draft)) {
+    if (path.startsWith("changes.")) {
+      changes[path.slice("changes.".length)] = value;
+      changesTouched = true;
+    } else {
+      next[path] = value;
+    }
+  }
+  if (changesTouched) next.changes = changes;
+  return next;
+}
 
 export type AiConversationSummary = {
   id: string;
