@@ -1091,16 +1091,22 @@ const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; 
 const CACHE_TTL_STATIC = 1000 * 60 * 60; // 1 hour for static help questions
 const CACHE_TTL_LIVE = 1000 * 60 * 5; // 5 minutes for live data questions
 
-export async function askCrmHelp(question: string, conversationHistory?: Array<{role: 'user'|'assistant', content: string}>): Promise<CrmHelpResponse> {
+export async function askCrmHelp(
+  question: string,
+  conversationHistory?: Array<{role: 'user'|'assistant', content: string}>,
+  images?: string[],
+): Promise<CrmHelpResponse> {
   const normalizedQuestion = question.toLowerCase().trim();
-  
+  const hasImages = !!images && images.length > 0;
+
   // Detect what live data might be needed
   const dataNeeds = await detectDataNeed(question);
   const needsLiveData = dataNeeds.length > 0;
   const cacheTTL = needsLiveData ? CACHE_TTL_LIVE : CACHE_TTL_STATIC;
-  
-  // Skip cache for follow-up questions (they depend on prior context)
-  const isFollowUp = conversationHistory && conversationHistory.length > 0;
+
+  // Skip cache for follow-up questions (they depend on prior context) and for
+  // photo questions (the answer depends on the image, not just the text).
+  const isFollowUp = (conversationHistory && conversationHistory.length > 0) || hasImages;
   if (!isFollowUp) {
     const cached = helpCache.get(normalizedQuestion);
     if (cached && Date.now() - cached.timestamp < cacheTTL) {
@@ -1122,6 +1128,8 @@ export async function askCrmHelp(question: string, conversationHistory?: Array<{
     const systemPrompt = `You are Gibbs — the GHQ assistant at Giesbrecht HVAC: a sharp, friendly teammate who knows the CRM inside out and can see live business data (upcoming work orders, agreements, invoices, quotes, projects). Your name is Gibbs (from Giesbrecht); if someone asks who or what you are, that's your answer.
 
 Right now it is ${formatInTimeZone(new Date(), BUSINESS_TIMEZONE, "EEEE, MMMM d, yyyy 'at' h:mm a")} Eastern time (${BUSINESS_TIMEZONE}) — resolve every relative date the user says ("today", "tomorrow", "next Tuesday", "10 AM") against this clock.
+
+Users can attach photos (equipment, model/serial plates, thermostats, job sites, error codes). When a photo is attached, read it carefully — identify make/model/serial numbers, describe visible issues, diagnose what you can see — and fold what you find into your answer or into the params of any action they asked you to prepare.
 
 ${CRM_FUNCTIONALITY_KNOWLEDGE}
 ${liveDataSection}
@@ -1153,23 +1161,50 @@ Return JSON with:
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
     const priorTurns: Array<{role: 'user'|'assistant', content: string}> = conversationHistory ?? [];
+
+    // Attached photos ride the current question as vision content blocks.
+    const imageBlocks = (images ?? [])
+      .map((dataUrl) => {
+        const match = /^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i.exec(dataUrl);
+        return match ? { mediaType: match[1].toLowerCase(), data: match[2] } : null;
+      })
+      .filter((b): b is { mediaType: string; data: string } => b !== null);
+
     let content: string | null | undefined;
     let finishReason: string | undefined;
     if (claudeConfigured()) {
+      const userTurn = imageBlocks.length > 0
+        ? {
+            role: "user" as const,
+            content: [
+              ...imageBlocks.map((b) => ({ type: "image", source: { type: "base64", media_type: b.mediaType, data: b.data } })),
+              { type: "text", text: question },
+            ],
+          }
+        : { role: "user" as const, content: question };
       content = stripJsonFences(
         await claudeChat({
           system: systemPrompt + "\n\nRespond with ONLY the JSON object — no prose around it.",
-          messages: [...priorTurns, { role: "user", content: question }],
+          messages: [...priorTurns, userTurn],
           maxTokens: 2000,
         }),
       );
     } else {
+      const userTurn: any = imageBlocks.length > 0
+        ? {
+            role: "user",
+            content: [
+              ...imageBlocks.map((b) => ({ type: "image_url", image_url: { url: `data:${b.mediaType};base64,${b.data}` } })),
+              { type: "text", text: question },
+            ],
+          }
+        : { role: "user", content: question };
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           ...priorTurns,
-          { role: "user", content: question }
+          userTurn
         ],
         response_format: { type: "json_object" },
         max_tokens: 2000,
@@ -1233,9 +1268,10 @@ Return JSON with:
       proposedActions,
     };
 
-    // Never cache responses that carry proposed actions — each ask should be
-    // freshly generated, and a stale cached proposal must not resurface.
-    if (proposedActions.length === 0) {
+    // Never cache responses that carry proposed actions or answered a photo —
+    // each ask should be freshly generated, and a stale cached proposal (or a
+    // photo-specific answer keyed by text alone) must not resurface.
+    if (proposedActions.length === 0 && !hasImages) {
       helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
     }
 

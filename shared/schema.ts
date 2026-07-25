@@ -4608,6 +4608,7 @@ export const aiMessages = pgTable("ai_messages", {
   role: text("role").notNull(), // 'user' | 'assistant'
   content: text("content").notNull(),
   relatedTopics: json("related_topics").$type<string[]>().default([]),
+  attachments: json("attachments").$type<string[] | null>(), // image data URLs sent with a user message
   proposedAction: json("proposed_action").$type<{ type: string; summary: string; params: Record<string, unknown> } | null>(),
   actionStatus: text("action_status"), // null (pending) | 'approved' | 'dismissed'
   actionResult: json("action_result").$type<{ entity: string; id: string; label: string; url: string } | null>(),

@@ -135,8 +135,8 @@ app.use((req, res, next) => {
     express.raw({ type: 'application/json' })(req, res, next);
     return;
   }
-  if (req.path === '/api/crm/mail/send') {
-    // Email attachments (base64) can be large — allow up to ~30MB here
+  if (req.path === '/api/crm/mail/send' || req.path === '/api/crm/help') {
+    // Email attachments and Gibbs photo uploads (base64) can be large
     express.json({ limit: '30mb' })(req, res, next);
     return;
   }
@@ -296,6 +296,7 @@ async function runAiConversationMigrations() {
       )
     `);
     await db.execute(sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS space_id varchar`);
+    await db.execute(sql`ALTER TABLE ai_messages ADD COLUMN IF NOT EXISTS attachments json`);
   } catch (err) {
     console.error("AI conversation migration error (non-fatal):", err);
   }

@@ -8,6 +8,7 @@ import {
   type AiConversationSummary,
   type AiProposedAction,
   type AiSpace,
+  compressImageForAi,
   createAiSpace,
   deleteAiConversation,
   deleteAiSpace,
@@ -18,7 +19,10 @@ import {
   moveAiConversation,
 } from "@/lib/ai-conversations";
 import {
+  Check,
   Folder,
+  FolderInput,
+  ImagePlus,
   Loader2,
   MessagesSquare,
   Mic,
@@ -31,6 +35,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /** The desktop GHQ assistant — a full-size ChatGPT-style modal: conversation
  *  history lives in a left sidebar grouped by date section (Today, Yesterday,
@@ -105,8 +115,22 @@ export default function AiAssistantModal() {
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [attachments, setAttachments] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const pickImages = async (files: FileList | null) => {
+    if (!files) return;
+    for (const file of Array.from(files).slice(0, 4)) {
+      try {
+        const url = await compressImageForAi(file);
+        setAttachments((prev) => (prev.length >= 4 ? prev : [...prev, url]));
+      } catch {
+        // unreadable file — skip it silently
+      }
+    }
+  };
 
   // Anything in the CRM opens the assistant by dispatching "ghq-open-ai".
   useEffect(() => {
@@ -170,24 +194,28 @@ export default function AiAssistantModal() {
     });
   };
 
-  const assignActiveConversation = (spaceId: string | null) => {
-    if (!conversationId) return;
-    moveAiConversation(conversationId, spaceId).then(() => {
+  // A chat lives in exactly one space (or none) — moving it replaces the old
+  // assignment.
+  const moveConversation = (id: string, spaceId: string | null) => {
+    moveAiConversation(id, spaceId).then(() => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
     });
   };
 
   const sendQuestion = (raw: string) => {
-    const question = raw.trim();
+    const photos = attachments;
+    const question = raw.trim() || (photos.length > 0 ? "Take a look at this photo." : "");
     if (question.length < 3 || pending) return;
     const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    setMessages((prev) => [...prev, { role: "user", content: question, attachments: photos.length > 0 ? photos : undefined }]);
     setInput("");
+    setAttachments([]);
     setPending(true);
     apiRequest("POST", "/api/crm/help", {
       question,
       conversationHistory: historyForApi,
       conversationId,
+      images: photos.length > 0 ? photos : undefined,
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
     })
@@ -486,6 +514,32 @@ export default function AiAssistantModal() {
                           </p>
                           <p className="text-[11px] text-slate-400">{formatConversationWhen(c.updatedAt)}</p>
                         </button>
+                        {/* Move to a space — a chat lives in exactly one */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-all hover:text-[#711419] group-hover:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-[#711419]"
+                              aria-label="Move to space"
+                              data-testid={`ai-conversation-move-${c.id}`}
+                            >
+                              <FolderInput className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => moveConversation(c.id, null)}>
+                              <MessagesSquare className="mr-2 h-3.5 w-3.5" />
+                              No space
+                              {!c.spaceId && <Check className="ml-auto h-3.5 w-3.5 text-[#711419]" />}
+                            </DropdownMenuItem>
+                            {spaces.map((s) => (
+                              <DropdownMenuItem key={s.id} onClick={() => moveConversation(c.id, s.id)}>
+                                <Folder className="mr-2 h-3.5 w-3.5" />
+                                <span className="truncate">{s.name}</span>
+                                {c.spaceId === s.id && <Check className="ml-auto h-3.5 w-3.5 text-[#711419]" />}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <button
                           onClick={() => removeConversation(c.id)}
                           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-all hover:text-red-600 group-hover:opacity-100"
@@ -519,22 +573,6 @@ export default function AiAssistantModal() {
             <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
               {activeTitle || (messages.length > 0 ? "Conversation" : "New chat")}
             </p>
-            {conversationId && (
-              <select
-                value={activeConvo?.spaceId ?? ""}
-                onChange={(e) => assignActiveConversation(e.target.value || null)}
-                className="h-8 max-w-[170px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 focus:border-[#711419]/50 focus:outline-none"
-                title="File this chat into a space"
-                data-testid="ai-conversation-space"
-              >
-                <option value="">No space</option>
-                {spaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            )}
             <button
               onClick={() => setOpen(false)}
               className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
@@ -576,8 +614,25 @@ export default function AiAssistantModal() {
                   if (msg.role === "user") {
                     return (
                       <div key={i} className="flex justify-end">
-                        <div className="max-w-[80%] rounded-lg rounded-tr-sm bg-[#711419] px-4 py-2.5 text-sm leading-relaxed text-white">
-                          {msg.content}
+                        <div className="max-w-[80%] space-y-1.5">
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="flex flex-wrap justify-end gap-1.5">
+                              {msg.attachments.map((src, j) => (
+                                <img
+                                  key={j}
+                                  src={src}
+                                  alt="Attached photo"
+                                  className="max-h-44 cursor-pointer rounded-lg border border-slate-200 object-cover"
+                                  onClick={() => window.open(src, "_blank")}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          {msg.content.trim() !== "" && (
+                            <div className="rounded-lg rounded-tr-sm bg-[#711419] px-4 py-2.5 text-sm leading-relaxed text-white">
+                              {msg.content}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -727,7 +782,45 @@ export default function AiAssistantModal() {
                 )}
               </p>
             )}
+            {attachments.length > 0 && (
+              <div className="mx-auto mb-2 flex max-w-3xl flex-wrap gap-2">
+                {attachments.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img src={src} alt="" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
+                    <button
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-red-600"
+                      aria-label="Remove photo"
+                      data-testid={`ai-attachment-remove-${i}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mx-auto flex max-w-3xl items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  pickImages(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={attachments.length >= 4 || pending}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-[#711419]/50 hover:text-[#711419] disabled:opacity-40"
+                aria-label="Attach photos"
+                title="Attach photos (up to 4)"
+                data-testid="ai-attach"
+              >
+                <ImagePlus className="h-5 w-5" />
+              </button>
               <input
                 ref={inputRef}
                 type="text"
@@ -740,7 +833,7 @@ export default function AiAssistantModal() {
                   }
                 }}
                 placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask about the business, or tell me what to create..."}
-                className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#711419]/50 focus:outline-none"
+                className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
                 data-testid="ai-input"
               />
               {voiceSupported && (
@@ -761,7 +854,7 @@ export default function AiAssistantModal() {
               )}
               <button
                 onClick={() => sendQuestion(input)}
-                disabled={input.trim().length < 3 || pending}
+                disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-colors hover:bg-[#8a1a1f] disabled:opacity-40"
                 aria-label="Send"
                 data-testid="ai-send"

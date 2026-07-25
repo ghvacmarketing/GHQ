@@ -11,6 +11,8 @@ export type AiProposedAction = {
 export type AiChatMessage = {
   role: "user" | "assistant";
   content: string;
+  /** Image data URLs attached to a user message. */
+  attachments?: string[] | null;
   relatedTopics?: string[];
   proposedAction?: AiProposedAction | null;
   actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose";
@@ -81,6 +83,7 @@ type AiServerMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  attachments?: string[] | null;
   relatedTopics?: string[] | null;
   proposedAction?: AiProposedAction | null;
   actionStatus?: string | null;
@@ -92,6 +95,7 @@ export function mapServerAiMessage(m: AiServerMessage): AiChatMessage {
   return {
     role: m.role,
     content: m.content,
+    attachments: m.attachments ?? null,
     relatedTopics: m.relatedTopics ?? undefined,
     proposedAction: m.proposedAction ?? null,
     actionState: hasAction
@@ -143,6 +147,32 @@ export async function deleteAiConversation(id: string): Promise<boolean> {
 export function dismissAiAction(messageId?: string) {
   if (!messageId) return;
   fetch(`/api/crm/ai/messages/${messageId}/dismiss`, { method: "POST", credentials: "include" }).catch(() => {});
+}
+
+/** Downscale + re-encode a picked image to a JPEG data URL the AI can read.
+ *  Always re-encodes (iPhone HEIC won't be accepted upstream as-is) and caps
+ *  the long edge so a 12MP camera shot becomes a few hundred KB. */
+export async function compressImageForAi(file: File, maxDim = 1400): Promise<string> {
+  const originalUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Couldn't read that file"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("That file isn't a readable image"));
+    el.src = originalUrl;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Couldn't process the image");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.8);
 }
 
 export function formatConversationWhen(iso: string | null): string {

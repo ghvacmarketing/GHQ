@@ -2283,8 +2283,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Optional attached photos: data-URL images, capped in count and size.
+      const images: string[] = Array.isArray(req.body.images)
+        ? req.body.images
+            .filter((s: unknown) => typeof s === "string" && /^data:image\/[a-z0-9+.-]+;base64,/i.test(s as string) && (s as string).length < 4_000_000)
+            .slice(0, 4)
+        : [];
+
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question, history);
+      const result = await askCrmHelp(question, history, images);
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
@@ -2308,7 +2315,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           await db.update(aiConversations).set({ updatedAt: new Date() }).where(eq(aiConversations.id, convoId));
         }
-        await db.insert(aiMessages).values({ conversationId: convoId, role: "user", content: question.trim() });
+        await db.insert(aiMessages).values({
+          conversationId: convoId,
+          role: "user",
+          content: question.trim(),
+          attachments: images.length > 0 ? images : null,
+        });
         const actions = result.proposedActions?.length
           ? result.proposedActions
           : result.proposedAction

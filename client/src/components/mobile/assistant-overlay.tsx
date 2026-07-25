@@ -4,11 +4,12 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { History, Loader2, Mic, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { History, ImagePlus, Loader2, Mic, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import {
   type AiChatMessage as ChatMessage,
   type AiConversationSummary,
+  compressImageForAi,
   deleteAiConversation,
   dismissAiAction,
   fetchAiConversation,
@@ -48,7 +49,21 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [attachments, setAttachments] = useState<string[]>([]);
   const composerRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const pickImages = async (files: FileList | null) => {
+    if (!files) return;
+    for (const file of Array.from(files).slice(0, 4)) {
+      try {
+        const url = await compressImageForAi(file);
+        setAttachments((prev) => (prev.length >= 4 ? prev : [...prev, url]));
+      } catch {
+        // unreadable file — skip it
+      }
+    }
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ y: number; dy: number; active: boolean } | null>(null);
@@ -164,13 +179,20 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   }, [open, cancelVoice]);
 
   const sendQuestion = (raw: string) => {
-    const question = raw.trim();
+    const photos = attachments;
+    const question = raw.trim() || (photos.length > 0 ? "Take a look at this photo." : "");
     if (question.length < 3 || pending) return;
     const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    setMessages((prev) => [...prev, { role: "user", content: question, attachments: photos.length > 0 ? photos : undefined }]);
     setInput("");
+    setAttachments([]);
     setPending(true);
-    apiRequest("POST", "/api/crm/help", { question, conversationHistory: historyForApi, conversationId })
+    apiRequest("POST", "/api/crm/help", {
+      question,
+      conversationHistory: historyForApi,
+      conversationId,
+      images: photos.length > 0 ? photos : undefined,
+    })
       .then(async (r) => {
         const data = await r.json();
         if (data.conversationId) setConversationId(data.conversationId);
@@ -436,8 +458,19 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 if (msg.role === "user") {
                   return (
                     <div key={i} className="flex justify-end">
-                      <div className="max-w-[85%] rounded-[4px] rounded-br-[1px] bg-[#711419] px-3.5 py-2.5 text-sm leading-relaxed text-white">
-                        {msg.content}
+                      <div className="max-w-[85%] space-y-1.5">
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap justify-end gap-1.5">
+                            {msg.attachments.map((src, j) => (
+                              <img key={j} src={src} alt="Attached photo" className="max-h-40 rounded-[4px] border border-slate-800 object-cover" />
+                            ))}
+                          </div>
+                        )}
+                        {msg.content.trim() !== "" && (
+                          <div className="rounded-[4px] rounded-br-[1px] bg-[#711419] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+                            {msg.content}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -575,7 +608,43 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               Got it — writing that down...
             </p>
           )}
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachments.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-700 object-cover" />
+                  <button
+                    onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-white"
+                    aria-label="Remove photo"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                pickImages(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={attachments.length >= 4 || pending}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-slate-800 bg-slate-900 text-slate-400 transition-all active:scale-95 disabled:opacity-40"
+              aria-label="Attach photos"
+              data-testid="assistant-attach"
+            >
+              <ImagePlus className="h-5 w-5" />
+            </button>
             <input
               ref={composerRef}
               type="text"
@@ -588,7 +657,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 }
               }}
               placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask or tell me what to do..."}
-              className="h-11 min-w-0 flex-1 rounded-[4px] border border-slate-800 bg-slate-900 px-3.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-slate-600 focus:outline-none"
+              className="h-11 min-w-0 flex-1 rounded-[4px] border border-slate-800 bg-slate-900 px-3.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none"
               data-testid="assistant-input"
             />
             {supportsVoice && (
@@ -610,7 +679,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             )}
             <button
               onClick={() => sendQuestion(input)}
-              disabled={input.trim().length < 3 || pending}
+              disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-all active:scale-95 disabled:opacity-40"
               aria-label="Send"
               data-testid="assistant-send"

@@ -12,9 +12,11 @@ export function claudeConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
+// content can be a plain string or an array of Anthropic content blocks
+// (e.g. image blocks + a text block for vision requests).
 export async function claudeChat(opts: {
   system: string;
-  messages: { role: "user" | "assistant"; content: string }[];
+  messages: { role: "user" | "assistant"; content: string | unknown[] }[];
   maxTokens?: number;
 }): Promise<string> {
   const res = await fetch(API_URL, {
