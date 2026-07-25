@@ -52,7 +52,13 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [pending, setPending] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const finalTextRef = useRef("");
+  // Text from recognizer sessions that already ended (we relaunch on silent
+  // self-stops) + the CURRENT session's finals. The current session is fully
+  // REBUILT from e.results on every event instead of appended to — Android
+  // Chrome re-delivers the same final results repeatedly in continuous mode,
+  // and incremental appending turns one sentence into twenty.
+  const prevSessionsRef = useRef("");
+  const sessionFinalRef = useRef("");
   const manualStopRef = useRef(false);
   const composerRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -130,13 +136,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   useEffect(() => {
     if (!open) {
       manualStopRef.current = true;
-      finalTextRef.current = "";
+      prevSessionsRef.current = "";
+      sessionFinalRef.current = "";
       recognitionRef.current?.abort?.();
       setListening(false);
     }
     return () => {
       manualStopRef.current = true;
-      finalTextRef.current = "";
+      prevSessionsRef.current = "";
+      sessionFinalRef.current = "";
       recognitionRef.current?.abort?.();
     };
   }, [open]);
@@ -178,8 +186,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   // ref so it survives across those silent restarts.
   const finalizeAndSend = () => {
     setListening(false);
-    const spoken = finalTextRef.current.replace(/\s+/g, " ").trim();
-    finalTextRef.current = "";
+    const spoken = (prevSessionsRef.current + sessionFinalRef.current).replace(/\s+/g, " ").trim();
+    prevSessionsRef.current = "";
+    sessionFinalRef.current = "";
     if (spoken.length >= 3) sendQuestion(spoken);
   };
 
@@ -190,16 +199,31 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     rec.continuous = true;
     rec.maxAlternatives = 1;
     rec.onresult = (e: any) => {
+      // Rebuild this session's transcript from scratch every event —
+      // idempotent, so duplicate deliveries of the same results can never
+      // stack. Also skip back-to-back identical entries (another Android
+      // duplication mode).
+      let sessionFinal = "";
       let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0]?.transcript || "";
-        if (e.results[i].isFinal) finalTextRef.current += t + " ";
-        else interim += t;
+      let prevChunk = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const t = (e.results[i][0]?.transcript || "").trim();
+        if (!t || t === prevChunk) {
+          prevChunk = t;
+          continue;
+        }
+        prevChunk = t;
+        if (e.results[i].isFinal) sessionFinal += t + " ";
+        else interim += t + " ";
       }
-      setInput((finalTextRef.current + interim).replace(/\s+/g, " ").trimStart());
+      sessionFinalRef.current = sessionFinal;
+      setInput((prevSessionsRef.current + sessionFinal + interim).replace(/\s+/g, " ").trimStart());
     };
     rec.onend = () => {
       recognitionRef.current = null;
+      // Fold the finished session's finals into the carried text exactly once.
+      prevSessionsRef.current = prevSessionsRef.current + sessionFinalRef.current;
+      sessionFinalRef.current = "";
       if (manualStopRef.current) {
         finalizeAndSend();
       } else {
@@ -217,7 +241,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       // "network", "aborted") fall through to onend and restart.
       if (e?.error === "not-allowed" || e?.error === "service-not-allowed") {
         manualStopRef.current = true;
-        finalTextRef.current = "";
+        prevSessionsRef.current = "";
+        sessionFinalRef.current = "";
         setListening(false);
       }
     };
@@ -227,7 +252,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
 
   const startVoice = () => {
     if (!SpeechRecognitionImpl || listening) return;
-    finalTextRef.current = "";
+    prevSessionsRef.current = "";
+    sessionFinalRef.current = "";
     manualStopRef.current = false;
     setListening(true);
     try {
