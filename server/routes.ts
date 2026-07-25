@@ -2271,7 +2271,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(aiMessages.conversationId, found.id))
             .orderBy(desc(aiMessages.createdAt))
             .limit(10);
-          history = stored.reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+          history = stored
+            .reverse()
+            // Action-only rows have empty content; empty text blocks are
+            // rejected by the model APIs, so keep them out of the replay.
+            .filter((m) => m.content && m.content.trim() !== "")
+            .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
           // The 10-message window can cut mid-pair; Anthropic requires the
           // first message to be a user turn, so trim a leading assistant one.
           while (history.length > 0 && history[0].role === "assistant") history.shift();
@@ -2283,6 +2288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
+      const extraActions: Array<{ messageId: string; proposedAction: unknown }> = [];
       try {
         if (!convoId) {
           // New conversations can be filed into a space (owned by this user).
@@ -2303,6 +2309,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await db.update(aiConversations).set({ updatedAt: new Date() }).where(eq(aiConversations.id, convoId));
         }
         await db.insert(aiMessages).values({ conversationId: convoId, role: "user", content: question.trim() });
+        const actions = result.proposedActions?.length
+          ? result.proposedActions
+          : result.proposedAction
+            ? [result.proposedAction]
+            : [];
         const [assistantMsg] = await db
           .insert(aiMessages)
           .values({
@@ -2310,15 +2321,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: "assistant",
             content: result.answer,
             relatedTopics: result.relatedTopics || [],
-            proposedAction: result.proposedAction || null,
+            proposedAction: actions[0] || null,
           })
           .returning({ id: aiMessages.id });
         messageId = assistantMsg.id;
+        // One spoken message can ask for several things — every action beyond
+        // the first gets its own (content-less) message row so each has an
+        // independent approve/dismiss lifecycle and audit trail.
+        for (const extra of actions.slice(1)) {
+          const [row] = await db
+            .insert(aiMessages)
+            .values({ conversationId: convoId, role: "assistant", content: "", proposedAction: extra })
+            .returning({ id: aiMessages.id });
+          extraActions.push({ messageId: row.id, proposedAction: extra });
+        }
       } catch (persistErr) {
         console.error("AI conversation persist error (non-fatal):", persistErr);
       }
 
-      res.json({ ...result, conversationId: convoId, messageId });
+      res.json({ ...result, conversationId: convoId, messageId, extraActions });
     } catch (error: any) {
       console.error("Error in CRM help:", error);
       const detail = error?.message || error?.error?.message || "";

@@ -956,28 +956,42 @@ There is **no** automatic dispatch, auto-assignment, or round-robin routing in t
 ## CRM NAVIGATION
 
 ### Sidebar pages (what actually exists)
-Every page in the CRM sidebar — these are the only pages that exist:
+Every page in the CRM sidebar:
 
 | Section | Page | URL |
 |---------|------|-----|
 | Main | Dashboard | /crm/dashboard |
 | Main | Dispatch Board | /crm/dispatch |
 | Main | Phone | /crm/phone |
-| Main | Messaging | /crm/messaging |
-| Main | Notifications | /crm/notifications |
+| Main | Inbox — Messages (SMS) | /crm/messaging |
+| Main | Inbox — Mail (Gmail) | /crm/mail |
 | Admin | Customers | /crm/customers |
 | Admin | Agreements | /crm/agreements |
 | Admin | Quotes | /crm/quotes |
 | Admin | Invoices | /crm/invoices |
+| Admin | Media (photo & file gallery) | /crm/photos |
 | Operations | Work Orders | /crm/work-orders |
+| Operations | Environment Monitoring | /crm/analytics |
 | Operations | Projects | /crm/projects |
-| Operations | Tasks | /crm/tasks/board |
+| Operations | Activity (Tasks) | /crm/tasks/board |
+| Operations | Rebate Programs | /crm/rebate-programs |
+| Operations | Signatures (e-sign) | /crm/esign |
 | Operations | Items | /crm/items |
 | Sales | Lead Funnel | /crm/prospect-funnel |
+| Sales | Salesbook | /crm/salesbook |
 | Other | Goals | /crm/reports |
-| Other | Marketing | /crm/marketing |
 | Other | Settings | /crm/settings |
-| Footer | Mobile View | /mobile |
+
+Not in the sidebar but real CRM pages: Notifications (/crm/notifications, bell icon), Install Planner (/crm/install-planner), Checklist Canvas (/crm/checklists, reached from Settings → Service Checklists), Marketing Automations (/crm/marketing).
+
+### The GHQ app suite (beyond the CRM)
+The signed-in home screen at / greets the user and shows role-filtered app tiles:
+- **CRM** (/crm) — everything above
+- **Field** (/mobile) — the tech mobile app: agenda, jobs, photos, time clock
+- **Documents** (/documents) — company file manager: Drive/Library folders, categories, upload by drag-and-drop, star/rename/move/archive, image & PDF preview, storage stats
+- **Accounting** (/accounting) — owner/admin/supervisor only: dashboard KPIs (MTD revenue/expenses/net, A/R with aging), statements (P&L, Revenue, Expenses, A/R Aging, Top Customers), an expense ledger, a chart of accounts, and the Reports workspace (Report Builder, Custom Builder with data source/columns/group-by/filters, Saved Reports with CSV export, print, sharing, pinning, recurring email). /reports redirects here.
+- **Marketing** (/marketing) — owner/admin/supervisor/sales: Dashboard, Campaigns (drip-sequence wizard: template → audience → sequence → launch), Audiences (segment builder over live CRM data with include/exclude filters and live count preview), Templates (Email/SMS/call-script gallery with a block-based visual email editor and merge fields like {{first_name}}, test-send), Automations, and Lead Sources (live CRM attribution with cost/ROI). Integrations, Performance, and Settings tabs are still "Coming online" placeholders.
+- **Customer Portal** — customer-facing
 
 ### Settings sub-sections (what actually exists inside Settings)
 The Settings page at /crm/settings contains these sub-sections:
@@ -990,8 +1004,10 @@ The Settings page at /crm/settings contains these sub-sections:
 - **Lead Types** — configure lead categories for the sales funnel
 - **Lead Classification** — set up lead temperature and driver classifications
 - **Work Order Subtypes** — customize work order sub-categories
-- **Service Checklists** — configure service call questionnaires by service type
+- **Service Checklists** — configure service call questionnaires by service type (opens the Checklist Canvas)
 - **Package Pricing** — configure maintenance package tiers and pricing
+- **Dispatch Board** — set the dispatch grid time increment and choose which staff appear on the board
+- **Proposal Templates** — reusable proposal templates with merge fields and image library
 
 **Financial**
 - **Payment Settings** — configure Stripe, financing link (GreenSky URL), and payment options
@@ -1002,6 +1018,8 @@ The Settings page at /crm/settings contains these sub-sections:
 - **Import Data** — import customer or equipment data from CSV
 - **Fleet Tracking** — Bouncie GPS vehicle tracking integration
 - **Salesbook Directory** — manage the table of contents entries for the digital salesbook
+- **Customer Portal** — control whether portal profile edits sync straight into the CRM or wait for review
+- **Appearance** — light/dark theme for the CRM
 - **System Tools** — system-level configuration and utilities
 
 ### Public-facing pages (outside the CRM)
@@ -1013,15 +1031,35 @@ The Settings page at /crm/settings contains these sub-sections:
 
 ---
 
+## MEDIA (PHOTO & FILE GALLERY)
+The Media page (/crm/photos, sidebar: Admin → Media) is a live company-wide gallery of every photo and file uploaded against customers — job photos from techs, documents, checklist photos. It refreshes automatically every 10 seconds ("Live" indicator). Features: search by file name/customer/uploader; tabs for All, Photos, Documents, Checklist Photos, Recent; Grid or List views with thumbnail zoom; filters by customer, uploader, and date range; Google-Photos-style multi-select with bulk Download and bulk Delete; full-screen lightbox viewer for images and PDFs; an Upload button that attaches files to a chosen customer.
+
+## MAIL (GMAIL INBOX)
+The Mail page (/crm/mail, part of Inbox) is a full Gmail client inside the CRM via Google Workspace OAuth — each user connects their own Gmail with the Connect Gmail button. Thread list with unread dots and Inbox/Unread/Sent folders, auto-sync every few seconds, customer identity strip linking to the CRM record (or a "Not in CRM" badge), sanitized HTML bodies with inline images and attachment viewing, Archive/Delete, inline reply with attachments, and a Gmail-style Compose panel with To/Cc/Bcc autocomplete over CRM customers. A Messages | Mail switcher at the top moves between SMS and email.
+
+## SIGNATURES (E-SIGN)
+The Signatures page (/crm/esign, sidebar: Operations → Signatures) is an in-house e-signature tool. Overview tab shows stats (total/draft/out-for-signature/completed, completion rate, average time to sign, deposits collected); List/Card views show status pills, signing progress, and deposit badges. "New Document" uploads a PDF and opens the editor, where you add color-coded recipients and place Signature, Initials, Full Name, Date, Text, and Payment fields on the pages, optionally set a deposit amount, then Send emails the recipients. Completed documents download as signed PDFs.
+
+## ENVIRONMENT MONITORING
+The Environment Monitoring page (/crm/analytics, sidebar: Operations) is a live humidity/temperature dashboard fed by Govee sensors installed at customer properties (e.g. crawlspaces). Overall health status (normal/watch/high/critical/offline), a "Sync now" button, open alerts that can spawn service work orders straight into the dispatch queue, and device mapping that ties each sensor to a customer property. Sensor detail shows live readings, risk badge, a reading-history trend chart with threshold lines, and a Create Work Order button.
+
+## REBATE PROGRAMS
+The Rebate Programs page (/crm/rebate-programs, sidebar: Operations) tracks HEAR and HER utility/government rebate cases. Search by client/address/case number; quick filters (All, In Progress, Waiting on Customer, Scope Needed, Approved, Closed); table shows case #, customer, program, status, priority, assignee, workflow step, rebate amount, application date. "New Case" requires the Neighborly case number, then links an existing CRM customer (auto-fills contact info) or manual details.
+
+## CHECKLIST CANVAS
+The Checklist Canvas (/crm/checklists, reached from Settings → Service Checklists) is a node-based visual editor for authoring the checklists techs complete in the field. Pick a work order type → subtype → checklist, then edit on a pannable/zoomable canvas: ordered question steps grouped into collapsible sections, drag to reorder, plus free-floating photo steps (label, instructions, required toggle) that can be linked to specific questions with drag connectors.
+
+## INSTALL PLANNER
+The Install Planner (/crm/install-planner) is a capacity-planning board for tentative and sold installs. Calendar view: drag across days to create a hold, drag/resize blocks, cross month boundaries. Timeline view: Gantt-style bars per crew, draggable across dates and crews; crews can be added/renamed/deleted. Blocks carry confidence (High/Medium/Low, dashed) or Sold (solid green) styling; a "Crews/day" setting caps daily capacity. Each block links a CRM customer with dates, crew, estimated value, and notes; a "Sell" action converts a hold to Sold.
+
 ## FEATURES THAT DO NOT EXIST IN THIS CRM
 
 **IMPORTANT: The following features do NOT exist. If asked about them, clearly say they are not part of this system.**
 
-- ❌ No "Settings → Online Booking" or "Settings → Customer Portal" page
-- ❌ No "Settings → Auto-assignment" or "Settings → Dispatch Rules" page
+- ❌ No "Settings → Online Booking" page
+- ❌ No auto-assignment, round-robin, or auto-dispatch of work orders (Settings → Dispatch Board only sets the grid increment and who appears on the board)
 - ❌ No "Settings → Widgets" page
 - ❌ No "Public booking URL" field or "booking link" field anywhere in Settings
-- ❌ No auto-assignment, round-robin, or auto-dispatch of work orders
 - ❌ The booking link requires no configuration — it is always {domain}/book
 
 `;
@@ -1042,7 +1080,11 @@ export interface CrmHelpResponse {
   relatedTopics: string[];
   confidence: "high" | "medium" | "low";
   hasLiveData?: boolean;
+  /** First proposed action — kept for backward compatibility. */
   proposedAction?: ProposedAction | null;
+  /** ALL proposed actions — one spoken request can carry several ("create a
+   *  work order for X and a task to Y"). Max 5. */
+  proposedActions?: ProposedAction[];
 }
 
 const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; hasLiveData: boolean }>();
@@ -1095,7 +1137,8 @@ Voice and formatting — these matter as much as accuracy:
 CRITICAL ACCURACY RULE: Only describe features, settings pages, navigation paths, and URLs that are explicitly documented in the knowledge base above. If something is not listed there — especially settings pages, admin panels, or configuration screens — do NOT invent or assume it exists. Respond with: "I don't have specific information about that in this CRM — it may not exist or may not be documented." NEVER invent settings pages, URLs, configuration screens, or features that are not documented above. Pay special attention to the "FEATURES THAT DO NOT EXIST" section — if a user asks about one of those items, clearly state it does not exist in this system.
 
 PROPOSING ACTIONS (strict rules):
-You can PREPARE two kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include a proposedAction when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
+You can PREPARE two kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include proposedActions when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions.
+MULTIPLE REQUESTS IN ONE MESSAGE: voice users often ask for several things in one breath ("create a work order for the Smiths tomorrow at 10, add a task to order filters, and who hasn't paid?"). Handle ALL of them: answer every question asked, and include one proposedActions entry PER thing to create — never silently drop or merge requests. Say in your answer what each prepared action is. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
 Pass customerName exactly as the user said or typed it, even if it looks misspelled — the server fuzzy-matches it against the CRM and will ask the user to pick when it isn't sure. Never refuse an action just because the name looks off.
 Action types and their params:
 1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
@@ -1105,7 +1148,7 @@ Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedAction: OMIT this field entirely unless the user explicitly asked you to create something. When present: { "type": "create_task" | "create_work_order", "summary": one plain sentence describing exactly what will be created, "params": {...} }`;
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -1157,20 +1200,28 @@ Return JSON with:
       };
     }
     
-    // Whitelist-check any proposed action shape here too — anything that isn't
-    // exactly a known type with an object params is dropped on the floor.
-    let proposedAction: ProposedAction | null = null;
-    const pa = parsed.proposedAction;
-    if (
-      pa &&
-      typeof pa === "object" &&
-      (pa.type === "create_task" || pa.type === "create_work_order") &&
-      typeof pa.summary === "string" &&
-      pa.params &&
-      typeof pa.params === "object" &&
-      !Array.isArray(pa.params)
-    ) {
-      proposedAction = { type: pa.type, summary: pa.summary.slice(0, 300), params: pa.params };
+    // Whitelist-check every proposed action shape here too — anything that
+    // isn't exactly a known type with an object params is dropped on the
+    // floor. The model may return proposedActions (array) or the legacy
+    // singular proposedAction.
+    const rawActions: any[] = Array.isArray(parsed.proposedActions)
+      ? parsed.proposedActions
+      : parsed.proposedAction
+        ? [parsed.proposedAction]
+        : [];
+    const proposedActions: ProposedAction[] = [];
+    for (const pa of rawActions.slice(0, 5)) {
+      if (
+        pa &&
+        typeof pa === "object" &&
+        (pa.type === "create_task" || pa.type === "create_work_order") &&
+        typeof pa.summary === "string" &&
+        pa.params &&
+        typeof pa.params === "object" &&
+        !Array.isArray(pa.params)
+      ) {
+        proposedActions.push({ type: pa.type, summary: pa.summary.slice(0, 300), params: pa.params });
+      }
     }
 
     const result: CrmHelpResponse = {
@@ -1178,12 +1229,13 @@ Return JSON with:
       relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics.slice(0, 3) : [],
       confidence: parsed.confidence || "medium",
       hasLiveData: needsLiveData,
-      proposedAction,
+      proposedAction: proposedActions[0] ?? null,
+      proposedActions,
     };
 
-    // Never cache responses that carry a proposed action — each ask should be
+    // Never cache responses that carry proposed actions — each ask should be
     // freshly generated, and a stale cached proposal must not resurface.
-    if (!proposedAction) {
+    if (proposedActions.length === 0) {
       helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
     }
 

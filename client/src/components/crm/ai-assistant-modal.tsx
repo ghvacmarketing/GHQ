@@ -48,6 +48,9 @@ interface HelpResponse {
   proposedAction?: AiProposedAction | null;
   conversationId?: string;
   messageId?: string;
+  /** One spoken message can carry several creation requests — each extra
+   *  action arrives as its own approval card with its own message id. */
+  extraActions?: Array<{ messageId?: string; proposedAction?: AiProposedAction | null }>;
 }
 
 const STARTERS = [
@@ -193,6 +196,7 @@ export default function AiAssistantModal() {
         const data = (await r.json()) as HelpResponse;
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+        const extras = (data.extraActions || []).filter((e) => e.proposedAction);
         setMessages((prev) => [
           ...prev,
           {
@@ -203,6 +207,13 @@ export default function AiAssistantModal() {
             actionState: data.proposedAction ? ("pending" as const) : undefined,
             messageId: data.messageId,
           },
+          ...extras.map((e) => ({
+            role: "assistant" as const,
+            content: "",
+            proposedAction: e.proposedAction || null,
+            actionState: "pending" as const,
+            messageId: e.messageId,
+          })),
         ]);
       })
       .catch((e: any) => {
@@ -576,9 +587,11 @@ export default function AiAssistantModal() {
                         <Sparkles className="h-4 w-4 text-white" />
                       </div>
                       <div className="min-w-0 flex-1 space-y-2">
-                        <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
-                          {cleanAnswer(msg.content)}
-                        </div>
+                        {msg.content.trim() !== "" && (
+                          <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
+                            {cleanAnswer(msg.content)}
+                          </div>
+                        )}
                         {msg.proposedAction && msg.actionState !== "dismissed" && (
                           <div className="rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3" data-testid={`ai-action-card-${i}`}>
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">

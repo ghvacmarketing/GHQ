@@ -175,6 +175,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         const data = await r.json();
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+        // One spoken message can carry several creation requests — each extra
+        // action renders as its own approval card.
+        const extras = (Array.isArray(data.extraActions) ? data.extraActions : []).filter((e: any) => e.proposedAction);
         setMessages((prev) => [
           ...prev,
           {
@@ -185,6 +188,13 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             actionState: data.proposedAction ? ("pending" as const) : undefined,
             messageId: data.messageId,
           },
+          ...extras.map((e: any) => ({
+            role: "assistant" as const,
+            content: "",
+            proposedAction: e.proposedAction || null,
+            actionState: "pending" as const,
+            messageId: e.messageId,
+          })),
         ]);
       })
       .catch((e: any) => {
@@ -434,9 +444,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 }
                 return (
                   <div key={i} className="space-y-2">
-                    <div className="max-w-[92%] whitespace-pre-wrap rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-relaxed text-slate-200">
-                      {stripMarkdown(msg.content)}
-                    </div>
+                    {msg.content.trim() !== "" && (
+                      <div className="max-w-[92%] whitespace-pre-wrap rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-relaxed text-slate-200">
+                        {stripMarkdown(msg.content)}
+                      </div>
+                    )}
                     {msg.proposedAction && msg.actionState !== "dismissed" && (
                       <div className="max-w-[92%] rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3" data-testid={`assistant-action-card-${i}`}>
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e8b4b8]">
