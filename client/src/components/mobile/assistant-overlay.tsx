@@ -226,6 +226,31 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     e.stopPropagation();
   };
 
+  // iOS keyboard hangover: focusing the composer can scroll the whole PWA up
+  // to keep the input visible, and after the keyboard closes the window stays
+  // scrolled — fixed elements ride along and a white band shows under the
+  // sheet. Snap the window back whenever the keyboard leaves or focus drops.
+  useEffect(() => {
+    if (!open) return;
+    const snapBack = () => {
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      const doc = document.documentElement;
+      if (doc.scrollTop !== 0) doc.scrollTop = 0;
+      if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+    };
+    const vv = window.visualViewport;
+    const onVvResize = () => {
+      // Act only once the keyboard is (mostly) gone — never fight it open
+      if (!vv || vv.height >= window.innerHeight * 0.8) snapBack();
+    };
+    vv?.addEventListener("resize", onVvResize);
+    window.addEventListener("focusout", snapBack);
+    return () => {
+      vv?.removeEventListener("resize", onVvResize);
+      window.removeEventListener("focusout", snapBack);
+    };
+  }, [open]);
+
   // Freeze the app behind the sheet — otherwise scroll gestures inside Gibbs
   // chain through and drag the page underneath (iOS PWAs especially).
   useEffect(() => {

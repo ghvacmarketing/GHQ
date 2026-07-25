@@ -558,9 +558,12 @@ select.dark-input option {
 }
 
 /* No overscroll rubber-banding: horizontal kills the browser history swipe,
-   vertical kills the bounce that flashes bare white past the app's edges. */
+   vertical kills the bounce that flashes bare white past the app's edges.
+   The background matches the app so any iOS viewport hangover (keyboard
+   scroll residue) shows app-colored, never stark white. */
 html, body {
   overscroll-behavior: none;
+  background-color: #f8fafc;
 }
 
 /* =========================================
