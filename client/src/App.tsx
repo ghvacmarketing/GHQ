@@ -203,25 +203,15 @@ class ErrorBoundary extends Component<
   }
 }
 
-// Branded full-screen loader for the initial app load.
+// Branded full-screen loader for the initial app load — the same GHQ mark in
+// a spinning arc used between apps. The old three-dot bounce loader is gone.
 function GlobalLoader() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background" data-testid="global-loader">
-      <div className="relative mb-6 flex items-center justify-center">
-        <span className="absolute h-24 w-24 rounded-full bg-[#711419]/10 blur-2xl animate-pulse" />
-        <img
-          src={redLogoUrl}
-          alt="Giesbrecht HVAC"
-          className="relative h-14 w-14 rounded-lg object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
-        />
+    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]" data-testid="global-loader">
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <div className="absolute inset-0 animate-spin rounded-full border-2 border-slate-200 border-t-[#711419]" />
+        <img src={redLogoUrl} alt="GHQ" className="app-loader-logo h-10 w-10 rounded-lg object-contain" />
       </div>
-      <div className="flex items-center gap-1.5" aria-hidden="true">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#711419] animate-bounce [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-[#711419] animate-bounce [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-[#711419] animate-bounce" />
-      </div>
-      <p className="mt-5 text-sm font-medium tracking-wide text-foreground">Giesbrecht HVAC</p>
-      <p className="mt-0.5 text-xs uppercase tracking-[0.25em] text-muted-foreground">GHQ</p>
     </div>
   );
 }
