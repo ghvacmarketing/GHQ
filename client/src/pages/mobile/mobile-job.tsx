@@ -743,7 +743,9 @@ export default function MobileJob() {
         setShowCreateDialog(open); 
         if (!open) resetCreateForm(); 
       }}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        {/* Phones cap at ~72dvh so it floats like a card instead of filling
+            the screen; tablets keep the roomier popup. */}
+        <DialogContent className="max-w-md max-h-[72dvh] sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Job</DialogTitle>
             <DialogDescription>

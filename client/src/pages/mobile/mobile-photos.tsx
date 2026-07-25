@@ -362,7 +362,7 @@ export default function MobilePhotos() {
         {/* Collapsed: just a search icon top right. Tapping it expands the
             iOS-style search bar with Cancel; results ease in below. */}
         {!searchActive ? (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
             <button
               onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 60); }}
               className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
@@ -370,6 +370,24 @@ export default function MobilePhotos() {
               data-testid="button-open-search"
             >
               <Search className="h-4 w-4" />
+            </button>
+            {/* Quick add — straight to the camera when a customer is picked,
+                otherwise nudge into search to pick who the shots save to */}
+            <button
+              onClick={() => {
+                if (activeCustomer) {
+                  openCamera();
+                } else {
+                  toast({ title: "Pick a customer first", description: "Photos save to a customer — search and select one." });
+                  setSearchActive(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 60);
+                }
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white shadow-sm transition-transform active:scale-95"
+              aria-label="Take and add photos"
+              data-testid="button-quick-add-photo"
+            >
+              <Camera className="h-4 w-4" />
             </button>
           </div>
         ) : (
