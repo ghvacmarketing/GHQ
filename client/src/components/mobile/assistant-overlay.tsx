@@ -640,8 +640,10 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </div>
         </div>
 
-        {/* Conversation */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+        {/* Conversation — overflow-x-hidden is load-bearing: overflow-y-auto
+            alone lets one long unbroken string (a URL, an address) widen the
+            pane and drag the whole chat sideways off screen */}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4">
           {messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-10 w-10 rotate-45 text-[#711419]">
@@ -689,7 +691,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           </div>
                         )}
                         {msg.content.trim() !== "" && (
-                          <div className="rounded-[4px] rounded-br-[1px] bg-[#711419] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+                          <div className="break-words rounded-[4px] rounded-br-[1px] bg-[#711419] px-3.5 py-2.5 text-sm leading-relaxed text-white">
                             {msg.content}
                           </div>
                         )}
@@ -703,7 +705,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 return (
                   <div key={i} className="space-y-2">
                     {msg.content.trim() !== "" && (
-                      <div className="max-w-[92%] whitespace-pre-wrap rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-relaxed text-slate-200">
+                      <div className="max-w-[92%] whitespace-pre-wrap break-words rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-relaxed text-slate-200">
                         <TypewriterText
                           text={stripMarkdown(msg.content)}
                           animate={i === freshIndex}
@@ -720,7 +722,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                       </div>
                     )}
                     {revealed && msg.proposedAction && msg.actionState !== "dismissed" && (
-                      <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
+                      <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 break-words rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e8b4b8]">
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
@@ -867,7 +869,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               ))}
             </div>
           )}
-          <div className="flex items-end gap-2">
+          {/* One unified strip — photos, typing, voice, and send all live in
+              a single bar, same as the desktop composer */}
+          <div className="flex items-end gap-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5">
             <input
               ref={fileInputRef}
               type="file"
@@ -882,7 +886,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={attachments.length >= 4 || pending}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-slate-800 bg-slate-900 text-slate-400 transition-all active:scale-95 disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all active:scale-95 active:text-slate-200 disabled:opacity-40"
               aria-label="Attach photos"
               data-testid="assistant-attach"
             >
@@ -900,7 +904,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 }
               }}
               placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask or tell me what to do..."}
-              className="max-h-32 min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto rounded-[4px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-5 text-slate-100 placeholder:text-slate-600 focus:outline-none"
+              className="max-h-32 min-h-[36px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-[7px] text-sm leading-5 text-slate-100 placeholder:text-slate-600 focus:outline-none"
               data-testid="assistant-input"
             />
             {supportsVoice && (
@@ -908,29 +912,27 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 onClick={listening ? stopVoice : startVoice}
                 disabled={transcribing}
                 className={cn(
-                  "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border transition-all active:scale-95",
-                  listening
-                    ? "border-[#711419] bg-[#711419] text-white"
-                    : "border-slate-800 bg-slate-900 text-slate-400",
+                  "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95",
+                  listening ? "bg-[#711419] text-white" : "text-slate-400 active:text-slate-200",
                 )}
                 aria-label={listening ? "Stop listening" : "Speak to the assistant"}
                 data-testid="assistant-mic"
               >
-                {listening && <span className="absolute inset-0 animate-ping rounded-[4px] border border-[#711419]" />}
+                {listening && <span className="absolute inset-0 animate-ping rounded-lg border border-[#711419]" />}
                 {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
               </button>
             )}
             <button
               onClick={() => sendQuestion(input)}
               disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-              className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:opacity-30"
+              className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:opacity-30"
               aria-label="Send"
               data-testid="assistant-send"
             >
               {pending ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-4.5 w-4.5 animate-spin" />
               ) : (
-                <Send className="h-4.5 w-4.5 transition-transform duration-200 ease-out group-active:-translate-y-0.5 group-active:translate-x-0.5" />
+                <Send className="h-4 w-4 transition-transform duration-200 ease-out group-active:-translate-y-0.5 group-active:translate-x-0.5" />
               )}
             </button>
           </div>
