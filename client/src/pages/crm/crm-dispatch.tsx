@@ -87,6 +87,8 @@ import {
   Ban,
   Check,
   X,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PanelSection, PanelRow } from "@/components/crm/panel-blocks";
@@ -493,7 +495,7 @@ interface DraggableQueueCardProps {
   onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
-function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: DraggableQueueCardProps) {
+function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "list" }: DraggableQueueCardProps & { view?: "cards" | "list" }) {
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
   const needsSchedulingNow = (workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart;
@@ -519,7 +521,11 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: Draggable
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-2 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''}`}
+      className={`flex items-center gap-2 px-2 py-2 transition-colors ${
+        view === "cards"
+          ? `rounded-[4px] border border-slate-200 bg-white hover:border-slate-400 ${needsSchedulingNow ? 'border-red-200 bg-red-50' : ''}`
+          : `border-b border-slate-100 hover:bg-slate-50 ${needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''}`
+      } ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'}`}
       data-testid={`queue-card-${workOrder.id}`}
       {...attributes}
       {...listeners}
@@ -576,7 +582,8 @@ function QueueStageBox({
   workOrders,
   onWorkOrderClick,
   onOpenQuickStatus,
-}: QueueStageBoxProps) {
+  view = "list",
+}: QueueStageBoxProps & { view?: "cards" | "list" }) {
   const [isOpen, setIsOpen] = useState(true);
   const colors = queueStageColors[stage];
   const label = queueStageLabels[stage];
@@ -599,13 +606,14 @@ function QueueStageBox({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0 pb-3 px-3">
-            <div className="divide-y divide-slate-100">
+            <div className={view === "cards" ? "grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2 xl:grid-cols-3" : "divide-y divide-slate-100"}>
               {workOrders.map((wo) => (
                 <DraggableQueueCard
                   key={wo.id}
                   workOrder={wo}
                   onClick={onWorkOrderClick}
                   onOpenQuickStatus={onOpenQuickStatus}
+                  view={view}
                 />
               ))}
             </div>
@@ -2006,9 +2014,29 @@ function UnassignedQueueSection({
     id: "unassigned-queue",
   });
   
+  const [queueSearch, setQueueSearch] = useState("");
+  const [queueView, setQueueView] = useState<"cards" | "list">(
+    () => (typeof window !== "undefined" && (localStorage.getItem("dispatchQueueView") as "cards" | "list")) || "cards",
+  );
+  const [queueCollapsed, setQueueCollapsed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("dispatchQueueCollapsed") === "1",
+  );
+  useEffect(() => {
+    localStorage.setItem("dispatchQueueView", queueView);
+  }, [queueView]);
+  useEffect(() => {
+    localStorage.setItem("dispatchQueueCollapsed", queueCollapsed ? "1" : "0");
+  }, [queueCollapsed]);
+
   const filteredWorkOrders = useMemo(() => {
-    return workOrders;
-  }, [workOrders]);
+    const q = queueSearch.trim().toLowerCase();
+    if (!q) return workOrders;
+    return workOrders.filter((wo) =>
+      [wo.customerName, wo.title, (wo as any).propertyAddress, (wo as any).workSubtype]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [workOrders, queueSearch]);
 
   const groupedByStage = useMemo(() => {
     const groups: Record<DispatchQueueStage, DispatchWorkOrder[]> = {
@@ -2050,14 +2078,54 @@ function UnassignedQueueSection({
       className={`space-y-3 p-2 rounded-lg transition-colors ${isOver ? 'bg-amber-50 ring-2 ring-amber-400 ring-dashed' : ''}`}
       data-testid="unassigned-queue-section"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold text-slate-800">
           Unassigned Queue {workOrders.length}
           {isOver && <span className="ml-2 text-sm text-amber-600 font-normal">Drop here to unassign</span>}
         </h2>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative w-52">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={queueSearch}
+              onChange={(e) => setQueueSearch(e.target.value)}
+              placeholder="Search queue…"
+              className="h-8 bg-white pl-8 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+              data-testid="queue-search"
+            />
+          </div>
+          <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            <button
+              onClick={() => setQueueView("cards")}
+              className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-all ${
+                queueView === "cards" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              data-testid="queue-view-cards"
+            >
+              <LayoutGrid className="h-3 w-3" strokeWidth={1.75} /> Cards
+            </button>
+            <button
+              onClick={() => setQueueView("list")}
+              className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-all ${
+                queueView === "list" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              data-testid="queue-view-list"
+            >
+              <List className="h-3 w-3" strokeWidth={1.75} /> List
+            </button>
+          </div>
+          <button
+            onClick={() => setQueueCollapsed((v) => !v)}
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900"
+            title={queueCollapsed ? "Expand queue" : "Collapse queue"}
+            data-testid="queue-collapse"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${queueCollapsed ? "-rotate-90" : ""}`} />
+          </button>
+        </div>
       </div>
-      
-      {filteredWorkOrders.length === 0 ? (
+
+      {queueCollapsed ? null : filteredWorkOrders.length === 0 ? (
         <Card className={`border-dashed ${isOver ? 'bg-amber-50 border-amber-300' : 'bg-slate-50'}`}>
           <CardContent className="py-8 text-center text-slate-500">
             <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -2073,6 +2141,7 @@ function UnassignedQueueSection({
               workOrders={groupedByStage[stage]}
               onWorkOrderClick={onWorkOrderClick}
               onOpenQuickStatus={onOpenQuickStatus}
+              view={queueView}
             />
           ))}
         </div>
