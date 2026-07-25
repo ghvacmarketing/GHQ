@@ -2258,6 +2258,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fuzzy customer-name scoring for AI actions — voice transcription mangles
+  // names ("Blue Water Kafe"), so exact/ILIKE matching isn't enough. Combines
+  // token overlap with an edit-distance ratio; both are case-insensitive.
+  const aiNameSimilarity = (a: string, b: string): number => {
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const na = norm(a);
+    const nb = norm(b);
+    if (!na || !nb) return 0;
+    if (na === nb) return 1;
+    if (na.includes(nb) || nb.includes(na)) return 0.92;
+    const ta = na.split(" ");
+    const tb = new Set(nb.split(" "));
+    let overlap = 0;
+    for (const t of ta) if (tb.has(t)) overlap++;
+    const tokenScore = (2 * overlap) / (ta.length + tb.size);
+    const sa = na.replace(/ /g, "");
+    const sb = nb.replace(/ /g, "");
+    const m = sa.length;
+    const n = sb.length;
+    const dp: number[] = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      let prev = dp[0];
+      dp[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const cur = dp[j];
+        dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (sa[i - 1] === sb[j - 1] ? 0 : 1));
+        prev = cur;
+      }
+    }
+    const levScore = 1 - dp[n] / Math.max(m, n);
+    return Math.max(tokenScore, levScore) * 0.98;
+  };
+
   // Execute an AI-proposed action AFTER explicit user approval. The model can
   // only propose; nothing runs until a signed-in user clicks Approve, and only
   // these whitelisted action types exist. Everything is re-validated with zod
@@ -2281,6 +2314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: z.literal("create_work_order"),
           params: z.object({
             customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
             title: z.string().trim().min(1).max(200),
             description: z.string().trim().min(1).max(2000),
             visitType: z.enum(["SERVICE", "MAINTENANCE", "INSTALL", "SALES"]).optional(),
@@ -2319,21 +2353,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(201).json({ ok: true, entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
       }
 
-      // create_work_order — resolve the customer by name, use their first property
-      const needle = action.params.customerName.trim().toLowerCase();
-      const matches = await db
-        .select({ id: crmCustomers.id, name: crmCustomers.name })
-        .from(crmCustomers)
-        .where(sql`LOWER(${crmCustomers.name}) LIKE ${"%" + needle + "%"}`)
-        .limit(5);
-      let customer = matches.length === 1 ? matches[0] : matches.find((m) => m.name.toLowerCase() === needle);
-      if (!customer) {
-        if (matches.length === 0) {
+      // create_work_order — resolve the customer. An explicit customerId (the
+      // user picked from the candidate list) wins; otherwise fuzzy-match the
+      // spoken/typed name: confident lead auto-picks, too-close-to-call
+      // returns candidates for the user to choose from.
+      let customer: { id: string; name: string } | undefined;
+      if (action.params.customerId) {
+        const [picked] = await db
+          .select({ id: crmCustomers.id, name: crmCustomers.name })
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, action.params.customerId));
+        if (!picked) return res.status(422).json({ message: "That customer no longer exists." });
+        customer = picked;
+      } else {
+        const allCustomers = await db.select({ id: crmCustomers.id, name: crmCustomers.name }).from(crmCustomers);
+        const scored = allCustomers
+          .map((c) => ({ ...c, score: aiNameSimilarity(c.name || "", action.params.customerName) }))
+          .sort((x, y) => y.score - x.score);
+        const best = scored[0];
+        const second = scored[1];
+        if (!best || best.score < 0.5) {
           return res.status(422).json({ message: `No customer found matching "${action.params.customerName}".` });
         }
-        return res.status(422).json({
-          message: `Multiple customers match "${action.params.customerName}": ${matches.map((m) => m.name).join(", ")}. Ask again with the exact name.`,
-        });
+        if (best.score >= 0.85 && (!second || best.score - second.score >= 0.15)) {
+          customer = { id: best.id, name: best.name };
+        } else {
+          return res.status(422).json({
+            message: `Not sure which customer you meant by "${action.params.customerName}" — pick the right one:`,
+            candidates: scored
+              .filter((c) => c.score >= 0.4)
+              .slice(0, 5)
+              .map((c) => ({ id: c.id, name: c.name })),
+          });
+        }
       }
       const [property] = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customer.id)).limit(1);
       if (!property) {
@@ -2410,7 +2462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await logCrmAudit(user.id, "ai_action.create_work_order", "work_order", workOrder.id, { params: action.params, customerId: customer.id, assignedTechId: assignedTech?.id ?? null }, req.ip);
-      const label = assignedTech ? `${workOrder.title} (assigned to ${assignedTech.name})` : workOrder.title;
+      const label = `${workOrder.title} for ${customer.name}${assignedTech ? ` (assigned to ${assignedTech.name})` : ""}`;
       return res.status(201).json({ ok: true, entity: "work_order", id: workOrder.id, label, url: `/crm/work-orders/${workOrder.id}` });
     } catch (error: any) {
       console.error("Error executing AI action:", error);

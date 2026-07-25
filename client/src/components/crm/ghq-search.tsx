@@ -187,9 +187,10 @@ type ConversationMessage = {
   content: string;
   relatedTopics?: string[];
   proposedAction?: ProposedAction | null;
-  actionState?: "pending" | "executing" | "done" | "dismissed" | "error";
+  actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose";
   actionResult?: { label: string; url: string } | null;
   actionError?: string | null;
+  actionCandidates?: { id: string; name: string }[] | null;
 };
 
 /** The assistant answers in plain prose, but strip any markdown that slips
@@ -306,17 +307,40 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
   const handleAskHelp = () => askQuestion(searchQuery);
 
-  // Execute an AI-proposed action — only ever called from the Approve button.
-  const runProposedAction = (index: number) => {
+  // Execute an AI-proposed action — only ever called from the Approve button
+  // (or a candidate pick when the customer name was too close to call).
+  const runProposedAction = (index: number, extraParams?: Record<string, unknown>) => {
     const msg = conversationMessages[index];
     if (!msg?.proposedAction || msg.actionState === "executing" || msg.actionState === "done") return;
-    setConversationMessages(prev => prev.map((m, j) => (j === index ? { ...m, actionState: "executing" as const, actionError: null } : m)));
-    apiRequest("POST", "/api/crm/ai/execute-action", {
-      type: msg.proposedAction.type,
-      params: msg.proposedAction.params,
+    setConversationMessages(prev => prev.map((m, j) => (
+      j === index ? { ...m, actionState: "executing" as const, actionError: null, actionCandidates: null } : m
+    )));
+    fetch("/api/crm/ai/execute-action", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: msg.proposedAction.type,
+        params: { ...msg.proposedAction.params, ...extraParams },
+      }),
     })
       .then(async (r) => {
-        const data = await r.json();
+        const data = await r.json().catch(() => ({} as any));
+        if (!r.ok) {
+          // Ambiguous customer name → server sends candidates for the user to pick
+          if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+            setConversationMessages(prev => prev.map((m, j) => (
+              j === index
+                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which customer did you mean?", actionCandidates: data.candidates }
+                : m
+            )));
+          } else {
+            setConversationMessages(prev => prev.map((m, j) => (
+              j === index ? { ...m, actionState: "error" as const, actionError: data.message || "Couldn't complete the action." } : m
+            )));
+          }
+          return;
+        }
         setConversationMessages(prev => prev.map((m, j) => (
           j === index
             ? { ...m, actionState: "done" as const, actionResult: { label: data.label || "Created", url: data.url || "/crm/dashboard" } }
@@ -586,6 +610,27 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                           </button>
                         </div>
                       </>
+                    )}
+                    {msg.actionState === "choose" && msg.actionCandidates && (
+                      <div className="mt-2.5 space-y-1.5">
+                        <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>
+                        {msg.actionCandidates.map((cand) => (
+                          <button
+                            key={cand.id}
+                            onClick={() => runProposedAction(i, { customerId: cand.id })}
+                            className="block w-full rounded-[3px] border border-slate-300/70 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                            data-testid={`ai-candidate-${cand.id}`}
+                          >
+                            {cand.name}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => dismissProposedAction(i)}
+                          className="mt-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
+                        >
+                          None of these — cancel
+                        </button>
+                      </div>
                     )}
                     {msg.actionState === "executing" && (
                       <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
