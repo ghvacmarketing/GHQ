@@ -34,7 +34,7 @@ export function SubPage({ backTo = "/mobile", children }: { backTo?: string; chi
 
   const onPointerDown = (e: React.PointerEvent) => {
     // Edge-start only, so normal taps/scrolls in content never move the page
-    if (e.clientX > 32) { drag.current = null; return; }
+    if (e.clientX > 48) { drag.current = null; return; }
     drag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };

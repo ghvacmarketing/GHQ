@@ -248,12 +248,6 @@ function OverviewTab({
         <p className="text-sm font-semibold text-slate-600">
           Job #{workOrder.workOrderNumber ?? ""} · {(workOrder.visitType || "SERVICE").charAt(0) + (workOrder.visitType || "SERVICE").slice(1).toLowerCase()}
         </p>
-        <span
-          className="absolute right-4 rounded-full bg-[#711419] px-3 py-1 text-xs font-bold text-white shadow-sm"
-          data-testid="job-status-badge"
-        >
-          {status.label}{optimisticStatus ? "…" : ""}
-        </span>
       </div>
 
       {/* Header */}
@@ -3924,7 +3918,9 @@ export default function MobileJobDetail() {
     setTimeout(() => { if (el) el.style.transition = ""; }, 290);
   };
   const onSwipeStart = (e: React.PointerEvent) => {
-    if (e.clientX > 28) { swipeDrag.current = null; return; }
+    // Wider start zone — Android's system gesture owns the outermost edge,
+    // so fingers landing "near the left" must still catch our drag.
+    if (e.clientX > 48) { swipeDrag.current = null; return; }
     // In a section (Work/Quote/Invoice) the edge swipe returns to the
     // Overview hub; on the hub itself it leaves to the jobs list.
     swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true, section: activeTab !== "overview" };
@@ -4439,16 +4435,10 @@ export default function MobileJobDetail() {
   ];
 
   return (
-    <MobileShell
-      customNav={{
-        tabs: tabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon })),
-        activeId: activeTab,
-        onSelect: (id) => switchTab(id as TabType),
-      }}
-    >
-      <OfflineIndicator />
-      {/* Real Jobs page beneath the detail — visible/parallaxing while
-          swiping the whole job away, exactly like the section stack */}
+    <div className="relative h-screen overflow-hidden bg-slate-50">
+      {/* Real Jobs page beneath the detail — the WHOLE screen (bottom nav
+          included) slides over it, so the swipe reads as one solid sheet
+          with no seam between the page and the nav */}
       {showUnderlay && (
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
           <div ref={pageUnderlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
@@ -4457,7 +4447,18 @@ export default function MobileJobDetail() {
           <div ref={pageScrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
         </div>
       )}
-      {/* Floating back — tap, or swipe right anywhere from the left half */}
+      <div
+        ref={pageRef}
+        className="page-slide-in relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={onSwipeStart}
+        onPointerMove={onSwipeMove}
+        onPointerUp={onSwipeEnd}
+        onPointerCancel={onSwipeEnd}
+      >
+      <MobileShell>
+      <OfflineIndicator />
+      {/* Floating back — tap, or swipe right from the left edge */}
       <button
         onClick={() => { if (activeTab !== "overview") closeSectionAnimated(); else goBackAnimated(); }}
         className="absolute left-3 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-700 shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
@@ -4467,15 +4468,33 @@ export default function MobileJobDetail() {
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
+      {/* Floating job tabs — ride above the main nav and slide with the page */}
       <div
-        ref={pageRef}
-        className="page-slide-in relative z-10 flex h-full flex-col bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
-        style={{ touchAction: "pan-y" }}
-        onPointerDown={onSwipeStart}
-        onPointerMove={onSwipeMove}
-        onPointerUp={onSwipeEnd}
-        onPointerCancel={onSwipeEnd}
+        className="pointer-events-none absolute inset-x-0 z-30 flex justify-center"
+        style={{ bottom: "calc(92px + env(safe-area-inset-bottom))" }}
+        data-testid="job-tab-rail"
       >
+        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-slate-900/10 bg-white/90 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)] backdrop-blur-xl">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const active = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => switchTab(t.id)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  active ? "bg-[#711419] text-white" : "text-slate-600"
+                }`}
+                data-testid={`job-tab-${t.id}`}
+              >
+                <Icon className="h-4 w-4" strokeWidth={1.75} />
+                {active && t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="relative flex h-full flex-col bg-slate-50">
         <div className="flex-shrink-0 p-4 pb-2">
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
@@ -4553,6 +4572,8 @@ export default function MobileJobDetail() {
           </div>
         </div>
 
+      </div>
+      </MobileShell>
       </div>
 
       <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
@@ -5034,6 +5055,6 @@ export default function MobileJobDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </MobileShell>
+    </div>
   );
 }
