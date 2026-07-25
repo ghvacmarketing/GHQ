@@ -635,7 +635,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-20 h-12"
+                className="pl-10 pr-20 h-12 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                 data-testid="input-ghq-search"
               />
               {mode === "help" && searchQuery.trim().length >= 3 && (

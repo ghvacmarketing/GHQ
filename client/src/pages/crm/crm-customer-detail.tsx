@@ -2235,6 +2235,41 @@ function CustomerTabbedView({
   const customerSensors = sensorData?.sensors || [];
   const [sensorDetail, setSensorDetail] = useState<SensorView | null>(null);
 
+  // Maintenance agreements (same cache key as the Agreements tab)
+  const { data: overviewAgreements } = useQuery<AgreementWithVisits[]>({
+    queryKey: [`/api/crm/customers/${customer.id}/agreements`],
+  });
+  const visibleAgreements = (overviewAgreements || []).filter((a) => a.status !== "cancelled");
+
+  // Snapshot stat tiles
+  const openWorkOrders = crmWorkOrders?.filter(
+    (wo) => !wo.isHistorical && !["completed", "invoiced", "paid", "cancelled"].includes(wo.status),
+  ) || [];
+  const activeNowCount = openWorkOrders.filter((wo) =>
+    ["dispatched", "en_route", "on_site", "in_progress"].includes(wo.status),
+  ).length;
+  const scheduledCount = openWorkOrders.filter((wo) => wo.status === "scheduled").length;
+  const openQuotes = crmQuotes?.filter(
+    (q) => !["accepted", "declined", "expired", "void", "converted"].includes((q.status || "").toLowerCase()),
+  ) || [];
+  const openQuoteValue = openQuotes.reduce((s, q) => s + (Number((q as any).total) || 0), 0);
+  const openInvoices = crmInvoices?.filter((inv) =>
+    ["sent", "partial", "overdue"].includes((inv.status || "").toLowerCase()),
+  ) || [];
+  const balanceDue = openInvoices.reduce((s, inv) => s + (Number(inv.balanceDue) || 0), 0);
+  const collectedTotal = (crmInvoices || []).reduce(
+    (s, inv) => s + Math.max(0, (Number(inv.total) || 0) - (Number(inv.balanceDue) || 0)),
+    0,
+  );
+  const nextVisit = openWorkOrders
+    .filter((wo) => wo.scheduledAt || wo.scheduledDate)
+    .sort(
+      (a, b) =>
+        new Date(a.scheduledAt || a.scheduledDate).getTime() - new Date(b.scheduledAt || b.scheduledDate).getTime(),
+    )[0];
+  const money = (n: number, digits = 0) =>
+    `$${n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+
   const combinedTimelineEntries = (() => {
     const entries: Array<{ id: string; type: string; title: string; description: string; timestamp: Date; userName?: string }> = [];
     
@@ -2416,123 +2451,346 @@ function CustomerTabbedView({
 
       {/* Overview Tab */}
       <TabsContent value="overview" className="space-y-6" data-testid="tab-content-overview">
-        {/* Customer Summary Card */}
-        <Card className="border shadow-sm" data-testid="card-customer-summary">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4 mb-6">
-              <div className={`p-3 rounded-full ${getCustomerBgColor()}`}>
-                {getCustomerIcon()}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold text-slate-900">{getCustomerTypeLabel()} Customer</h2>
-                <p className="text-sm text-slate-500 mt-0.5">{customer.name}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <StatusDot pill={getCustomerBadgeColor()}>{customer.customerType}</StatusDot>
-                {customer.protectionPlanLevel && (
-                  <StatusDot
-                    pill="bg-emerald-100 text-emerald-700 border-emerald-200 flex items-center gap-1"
-                    data-testid="badge-protection-plan"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {protectionPlanLabel(customer.protectionPlanLevel)} Protection Member
-                  </StatusDot>
-                )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Name</p>
-                  <p className="text-sm font-medium text-slate-900">{customer.name}</p>
-                </div>
-                {customer.companyName && customer.companyName !== customer.name && (
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Company</p>
-                    <p className="text-sm font-medium text-slate-900">{customer.companyName}</p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Address</p>
-                  <p className="text-sm text-slate-700">{customer.fullAddress || "No address on file"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
-                  <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Protection Plan</p>
-                  {customer.protectionPlanLevel ? (
-                    <div className="flex items-center gap-1.5" data-testid="text-protection-plan">
-                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm font-medium text-slate-900">
-                        {protectionPlanLabel(customer.protectionPlanLevel)} Plan Member
-                      </span>
-                      {customer.protectionPlanSince && (
-                        <span className="text-xs text-slate-400">
-                          since {formatDate(customer.protectionPlanSince)}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">Not a member</p>
+        {/* Snapshot stat tiles */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="overview-stat-tiles">
+          <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="tile-status">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Status
+            </p>
+            <p className="mt-1.5 text-lg font-bold capitalize leading-none text-slate-900">
+              {customer.customerStatus || "Customer"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">{getCustomerTypeLabel()}</p>
+          </div>
+          <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="tile-open-work">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <Briefcase className="h-3.5 w-3.5" /> Open Work
+            </p>
+            <p className="mt-1.5 text-lg font-bold leading-none text-slate-900">{openWorkOrders.length}</p>
+            <p className="mt-1 text-xs text-slate-500">{activeNowCount} active · {scheduledCount} scheduled</p>
+          </div>
+          <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="tile-open-quotes">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <FileText className="h-3.5 w-3.5" /> Open Quotes
+            </p>
+            <p className="mt-1.5 text-lg font-bold leading-none text-slate-900">{openQuotes.length}</p>
+            <p className="mt-1 text-xs text-slate-500">{money(openQuoteValue)} value</p>
+          </div>
+          <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="tile-balance">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <DollarSign className="h-3.5 w-3.5" /> Balance
+            </p>
+            {openInvoices.length > 0 ? (
+              <p className="mt-1.5 text-lg font-bold leading-none text-slate-900">{money(balanceDue, 2)}</p>
+            ) : (
+              <p className="mt-1.5 text-lg font-bold leading-none text-emerald-600">Paid up</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              {openInvoices.length} open {openInvoices.length === 1 ? "invoice" : "invoices"} · {money(collectedTotal, 2)} collected
+            </p>
+          </div>
+          <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="tile-next-action">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <CalendarIcon className="h-3.5 w-3.5" /> Next Action
+            </p>
+            <p className="mt-1.5 text-lg font-bold leading-none text-slate-900">
+              {nextVisit ? format(new Date(nextVisit.scheduledAt || nextVisit.scheduledDate), "MMM d") : "—"}
+            </p>
+            <p className="mt-1 truncate text-xs text-slate-500">
+              {nextVisit ? nextVisit.title || nextVisit.jobType || "Scheduled visit" : "Nothing scheduled"}
+            </p>
+          </div>
+        </div>
+
+        {/* Account details + Active Work / Recent Activity rail */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none lg:col-span-2" data-testid="card-customer-summary">
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center justify-between border-b border-slate-300/70 pb-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Account</p>
+                <div className="flex items-center gap-1.5">
+                  <StatusDot pill={getCustomerBadgeColor()}>{customer.customerType}</StatusDot>
+                  {customer.protectionPlanLevel && (
+                    <StatusDot
+                      pill="bg-emerald-100 text-emerald-700 border-emerald-200 flex items-center gap-1"
+                      data-testid="badge-protection-plan"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {protectionPlanLabel(customer.protectionPlanLevel)} Protection Member
+                    </StatusDot>
                   )}
                 </div>
-                {customer.parentCustomerId && parentCustomer && (
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Parent Account</p>
-                    <Link href={`/crm/customers/${customer.parentCustomerId}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                      <Building2 className="h-3.5 w-3.5" />
-                      {parentCustomer.name}
-                    </Link>
-                    {customer.billToParent && (
-                      <StatusDot pill="text-xs mt-1 border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</StatusDot>
+              </div>
+              <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+                <div className="flex items-start gap-2.5">
+                  {getCustomerIcon()}
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Account</p>
+                    <p className="text-sm font-medium text-slate-900">{customer.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Status</p>
+                    <p className="text-sm font-semibold capitalize text-[#711419]">{customer.customerStatus || "Active"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Type</p>
+                    <p className="text-sm font-medium text-slate-900">{getCustomerTypeLabel()}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CalendarIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Customer Since</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {customer.createdAt ? format(new Date(customer.createdAt), "MMM yyyy") : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Phone</p>
+                    {customer.phone ? (
+                      <a href={`tel:${customer.phone}`} className="text-sm font-medium text-slate-900 hover:text-[#711419]">
+                        {customer.phone}
+                      </a>
+                    ) : (
+                      <p className="text-sm text-slate-400">No phone</p>
                     )}
                   </div>
-                )}
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
-                  {customer.phone ? (
-                    <a href={`tel:${customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                      <Phone className="h-3.5 w-3.5" />
-                      {customer.phone}
-                    </a>
-                  ) : (
-                    <p className="text-sm text-slate-400">No phone</p>
-                  )}
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
-                  {customer.email ? (
-                    <a href={`mailto:${customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                      <Mail className="h-3.5 w-3.5" />
-                      {customer.email}
-                    </a>
-                  ) : (
-                    <p className="text-sm text-slate-400">No email</p>
-                  )}
+                <div className="flex items-start gap-2.5">
+                  <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Company</p>
+                    <p className="text-sm font-medium text-slate-900">{customer.companyName || "—"}</p>
+                  </div>
                 </div>
-                {subAccounts.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Sub-Accounts</p>
-                    <div className="space-y-1">
-                      {subAccounts.slice(0, 3).map(sub => (
-                        <button key={sub.id} onClick={() => navigate(`/crm/customers/${sub.id}`)} className="text-sm text-blue-600 hover:underline flex items-center gap-1 w-full text-left">
-                          <ChevronRight className="h-3 w-3" />
-                          {sub.name}
-                        </button>
-                      ))}
-                      {subAccounts.length > 3 && (
-                        <p className="text-xs text-slate-400">+{subAccounts.length - 3} more</p>
+                <div className="flex items-start gap-2.5">
+                  <Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Email</p>
+                    {customer.email ? (
+                      <a href={`mailto:${customer.email}`} className="break-all text-sm font-medium text-slate-900 hover:text-[#711419]">
+                        {customer.email}
+                      </a>
+                    ) : (
+                      <p className="text-sm text-slate-400">No email</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Primary Property</p>
+                    <p className="text-sm font-medium text-slate-900">{customer.fullAddress || "No address on file"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Protection Plan</p>
+                    {customer.protectionPlanLevel ? (
+                      <p className="text-sm font-medium text-slate-900" data-testid="text-protection-plan">
+                        {protectionPlanLabel(customer.protectionPlanLevel)} Plan Member
+                        {customer.protectionPlanSince && (
+                          <span className="ml-1 text-xs font-normal text-slate-400">
+                            since {formatDate(customer.protectionPlanSince)}
+                          </span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-400">Not a member</p>
+                    )}
+                  </div>
+                </div>
+                {customer.parentCustomerId && parentCustomer && (
+                  <div className="flex items-start gap-2.5">
+                    <GitBranch className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-slate-500">Parent Account</p>
+                      <Link href={`/crm/customers/${customer.parentCustomerId}`} className="text-sm font-medium text-slate-900 hover:text-[#711419]">
+                        {parentCustomer.name}
+                      </Link>
+                      {customer.billToParent && (
+                        <StatusDot pill="text-xs mt-1 border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</StatusDot>
                       )}
                     </div>
                   </div>
                 )}
+                {subAccounts.length > 0 && (
+                  <div className="flex items-start gap-2.5">
+                    <Users className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-slate-500">Sub-Accounts</p>
+                      <div className="space-y-0.5">
+                        {subAccounts.slice(0, 3).map(sub => (
+                          <button key={sub.id} onClick={() => navigate(`/crm/customers/${sub.id}`)} className="block text-left text-sm font-medium text-slate-900 hover:text-[#711419]">
+                            {sub.name}
+                          </button>
+                        ))}
+                        {subAccounts.length > 3 && (
+                          <p className="text-xs text-slate-400">+{subAccounts.length - 3} more</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-active-work">
+              <CardContent className="p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-slate-300/70 pb-2.5">
+                  <p className="text-sm font-semibold text-slate-900">Active Work</p>
+                  <button
+                    onClick={() => setActiveTab("work-orders")}
+                    className="flex items-center gap-0.5 text-xs font-semibold text-[#711419] hover:underline"
+                    data-testid="button-view-all-work"
+                  >
+                    View all <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {openWorkOrders.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-slate-400">No open jobs</p>
+                ) : (
+                  <div className="space-y-2">
+                    {openWorkOrders.slice(0, 4).map((wo) => (
+                      <button
+                        key={wo.id}
+                        onClick={() => onViewWorkOrder(wo.id)}
+                        className="w-full rounded-[3px] border border-slate-300/70 p-2.5 text-left hover:border-slate-900"
+                        data-testid={`overview-open-wo-${wo.id}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-medium text-slate-900">{wo.title || wo.jobType || "Work order"}</p>
+                          <span className="shrink-0 rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                            {String(wo.status || "").replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        {(wo.scheduledAt || wo.scheduledDate) && (
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {format(new Date(wo.scheduledAt || wo.scheduledDate), "MMM d, h:mm a")}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-recent-activity">
+              <CardContent className="p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-slate-300/70 pb-2.5">
+                  <p className="text-sm font-semibold text-slate-900">Recent Activity</p>
+                  <button
+                    onClick={() => setActiveTab("timeline")}
+                    className="flex items-center gap-0.5 text-xs font-semibold text-[#711419] hover:underline"
+                    data-testid="button-view-all-timeline"
+                  >
+                    View all <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {timelineLoading || notesLoading ? (
+                  <div className="space-y-2 py-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : combinedTimelineEntries.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-slate-400">No activity yet</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {combinedTimelineEntries.map((entry) => {
+                      const config = entry.type === 'note'
+                        ? { icon: MessageSquare, textColor: "text-slate-500" }
+                        : timelineTypeConfig[entry.type as TimelineEntry['type']] || { icon: Circle, textColor: "text-slate-500" };
+                      const IconComponent = config.icon;
+                      return (
+                        <div key={entry.id} className="flex items-start gap-2.5" data-testid={`timeline-entry-overview-${entry.id}`}>
+                          <IconComponent className={cn("mt-0.5 h-4 w-4 shrink-0", config.textColor)} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="truncate text-sm font-medium text-slate-900">{entry.title}</p>
+                              <span className="shrink-0 text-[11px] text-slate-400">{format(entry.timestamp, "MMM d")}</span>
+                            </div>
+                            <p className="line-clamp-1 text-xs text-slate-500">
+                              {entry.description?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Agreements */}
+        <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-overview-agreements">
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-300/70 pb-2.5">
+              <p className="text-sm font-semibold text-slate-900">Agreements</p>
+              <button
+                onClick={() => setActiveTab("agreements")}
+                className="flex items-center gap-0.5 text-xs font-semibold text-[#711419] hover:underline"
+                data-testid="button-view-all-agreements"
+              >
+                View all <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
+            {visibleAgreements.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-slate-400">No active agreements</p>
+                <button
+                  onClick={() => setActiveTab("agreements")}
+                  className="mt-1 text-sm font-semibold text-[#711419] hover:underline"
+                  data-testid="button-create-agreement-overview"
+                >
+                  Create an agreement →
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                {visibleAgreements.slice(0, 6).map((ag) => (
+                  <button
+                    key={ag.id}
+                    onClick={() => setActiveTab("agreements")}
+                    className="rounded-[3px] border border-slate-300/70 p-3 text-left hover:border-slate-900"
+                    data-testid={`overview-agreement-${ag.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-slate-900">{ag.agreementPlan || "Agreement"}</p>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                          ag.status === "active" && "bg-emerald-100 text-emerald-700",
+                          ag.status === "expiring" && "bg-amber-100 text-amber-700",
+                          ag.status === "expired" && "bg-red-100 text-red-700",
+                        )}
+                      >
+                        {ag.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      #{ag.agreementNumber}
+                      {ag.nextServiceDate && ` · Next visit ${format(new Date(ag.nextServiceDate), "MMM d, yyyy")}`}
+                      {ag.price && ` · ${money(Number(ag.price) || 0)}`}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -2656,92 +2914,6 @@ function CustomerTabbedView({
             </CardContent>
           </Card>
         )}
-
-        {/* Customer Timeline Section */}
-        <Card data-testid="card-customer-timeline-overview">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-[#711419]" />
-              Customer Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <CommentComposer
-                entityType="customer"
-                entityId={customer.id}
-                onCommentPosted={onCommentPosted}
-                placeholder="Add a comment about this customer..."
-              />
-
-              {timelineLoading || notesLoading ? (
-                <div className="space-y-3 py-4">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ) : combinedTimelineEntries.length === 0 ? (
-                <div className="text-center py-6">
-                  <History className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No activity yet</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Comments and activity will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {combinedTimelineEntries.map((entry) => {
-                    const config = entry.type === 'note' 
-                      ? { icon: MessageSquare, bgColor: "bg-gray-100", textColor: "text-gray-700" }
-                      : timelineTypeConfig[entry.type as TimelineEntry['type']] || { icon: Circle, bgColor: "bg-slate-100", textColor: "text-slate-700" };
-                    const IconComponent = config.icon;
-                    
-                    return (
-                      <div 
-                        key={entry.id} 
-                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"
-                        data-testid={`timeline-entry-overview-${entry.id}`}
-                      >
-                        <div className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                          config.bgColor
-                        )}>
-                          <IconComponent className={cn("h-4 w-4", config.textColor)} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-medium text-sm text-slate-700 truncate">
-                              {entry.title}
-                            </span>
-                            <span className="text-xs text-slate-400 flex-shrink-0">
-                              {format(entry.timestamp, "MMM d, yyyy 'at' h:mm a")}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-600 line-clamp-2">
-                            {entry.description?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="pt-2 border-t">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"
-                  onClick={() => setActiveTab("timeline")}
-                  data-testid="button-view-all-timeline"
-                >
-                  View All Timeline
-                  <History className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Environment Monitoring — Govee sensors assigned to this customer */}
         {customerSensors.length > 0 && (

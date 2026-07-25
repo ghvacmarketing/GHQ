@@ -678,7 +678,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
     setAnswers((prev) => ({ ...prev, [id]: value }));
 
   // Group questions into their builder-defined sections (phases)
-  const groupedQuestions = (() => {
+  const sections = (() => {
     const groups: Array<{ name: string | null; qs: AssignedChecklistTemplate["questions"] }> = [];
     const gIdx = new Map<string, number>();
     for (const q of template.questions) {
@@ -690,36 +690,101 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
       }
       groups[gIdx.get(key)!].qs.push(q);
     }
-    return groups.flatMap((g) => g.qs.map((q, i) => ({ q, header: i === 0 ? g.name : null })));
+    return groups;
   })();
+  const showSectionHeaders = sections.length > 1 || Boolean(sections[0]?.name);
+  const answeredIn = (qs: AssignedChecklistTemplate["questions"]) =>
+    qs.filter((q) => {
+      const a = answers[q.id];
+      return a !== undefined && a !== "";
+    }).length;
+
+  // Photo steps tied to a question render ON that question's card; the rest
+  // collect in a general "Required photos" block.
+  const photosByQuestion = new Map<string, NonNullable<AssignedChecklistTemplate["photoSteps"]>>();
+  const generalPhotos: NonNullable<AssignedChecklistTemplate["photoSteps"]> = [];
+  for (const ps of template.photoSteps ?? []) {
+    if (ps.linkedQuestionId) {
+      const arr = photosByQuestion.get(ps.linkedQuestionId) ?? [];
+      arr.push(ps);
+      photosByQuestion.set(ps.linkedQuestionId, arr);
+    } else {
+      generalPhotos.push(ps);
+    }
+  }
 
   return (
     <div className="space-y-4">
-      <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-fill">
-        <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
+      <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-checklist-fill">
+        <CardHeader className="border-b border-slate-300/70 pb-3">
           <CardTitle className="flex items-center justify-between gap-2 text-base font-semibold">
-            <span className="flex items-center gap-2">
-              <Clipboard className="h-4 w-4 text-amber-600" />
+            <span className="flex items-center gap-2 text-slate-900">
+              <Clipboard className="h-4 w-4 text-[#711419]" />
               {template.name}
             </span>
-            <span className="text-xs font-semibold text-amber-700">{answeredCount}/{template.questions.length}</span>
+            <span className="rounded-[3px] border border-slate-300/70 bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">
+              {answeredCount}/{template.questions.length}
+            </span>
           </CardTitle>
-          {template.description && <p className="text-sm text-amber-700 mt-1">{template.description}</p>}
+          {template.description && <p className="mt-1 text-sm text-slate-500">{template.description}</p>}
+          {sections.length > 1 && (
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {sections.length} sections
+            </p>
+          )}
+          <div className="mt-2 h-1 w-full bg-slate-100">
+            <div
+              className="h-full bg-[#711419] transition-all"
+              style={{ width: `${(answeredCount / Math.max(1, template.questions.length)) * 100}%` }}
+            />
+          </div>
         </CardHeader>
-        <CardContent className="pt-4 space-y-3">
-          {groupedQuestions.map(({ q, header }) => {
+        <CardContent className="space-y-5 pt-4">
+          {sections.map((section, si) => (
+            <div key={si} className="space-y-3">
+              {showSectionHeaders && (
+                <div className="flex items-center gap-2 border-b border-slate-300/70 pb-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-[3px] bg-slate-900 text-[11px] font-bold text-white">
+                    {si + 1}
+                  </span>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                    {section.name || `Section ${si + 1}`}
+                  </p>
+                  <span className="ml-auto text-[11px] font-semibold text-slate-400">
+                    {answeredIn(section.qs)} of {section.qs.length}
+                  </span>
+                </div>
+              )}
+              {section.qs.map((q) => {
             const value = answers[q.id];
+            const linkedPhotos = photosByQuestion.get(q.id) ?? [];
             return (
               <div key={q.id}>
-                {header && (
-                  <p className="pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-amber-700/80">{header}</p>
-                )}
-              <div className="rounded-lg border border-amber-200 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
+              <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
                 <p className="text-sm font-medium text-slate-800">
                   {q.question}
                   {q.isRequired && <span className="ml-1 text-red-500">*</span>}
                 </p>
                 {q.helpText && <p className="mt-0.5 text-xs text-slate-500">{q.helpText}</p>}
+                {linkedPhotos.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {linkedPhotos.map((ps) => (
+                      <div
+                        key={ps.id}
+                        className="flex items-start gap-1.5 rounded-[3px] border border-[#711419]/25 bg-[#711419]/5 px-2 py-1.5 text-xs font-semibold text-[#711419]"
+                        data-testid={`fill-photo-${ps.id}`}
+                      >
+                        <Camera className="mt-px h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Photo required{ps.label ? `: ${ps.label}` : ""}
+                          {ps.instructions && (
+                            <span className="block font-normal text-[#711419]/80">{ps.instructions}</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-2.5">
                   {q.questionType === "yes_no" && (
                     <div className="grid grid-cols-2 gap-2">
@@ -727,7 +792,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                         <button
                           key={opt}
                           onClick={() => setAnswer(q.id, opt)}
-                          className={`rounded-lg border py-2.5 text-sm font-semibold capitalize transition-colors ${
+                          className={`rounded-[3px] border py-2.5 text-sm font-semibold capitalize transition-colors ${
                             value === opt
                               ? opt === "yes"
                                 ? "border-green-500 bg-green-50 text-green-700"
@@ -766,8 +831,8 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                         <button
                           key={opt}
                           onClick={() => setAnswer(q.id, opt)}
-                          className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
-                            value === opt ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-200 text-slate-500"
+                          className={`rounded-[3px] border px-3.5 py-2 text-sm font-medium transition-colors ${
+                            value === opt ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-300/70 text-slate-500"
                           }`}
                         >
                           {opt}
@@ -787,8 +852,8 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                               const next = checked ? selected.filter((o) => o !== opt) : [...selected, opt];
                               setAnswer(q.id, next.join(", "));
                             }}
-                            className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
-                              checked ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-200 text-slate-500"
+                            className={`rounded-[3px] border px-3.5 py-2 text-sm font-medium transition-colors ${
+                              checked ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-300/70 text-slate-500"
                             }`}
                           >
                             {checked ? "\u2713 " : ""}{opt}
@@ -802,29 +867,25 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
               </div>
             );
           })}
+            </div>
+          ))}
 
-          {(template.photoSteps?.length ?? 0) > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-white p-3.5" data-testid="fill-photo-steps">
+          {generalPhotos.length > 0 && (
+            <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="fill-photo-steps">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                 <Camera className="h-4 w-4 text-[#711419]" /> Required photos
               </p>
               <p className="mt-0.5 text-xs text-slate-500">Take these in the Photos tab as you work.</p>
               <div className="mt-2 space-y-1.5">
-                {template.photoSteps!.map((ps) => {
-                  const stepNo = ps.linkedQuestionId
-                    ? template.questions.findIndex((q) => q.id === ps.linkedQuestionId) + 1
-                    : 0;
-                  return (
-                    <div key={ps.id} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#711419]" />
-                      <span>
-                        {ps.label}
-                        {stepNo > 0 && <span className="text-xs text-slate-400"> - step {stepNo}</span>}
-                        {ps.instructions && <span className="block text-xs text-slate-500">{ps.instructions}</span>}
-                      </span>
-                    </div>
-                  );
-                })}
+                {generalPhotos.map((ps) => (
+                  <div key={ps.id} className="flex items-start gap-2 text-sm text-slate-700">
+                    <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#711419]" />
+                    <span>
+                      {ps.label}
+                      {ps.instructions && <span className="block text-xs text-slate-500">{ps.instructions}</span>}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -832,7 +893,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
           <Button
             onClick={() => submit.mutate()}
             disabled={submit.isPending || missingRequired > 0}
-            className="h-12 w-full rounded-lg bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
+            className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
             data-testid="button-submit-checklist"
           >
             {submit.isPending
@@ -882,20 +943,20 @@ function WorkTab({
 
   return (
     <div className="space-y-4">
-      <Card className="border-amber-200 bg-amber-50/30" data-testid="card-work-checklist">
-        <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Clipboard className="h-4 w-4 text-amber-600" />
+      <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-work-checklist">
+        <CardHeader className="border-b border-slate-300/70 pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <Clipboard className="h-4 w-4 text-[#711419]" />
             {checklistResponse.checklist.name || "Service Checklist"}
           </CardTitle>
           {checklistResponse.checklist.description && (
-            <p className="text-sm text-amber-700 mt-1">{checklistResponse.checklist.description}</p>
+            <p className="text-sm text-slate-500 mt-1">{checklistResponse.checklist.description}</p>
           )}
         </CardHeader>
         <CardContent className="pt-4 space-y-4">
           {checklistResponse.summary && (
-            <div className="bg-white rounded-lg p-4 border border-amber-200">
-              <p className="text-xs text-amber-700 mb-2 uppercase tracking-wide font-medium">AI Summary</p>
+            <div className="rounded-[4px] border border-slate-300/70 bg-slate-50 p-4">
+              <p className="text-[11px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">AI Summary</p>
               <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-work-summary">
                 {checklistResponse.summary}
               </p>
@@ -906,7 +967,7 @@ function WorkTab({
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full flex items-center justify-between p-3 text-sm font-medium text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 bg-white min-h-[44px]"
+                className="w-full flex items-center justify-between p-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-[3px] border border-slate-300/70 bg-white min-h-[44px]"
                 data-testid="button-toggle-work-answers"
               >
                 <span>Checklist Answers ({checklistResponse.checklist.questions.length})</span>
@@ -918,7 +979,7 @@ function WorkTab({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
-              <div className="space-y-3 bg-white rounded-lg p-4 border border-amber-200">
+              <div className="space-y-3 bg-white rounded-[4px] p-4 border border-slate-300/70">
                 {checklistResponse.checklist.questions.map((question) => {
                   const answer = checklistResponse.answers[question.id];
                   return (
@@ -966,7 +1027,7 @@ function WorkTab({
           </Collapsible>
 
           {checklistResponse.completedAt && (
-            <p className="text-xs text-amber-600 text-right">
+            <p className="text-xs text-slate-500 text-right">
               Completed {format(new Date(checklistResponse.completedAt), "MMM d, h:mm a")}
               {checklistResponse.completedBy && ` by ${checklistResponse.completedBy}`}
             </p>
@@ -3881,6 +3942,14 @@ export default function MobileJobDetail() {
     const sec = sectionsRef.current;
     const fromOverview = activeTab === "overview";
     if (sec && !fromOverview) tabScroll.current[activeTab] = sec.scrollTop;
+    // Pre-position the layer BEFORE React commits the tab swap: the animation
+    // only starts on the next frame, so without this the incoming section
+    // paints once fully in place, then snaps to its start position — a
+    // visible flash.
+    if (sec) {
+      if (fromOverview) sec.style.transform = "translateX(100%)";
+      else sec.style.opacity = "0";
+    }
     setActiveTab(next);
     requestAnimationFrame(() => {
       const sec2 = sectionsRef.current;
@@ -3903,9 +3972,12 @@ export default function MobileJobDetail() {
         setTimeout(setOpenLayerStyles, 230);
       } else {
         sec2.animate(
-          [{ transform: "translateX(16px)", opacity: 0.6 }, { transform: "translateX(0)", opacity: 1 }],
-          { duration: 180, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+          [{ transform: "translateX(12px)", opacity: 0 }, { transform: "translateX(0)", opacity: 1 }],
+          { duration: 160, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
         );
+        setTimeout(() => {
+          if (sectionsRef.current) sectionsRef.current.style.opacity = "";
+        }, 150);
       }
     });
   };
