@@ -357,45 +357,50 @@ export default function MobilePhotos() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Photos</h2>
-          <p className="text-sm text-slate-500">Search any customer to add photos, or browse recent shots.</p>
-        </div>
-
-        {/* iOS-style search: minimal pill; Cancel slides in on focus and the
-            results panel eases in below while the page content steps aside */}
-        <div className="flex items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              ref={searchInputRef}
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-              onFocus={() => setSearchActive(true)}
-              placeholder="Search customers"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-9 text-[16px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-300 focus:bg-white"
-              data-testid="input-customer-search"
-            />
-            {customerSearch && (
-              <button
-                onClick={() => { setCustomerSearch(""); searchInputRef.current?.focus(); }}
-                className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md bg-slate-300 text-white"
-                aria-label="Clear search"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+        {/* Collapsed: just a search icon top right. Tapping it expands the
+            iOS-style search bar with Cancel; results ease in below. */}
+        {!searchActive ? (
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 60); }}
+              className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+              aria-label="Search customers"
+              data-testid="button-open-search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            onClick={cancelSearch}
-            className={`overflow-hidden whitespace-nowrap text-[15px] font-medium text-[#711419] transition-all duration-300 ease-out ${
-              searchActive ? "ml-3 max-w-[72px] opacity-100" : "ml-0 max-w-0 opacity-0"
-            }`}
-            data-testid="button-cancel-search"
-          >
-            Cancel
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                placeholder="Search customers"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-9 text-[16px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-300 focus:bg-white"
+                data-testid="input-customer-search"
+              />
+              {customerSearch && (
+                <button
+                  onClick={() => { setCustomerSearch(""); searchInputRef.current?.focus(); }}
+                  className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md bg-slate-300 text-white"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={cancelSearch}
+              className="ml-3 whitespace-nowrap text-[15px] font-medium text-[#711419]"
+              data-testid="button-cancel-search"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Search results (only while searching) */}
         {searchActive && (

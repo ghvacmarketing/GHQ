@@ -13338,6 +13338,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CompanyCam photo.created webhook — instant pull. The payload is only a
+  // poke: we re-fetch the ids from CompanyCam's API with our token before
+  // importing anything, so spoofed posts are harmless. Path lives under
+  // /api/webhooks/ (exempt from the legacy auth gate).
+  app.post("/api/webhooks/companycam", async (req, res) => {
+    res.status(200).json({ ok: true }); // ack fast — CompanyCam retries slow endpoints
+    try {
+      const body = req.body || {};
+      const photo = body.photo || body.data?.photo || body.payload?.photo || (body.type ? body.data : null) || body;
+      const photoId = String(photo?.id || body.photo_id || "");
+      const projectId = photo?.project_id ? String(photo.project_id) : null;
+      if (!photoId) return;
+      const { handleWebhookPhoto } = await import("./services/companycam");
+      handleWebhookPhoto(photoId, projectId).catch((e) => console.error("[CompanyCam] webhook handling failed:", e?.message || e));
+    } catch (e) {
+      console.error("[CompanyCam] webhook parse failed:", e);
+    }
+  });
+
   // ---- CompanyCam admin: status, manual sync, manual matching ----
   app.get("/api/crm/companycam/status", requireCrmAdmin, async (_req, res) => {
     try {

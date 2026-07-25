@@ -4,6 +4,7 @@ import {
   companycamPushedPhotos,
   crmCustomers,
   crmProperties,
+  crmUsers,
   customerFiles,
 } from "@shared/schema";
 import { eq, sql, like } from "drizzle-orm";
@@ -253,16 +254,46 @@ export async function syncCompanycam(): Promise<CompanycamSyncResult> {
   }
 }
 
+/** CompanyCam creators and CRM users are the same people — match the photo's
+ *  creator_name to a crm_user so galleries credit the right tech. Exact
+ *  normalized full-name match first, then first+last token containment. */
+let userMatchCache: { at: number; users: Array<{ id: string; norm: string; tokens: string[] }> } | null = null;
+async function matchCreatorToUser(creatorName: string | null): Promise<string | null> {
+  if (!creatorName?.trim()) return null;
+  if (!userMatchCache || Date.now() - userMatchCache.at > 10 * 60 * 1000) {
+    const rows = await db.select({ id: crmUsers.id, name: crmUsers.name }).from(crmUsers);
+    userMatchCache = {
+      at: Date.now(),
+      users: rows
+        .filter((u) => u.name)
+        .map((u) => {
+          const norm = u.name.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+          return { id: u.id, norm, tokens: norm.split(" ") };
+        }),
+    };
+  }
+  const norm = creatorName.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+  if (!norm) return null;
+  const exact = userMatchCache.users.find((u) => u.norm === norm);
+  if (exact) return exact.id;
+  const tokens = norm.split(" ");
+  const contained = userMatchCache.users.filter(
+    (u) => tokens.length >= 2 && tokens.every((t) => u.tokens.includes(t)),
+  );
+  return contained.length === 1 ? contained[0].id : null;
+}
+
 /** Import one project's photos as reference rows on the customer. Returns the
- *  number of NEW rows. */
+ *  number of NEW rows. Also backfills uploader attribution on rows imported
+ *  before creator matching existed. */
 export async function importProjectPhotos(ccProjectId: string, customerId: string, projectName: string): Promise<number> {
   const photos = await fetchProjectPhotos(ccProjectId);
 
   const existing = await db
-    .select({ objectPath: customerFiles.objectPath })
+    .select({ id: customerFiles.id, objectPath: customerFiles.objectPath, uploadedBy: customerFiles.uploadedBy })
     .from(customerFiles)
     .where(like(customerFiles.objectPath, "companycam:%"));
-  const have = new Set(existing.map((r) => r.objectPath));
+  const have = new Map(existing.map((r) => [r.objectPath, r]));
 
   const pushed = await db.select({ ccPhotoId: companycamPushedPhotos.ccPhotoId }).from(companycamPushedPhotos);
   const pushedIds = new Set(pushed.map((r) => r.ccPhotoId));
@@ -271,7 +302,16 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
   for (const photo of photos) {
     if (photo.status && photo.status !== "active") continue;
     const key = `companycam:${photo.id}`;
-    if (have.has(key) || pushedIds.has(photo.id)) continue;
+    if (pushedIds.has(photo.id)) continue;
+    const existingRow = have.get(key);
+    if (existingRow) {
+      // Backfill the uploader on rows that predate creator matching
+      if (!existingRow.uploadedBy) {
+        const userId = await matchCreatorToUser(photo.creator_name);
+        if (userId) await db.update(customerFiles).set({ uploadedBy: userId }).where(eq(customerFiles.id, existingRow.id));
+      }
+      continue;
+    }
     const original = photo.uris.find((u) => u.type === "original") || photo.uris[0];
     if (!original?.uri) continue;
     const capturedAt = photo.captured_at || photo.created_at || null;
@@ -282,7 +322,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
       objectPath: key,
       contentType: "image/jpeg",
       size: null,
-      uploadedBy: null,
+      uploadedBy: await matchCreatorToUser(photo.creator_name),
       createdAt: capturedAt ? new Date(capturedAt * 1000) : new Date(),
     });
     imported++;
@@ -330,12 +370,56 @@ export async function pushPhotoToCompanycam(customerId: string, fileId: string, 
   }
 }
 
-/** Boot-time scheduler: first sync shortly after start, then hourly. */
+/** Near-realtime pull: CompanyCam's photo.created webhook pokes us with ids.
+ *  The payload is treated as UNTRUSTED — we re-fetch the photo from the API
+ *  with our own token and import only what's really there, so a spoofed POST
+ *  can at worst trigger a legitimate import. */
+let lastWebhookFullSync = 0;
+export async function handleWebhookPhoto(photoId: string, projectId: string | null): Promise<void> {
+  if (!companycamConfigured()) return;
+  const photo: any = await ccFetch(`/photos/${photoId}`).catch(() => null);
+  if (!photo?.id) return;
+  const projId = String(photo.project_id || projectId || "");
+  if (!projId) return;
+
+  const [link] = await db.select().from(companycamProjectLinks).where(eq(companycamProjectLinks.ccProjectId, projId));
+  if (link?.customerId && link.matchType !== "ignored") {
+    const imported = await importProjectPhotos(projId, link.customerId, link.ccProjectName || "CompanyCam");
+    if (imported > 0) console.log(`[CompanyCam] webhook imported ${imported} photo(s) for project ${projId}`);
+    return;
+  }
+  // Unknown or unmatched project (e.g. brand new job) — run a full sync so it
+  // gets address-matched, debounced to once a minute.
+  if (Date.now() - lastWebhookFullSync > 60_000) {
+    lastWebhookFullSync = Date.now();
+    await syncCompanycam().catch((e) => console.error("[CompanyCam] webhook-triggered sync failed:", e?.message || e));
+  }
+}
+
+/** Make sure our photo.created webhook is registered (idempotent). */
+async function ensureWebhook(): Promise<void> {
+  try {
+    const publicBase = process.env.PUBLIC_BASE_URL || "https://www.ghvac.app";
+    const target = `${publicBase}/api/webhooks/companycam`;
+    const hooks: any[] = await ccFetch("/webhooks");
+    if (hooks.some((h) => h.url === target && h.enabled)) return;
+    await ccPost("/webhooks", { webhook: { url: target, scopes: ["photo.created"], enabled: true } });
+    console.log(`[CompanyCam] registered photo.created webhook -> ${target}`);
+  } catch (e: any) {
+    console.error("[CompanyCam] webhook registration failed:", e?.message || e);
+  }
+}
+
+/** Boot-time scheduler: first sync shortly after start, then hourly (the
+ *  webhook handles the instant pulls; this is the reconciliation pass). */
 export function scheduleCompanycamSync(): void {
   if (!companycamConfigured()) {
     console.log("[CompanyCam] no token configured — sync disabled");
     return;
   }
-  setTimeout(() => syncCompanycam().catch((e) => console.error("[CompanyCam] initial sync failed:", e?.message || e)), 30_000);
+  setTimeout(() => {
+    ensureWebhook();
+    syncCompanycam().catch((e) => console.error("[CompanyCam] initial sync failed:", e?.message || e));
+  }, 30_000);
   setInterval(() => syncCompanycam().catch((e) => console.error("[CompanyCam] hourly sync failed:", e?.message || e)), 60 * 60 * 1000);
 }
