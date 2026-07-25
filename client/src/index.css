@@ -477,34 +477,23 @@ input.rounded-full:focus {
   border-color: transparent !important;
 }
 
-/* GHQ "actions" glyph (v2) — a 2×2 cluster of small squares. On hover of the
-   glyph or any wrapping button, the cluster rotates a quarter turn on the
-   house motion curve. */
+/* GHQ "actions" glyph — an SVG 2×2 grid of rounded squares (currentColor).
+   Hovering the wrapping button spins it 45° into a diamond with a slight
+   grow; `.ghq-more-open` locks the diamond (a touch larger) while a menu is
+   open. The open rule comes last so it wins over the hover preview. */
 .ghq-more {
-  display: inline-grid;
-  width: 1rem;
-  height: 1rem;
-  place-content: center;
-  grid-template-columns: repeat(2, 4px);
-  grid-auto-rows: 4px;
-  gap: 2.5px;
+  width: 18px;
+  height: 18px;
   transform-origin: center;
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+  transition: transform 0.3s ease-out;
 }
-.ghq-more-sq {
-  width: 4px;
-  height: 4px;
-  border-radius: 1px;
-  background: currentColor;
-}
-/* A 2x2 square cluster is symmetric under 90deg — that rotation reads as a
-   wobble, not motion. 45deg lands in a distinct diamond formation instead. */
 button:hover .ghq-more,
 [role="button"]:hover .ghq-more,
-.ghq-more:hover,
-.ghq-more-open {
-  transform: rotate(45deg);
+.ghq-more:hover {
+  transform: rotate(45deg) scale(1.05);
+}
+svg.ghq-more.ghq-more-open {
+  transform: rotate(45deg) scale(1.1);
 }
 
 /* Dark editor inputs (email template builder panels) */

@@ -589,7 +589,7 @@ export default function CrmMail() {
                   <DropdownMenuTrigger asChild>
                     <button
                       className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                        "flex h-8 w-8 items-center justify-center rounded-md transition-all duration-200 active:scale-90",
                         actionsOpen
                           ? "bg-slate-200 text-slate-900"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900",
@@ -597,7 +597,7 @@ export default function CrmMail() {
                       title="Conversation actions"
                       data-testid="thread-actions"
                     >
-                      <MoreIcon className={cn(actionsOpen && "ghq-more-open")} />
+                      <MoreIcon open={actionsOpen} />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
