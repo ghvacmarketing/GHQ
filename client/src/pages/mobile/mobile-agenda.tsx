@@ -837,7 +837,7 @@ export default function MobileAgenda() {
     <MobileShell>
       <OfflineIndicator />
       
-      <div className="p-4 space-y-6 pb-32" data-testid="mobile-agenda">
+      <div className="p-4 space-y-6" data-testid="mobile-agenda">
         {currentUser && <ProfileHeader user={currentUser} />}
         
         {(showCacheWarning && workOrders && workOrders.length > 0) && (

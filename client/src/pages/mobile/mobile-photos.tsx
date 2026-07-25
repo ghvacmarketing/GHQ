@@ -335,7 +335,7 @@ export default function MobilePhotos() {
 
   return (
     <MobileShell>
-      <div className="p-4 space-y-5">
+      <div className="p-4 space-y-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Photos</h2>
           <p className="text-sm text-slate-500">Search any customer to add photos, or browse recent shots.</p>
@@ -352,13 +352,13 @@ export default function MobilePhotos() {
               onChange={(e) => setCustomerSearch(e.target.value)}
               onFocus={() => setSearchActive(true)}
               placeholder="Search customers"
-              className="h-10 w-full rounded-full bg-slate-100 pl-9 pr-9 text-[16px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:bg-slate-200/60"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-9 text-[16px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-300 focus:bg-white"
               data-testid="input-customer-search"
             />
             {customerSearch && (
               <button
                 onClick={() => { setCustomerSearch(""); searchInputRef.current?.focus(); }}
-                className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-white"
+                className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md bg-slate-300 text-white"
                 aria-label="Clear search"
               >
                 <X className="h-3 w-3" />
