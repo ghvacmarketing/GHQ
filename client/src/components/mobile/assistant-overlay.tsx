@@ -299,7 +299,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         >
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
-            <h1 className="text-sm font-semibold leading-tight text-slate-100">Assistant</h1>
+            <h1 className="text-sm font-semibold leading-tight text-slate-100">Gibbs</h1>
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -397,7 +397,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
               </svg>
               <h2 className="mt-4 text-lg font-semibold text-slate-100">
-                {firstName ? `What can I get done for you, ${firstName}?` : "What can I get done for you?"}
+                {firstName ? `Gibbs here — what can I get done, ${firstName}?` : "Gibbs here — what can I get done?"}
               </h2>
               <p className="mt-1 max-w-[260px] text-sm text-slate-500">
                 Ask about the business, or tell me what to create. Anything I set up waits for your approval.

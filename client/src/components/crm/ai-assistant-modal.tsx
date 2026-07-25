@@ -304,7 +304,7 @@ export default function AiAssistantModal() {
                 </span>
                 <div>
                   <p className="text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-slate-400">GHQ Intelligence</p>
-                  <p className="text-sm font-semibold leading-tight text-slate-800">Assistant</p>
+                  <p className="text-sm font-semibold leading-tight text-slate-800">Gibbs</p>
                 </div>
               </div>
             </div>
@@ -394,7 +394,7 @@ export default function AiAssistantModal() {
                 <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10 text-[#711419]">
                   <Sparkles className="h-7 w-7" />
                 </span>
-                <h2 className="text-xl font-semibold text-slate-800">What can I get done for you?</h2>
+                <h2 className="text-xl font-semibold text-slate-800">Gibbs here — what can I get done?</h2>
                 <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-500">
                   I know how GHQ works and can see live data — schedules, agreements, invoices, quotes.
                   Anything I set up waits for your approval.

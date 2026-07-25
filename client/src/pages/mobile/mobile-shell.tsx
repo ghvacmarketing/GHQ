@@ -198,7 +198,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       <DraggableSheet open={moreOpen} onOpenChange={setMoreOpen} title="More" testid="sheet-more">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Go to</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={Sparkles} label="Ask AI" onClick={openAssistant} testid="more-assistant" />
+            <SheetTile icon={Sparkles} label="Ask Gibbs" onClick={openAssistant} testid="more-assistant" />
             <SheetTile icon={Users} label="Customers" onClick={() => go("/mobile/customers")} testid="more-customers" />
             <SheetTile icon={MessageSquare} label="Messages" onClick={() => go("/mobile/messages")} testid="more-messages" />
           </div>

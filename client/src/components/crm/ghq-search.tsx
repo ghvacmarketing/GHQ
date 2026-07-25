@@ -412,7 +412,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
             <button
               onClick={() => { setMenuOpen(false); openGlobalAI(); }}
               className="w-12 h-12 rounded-full bg-card text-foreground border border-border shadow-lg flex items-center justify-center hover:bg-accent transition-colors"
-              title="Ask AI"
+              title="Ask Gibbs"
             >
               <Sparkles className="h-5 w-5" />
             </button>

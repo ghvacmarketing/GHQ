@@ -568,7 +568,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
         <TopNavSearch />
 
         <div className="flex flex-1 items-center justify-end gap-1.5">
-          <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask AI" data-testid="button-topnav-ai">
+          <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask Gibbs" data-testid="button-topnav-ai">
             <Sparkles className="h-5 w-5 text-slate-600" />
           </Button>
           <Button
