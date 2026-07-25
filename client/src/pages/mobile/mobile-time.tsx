@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  Clock, Play, Square, Loader2, AlertCircle, CheckCircle, Briefcase, Plus,
+  Clock, Square, Loader2, AlertCircle, CheckCircle, Briefcase, Plus,
   Car, Warehouse, GraduationCap, Users, Coffee, MoreHorizontal, Wrench,
 } from "lucide-react";
 import { format, formatDistanceToNow, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
@@ -51,7 +51,6 @@ export default function MobileTime() {
   const [view, setView] = useState<"clock" | "timesheet">("clock");
   const [showClockOutDialog, setShowClockOutDialog] = useState(false);
   const [workNotes, setWorkNotes] = useState("");
-  const [clockCategory, setClockCategory] = useState("job");
 
   // Manual entry dialog
   const [manualOpen, setManualOpen] = useState(false);
@@ -67,11 +66,6 @@ export default function MobileTime() {
     refetchInterval: 30000,
   });
 
-  const { data: history, isLoading: loadingHistory } = useQuery<EntryWithCategory[]>({
-    queryKey: ["/api/mobile/time/history"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
-
   const invalidateTime = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/mobile/time/current"] });
     queryClient.invalidateQueries({ queryKey: ["/api/mobile/time/history"] });
@@ -79,10 +73,10 @@ export default function MobileTime() {
   };
 
   const clockInMutation = useMutation({
-    mutationFn: async () => apiRequest("POST", "/api/mobile/time/clock-in", { category: clockCategory }),
-    onSuccess: () => {
+    mutationFn: async (category: string) => apiRequest("POST", "/api/mobile/time/clock-in", { category }),
+    onSuccess: (_data, category) => {
       invalidateTime();
-      toast({ title: "Clocked In", description: `Tracking ${categoryMeta(clockCategory).label.toLowerCase()} time.` });
+      toast({ title: "Clocked In", description: `Tracking ${categoryMeta(category).label.toLowerCase()} time.` });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to clock in", variant: "destructive" });
@@ -193,54 +187,28 @@ export default function MobileTime() {
                       </div>
                     )}
 
-                    {/* What is this time for? */}
                     {!isClockedIn && (
-                      <div className="flex flex-wrap justify-center gap-1.5" data-testid="clock-categories">
-                        {TIME_CATEGORIES.map((c) => {
-                          const Icon = c.icon;
-                          const active = clockCategory === c.key;
-                          return (
-                            <button
-                              key={c.key}
-                              onClick={() => setClockCategory(c.key)}
-                              className={`flex items-center gap-1.5 rounded-[3px] border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                                active
-                                  ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
-                                  : "border-slate-200 bg-white text-slate-600"
-                              }`}
-                              data-testid={`clock-category-${c.key}`}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              {c.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <p className="text-sm text-slate-500">Pick what you're starting below.</p>
                     )}
 
-                    <Button
-                      size="lg"
-                      className={`w-full h-16 text-lg font-semibold rounded-[4px] ${
-                        isClockedIn ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
-                      }`}
-                      onClick={() => (isClockedIn ? setShowClockOutDialog(true) : clockInMutation.mutate())}
-                      disabled={isLoading}
-                      data-testid={isClockedIn ? "button-clock-out" : "button-clock-in"}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                      ) : isClockedIn ? (
-                        <>
-                          <Square className="h-6 w-6 mr-2" />
-                          Clock Out
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-6 w-6 mr-2" />
-                          Clock In — {categoryMeta(clockCategory).label}
-                        </>
-                      )}
-                    </Button>
+                    {isClockedIn && (
+                      <Button
+                        size="lg"
+                        className="w-full h-16 text-lg font-semibold rounded-[4px] bg-red-600 hover:bg-red-700"
+                        onClick={() => setShowClockOutDialog(true)}
+                        disabled={isLoading}
+                        data-testid="button-clock-out"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                        ) : (
+                          <>
+                            <Square className="h-6 w-6 mr-2" />
+                            Clock Out
+                          </>
+                        )}
+                      </Button>
+                    )}
 
                     <button
                       onClick={() => setManualOpen(true)}
@@ -254,29 +222,52 @@ export default function MobileTime() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[4px] border-slate-300/70 shadow-none">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold">Recent Time Entries</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingHistory ? (
-                  <div className="flex justify-center py-8">
-                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
-                  </div>
-                ) : !history || history.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    <Clock className="h-12 w-12 mx-auto mb-2 text-slate-300" />
-                    <p>No time entries yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2" data-testid="time-history-list">
-                    {history.slice(0, 6).map((entry) => (
-                      <TimeEntryRow key={entry.id} entry={entry} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Tap a card to clock straight in to that kind of time */}
+            {!loadingCurrent && !isClockedIn && (
+              <div className="space-y-2" data-testid="clock-in-cards">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Clock in to</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {TIME_CATEGORIES.slice(0, 3).map((c) => {
+                    const Icon = c.icon;
+                    const starting = clockInMutation.isPending && clockInMutation.variables === c.key;
+                    return (
+                      <button
+                        key={c.key}
+                        onClick={() => clockInMutation.mutate(c.key)}
+                        disabled={isLoading}
+                        className="flex flex-col items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-2 py-4 transition-all active:scale-[0.97] disabled:opacity-60"
+                        data-testid={`clock-in-${c.key}`}
+                      >
+                        <span className="flex h-10 w-10 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
+                          {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon className="h-5 w-5" />}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {TIME_CATEGORIES.slice(3).map((c) => {
+                    const Icon = c.icon;
+                    const starting = clockInMutation.isPending && clockInMutation.variables === c.key;
+                    return (
+                      <button
+                        key={c.key}
+                        onClick={() => clockInMutation.mutate(c.key)}
+                        disabled={isLoading}
+                        className="flex flex-col items-center gap-1.5 rounded-[4px] border border-slate-300/70 bg-white px-1 py-3 transition-all active:scale-[0.97] disabled:opacity-60"
+                        data-testid={`clock-in-${c.key}`}
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-[3px] border border-slate-300/70 bg-slate-100 text-slate-600">
+                          {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                        </span>
+                        <span className="text-[11px] font-medium text-slate-600">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <TimesheetView />
