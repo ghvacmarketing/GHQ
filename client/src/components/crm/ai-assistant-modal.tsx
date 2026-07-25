@@ -117,9 +117,18 @@ export default function AiAssistantModal() {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Long questions (typed or dictated) wrap onto new lines: grow the box up
+  // to ~5 lines, then scroll inside it instead of running off screen.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
 
   const pickImages = async (files: FileList | null) => {
     if (!files) return;
@@ -835,7 +844,7 @@ export default function AiAssistantModal() {
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-1">
+              <div className="flex items-end gap-1">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -857,19 +866,19 @@ export default function AiAssistantModal() {
                 >
                   <ImagePlus className="h-5 w-5" />
                 </button>
-                <input
+                <textarea
                   ref={inputRef}
-                  type="text"
+                  rows={1}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       sendQuestion(input);
                     }
                   }}
                   placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask about the business, or tell me what to create..."}
-                  className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
+                  className="max-h-40 min-h-[36px] min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2 text-sm leading-5 text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
                   data-testid="ai-input"
                 />
                 {voiceSupported && (

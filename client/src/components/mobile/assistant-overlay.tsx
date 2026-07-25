@@ -51,7 +51,16 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [hydrated, setHydrated] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
-  const composerRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // Long questions (typed or dictated) wrap onto new lines: grow the box up
+  // to ~4 lines, then scroll inside it instead of running off screen.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [input]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const pickImages = async (files: FileList | null) => {
@@ -165,11 +174,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
 
-  // While dictating, keep the input scrolled to the newest words so you can
+  // While dictating, keep the box scrolled to the newest words so you can
   // watch the transcript grow instead of staring at the first few.
   useEffect(() => {
     if (listening && composerRef.current) {
-      composerRef.current.scrollLeft = composerRef.current.scrollWidth;
+      composerRef.current.scrollTop = composerRef.current.scrollHeight;
     }
   }, [input, listening]);
 
@@ -651,7 +660,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               ))}
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -672,19 +681,19 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             >
               <ImagePlus className="h-5 w-5" />
             </button>
-            <input
+            <textarea
               ref={composerRef}
-              type="text"
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   sendQuestion(input);
                 }
               }}
               placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask or tell me what to do..."}
-              className="h-11 min-w-0 flex-1 rounded-[4px] border border-slate-800 bg-slate-900 px-3.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none"
+              className="max-h-32 min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto rounded-[4px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-5 text-slate-100 placeholder:text-slate-600 focus:outline-none"
               data-testid="assistant-input"
             />
             {supportsVoice && (
