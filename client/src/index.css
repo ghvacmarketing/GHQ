@@ -557,9 +557,10 @@ select.dark-input option {
   animation: page-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0.34, 1);
 }
 
-/* No horizontal overscroll/history-swipe rubber-banding */
+/* No overscroll rubber-banding: horizontal kills the browser history swipe,
+   vertical kills the bounce that flashes bare white past the app's edges. */
 html, body {
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
 }
 
 /* =========================================

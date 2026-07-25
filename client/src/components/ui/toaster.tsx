@@ -1,3 +1,4 @@
+import { useLocation } from "wouter"
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
@@ -10,6 +11,9 @@ import {
 
 export function Toaster() {
   const { toasts } = useToast()
+  const [location] = useLocation()
+  // In the mobile app, lift the stack clear of the bottom tab bar.
+  const inMobileApp = location.startsWith("/mobile")
 
   return (
     <ToastProvider>
@@ -27,7 +31,9 @@ export function Toaster() {
           </Toast>
         )
       })}
-      <ToastViewport />
+      <ToastViewport
+        className={inMobileApp ? "bottom-[calc(64px+env(safe-area-inset-bottom))]" : undefined}
+      />
     </ToastProvider>
   )
 }

@@ -391,7 +391,7 @@ export default function MobilePhotos() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center animate-in fade-in slide-in-from-right-8 duration-300 ease-out">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input

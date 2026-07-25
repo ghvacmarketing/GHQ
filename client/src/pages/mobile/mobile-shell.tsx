@@ -138,7 +138,9 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       </main>
 
       {/* Flat full-width bottom tab bar (icon + label; active = maroon) */}
-      <div className="absolute inset-x-0 bottom-0 z-40" data-testid="mobile-nav">
+      {/* touch-action none: an upward swipe on the nav must not rubber-band
+          the page and flash white below it */}
+      <div className="absolute inset-x-0 bottom-0 z-40" style={{ touchAction: "none" }} data-testid="mobile-nav">
         <nav
           className="rounded-t-2xl border-t border-slate-200/80 bg-[#f4f4f4]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
