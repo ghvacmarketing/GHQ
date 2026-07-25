@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { Folder, ImagePlus, Loader2, MessagesSquare, Mic, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Folder, ImagePlus, Loader2, MessagesSquare, Mic, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import {
@@ -61,6 +61,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [attachments, setAttachments] = useState<string[]>([]);
   // Index of the just-arrived answer — the only message that types itself in.
   const [freshIndex, setFreshIndex] = useState<number | null>(null);
+  // Approval cards and topic chips wait until the fresh answer finishes
+  // typing — Gibbs shouldn't drop a card mid-sentence.
+  const [typedOut, setTypedOut] = useState(true);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   // Long questions (typed or dictated) wrap onto new lines: grow the box up
@@ -403,6 +406,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
         setFreshIndex(assistantIndex);
+        // No text to type out (action-only reply) → show cards right away.
+        setTypedOut(!String(data.answer ?? "").trim());
         // One spoken message can carry several creation requests — each extra
         // action renders as its own approval card.
         const extras = (Array.isArray(data.extraActions) ? data.extraActions : []).filter((e: any) => e.proposedAction);
@@ -866,6 +871,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                     </div>
                   );
                 }
+                // Everything under the fresh answer holds until it's done
+                // typing; older messages render their cards instantly.
+                const revealed = freshIndex === null || i < freshIndex || typedOut;
                 return (
                   <div key={i} className="space-y-2">
                     {msg.content.trim() !== "" && (
@@ -874,11 +882,19 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           text={stripMarkdown(msg.content)}
                           animate={i === freshIndex}
                           onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                          onComplete={
+                            i === freshIndex
+                              ? () => {
+                                  setTypedOut(true);
+                                  requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+                                }
+                              : undefined
+                          }
                         />
                       </div>
                     )}
-                    {msg.proposedAction && msg.actionState !== "dismissed" && (
-                      <div className="max-w-[92%] rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3" data-testid={`assistant-action-card-${i}`}>
+                    {revealed && msg.proposedAction && msg.actionState !== "dismissed" && (
+                      <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e8b4b8]">
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
@@ -942,20 +958,26 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           </p>
                         )}
                         {msg.actionState === "done" && msg.actionResult && (
-                          <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-400">
-                            <span>Done — {msg.actionResult.label}</span>
+                          <div className="mt-2.5 animate-in fade-in slide-in-from-bottom-1 space-y-2 duration-300">
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Done
+                            </p>
                             <button
                               onClick={() => { onClose(); navigate(msg.actionResult!.url); }}
-                              className="text-[#e8b4b8] underline underline-offset-2"
+                              className="flex w-full items-center justify-between gap-2 rounded-[4px] border border-slate-700 bg-slate-900 px-3 py-2.5 text-left transition-all active:scale-[0.98] active:border-[#711419]"
                               data-testid={`assistant-action-open-${i}`}
                             >
-                              Open it
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-slate-100">{msg.actionResult.label}</span>
+                                <span className="block text-[11px] text-slate-500">Tap to see what Gibbs set up</span>
+                              </span>
+                              <ArrowUpRight className="h-4 w-4 shrink-0 text-[#e8b4b8]" />
                             </button>
                           </div>
                         )}
                       </div>
                     )}
-                    {msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && (
+                    {revealed && msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && (
                       <div className="flex flex-wrap gap-1.5">
                         {msg.relatedTopics.map((topic, j) => (
                           <button

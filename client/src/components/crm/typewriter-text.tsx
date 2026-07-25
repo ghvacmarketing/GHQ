@@ -7,10 +7,15 @@ export function TypewriterText({
   text,
   animate,
   onProgress,
+  onComplete,
 }: {
   text: string;
   animate: boolean;
   onProgress?: () => void;
+  /** Fired once when an animated reveal reaches the end — lets the parent
+   *  hold back follow-up UI (approval cards, chips) until Gibbs "finishes
+   *  talking". Not fired for instantly-rendered messages. */
+  onComplete?: () => void;
 }) {
   const [shown, setShown] = useState(animate ? 0 : text.length);
   const doneRef = useRef(!animate);
@@ -33,6 +38,7 @@ export function TypewriterText({
         doneRef.current = true;
         clearInterval(id);
         onProgress?.();
+        onComplete?.();
       }
     }, 16);
     return () => clearInterval(id);

@@ -20,7 +20,9 @@ import {
   moveAiConversation,
 } from "@/lib/ai-conversations";
 import {
+  ArrowUpRight,
   Check,
+  CheckCircle2,
   Folder,
   FolderInput,
   ImagePlus,
@@ -120,6 +122,9 @@ export default function AiAssistantModal() {
   const [attachments, setAttachments] = useState<string[]>([]);
   // Index of the just-arrived answer — the only message that types itself in.
   const [freshIndex, setFreshIndex] = useState<number | null>(null);
+  // Approval cards and topic chips wait until the fresh answer finishes
+  // typing — Gibbs shouldn't drop a card mid-sentence.
+  const [typedOut, setTypedOut] = useState(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -241,6 +246,8 @@ export default function AiAssistantModal() {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
         const extras = (data.extraActions || []).filter((e) => e.proposedAction);
         setFreshIndex(assistantIndex);
+        // No text to type out (action-only reply) → show cards right away.
+        setTypedOut(!String(data.answer ?? "").trim());
         setMessages((prev) => [
           ...prev,
           {
@@ -689,6 +696,9 @@ export default function AiAssistantModal() {
                       </div>
                     );
                   }
+                  // Everything under the fresh answer holds until it's done
+                  // typing; older messages render their cards instantly.
+                  const revealed = freshIndex === null || i < freshIndex || typedOut;
                   return (
                     <div key={i} className="flex items-start gap-3">
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
@@ -701,11 +711,19 @@ export default function AiAssistantModal() {
                               text={cleanAnswer(msg.content)}
                               animate={i === freshIndex}
                               onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                              onComplete={
+                                i === freshIndex
+                                  ? () => {
+                                      setTypedOut(true);
+                                      requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+                                    }
+                                  : undefined
+                              }
                             />
                           </div>
                         )}
-                        {msg.proposedAction && msg.actionState !== "dismissed" && (
-                          <div className="rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3" data-testid={`ai-action-card-${i}`}>
+                        {revealed && msg.proposedAction && msg.actionState !== "dismissed" && (
+                          <div className="animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3 duration-300" data-testid={`ai-action-card-${i}`}>
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
                               {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
@@ -769,23 +787,29 @@ export default function AiAssistantModal() {
                               </p>
                             )}
                             {msg.actionState === "done" && msg.actionResult && (
-                              <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                                <span>Done — {msg.actionResult.label}</span>
+                              <div className="mt-2.5 animate-in fade-in slide-in-from-bottom-1 space-y-2 duration-300">
+                                <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Done
+                                </p>
                                 <button
                                   onClick={() => {
                                     navigate(msg.actionResult!.url);
                                     setOpen(false);
                                   }}
-                                  className="text-[#711419] hover:underline"
+                                  className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-[#711419]"
                                   data-testid={`ai-action-open-${i}`}
                                 >
-                                  Open it
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-sm font-semibold text-slate-800">{msg.actionResult.label}</span>
+                                    <span className="block text-[11px] text-slate-500">Open what Gibbs set up</span>
+                                  </span>
+                                  <ArrowUpRight className="h-4 w-4 shrink-0 text-[#711419]" />
                                 </button>
                               </div>
                             )}
                           </div>
                         )}
-                        {msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && (
+                        {revealed && msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && (
                           <div className="flex flex-wrap gap-2 pl-1">
                             {msg.relatedTopics.map((topic, j) => (
                               <button
