@@ -132,6 +132,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   // panel or scrim to push it back. Direction-locked so vertical scrolling in
   // the message list is untouched.
   const panelRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const hDragRef = useRef<{ x: number; y: number; locked: boolean; opening: boolean; p: number; lastX: number; lastT: number; vx: number } | null>(null);
   const suppressClickRef = useRef(false);
@@ -143,6 +144,12 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       panelRef.current.style.transition = move;
       panelRef.current.style.transform = `translateX(${(p - 1) * w}px)`;
     }
+    if (mainRef.current) {
+      // Parallax: the chat drifts a third of the panel's travel, so the
+      // panel clearly overlaps it instead of shoving it off screen.
+      mainRef.current.style.transition = move;
+      mainRef.current.style.transform = `translateX(${p * w * (1 / 3)}px)`;
+    }
     if (scrimRef.current) {
       scrimRef.current.style.transition = animate ? "opacity 0.28s ease-out" : "none";
       scrimRef.current.style.opacity = String(p);
@@ -150,7 +157,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   };
 
   const clearPanelDragStyles = () => {
-    for (const el of [panelRef.current, scrimRef.current]) {
+    for (const el of [panelRef.current, mainRef.current, scrimRef.current]) {
       if (!el) continue;
       el.style.transition = "";
       el.style.transform = "";
@@ -544,12 +551,16 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-slate-950 shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
         style={{ top: "calc(44px + env(safe-area-inset-top))" }}
       >
-        {/* Chat page — stays planted. The panel is a layer that slides in ON
-            TOP of it (deep shadow + dim underneath), so it overlaps the chat
-            instead of pushing it off screen. Swipe right anywhere here to
-            pull the panel in. */}
+        {/* Chat page — drifts right (about a third of the panel width) as
+            the panel slides in ON TOP of it, so the panel overlaps the chat
+            without pushing it off screen. Swipe right anywhere here to pull
+            the panel in. */}
         <div
-          className="relative flex min-h-0 flex-1 flex-col"
+          ref={mainRef}
+          className={cn(
+            "relative flex min-h-0 flex-1 flex-col transition-transform duration-300 ease-out",
+            panelOpen ? "translate-x-[min(28.6%,113px)]" : "translate-x-0",
+          )}
           style={{ touchAction: "pan-y" }}
           onPointerDown={(e) => onHStart(e, true)}
           onPointerMove={onHMove}
