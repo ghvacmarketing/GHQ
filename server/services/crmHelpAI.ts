@@ -385,6 +385,34 @@ export interface CrmHelpResponse {
 // customer, invoice, schedule, or record gets answered from live data instead
 // of "I don't know". Everything is capped and read-only; writes still go
 // through the approval-gated proposedActions flow.
+/** Structured action registration — the API parses tool input reliably, so a
+ *  proposal can never be lost to a malformed final JSON (long email bodies
+ *  with quotes/newlines regularly broke the JSON-embedded path). */
+const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
+  name: "propose_actions",
+  description:
+    "Register the action(s) the user asked you to create (task, work order, text, email, new customer) so they appear as approval cards. ALWAYS use this tool to propose actions — never embed proposedActions in your final JSON when this tool is available. Call it at most ONCE per reply, with ALL the actions.",
+  input_schema: {
+    type: "object",
+    properties: {
+      actions: {
+        type: "array",
+        description: "One entry per thing to create (max 5), exactly per the PROPOSING ACTIONS spec",
+        items: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer"] },
+            summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
+            params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
+          },
+          required: ["type", "summary", "params"],
+        },
+      },
+    },
+    required: ["actions"],
+  },
+};
+
 const CRM_TOOLS: ClaudeTool[] = [
   {
     name: "customer_profile",
@@ -685,10 +713,13 @@ export async function askCrmHelp(
   const needsLiveData = dataNeeds.length > 0;
   const cacheTTL = needsLiveData ? CACHE_TTL_LIVE : CACHE_TTL_STATIC;
 
-  // Skip cache for follow-up questions (they depend on prior context) and for
-  // photo questions (the answer depends on the image, not just the text).
+  // Skip cache for follow-up questions (they depend on prior context), photo
+  // questions (the answer depends on the image), and anything that sounds like
+  // a creation/send request — an action ask must always be freshly proposed,
+  // never replayed from a cached action-less answer.
   const isFollowUp = (conversationHistory && conversationHistory.length > 0) || hasImages;
-  if (!isFollowUp) {
+  const looksLikeActionAsk = /\b(create|make|add|schedule|send|text|email|set ?up|book|assign)\b/i.test(question);
+  if (!isFollowUp && !looksLikeActionAsk) {
     const cached = helpCache.get(normalizedQuestion);
     if (cached && Date.now() - cached.timestamp < cacheTTL) {
       return cached.result;
@@ -733,6 +764,7 @@ ACCURACY RULES — different standards for different kinds of questions:
 5. SALES & VALUE QUESTIONS ("how does the Elite package benefit a customer", "why would someone want this plan on their 3-ton heat pump", "what would you recommend"): this is where you SHINE generatively. Use the documented package facts (prices, visits, discounts, warranty terms) as your anchors, then ELABORATE like an expert salesperson-technician — connect each feature to a concrete outcome for that customer's equipment. Example: for Elite Care on a 3-ton heat pump — heat pumps run year-round so 2–3 tune-ups keep coils clean and the charge right (efficiency, capacity, compressor life), the 20% parts discount matters because heat pumps see double the runtime of AC-only systems, and top priority service means no week-long waits in July or January. NEVER answer these with "the documentation doesn't list benefits" — the facts are documented, the reasoning is your job.
 
 PROPOSING ACTIONS (strict rules):
+HOW TO PROPOSE: call the propose_actions tool with the full list of actions (one call, all actions) — actions registered through the tool always reach the user's approval cards. Only if that tool is unavailable to you, embed a proposedActions array in your final JSON instead. Never do both.
 You can PREPARE a few kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include proposedActions when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions.
 MULTIPLE REQUESTS IN ONE MESSAGE: voice users often ask for several things in one breath ("create a work order for the Smiths tomorrow at 10, add a task to order filters, and who hasn't paid?"). Handle ALL of them: answer every question asked, and include one proposedActions entry PER thing to create — never silently drop or merge requests. Say in your answer what each prepared action is.
 ADJUSTMENTS TO A PENDING PROPOSAL: if the user refines or corrects something you proposed before they approved it ("assign it to Rio", "make it 10:30 instead", "change it to maintenance"), respond with a NEW complete proposedActions entry carrying ALL the params — the original details PLUS their change (e.g. add "assignTo": "Rio" to the same work order). The new card is what they approve, right there. NEVER say the change will be applied later, at approval time, or "the system will match it" — put it in the card now so they can approve immediately. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
@@ -763,6 +795,29 @@ Return JSON with:
       })
       .filter((b): b is { mediaType: string; data: string } => b !== null);
 
+    // Actions the model registers via the propose_actions tool — collected
+    // here so they survive even when the final JSON answer fails to parse.
+    const toolProposed: ProposedAction[] = [];
+    const collectProposedActions = (input: Record<string, unknown>): string => {
+      const arr = Array.isArray((input as any)?.actions) ? (input as any).actions : [];
+      for (const pa of arr.slice(0, 5)) {
+        if (
+          pa &&
+          typeof pa === "object" &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer") &&
+          typeof pa.summary === "string" &&
+          pa.params &&
+          typeof pa.params === "object" &&
+          !Array.isArray(pa.params)
+        ) {
+          toolProposed.push({ type: pa.type, summary: String(pa.summary).slice(0, 300), params: pa.params });
+        }
+      }
+      return toolProposed.length > 0
+        ? `Registered ${toolProposed.length} action(s) — they will show as approval cards. In your final JSON answer, tell the user what's prepared and awaiting approval; do NOT repeat proposedActions in the JSON.`
+        : "No valid actions registered — check the action types and params against the PROPOSING ACTIONS spec.";
+    };
+
     let content: string | null | undefined;
     let finishReason: string | undefined;
     if (claudeConfigured()) {
@@ -781,8 +836,9 @@ Return JSON with:
             systemPrompt +
             "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats, company_docs). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up. BUT be efficient: use the fewest lookups that answer the question, and for action proposals (create/send) ONE customer lookup is usually all you need — once you have enough, stop looking and answer. If a lookup fails twice, answer with what you have and say what you couldn't verify.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
           messages: [...priorTurns, userTurn],
-          tools: CRM_TOOLS,
-          executeTool: executeCrmTool,
+          tools: [...CRM_TOOLS, PROPOSE_ACTIONS_TOOL],
+          executeTool: async (name, input) =>
+            name === "propose_actions" ? collectProposedActions(input) : executeCrmTool(name, input),
           maxTokens: 3500,
           maxIterations: 8,
         }),
@@ -882,6 +938,8 @@ Return JSON with:
       // A real answer in the wrong wrapper beats an apology every time.
       const partial = content.match(/"answer"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"|"\s*}|$)/)?.[1];
       const prose = !content.includes('"answer"') ? content.trim() : null;
+      // Tool-registered actions survive a broken final JSON — this is exactly
+      // the failure that used to eat email approval cards.
       return {
         answer: partial
           ? partial.replace(/\\n/g, "\n").replace(/\\"/g, '"')
@@ -889,7 +947,9 @@ Return JSON with:
             ? prose
             : "I ran into a problem formatting my response. Please try asking a more specific question.",
         relatedTopics: [],
-        confidence: partial || prose ? "medium" : "low"
+        confidence: partial || prose ? "medium" : "low",
+        proposedAction: toolProposed[0] ?? null,
+        proposedActions: toolProposed.slice(0, 5),
       };
     }
     
@@ -917,19 +977,23 @@ Return JSON with:
       }
     }
 
+    // Tool-registered actions are authoritative (parse-proof); JSON-embedded
+    // ones remain the fallback for models without the tool.
+    const mergedActions = toolProposed.length > 0 ? toolProposed.slice(0, 5) : proposedActions;
+
     const result: CrmHelpResponse = {
       answer: parsed.answer || "I don't have information about that feature.",
       relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics.slice(0, 3) : [],
       confidence: parsed.confidence || "medium",
       hasLiveData: needsLiveData,
-      proposedAction: proposedActions[0] ?? null,
-      proposedActions,
+      proposedAction: mergedActions[0] ?? null,
+      proposedActions: mergedActions,
     };
 
     // Never cache responses that carry proposed actions or answered a photo —
     // each ask should be freshly generated, and a stale cached proposal (or a
     // photo-specific answer keyed by text alone) must not resurface.
-    if (proposedActions.length === 0 && !hasImages) {
+    if (mergedActions.length === 0 && !hasImages) {
       helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
     }
 
