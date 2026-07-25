@@ -16,7 +16,7 @@ import {
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopBar } from "@/components/app-topbar";
-import { AppLoader } from "@/components/app-loader";
+import { AppLoader, useAppEntryHold } from "@/components/app-loader";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Button } from "@/components/ui/button";
@@ -317,7 +317,8 @@ export default function DocumentsApp() {
   };
 
   const loaderHold = useSmoothLoading(authLoading, 0, 600);
-  if (loaderHold || !currentUser) {
+  const entryHold = useAppEntryHold();
+  if (loaderHold || entryHold || !currentUser) {
     return (
       <AppLoader />
     );

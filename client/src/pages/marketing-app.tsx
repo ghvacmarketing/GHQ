@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { MarketingChrome, MARKETING_TABS } from "@/components/marketing-shell";
+import { AppLoader, useAppEntryHold } from "@/components/app-loader";
 import { TemplatesTab, AudiencesTab, LeadSourcesTab } from "@/pages/marketing-tools";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,9 +63,14 @@ export default function MarketingApp() {
   const known = tab === "dashboard" || !!PLACEHOLDERS[tab];
   usePageTitle(`Marketing — ${MARKETING_TABS.find((t) => t.key === tab)?.label ?? "Dashboard"}`);
 
-  const { data: currentUser } = useQuery<CrmUser | null>({
+  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
   });
+  const entryHold = useAppEntryHold();
+
+  if (entryHold || authLoading) {
+    return <AppLoader />;
+  }
 
   return (
     <MarketingChrome currentUser={currentUser ?? undefined}>

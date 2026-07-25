@@ -715,7 +715,7 @@ export default function CrmMessaging() {
                     className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
                       actionsOpen
-                        ? "bg-slate-900 text-white"
+                        ? "bg-slate-200 text-slate-900"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900",
                     )}
                     title="Conversation actions"

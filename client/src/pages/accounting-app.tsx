@@ -16,7 +16,7 @@ import {
   Megaphone as MegaphoneIcon, Truck, ShieldCheck, Sparkles, Hammer, Save as SaveIcon, FileBarChart,
 } from "lucide-react";
 import { AppTopBar } from "@/components/app-topbar";
-import { AppLoader } from "@/components/app-loader";
+import { AppLoader, useAppEntryHold } from "@/components/app-loader";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Button } from "@/components/ui/button";
@@ -164,7 +164,8 @@ export default function AccountingApp() {
   const mtdExpenses = Number(summary?.expensesByMonth.find((r) => r.month === thisMonthKey)?.total ?? 0);
 
   const loaderHold = useSmoothLoading(authLoading, 0, 600);
-  if (loaderHold || !currentUser) {
+  const entryHold = useAppEntryHold();
+  if (loaderHold || entryHold || !currentUser) {
     return (
       <AppLoader />
     );

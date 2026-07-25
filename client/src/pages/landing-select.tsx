@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { AppLoader } from "@/components/app-loader";
+import { AppLoader, useAppEntryHold } from "@/components/app-loader";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -72,6 +72,7 @@ const APPS: AppTile[] = [
 
 export default function LandingSelect() {
   const [, navigate] = useLocation();
+  const entryHold = useAppEntryHold();
 
   const { data: crmUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -91,7 +92,7 @@ export default function LandingSelect() {
     if (ready && !isAuthenticated) navigate("/crm/login");
   }, [ready, isAuthenticated, navigate]);
 
-  if (!ready || !isAuthenticated) {
+  if (entryHold || !ready || !isAuthenticated) {
     return (
       <AppLoader />
     );

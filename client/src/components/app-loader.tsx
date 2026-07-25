@@ -1,4 +1,18 @@
+import { useEffect, useState } from "react";
 import ghqLogo from "@assets/redlogo.webp";
+
+/** Fixed entry beat: true for the first `ms` after mount, no matter how fast
+ *  data arrives. Every app shell (and the welcome screen) gates on this so
+ *  switching apps ALWAYS shows the same AppLoader for the same beat —
+ *  consistent, deliberate, never a flash. */
+export function useAppEntryHold(ms = 600): boolean {
+  const [hold, setHold] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setHold(false), ms);
+    return () => clearTimeout(t);
+  }, [ms]);
+  return hold;
+}
 
 /** Between-app loader: the GHQ mark gently pulsing inside a spinning maroon
  *  arc. Pages hold it on screen for a minimum beat (see useSmoothLoading with
