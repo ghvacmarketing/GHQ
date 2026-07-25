@@ -74,7 +74,7 @@ import { randomUUID, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
-import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
+import { refreshWeather, scheduleWeatherRefresh, getWeatherData, getWeatherDataSelfHealing } from "./weather-service";
 import { startBouncieBackgroundSync } from "./services/bouncieService";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
@@ -12132,10 +12132,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WEATHER API ENDPOINTS
   // ============================================
 
-  // GET /api/weather - returns cached weather data
+  // GET /api/weather - returns cached weather data (kicks off a background
+  // refresh when the cache is missing or stale, so it self-heals)
   app.get("/api/weather", async (req, res) => {
     try {
-      const cache = await getWeatherData();
+      const cache = await getWeatherDataSelfHealing();
       if (!cache) {
         return res.status(404).json({ message: "No weather data cached yet" });
       }

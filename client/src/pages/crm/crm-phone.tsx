@@ -1999,25 +1999,37 @@ function WeeklyForecast() {
   }
 
   return (
-    <div className="mb-4 grid grid-cols-7 gap-1 py-3 px-3 bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50" data-testid="crm-phone-weather-weekly">
-      {dailyForecasts.slice(0, 7).map((day, idx) => (
-        <div key={idx} className="flex flex-col items-center text-center py-1" data-testid={`crm-phone-weather-day-${idx}`}>
-          <span className="text-xs font-medium text-muted-foreground truncate w-full">
-            {day.day.slice(0, 3)}
-          </span>
-          <div className="my-1">
-            {getWeatherIcon(day.icon, true, "sm")}
+    <div className="mb-4 py-3 px-3 bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50" data-testid="crm-phone-weather-weekly">
+      <div className="grid grid-cols-7 gap-1">
+        {dailyForecasts.slice(0, 7).map((day, idx) => (
+          <div key={idx} className="flex flex-col items-center text-center py-1" data-testid={`crm-phone-weather-day-${idx}`}>
+            <span className="text-xs font-medium text-muted-foreground truncate w-full">
+              {day.day.slice(0, 3)}
+            </span>
+            <div className="my-1">
+              {getWeatherIcon(day.icon, true, "sm")}
+            </div>
+            <div className="flex flex-col text-xs leading-tight">
+              {day.high !== null && (
+                <span className="text-red-600 dark:text-red-400 font-semibold">{day.high}°</span>
+              )}
+              {day.low !== null && (
+                <span className="text-blue-600 dark:text-blue-400">{day.low}°</span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col text-xs leading-tight">
-            {day.high !== null && (
-              <span className="text-red-600 dark:text-red-400 font-semibold">{day.high}°</span>
-            )}
-            {day.low !== null && (
-              <span className="text-blue-600 dark:text-blue-400">{day.low}°</span>
-            )}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      {/* Freshness stamp — a frozen forecast must never masquerade as live */}
+      {weather.fetchedAt && (
+        <p
+          className={`mt-1 text-right text-[10px] ${weather.stale ? "font-semibold text-amber-600" : "text-muted-foreground/70"}`}
+          data-testid="crm-phone-weather-updated"
+        >
+          {weather.stale ? "⚠ Stale — refreshing… · " : ""}
+          Updated {new Date(weather.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+        </p>
+      )}
     </div>
   );
 }

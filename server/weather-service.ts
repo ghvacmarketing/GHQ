@@ -55,7 +55,7 @@ export async function refreshWeather(): Promise<{ success: boolean; error?: stri
       expiresAt,
     });
 
-    console.log(`[Weather] Cache refreshed at ${new Date().toISOString()}`);
+    console.log(`[Weather] Cache refreshed for ${WEATHER_LAT},${WEATHER_LON} at ${new Date().toISOString()}`);
     return { success: true };
   } catch (error) {
     console.error("[Weather] Refresh failed:", error);
@@ -72,15 +72,34 @@ export function scheduleWeatherRefresh(): void {
 
   refreshWeather().catch(console.error);
 
+  // Forecasts shift during the day — refresh every 6 hours, not daily.
   weatherRefreshInterval = setInterval(() => {
     if (!isAppActive()) {
       console.log("[Weather] App idle, skipping refresh");
       return;
     }
     refreshWeather().catch(console.error);
-  }, 24 * 60 * 60 * 1000);
+  }, 6 * 60 * 60 * 1000);
 
-  console.log("[Weather] Daily refresh scheduled");
+  console.log("[Weather] Refresh scheduled (every 6 hours)");
+}
+
+let refreshInFlight = false;
+
+/** Self-healing read path: if the cache is missing or expired, kick off a
+ *  background refresh so the next request serves fresh data — a stale
+ *  forecast must never sit frozen on the dashboard indefinitely. */
+export async function getWeatherDataSelfHealing() {
+  const data = await getWeatherData();
+  if ((!data || data.stale) && !refreshInFlight) {
+    refreshInFlight = true;
+    refreshWeather()
+      .catch(console.error)
+      .finally(() => {
+        refreshInFlight = false;
+      });
+  }
+  return data;
 }
 
 export async function getWeatherData() {
