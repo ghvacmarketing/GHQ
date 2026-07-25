@@ -545,24 +545,8 @@ export default function MobileJob() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-job-page">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-slate-800">My Jobs</h1>
-          </div>
-          {isSupervisorPlus && (
-            <Button
-              onClick={() => setShowCreateDialog(true)}
-              className="bg-[#711419] hover:bg-[#5a1014]"
-              data-testid="button-create-work-order"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Job
-            </Button>
-          )}
-        </div>
-
-        {/* Today | Upcoming | History — same pill switcher as everywhere else */}
-        <div className="flex justify-center">
+        {/* Today | Upcoming | History switcher centered, New Job pinned right */}
+        <div className="relative flex items-center justify-center">
           <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/70 p-1">
             {(["today", "upcoming", "history"] as const).map((v) => (
               <button
@@ -577,6 +561,16 @@ export default function MobileJob() {
               </button>
             ))}
           </div>
+          {isSupervisorPlus && (
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
+              aria-label="New job"
+              data-testid="button-create-work-order"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         {jobsView === "today" && (
