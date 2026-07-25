@@ -837,7 +837,7 @@ export default function MobileAgenda() {
     <MobileShell>
       <OfflineIndicator />
       
-      <div className="p-4 space-y-6 pb-24" data-testid="mobile-agenda">
+      <div className="p-4 space-y-6 pb-32" data-testid="mobile-agenda">
         {currentUser && <ProfileHeader user={currentUser} />}
         
         {(showCacheWarning && workOrders && workOrders.length > 0) && (
@@ -1060,11 +1060,11 @@ export default function MobileAgenda() {
                           {fmt(revenue)}
                         </p>
                         {goalTarget > 0 && (
-                          <p className="mt-0.5 text-center text-sm text-slate-500">
-                            {pct}% of {fmt(goalTarget)} {isTech ? "goal to date" : "monthly goal"} ·{" "}
-                            <span className={onPace ? "font-semibold text-green-600" : "font-semibold text-amber-600"}>
-                              {onPace ? "on pace" : "behind pace"}
-                            </span>
+                          <p
+                            className={`mt-0.5 text-center text-sm font-semibold ${onPace ? "text-green-600" : "text-amber-600"}`}
+                            data-testid="perf-pace"
+                          >
+                            {onPace ? "On pace" : "Behind pace"}
                           </p>
                         )}
                       </>

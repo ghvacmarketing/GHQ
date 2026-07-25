@@ -22659,26 +22659,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           eq(monthlyGoals.month, month)
         ));
 
-      // Month-to-date revenue leaderboard (paid invoices attributed to the assigned tech)
+      // Month-to-date revenue leaderboard — EVERY field-team member appears,
+      // zeros included (left joins from users, revenue conditions inside the
+      // aggregates so rows without paid invoices still come back).
       let leaderboard: { name: string; revenue: number; jobs: number }[] = [];
       try {
+        const paidThisMonth = sql`${crmInvoices.status} = 'paid' AND COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt}) >= ${startOfMonth}`;
         const lbRows = await db.select({
           name: crmUsers.name,
-          revenue: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          jobs: sql<number>`COUNT(DISTINCT ${crmInvoices.workOrderId})::int`,
+          revenue: sql<string>`COALESCE(SUM(CASE WHEN ${paidThisMonth} THEN CAST(${crmInvoices.total} AS DECIMAL(10,2)) ELSE 0 END), 0)`,
+          jobs: sql<number>`COUNT(DISTINCT CASE WHEN ${paidThisMonth} THEN ${crmInvoices.workOrderId} END)::int`,
         })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .innerJoin(crmUsers, eq(crmWorkOrders.assignedTechId, crmUsers.id))
-          .where(and(
-            eq(crmInvoices.status, "paid"),
-            sql`COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt}) >= ${startOfMonth}`
-          ))
+          .from(crmUsers)
+          .leftJoin(crmWorkOrders, eq(crmWorkOrders.assignedTechId, crmUsers.id))
+          .leftJoin(crmInvoices, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .where(inArray(crmUsers.role, ["tech", "supervisor"]))
           .groupBy(crmUsers.id, crmUsers.name)
-          .orderBy(sql`SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))) DESC`);
+          .orderBy(sql`2 DESC`);
         leaderboard = lbRows
-          .map((r) => ({ name: r.name, revenue: parseFloat(r.revenue || "0"), jobs: Number(r.jobs) || 0 }))
-          .slice(0, 6);
+          .map((r) => ({ name: r.name, revenue: parseFloat(r.revenue || "0"), jobs: Number(r.jobs) || 0 }));
       } catch (e) {
         console.error("my-performance leaderboard error (non-fatal):", e);
       }
