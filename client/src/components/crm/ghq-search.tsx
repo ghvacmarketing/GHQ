@@ -8,9 +8,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  History,
   Search,
-  Trash2,
   Users,
   ClipboardList,
   Receipt,
@@ -21,28 +19,13 @@ import {
   Loader2,
   SearchX,
   Sparkles,
-  HelpCircle,
-  MessageCircle,
-  Send,
-  RotateCcw,
   Wrench,
   X,
   MessageSquarePlus,
-  Mic,
   ShieldCheck,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import {
-  type AiChatMessage,
-  type AiConversationSummary,
-  type AiProposedAction,
-  deleteAiConversation,
-  dismissAiAction,
-  fetchAiConversation,
-  fetchLatestAiConversation,
-  formatConversationWhen,
-} from "@/lib/ai-conversations";
+import AiAssistantModal from "@/components/crm/ai-assistant-modal";
 
 interface SearchResultItem {
   id: number;
@@ -180,34 +163,10 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// An action the AI proposed. NOTHING runs until the user clicks Approve —
-// the server re-validates every proposal against a strict whitelist and
-// executes under the approving user's own session. Conversations persist
-// server-side (shared with the mobile assistant) via @/lib/ai-conversations.
-interface HelpResponse {
-  answer: string;
-  relatedTopics: string[];
-  confidence: "high" | "medium" | "low";
-  proposedAction?: AiProposedAction | null;
-  conversationId?: string;
-  messageId?: string;
-}
 
-type ConversationMessage = AiChatMessage;
-
-/** The assistant answers in plain prose, but strip any markdown that slips
- *  through so the chat never shows raw asterisks or hash signs. */
-function cleanAnswer(text: string): string {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/__(.+?)__/g, "$1")
-    .replace(/^#{1,4}\s+/gm, "")
-    .replace(/^\s*[*-]\s+/gm, "\u2022 ")
-    .replace(/`([^`]+)`/g, "$1");
-}
-
-// Top-nav triggers dispatch these so the global search/AI/comment dialogs can be
-// opened from anywhere without prop-drilling. GhqSearch listens for them.
+// Top-nav triggers dispatch these so the global search/AI/comment dialogs can
+// be opened from anywhere without prop-drilling. GhqSearch handles search and
+// comments; the AI event is handled by AiAssistantModal (rendered below).
 export const openGlobalSearch = () => window.dispatchEvent(new Event("ghq-open-search"));
 export const openGlobalAI = () => window.dispatchEvent(new Event("ghq-open-ai"));
 export const openGlobalComment = () => window.dispatchEvent(new Event("ghq-open-comment"));
@@ -217,63 +176,14 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [aiEnabled, setAiEnabled] = useState(true);
-  const [mode, setMode] = useState<"search" | "help">("search");
-  const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const debouncedQuery = useDebounce(searchQuery, 300);
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery<SearchResponse>({
     queryKey: [`/api/crm/ghq/search?q=${encodeURIComponent(debouncedQuery)}&ai=${aiEnabled}`],
-    enabled: debouncedQuery.length >= 2 && mode === "search",
-  });
-
-  // Resume the most recent stored thread the first time Ask AI opens —
-  // conversations persist server-side and are shared with the mobile app.
-  useEffect(() => {
-    if (!open || mode !== "help" || hydrated) return;
-    setHydrated(true);
-    fetchLatestAiConversation().then((latest) => {
-      if (latest) {
-        setConversationId(latest.id);
-        setConversationMessages((prev) => (prev.length === 0 ? latest.messages : prev));
-      }
-    });
-  }, [open, mode, hydrated]);
-
-  const { data: pastConversations = [] } = useQuery<AiConversationSummary[]>({
-    queryKey: ["/api/crm/ai/conversations"],
-    enabled: open && mode === "help" && historyOpen,
-  });
-
-  const helpMutation = useMutation({
-    mutationFn: async ({ question, conversationHistory }: { question: string; conversationHistory: Array<{role: string; content: string}> }) => {
-      const response = await apiRequest("POST", "/api/crm/help", { question, conversationHistory, conversationId });
-      return response.json() as Promise<HelpResponse>;
-    },
-    onSuccess: (data) => {
-      if (data.conversationId) setConversationId(data.conversationId);
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
-      setConversationMessages(prev => [...prev, {
-        role: "assistant",
-        content: data.answer,
-        relatedTopics: data.relatedTopics,
-        proposedAction: data.proposedAction || null,
-        actionState: data.proposedAction ? "pending" : undefined,
-        messageId: data.messageId,
-      }]);
-    },
-    onError: (e: any) => {
-      setConversationMessages(prev => [...prev, {
-        role: "assistant",
-        content: e?.message || "Something went wrong reaching the AI. Try again in a moment.",
-      }]);
-    },
+    enabled: debouncedQuery.length >= 2,
   });
 
   const flatResults = useCallback(() => {
@@ -312,115 +222,6 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
     }
   }, [open]);
 
-  // Auto-scroll to bottom whenever a new message is added
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversationMessages]);
-
-  const askQuestion = (raw: string) => {
-    const question = raw.trim();
-    if (question.length < 3 || helpMutation.isPending) return;
-
-    // Capture history BEFORE appending the new user message
-    const historyForApi = conversationMessages.map(m => ({ role: m.role, content: m.content }));
-
-    // Optimistically add the user bubble
-    setConversationMessages(prev => [...prev, { role: "user", content: question }]);
-    setSearchQuery("");
-
-    helpMutation.mutate({ question, conversationHistory: historyForApi });
-  };
-
-  const handleAskHelp = () => askQuestion(searchQuery);
-
-  // Voice input for Ask AI — Web Speech API where it works, record-then-
-  // transcribe where it doesn't (Safari, iOS PWA). Spoken asks auto-send
-  // when the mic is tapped off.
-  const {
-    supported: voiceSupported,
-    listening,
-    processing: transcribing,
-    start: startVoice,
-    stop: stopVoice,
-    cancel: cancelVoice,
-  } = useVoiceDictation({
-    onTranscript: setSearchQuery,
-    onFinal: (spoken) => {
-      if (spoken.length >= 3) askQuestion(spoken);
-      else if (spoken) setSearchQuery(spoken);
-    },
-    onError: (message) => {
-      setConversationMessages((prev) => [...prev, { role: "assistant", content: message }]);
-    },
-  });
-
-  // Kill any live capture when the dialog closes or leaves AI mode.
-  useEffect(() => {
-    if (!open || mode !== "help") cancelVoice();
-  }, [open, mode, cancelVoice]);
-
-  // Execute an AI-proposed action — only ever called from the Approve button
-  // (or a candidate pick when the customer name was too close to call).
-  const runProposedAction = (index: number, extraParams?: Record<string, unknown>) => {
-    const msg = conversationMessages[index];
-    if (!msg?.proposedAction || msg.actionState === "executing" || msg.actionState === "done") return;
-    setConversationMessages(prev => prev.map((m, j) => (
-      j === index ? { ...m, actionState: "executing" as const, actionError: null, actionCandidates: null } : m
-    )));
-    fetch("/api/crm/ai/execute-action", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: msg.proposedAction.type,
-        params: { ...msg.proposedAction.params, ...extraParams },
-        messageId: msg.messageId,
-      }),
-    })
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({} as any));
-        if (!r.ok) {
-          // Ambiguous customer name → server sends candidates for the user to pick
-          if (Array.isArray(data.candidates) && data.candidates.length > 0) {
-            setConversationMessages(prev => prev.map((m, j) => (
-              j === index
-                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which customer did you mean?", actionCandidates: data.candidates }
-                : m
-            )));
-          } else {
-            setConversationMessages(prev => prev.map((m, j) => (
-              j === index ? { ...m, actionState: "error" as const, actionError: data.message || "Couldn't complete the action." } : m
-            )));
-          }
-          return;
-        }
-        setConversationMessages(prev => prev.map((m, j) => (
-          j === index
-            ? { ...m, actionState: "done" as const, actionResult: { label: data.label || "Created", url: data.url || "/crm/dashboard" } }
-            : m
-        )));
-        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
-      })
-      .catch((e: any) => {
-        setConversationMessages(prev => prev.map((m, j) => (
-          j === index ? { ...m, actionState: "error" as const, actionError: e?.message || "Couldn't complete the action." } : m
-        )));
-      });
-  };
-
-  const dismissProposedAction = (index: number) => {
-    dismissAiAction(conversationMessages[index]?.messageId);
-    setConversationMessages(prev => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
-  };
-
-  const handleNewConversation = () => {
-    setConversationMessages([]);
-    setConversationId(null);
-    setHistoryOpen(false);
-    setSearchQuery("");
-    setTimeout(() => inputRef.current?.focus(), 50);
-  };
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -428,14 +229,6 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (mode === "help") {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          handleAskHelp();
-        }
-        return;
-      }
-
       if (allResults.length === 0) return;
 
       if (e.key === "ArrowDown") {
@@ -455,7 +248,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
         }
       }
     },
-    [allResults, selectedIndex, navigate, mode, handleAskHelp]
+    [allResults, selectedIndex, navigate]
   );
 
   const handleResultClick = (category: CategoryKey, item: SearchResultItem) => {
@@ -578,244 +371,19 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
     );
   };
 
-  const renderHelpResults = () => {
-    if (historyOpen) {
-      return (
-        <div className="p-4 space-y-2" data-testid="ai-history-list">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Past conversations</p>
-          {pastConversations.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Nothing saved yet — ask something and it'll show up here.
-            </p>
-          ) : (
-            pastConversations.map((c) => (
-              <div
-                key={c.id}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
-                  c.id === conversationId ? "border-[#711419]/40 bg-[#711419]/[0.04]" : "border-border bg-card"
-                }`}
-              >
-                <button
-                  onClick={() => {
-                    fetchAiConversation(c.id).then((loaded) => {
-                      if (loaded) {
-                        setConversationId(loaded.id);
-                        setConversationMessages(loaded.messages);
-                        setHistoryOpen(false);
-                      }
-                    });
-                  }}
-                  className="min-w-0 flex-1 text-left"
-                  data-testid={`ai-conversation-${c.id}`}
-                >
-                  <p className="truncate text-sm font-medium text-foreground">{c.title || "Conversation"}</p>
-                  <p className="text-xs text-muted-foreground">{formatConversationWhen(c.updatedAt)}</p>
-                </button>
-                <button
-                  onClick={() => {
-                    deleteAiConversation(c.id).then(() => {
-                      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
-                      if (c.id === conversationId) {
-                        setConversationId(null);
-                        setConversationMessages([]);
-                      }
-                    });
-                  }}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-red-600"
-                  aria-label="Delete conversation"
-                  data-testid={`ai-conversation-delete-${c.id}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      );
-    }
-
-    if (conversationMessages.length === 0 && !helpMutation.isPending) {
-      return (
-        <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Sparkles className="h-6 w-6" />
-          </span>
-          <p className="text-sm font-semibold text-foreground">Hey — what can I help with?</p>
-          <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
-            I know how GHQ works and can see live data — schedules, agreements, invoices, quotes.
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {[
-              "What's on the schedule today?",
-              "Which invoices are unpaid?",
-              "How do agreement renewals work?",
-            ].map((q) => (
-              <button
-                key={q}
-                onClick={() => askQuestion(q)}
-                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs text-slate-700 transition-colors hover:border-[#711419] hover:text-[#711419]"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="p-4 space-y-4">
-        {conversationMessages.map((msg, i) => {
-          if (msg.role === "user") {
-            return (
-              <div key={i} className="flex justify-end">
-                <div className="bg-primary text-primary-foreground rounded-lg rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
-                  {msg.content}
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div key={i} className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[#e8704f] flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-white" />
-              </div>
-              <div className="flex-1 space-y-2">
-                <div className="bg-muted rounded-lg rounded-tl-sm p-4 text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-                  {cleanAnswer(msg.content)}
-                </div>
-                {msg.proposedAction && msg.actionState !== "dismissed" && (
-                  <div className="rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.03] p-3" data-testid={`ai-action-card-${i}`}>
-                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      {msg.proposedAction.type === "create_task" ? "New task" : "New work order"} — needs your approval
-                    </p>
-                    <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
-                    <div className="mt-1.5 space-y-0.5">
-                      {Object.entries(msg.proposedAction.params).map(([k, v]) => (
-                        <p key={k} className="text-xs text-slate-500">
-                          <span className="font-semibold capitalize text-slate-600">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
-                          {String(v)}
-                        </p>
-                      ))}
-                    </div>
-                    {(msg.actionState === "pending" || msg.actionState === "error") && (
-                      <>
-                        {msg.actionState === "error" && (
-                          <p className="mt-2 text-xs font-medium text-red-600">{msg.actionError}</p>
-                        )}
-                        <div className="mt-2.5 flex gap-2">
-                          <button
-                            onClick={() => runProposedAction(i)}
-                            className="rounded-[3px] bg-[#711419] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#8a1a1f]"
-                            data-testid={`ai-action-approve-${i}`}
-                          >
-                            {msg.actionState === "error" ? "Try again" : "Approve & run"}
-                          </button>
-                          <button
-                            onClick={() => dismissProposedAction(i)}
-                            className="rounded-[3px] border border-slate-300/70 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                            data-testid={`ai-action-dismiss-${i}`}
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      </>
-                    )}
-                    {msg.actionState === "choose" && msg.actionCandidates && (
-                      <div className="mt-2.5 space-y-1.5">
-                        <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>
-                        {msg.actionCandidates.map((cand) => (
-                          <button
-                            key={cand.id}
-                            onClick={() => runProposedAction(i, { customerId: cand.id })}
-                            className="block w-full rounded-[3px] border border-slate-300/70 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:border-[#711419] hover:text-[#711419]"
-                            data-testid={`ai-candidate-${cand.id}`}
-                          >
-                            {cand.name}
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => dismissProposedAction(i)}
-                          className="mt-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
-                        >
-                          None of these — cancel
-                        </button>
-                      </div>
-                    )}
-                    {msg.actionState === "executing" && (
-                      <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running with your approval...
-                      </p>
-                    )}
-                    {msg.actionState === "done" && msg.actionResult && (
-                      <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                        <span>Done — {msg.actionResult.label}</span>
-                        <button
-                          onClick={() => {
-                            navigate(msg.actionResult!.url);
-                            setOpen(false);
-                          }}
-                          className="text-[#711419] hover:underline"
-                          data-testid={`ai-action-open-${i}`}
-                        >
-                          Open it
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {msg.relatedTopics && msg.relatedTopics.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pl-1">
-                    {msg.relatedTopics.map((topic, j) => (
-                      <button
-                        key={j}
-                        onClick={() => askQuestion(topic)}
-                        className="text-xs px-2.5 py-1 rounded-full bg-white text-slate-700 hover:border-[#711419] hover:text-[#711419] transition-colors border border-border"
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Typing indicator while waiting for response */}
-        {helpMutation.isPending && (
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[#e8704f] flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <div className="bg-muted rounded-lg rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-    );
-  };
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
 
   // Allow the top nav (or anything) to open these dialogs via window events.
+  // ("ghq-open-ai" is handled by AiAssistantModal, rendered below.)
   useEffect(() => {
-    const onSearch = () => { setOpen(true); setMode("search"); };
-    const onAi = () => { setOpen(true); setMode("help"); };
+    const onSearch = () => setOpen(true);
     const onComment = () => setCommentOpen(true);
     window.addEventListener("ghq-open-search", onSearch);
-    window.addEventListener("ghq-open-ai", onAi);
     window.addEventListener("ghq-open-comment", onComment);
     return () => {
       window.removeEventListener("ghq-open-search", onSearch);
-      window.removeEventListener("ghq-open-ai", onAi);
       window.removeEventListener("ghq-open-comment", onComment);
     };
   }, []);
@@ -842,9 +410,16 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
               <MessageSquarePlus className="h-5 w-5" />
             </button>
             <button
-              onClick={() => { setMenuOpen(false); setOpen(true); setMode("search"); }}
+              onClick={() => { setMenuOpen(false); openGlobalAI(); }}
               className="w-12 h-12 rounded-full bg-card text-foreground border border-border shadow-lg flex items-center justify-center hover:bg-accent transition-colors"
-              title="Search & AI"
+              title="Ask AI"
+            >
+              <Sparkles className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); setOpen(true); }}
+              className="w-12 h-12 rounded-full bg-card text-foreground border border-border shadow-lg flex items-center justify-center hover:bg-accent transition-colors"
+              title="Search"
             >
               <Search className="h-5 w-5" />
             </button>
@@ -861,147 +436,57 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           data-testid="dialog-ghq-search"
           onKeyDown={handleKeyDown}
         >
-          {/* Search and AI are separate experiences, each opened from its own top-nav
-              button. The header just reflects the active one (no tab switching). */}
           <div className="border-b border-border px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              {mode === "search" ? (
-                <>
-                  <Search className="h-4 w-4 text-primary" />
-                  Search the CRM
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Ask AI
-                </>
-              )}
+              <Search className="h-4 w-4 text-primary" />
+              Search the CRM
             </div>
           </div>
 
           <div className="p-4 border-b border-border">
             <div className="relative">
-              {mode === "search" ? (
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              ) : (
-                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
-              )}
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder={
-                  mode === "search"
-                    ? "Search customers, work orders, invoices..."
-                    : listening
-                    ? "Listening..."
-                    : transcribing
-                    ? "Transcribing..."
-                    : conversationMessages.length > 0
-                    ? "Ask a follow-up question..."
-                    : "Ask about CRM features..."
-                }
+                placeholder="Search customers, work orders, invoices..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`pl-10 h-12 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none ${mode === "help" ? "pr-28" : "pr-20"}`}
+                className="pl-10 pr-20 h-12 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                 data-testid="input-ghq-search"
               />
-              {mode === "help" && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                  {voiceSupported && (
-                    <button
-                      onClick={listening ? stopVoice : startVoice}
-                      disabled={transcribing}
-                      className={`relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${
-                        listening
-                          ? "border-[#711419] bg-[#711419] text-white"
-                          : "border-border bg-background text-muted-foreground hover:text-[#711419] hover:border-[#711419]/50"
-                      }`}
-                      aria-label={listening ? "Stop listening" : "Speak your question"}
-                      data-testid="ai-mic"
-                    >
-                      {listening && <span className="absolute inset-0 animate-ping rounded-md border border-[#711419]" />}
-                      {transcribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-                    </button>
-                  )}
-                  {searchQuery.trim().length >= 3 && (
-                    <button
-                      onClick={handleAskHelp}
-                      disabled={helpMutation.isPending}
-                      className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
-                    >
-                      <Send className="h-3 w-3" />
-                      Ask
-                    </button>
-                  )}
-                </div>
-              )}
-              {mode === "search" && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded">Esc</kbd>
-                </div>
-              )}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded">Esc</kbd>
+              </div>
             </div>
           </div>
 
           <ScrollArea className="max-h-[60vh]">
-            <div className="p-2">
-              {mode === "search" ? renderResults() : renderHelpResults()}
-            </div>
+            <div className="p-2">{renderResults()}</div>
           </ScrollArea>
 
           <div className="px-4 py-2 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
-            {mode === "search" && (
-              <>
-                <button
-                  onClick={() => setAiEnabled(!aiEnabled)}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
-                    aiEnabled
-                      ? "bg-primary/10 text-primary border-primary/20"
-                      : "bg-muted text-muted-foreground border-border"
-                  }`}
-                  data-testid="toggle-ai-search"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  <span>AI {aiEnabled ? "On" : "Off"}</span>
-                </button>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded">↑</kbd>
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded">↓</kbd>
-                  <span className="ml-1">navigate</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded">Enter</kbd>
-                  <span className="ml-1">select</span>
-                </div>
-              </>
-            )}
-            {mode === "help" && (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-primary">
-                  <Sparkles className="h-3 w-3" />
-                  <span>AI-powered CRM help</span>
-                </div>
-                <button
-                  onClick={() => setHistoryOpen((v) => !v)}
-                  className={`flex items-center gap-1.5 transition-colors ml-2 ${
-                    historyOpen ? "text-[#711419]" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  data-testid="ai-history-toggle"
-                >
-                  <History className="h-3 w-3" />
-                  <span>History</span>
-                </button>
-                {conversationMessages.length > 0 && (
-                  <button
-                    onClick={handleNewConversation}
-                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors ml-2"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    <span>New conversation</span>
-                  </button>
-                )}
-              </div>
-            )}
+            <button
+              onClick={() => setAiEnabled(!aiEnabled)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
+                aiEnabled
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-muted text-muted-foreground border-border"
+              }`}
+              data-testid="toggle-ai-search"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>AI {aiEnabled ? "On" : "Off"}</span>
+            </button>
+            <div className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded">↑</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded">↓</kbd>
+              <span className="ml-1">navigate</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded">Enter</kbd>
+              <span className="ml-1">select</span>
+            </div>
             <div className="flex items-center gap-1 ml-auto">
               <kbd className="px-1.5 py-0.5 bg-muted rounded">⌘</kbd>
               <kbd className="px-1.5 py-0.5 bg-muted rounded">K</kbd>
@@ -1009,6 +494,9 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Full-size ChatGPT-style assistant — opens on "ghq-open-ai" */}
+      <AiAssistantModal />
     </>
   );
 }

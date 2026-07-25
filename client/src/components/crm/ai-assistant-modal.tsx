@@ -1,0 +1,607 @@
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useVoiceDictation } from "@/hooks/use-voice-dictation";
+import {
+  type AiChatMessage,
+  type AiConversationSummary,
+  type AiProposedAction,
+  deleteAiConversation,
+  fetchAiConversation,
+  fetchLatestAiConversation,
+  dismissAiAction,
+  formatConversationWhen,
+} from "@/lib/ai-conversations";
+import {
+  Loader2,
+  Mic,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  SquarePen,
+  Trash2,
+  X,
+} from "lucide-react";
+
+/** The desktop GHQ assistant — a full-size ChatGPT-style modal: conversation
+ *  history lives in a left sidebar grouped by date section (Today, Yesterday,
+ *  Previous 7 days, Older), the active thread fills the main pane. Same brain
+ *  and hard safeguards as everywhere else: the model only PROPOSES whitelisted
+ *  actions, nothing runs until Approve, and the server re-validates every
+ *  proposal. Threads persist server-side and are shared with the mobile app.
+ *  Opened from anywhere via the "ghq-open-ai" window event (openGlobalAI). */
+
+interface HelpResponse {
+  answer: string;
+  relatedTopics: string[];
+  confidence: "high" | "medium" | "low";
+  proposedAction?: AiProposedAction | null;
+  conversationId?: string;
+  messageId?: string;
+}
+
+const STARTERS = [
+  "What's on the schedule today?",
+  "Which invoices are unpaid?",
+  "Create a work order",
+  "Add a task for tomorrow",
+];
+
+/** Strip any markdown that slips through so the chat never shows raw
+ *  asterisks or hash signs. */
+function cleanAnswer(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/^#{1,4}\s+/gm, "")
+    .replace(/^\s*[*-]\s+/gm, "• ")
+    .replace(/`([^`]+)`/g, "$1");
+}
+
+/** ChatGPT-style date sections for the sidebar. */
+function groupConversations(list: AiConversationSummary[]): { label: string; items: AiConversationSummary[] }[] {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = startOfDay(new Date());
+  const oneDay = 24 * 60 * 60 * 1000;
+  const groups: Record<string, AiConversationSummary[]> = {
+    Today: [],
+    Yesterday: [],
+    "Previous 7 days": [],
+    Older: [],
+  };
+  for (const c of list) {
+    const t = c.updatedAt ? startOfDay(new Date(c.updatedAt)) : 0;
+    if (t >= today) groups.Today.push(c);
+    else if (t >= today - oneDay) groups.Yesterday.push(c);
+    else if (t >= today - 7 * oneDay) groups["Previous 7 days"].push(c);
+    else groups.Older.push(c);
+  }
+  return Object.entries(groups)
+    .map(([label, items]) => ({ label, items }))
+    .filter((g) => g.items.length > 0);
+}
+
+export default function AiAssistantModal() {
+  const [, navigate] = useLocation();
+  const [open, setOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [messages, setMessages] = useState<AiChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [input, setInput] = useState("");
+  const [pending, setPending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Anything in the CRM opens the assistant by dispatching "ghq-open-ai".
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("ghq-open-ai", onOpen);
+    return () => window.removeEventListener("ghq-open-ai", onOpen);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    setTimeout(() => inputRef.current?.focus(), 60);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, pending]);
+
+  // Resume the most recent stored thread the first time the modal opens.
+  useEffect(() => {
+    if (!open || hydrated) return;
+    setHydrated(true);
+    fetchLatestAiConversation().then((latest) => {
+      if (latest) {
+        setConversationId(latest.id);
+        setMessages((prev) => (prev.length === 0 ? latest.messages : prev));
+      }
+    });
+  }, [open, hydrated]);
+
+  const { data: conversations = [] } = useQuery<AiConversationSummary[]>({
+    queryKey: ["/api/crm/ai/conversations"],
+    enabled: open,
+  });
+
+  const sendQuestion = (raw: string) => {
+    const question = raw.trim();
+    if (question.length < 3 || pending) return;
+    const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
+    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    setInput("");
+    setPending(true);
+    apiRequest("POST", "/api/crm/help", { question, conversationHistory: historyForApi, conversationId })
+      .then(async (r) => {
+        const data = (await r.json()) as HelpResponse;
+        if (data.conversationId) setConversationId(data.conversationId);
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: data.answer,
+            relatedTopics: data.relatedTopics,
+            proposedAction: data.proposedAction || null,
+            actionState: data.proposedAction ? ("pending" as const) : undefined,
+            messageId: data.messageId,
+          },
+        ]);
+      })
+      .catch((e: any) => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: e?.message || "Something went wrong reaching the AI. Try again in a moment." },
+        ]);
+      })
+      .finally(() => setPending(false));
+  };
+
+  // Voice input — live transcript where Web Speech works, record-then-
+  // transcribe elsewhere. Spoken asks auto-send when the mic is tapped off.
+  const {
+    supported: voiceSupported,
+    listening,
+    processing: transcribing,
+    start: startVoice,
+    stop: stopVoice,
+    cancel: cancelVoice,
+  } = useVoiceDictation({
+    onTranscript: setInput,
+    onFinal: (spoken) => {
+      if (spoken.length >= 3) sendQuestion(spoken);
+      else if (spoken) setInput(spoken);
+    },
+    onError: (message) => {
+      setMessages((prev) => [...prev, { role: "assistant", content: message }]);
+    },
+  });
+
+  useEffect(() => {
+    if (!open) cancelVoice();
+  }, [open, cancelVoice]);
+
+  const openConversation = (id: string) => {
+    fetchAiConversation(id).then((loaded) => {
+      if (loaded) {
+        setConversationId(loaded.id);
+        setMessages(loaded.messages);
+      }
+    });
+  };
+
+  const removeConversation = (id: string) => {
+    deleteAiConversation(id).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+      if (id === conversationId) {
+        setConversationId(null);
+        setMessages([]);
+      }
+    });
+  };
+
+  const newChat = () => {
+    setMessages([]);
+    setConversationId(null);
+    setInput("");
+    inputRef.current?.focus();
+  };
+
+  const runProposedAction = (index: number, extraParams?: Record<string, unknown>) => {
+    const msg = messages[index];
+    if (!msg?.proposedAction || msg.actionState === "executing" || msg.actionState === "done") return;
+    setMessages((prev) => prev.map((m, j) => (
+      j === index ? { ...m, actionState: "executing" as const, actionError: null, actionCandidates: null } : m
+    )));
+    fetch("/api/crm/ai/execute-action", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: msg.proposedAction.type,
+        params: { ...msg.proposedAction.params, ...extraParams },
+        messageId: msg.messageId,
+      }),
+    })
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({} as any));
+        if (!r.ok) {
+          // Ambiguous customer name → the server sends candidates to pick from
+          if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+            setMessages((prev) => prev.map((m, j) => (
+              j === index
+                ? { ...m, actionState: "choose" as const, actionError: data.message || "Which customer did you mean?", actionCandidates: data.candidates }
+                : m
+            )));
+          } else {
+            setMessages((prev) => prev.map((m, j) => (
+              j === index ? { ...m, actionState: "error" as const, actionError: data.message || "Couldn't complete the action." } : m
+            )));
+          }
+          return;
+        }
+        setMessages((prev) => prev.map((m, j) => (
+          j === index
+            ? { ...m, actionState: "done" as const, actionResult: { label: data.label || "Created", url: data.url || "/crm/dashboard" } }
+            : m
+        )));
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      })
+      .catch((e: any) => {
+        setMessages((prev) => prev.map((m, j) => (
+          j === index ? { ...m, actionState: "error" as const, actionError: e?.message || "Couldn't complete the action." } : m
+        )));
+      });
+  };
+
+  const dismissProposedAction = (index: number) => {
+    dismissAiAction(messages[index]?.messageId);
+    setMessages((prev) => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
+  };
+
+  if (!open) return null;
+
+  const grouped = groupConversations(conversations);
+  const activeTitle = conversations.find((c) => c.id === conversationId)?.title;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-3 backdrop-blur-[2px]" data-testid="ai-assistant-modal">
+      {/* Backdrop click closes; clicks inside the panel don't bubble out */}
+      <div className="absolute inset-0" onClick={() => setOpen(false)} />
+      <div className="relative flex h-[min(780px,92vh)] w-[min(1150px,96vw)] overflow-hidden rounded-xl bg-white shadow-2xl">
+
+        {/* ── Sidebar: grouped conversation history ── */}
+        {sidebarOpen && (
+          <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50" data-testid="ai-sidebar">
+            <div className="flex items-center justify-between px-3 pb-2 pt-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#711419] text-white">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-slate-400">GHQ Intelligence</p>
+                  <p className="text-sm font-semibold leading-tight text-slate-800">Assistant</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-3 pb-2">
+              <button
+                onClick={newChat}
+                className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-[#711419]/40 hover:text-[#711419]"
+                data-testid="ai-new-chat"
+              >
+                <SquarePen className="h-4 w-4" />
+                New chat
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+              {grouped.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-slate-400">
+                  No conversations yet — ask something and it'll be saved here.
+                </p>
+              ) : (
+                grouped.map((group) => (
+                  <div key={group.label} className="mb-2">
+                    <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {group.label}
+                    </p>
+                    {group.items.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+                          c.id === conversationId ? "bg-[#711419]/10" : "hover:bg-slate-200/60"
+                        }`}
+                      >
+                        <button
+                          onClick={() => openConversation(c.id)}
+                          className="min-w-0 flex-1 text-left"
+                          data-testid={`ai-conversation-${c.id}`}
+                        >
+                          <p className={`truncate text-[13px] ${c.id === conversationId ? "font-semibold text-[#711419]" : "font-medium text-slate-700"}`}>
+                            {c.title || "Conversation"}
+                          </p>
+                          <p className="text-[11px] text-slate-400">{formatConversationWhen(c.updatedAt)}</p>
+                        </button>
+                        <button
+                          onClick={() => removeConversation(c.id)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-all hover:text-red-600 group-hover:opacity-100"
+                          aria-label="Delete conversation"
+                          data-testid={`ai-conversation-delete-${c.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* ── Main pane: active thread ── */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-3 py-2.5">
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              aria-label={sidebarOpen ? "Hide history" : "Show history"}
+              data-testid="ai-toggle-sidebar"
+            >
+              {sidebarOpen ? <PanelLeftClose className="h-4.5 w-4.5" /> : <PanelLeftOpen className="h-4.5 w-4.5" />}
+            </button>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
+              {activeTitle || (messages.length > 0 ? "Conversation" : "New chat")}
+            </p>
+            <button
+              onClick={() => setOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              aria-label="Close assistant"
+              data-testid="ai-close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Thread */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {messages.length === 0 && !pending ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10 text-[#711419]">
+                  <Sparkles className="h-7 w-7" />
+                </span>
+                <h2 className="text-xl font-semibold text-slate-800">What can I get done for you?</h2>
+                <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-500">
+                  I know how GHQ works and can see live data — schedules, agreements, invoices, quotes.
+                  Anything I set up waits for your approval.
+                </p>
+                <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+                  {STARTERS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => sendQuestion(s)}
+                      className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#711419]/50 hover:text-[#711419]"
+                      data-testid={`ai-starter-${s.slice(0, 10)}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mx-auto max-w-3xl space-y-4 pb-2">
+                {messages.map((msg, i) => {
+                  if (msg.role === "user") {
+                    return (
+                      <div key={i} className="flex justify-end">
+                        <div className="max-w-[80%] rounded-lg rounded-tr-sm bg-[#711419] px-4 py-2.5 text-sm leading-relaxed text-white">
+                          {msg.content}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
+                        <Sparkles className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
+                          {cleanAnswer(msg.content)}
+                        </div>
+                        {msg.proposedAction && msg.actionState !== "dismissed" && (
+                          <div className="rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3" data-testid={`ai-action-card-${i}`}>
+                            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              {msg.proposedAction.type === "create_task" ? "New task" : "New work order"} — needs your approval
+                            </p>
+                            <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
+                            <div className="mt-1.5 space-y-0.5">
+                              {Object.entries(msg.proposedAction.params).map(([k, v]) => (
+                                <p key={k} className="text-xs text-slate-500">
+                                  <span className="font-semibold capitalize text-slate-600">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
+                                  {String(v)}
+                                </p>
+                              ))}
+                            </div>
+                            {(msg.actionState === "pending" || msg.actionState === "error") && (
+                              <>
+                                {msg.actionState === "error" && (
+                                  <p className="mt-2 text-xs font-medium text-red-600">{msg.actionError}</p>
+                                )}
+                                <div className="mt-2.5 flex gap-2">
+                                  <button
+                                    onClick={() => runProposedAction(i)}
+                                    className="rounded-md bg-[#711419] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#8a1a1f]"
+                                    data-testid={`ai-action-approve-${i}`}
+                                  >
+                                    {msg.actionState === "error" ? "Try again" : "Approve & run"}
+                                  </button>
+                                  <button
+                                    onClick={() => dismissProposedAction(i)}
+                                    className="rounded-md border border-slate-300/70 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                                    data-testid={`ai-action-dismiss-${i}`}
+                                  >
+                                    Dismiss
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                            {msg.actionState === "choose" && msg.actionCandidates && (
+                              <div className="mt-2.5 space-y-1.5">
+                                <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>
+                                {msg.actionCandidates.map((cand) => (
+                                  <button
+                                    key={cand.id}
+                                    onClick={() => runProposedAction(i, { customerId: cand.id })}
+                                    className="block w-full rounded-md border border-slate-300/70 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                                    data-testid={`ai-candidate-${cand.id}`}
+                                  >
+                                    {cand.name}
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => dismissProposedAction(i)}
+                                  className="mt-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
+                                >
+                                  None of these — cancel
+                                </button>
+                              </div>
+                            )}
+                            {msg.actionState === "executing" && (
+                              <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running with your approval...
+                              </p>
+                            )}
+                            {msg.actionState === "done" && msg.actionResult && (
+                              <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                                <span>Done — {msg.actionResult.label}</span>
+                                <button
+                                  onClick={() => {
+                                    navigate(msg.actionResult!.url);
+                                    setOpen(false);
+                                  }}
+                                  className="text-[#711419] hover:underline"
+                                  data-testid={`ai-action-open-${i}`}
+                                >
+                                  Open it
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && (
+                          <div className="flex flex-wrap gap-2 pl-1">
+                            {msg.relatedTopics.map((topic, j) => (
+                              <button
+                                key={j}
+                                onClick={() => sendQuestion(topic)}
+                                className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                              >
+                                {topic}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {pending && (
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
+                      <Sparkles className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-slate-100 px-4 py-3.5">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:0ms]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:150ms]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:300ms]" />
+                    </div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+            )}
+          </div>
+
+          {/* Composer */}
+          <div className="shrink-0 border-t border-slate-200 px-4 py-3">
+            {(listening || transcribing) && (
+              <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#711419]">
+                {transcribing ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Got it — writing that down...
+                  </>
+                ) : (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#711419] opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[#711419]" />
+                    </span>
+                    Listening — click the mic again when you're done
+                  </>
+                )}
+              </p>
+            )}
+            <div className="mx-auto flex max-w-3xl items-center gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    sendQuestion(input);
+                  }
+                }}
+                placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask about the business, or tell me what to create..."}
+                className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#711419]/50 focus:outline-none"
+                data-testid="ai-input"
+              />
+              {voiceSupported && (
+                <button
+                  onClick={listening ? stopVoice : startVoice}
+                  disabled={transcribing}
+                  className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                    listening
+                      ? "border-[#711419] bg-[#711419] text-white"
+                      : "border-slate-200 bg-white text-slate-500 hover:border-[#711419]/50 hover:text-[#711419]"
+                  }`}
+                  aria-label={listening ? "Stop listening" : "Speak your question"}
+                  data-testid="ai-mic"
+                >
+                  {listening && <span className="absolute inset-0 animate-ping rounded-lg border border-[#711419]" />}
+                  {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                </button>
+              )}
+              <button
+                onClick={() => sendQuestion(input)}
+                disabled={input.trim().length < 3 || pending}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-colors hover:bg-[#8a1a1f] disabled:opacity-40"
+                aria-label="Send"
+                data-testid="ai-send"
+              >
+                <Send className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-slate-400">
+              Conversations are saved to your account and shared with the mobile app.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
