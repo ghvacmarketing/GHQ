@@ -74,7 +74,7 @@ import { randomUUID, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
-import { refreshWeather, scheduleWeatherRefresh, getWeatherData, getWeatherDataSelfHealing } from "./weather-service";
+import { refreshWeather, scheduleWeatherRefresh, getWeatherData, getWeatherDataSelfHealing, getWeatherForLocation, WEATHER_LOCATIONS } from "./weather-service";
 import { startBouncieBackgroundSync } from "./services/bouncieService";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
@@ -12132,11 +12132,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WEATHER API ENDPOINTS
   // ============================================
 
-  // GET /api/weather - returns cached weather data (kicks off a background
-  // refresh when the cache is missing or stale, so it self-heals)
+  // GET /api/weather/locations - the dispatch service-area city roster
+  app.get("/api/weather/locations", (_req, res) => {
+    res.json(WEATHER_LOCATIONS.map(({ slug, name, region, group }) => ({ slug, name, region, group })));
+  });
+
+  // GET /api/weather?location=<slug> - weather for any roster city (defaults
+  // to home base; self-heals when the cache is missing or stale)
   app.get("/api/weather", async (req, res) => {
     try {
-      const cache = await getWeatherDataSelfHealing();
+      const slug = typeof req.query.location === "string" ? req.query.location : "wrens";
+      const cache = await getWeatherForLocation(slug);
       if (!cache) {
         return res.status(404).json({ message: "No weather data cached yet" });
       }

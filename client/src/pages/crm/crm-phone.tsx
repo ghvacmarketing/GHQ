@@ -55,6 +55,7 @@ import { formatLocal, toLocalTime } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import type { Voicemail, CallLog, CallLogTask, CrmUser } from "@shared/schema";
 import { Switch } from "@/components/ui/switch";
+import { WeatherPanel } from "@/components/crm/weather-panel";
 
 const VOICEMAIL_STATUSES = ["NEW", "UNRESOLVED", "RESOLVED"] as const;
 type VoicemailStatus = typeof VOICEMAIL_STATUSES[number];
@@ -1908,51 +1909,6 @@ function VoicemailsKanban() {
   );
 }
 
-interface WeatherPeriod {
-  number: number;
-  name: string;
-  startTime: string;
-  endTime: string;
-  temperature: number;
-  temperatureUnit: string;
-  windSpeed: string;
-  windDirection: string;
-  shortForecast: string;
-  detailedForecast: string;
-  icon: string;
-  isDaytime: boolean;
-}
-
-interface WeatherAlert {
-  properties: {
-    headline: string;
-    severity: string;
-    event: string;
-    description: string;
-    expires: string;
-  };
-}
-
-interface WeatherData {
-  lat: string;
-  lon: string;
-  forecast: { properties: { periods: WeatherPeriod[] }; current?: WeatherPeriod | null };
-  hourly: { properties: { periods: WeatherPeriod[] } };
-  alerts: { features: WeatherAlert[] };
-  fetchedAt: string;
-  stale: boolean;
-}
-
-function getWeatherIcon(shortForecast: string, isDaytime: boolean, size: "sm" | "md" = "md") {
-  const forecast = shortForecast.toLowerCase();
-  const className = size === "sm" ? "h-4 w-4" : "h-5 w-5";
-  if (forecast.includes("rain") || forecast.includes("shower")) return <CloudRain className={cn(className, "text-blue-500")} />;
-  if (forecast.includes("snow")) return <CloudSnow className={cn(className, "text-blue-300")} />;
-  if (forecast.includes("cloud") || forecast.includes("overcast")) return <Cloud className={cn(className, "text-gray-400")} />;
-  if (forecast.includes("wind")) return <Wind className={cn(className, "text-gray-500")} />;
-  return isDaytime ? <Sun className={cn(className, "text-yellow-500")} /> : <Cloud className={cn(className, "text-gray-600")} />;
-}
-
 interface WeatherImpactDataPoint {
   date: string;
   calls: number;
@@ -1964,74 +1920,6 @@ interface WeatherImpactDataPoint {
 interface WeatherImpactResponse {
   data: WeatherImpactDataPoint[];
   updatedAt: string;
-}
-
-function WeeklyForecast() {
-  const { data: weather } = useQuery<WeatherData>({
-    queryKey: ["/api/weather"],
-    staleTime: 1000 * 60 * 30,
-    retry: false,
-  });
-
-  if (!weather?.forecast?.properties?.periods?.length) {
-    return null;
-  }
-
-  const periods = weather.forecast.properties.periods;
-  
-  const dailyForecasts: { day: string; high: number | null; low: number | null; icon: string; isDaytime: boolean }[] = [];
-  for (let i = 0; i < periods.length; i++) {
-    const period = periods[i];
-    const dayName = period.name.replace(/ Night$/, "").replace("This ", "").replace("Tonight", "Today");
-    const existing = dailyForecasts.find(d => d.day === dayName);
-    if (existing) {
-      if (period.isDaytime) existing.high = period.temperature;
-      else existing.low = period.temperature;
-    } else {
-      dailyForecasts.push({
-        day: dayName,
-        high: period.isDaytime ? period.temperature : null,
-        low: !period.isDaytime ? period.temperature : null,
-        icon: period.shortForecast,
-        isDaytime: period.isDaytime,
-      });
-    }
-  }
-
-  return (
-    <div className="mb-4 py-3 px-3 bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50" data-testid="crm-phone-weather-weekly">
-      <div className="grid grid-cols-7 gap-1">
-        {dailyForecasts.slice(0, 7).map((day, idx) => (
-          <div key={idx} className="flex flex-col items-center text-center py-1" data-testid={`crm-phone-weather-day-${idx}`}>
-            <span className="text-xs font-medium text-muted-foreground truncate w-full">
-              {day.day.slice(0, 3)}
-            </span>
-            <div className="my-1">
-              {getWeatherIcon(day.icon, true, "sm")}
-            </div>
-            <div className="flex flex-col text-xs leading-tight">
-              {day.high !== null && (
-                <span className="text-red-600 dark:text-red-400 font-semibold">{day.high}°</span>
-              )}
-              {day.low !== null && (
-                <span className="text-blue-600 dark:text-blue-400">{day.low}°</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-      {/* Freshness stamp — a frozen forecast must never masquerade as live */}
-      {weather.fetchedAt && (
-        <p
-          className={`mt-1 text-right text-[10px] ${weather.stale ? "font-semibold text-amber-600" : "text-muted-foreground/70"}`}
-          data-testid="crm-phone-weather-updated"
-        >
-          {weather.stale ? "⚠ Stale — refreshing… · " : ""}
-          Updated {new Date(weather.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-        </p>
-      )}
-    </div>
-  );
 }
 
 const phoneScreeningSchema = z.object({
@@ -2679,8 +2567,7 @@ function WeatherImpactTab() {
 
   return (
     <div className="space-y-4">
-      <WeatherWidget />
-      <WeeklyForecast />
+      <WeatherPanel />
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <Select value={range} onValueChange={setRange}>
@@ -2879,113 +2766,6 @@ function WeatherImpactTab() {
           </p>
         </>
       )}
-    </div>
-  );
-}
-
-function WeatherWidget() {
-  const [alertsOpen, setAlertsOpen] = useState(false);
-  const { data: weather, isLoading, error } = useQuery<WeatherData>({
-    queryKey: ["/api/weather"],
-    staleTime: 1000 * 60 * 30,
-    retry: false,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="mb-2 py-2 px-3 bg-muted/20 dark:bg-muted/10 rounded-md border border-border/50 flex items-center gap-2" data-testid="crm-phone-weather-loading">
-        <div className="w-5 h-5 rounded-full bg-muted animate-pulse" />
-        <div className="h-4 w-20 bg-muted animate-pulse rounded" />
-        <div className="h-3 w-24 bg-muted animate-pulse rounded" />
-      </div>
-    );
-  }
-
-  if (error || !weather?.forecast?.properties?.periods?.length) {
-    return (
-      <div className="mb-2 py-2 px-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-md border border-amber-200/50 dark:border-amber-800/50 flex items-center gap-2 text-amber-700 dark:text-amber-400" data-testid="crm-phone-weather-unavailable">
-        <AlertTriangle className="h-4 w-4" />
-        <span className="text-xs">Weather unavailable</span>
-      </div>
-    );
-  }
-
-  const periods = weather.forecast.properties.periods;
-  // Prefer the true current reading; periods[0] is today's forecast high,
-  // which used to masquerade as "the temperature right now".
-  const currentPeriod = weather.forecast.current || periods[0];
-  const activeAlerts = weather.alerts?.features || [];
-
-  let highTemp: number | null = null;
-  let lowTemp: number | null = null;
-  
-  for (let i = 0; i < Math.min(4, periods.length); i++) {
-    const period = periods[i];
-    if (period.isDaytime && highTemp === null) {
-      highTemp = period.temperature;
-    } else if (!period.isDaytime && lowTemp === null) {
-      lowTemp = period.temperature;
-    }
-    if (highTemp !== null && lowTemp !== null) break;
-  }
-
-  return (
-    <div className="mb-2" data-testid="crm-phone-weather-widget">
-      {activeAlerts.length > 0 && (
-        <Collapsible open={alertsOpen} onOpenChange={setAlertsOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full mb-1 py-1.5 px-2 bg-red-100/80 dark:bg-red-950/40 border border-red-200/50 dark:border-red-800/50 rounded-md flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors" data-testid="crm-phone-weather-alerts-toggle">
-              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="text-xs font-medium flex-1 text-left truncate">{activeAlerts.length} weather alert{activeAlerts.length > 1 ? "s" : ""}</span>
-              {alertsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mb-1 p-2 bg-red-50/50 dark:bg-red-950/20 border border-red-200/30 dark:border-red-800/30 rounded-md space-y-1" data-testid="crm-phone-weather-alerts">
-              {activeAlerts.slice(0, 2).map((alert, idx) => (
-                <div key={idx} className="text-red-700 dark:text-red-400 text-xs">
-                  {alert.properties.headline}
-                </div>
-              ))}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-      <div className="flex items-center gap-4 py-3 px-4 bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-sm" data-testid="crm-phone-weather-current">
-        <div className="flex-shrink-0">
-          {getWeatherIcon(currentPeriod.shortForecast, currentPeriod.isDaytime, "md")}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-foreground" data-testid="crm-phone-weather-temperature">
-              {currentPeriod.temperature}°
-            </span>
-            <span className="text-sm text-muted-foreground">{currentPeriod.name}</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            {highTemp !== null && (
-              <span className="text-red-600 dark:text-red-400 font-medium" data-testid="crm-phone-weather-high">
-                H: {highTemp}°
-              </span>
-            )}
-            {lowTemp !== null && (
-              <span className="text-blue-600 dark:text-blue-400 font-medium" data-testid="crm-phone-weather-low">
-                L: {lowTemp}°
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground truncate mt-0.5" data-testid="crm-phone-weather-short-forecast">
-            {currentPeriod.shortForecast}
-          </p>
-        </div>
-        <div className="flex flex-col items-end text-xs text-muted-foreground flex-shrink-0">
-          <div className="flex items-center gap-1">
-            <Wind className="h-3.5 w-3.5" />
-            <span>{currentPeriod.windSpeed}</span>
-          </div>
-          <span className="text-[10px]">{currentPeriod.windDirection}</span>
-        </div>
-      </div>
     </div>
   );
 }
