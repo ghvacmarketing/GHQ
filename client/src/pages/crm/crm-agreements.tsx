@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,6 +67,11 @@ import {
   Printer,
   RefreshCw,
   Filter,
+  List,
+  LayoutGrid,
+  BarChart3,
+  DollarSign,
+  CalendarDays,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays, parseISO } from "date-fns";
@@ -182,6 +187,32 @@ export default function CrmAgreements() {
   const [sortField, setSortField] = useState<SortField>("customerName");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [agreementTypeFilter, setAgreementTypeFilter] = useState<string>("all");
+  const [view, setView] = useState<"overview" | "list" | "cards">(
+    () => (typeof window !== "undefined" && (localStorage.getItem("agreementsView") as "overview" | "list" | "cards")) || "list",
+  );
+  useEffect(() => {
+    localStorage.setItem("agreementsView", view);
+  }, [view]);
+
+  type AgreementsOverview = {
+    counts: Record<string, number>;
+    liveCount: number;
+    annualRevenue: number;
+    monthlyRevenue: number;
+    avgAnnualPerAgreement: number;
+    activeSystems: number;
+    autoRenewCount: number;
+    visitsDue30: number;
+    invoicesDue30: number;
+    plans: { plan: string; count: number; annualRevenue: number }[];
+  };
+  const { data: overview } = useQuery<AgreementsOverview>({
+    queryKey: ["/api/crm/agreements/overview"],
+    enabled: view === "overview",
+    staleTime: 60 * 1000,
+  });
+  const fmtMoney = (n: number) =>
+    n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
   const [createForm, setCreateForm] = useState({
     agreementNumber: "",
@@ -616,15 +647,26 @@ export default function CrmAgreements() {
             <p className="mt-0.5 text-sm text-muted-foreground">Preventative maintenance &amp; service plans</p>
           </div>
 
-          <div className="relative w-full lg:flex-1 lg:max-w-md lg:mx-auto">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search agreements…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-              data-testid="input-search"
-            />
+          {/* Center view switcher — same pill segmented control as Quotes */}
+          <div className="mx-auto inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            {(
+              [
+                ["overview", "Overview", BarChart3],
+                ["list", "List", List],
+                ["cards", "Cards", LayoutGrid],
+              ] as const
+            ).map(([key, label, Icon]) => (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                  view === key ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid={`agreements-view-${key}`}
+              >
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.75} /> {label}
+              </button>
+            ))}
           </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -718,8 +760,9 @@ export default function CrmAgreements() {
             </div>
         </div>
 
-        {/* Tab Filters with Type dropdown on right */}
-        <div className="flex items-center justify-between gap-2">
+        {/* Status tabs left · search + filter right (hidden on Overview) */}
+        {view !== "overview" && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <IndustrialTabs
             testidPrefix="tab"
             className="flex-wrap overflow-visible"
@@ -736,7 +779,17 @@ export default function CrmAgreements() {
               return { key: tab.key, label: tab.label, count: count != null && count > 0 ? count : null };
             })}
           />
-          <div className="shrink-0 pb-1">
+          <div className="flex shrink-0 items-center gap-2 pb-1">
+            <div className="relative w-56">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search agreements…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="h-8 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                data-testid="input-search"
+              />
+            </div>
             <Select value={agreementTypeFilter} onValueChange={setAgreementTypeFilter}>
               <SelectTrigger
                 className={`relative h-8 w-8 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
@@ -766,7 +819,224 @@ export default function CrmAgreements() {
             </Select>
           </div>
         </div>
+        )}
 
+        {/* Overview — agreement stats across the whole book of business */}
+        {view === "overview" && (
+          <div className="space-y-4" data-testid="agreements-overview">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Card className="border shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419]/10 text-[#711419]">
+                      <FileCheck className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Live agreements</p>
+                      <p className="text-xl font-bold text-slate-900" data-testid="stat-live-agreements">{overview?.liveCount ?? "—"}</p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {overview ? `${overview.counts.active || 0} active · ${overview.counts.grace_period || 0} in grace` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                      <DollarSign className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Annual value</p>
+                      <p className="text-xl font-bold text-slate-900" data-testid="stat-annual-value">
+                        {overview ? fmtMoney(overview.annualRevenue) : "—"}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {overview ? `≈ ${fmtMoney(overview.monthlyRevenue)}/mo recurring` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+                      <BarChart3 className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Avg per agreement</p>
+                      <p className="text-xl font-bold text-slate-900" data-testid="stat-avg-agreement">
+                        {overview ? fmtMoney(overview.avgAnnualPerAgreement) : "—"}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {overview ? `${overview.activeSystems} systems covered` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                      <CalendarDays className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Due next 30 days</p>
+                      <p className="text-xl font-bold text-slate-900" data-testid="stat-due-30">{overview?.visitsDue30 ?? "—"}</p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {overview ? `visits · ${overview.invoicesDue30} invoices due` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border shadow-sm">
+                <CardContent className="p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status breakdown</p>
+                  {overview && (
+                    <>
+                      {(() => {
+                        const segs = [
+                          { key: "active", label: "Active", cls: "bg-emerald-500" },
+                          { key: "pending", label: "Pending", cls: "bg-amber-400" },
+                          { key: "grace_period", label: "Grace period", cls: "bg-orange-500" },
+                          { key: "expired", label: "Expired", cls: "bg-red-400" },
+                          { key: "cancelled", label: "Cancelled", cls: "bg-slate-300" },
+                        ];
+                        const total = segs.reduce((s, x) => s + (overview.counts[x.key] || 0), 0) || 1;
+                        return (
+                          <>
+                            <div className="mb-3 flex h-2 overflow-hidden rounded-full bg-slate-100">
+                              {segs.map((s) => (
+                                <div key={s.key} className={s.cls} style={{ width: `${((overview.counts[s.key] || 0) / total) * 100}%` }} />
+                              ))}
+                            </div>
+                            <div className="space-y-1.5">
+                              {segs.map((s) => (
+                                <div key={s.key} className="flex items-center gap-2 text-sm">
+                                  <span className={`h-2 w-2 rounded-[2px] ${s.cls}`} />
+                                  <span className="flex-1 text-slate-600">{s.label}</span>
+                                  <span className="font-semibold tabular-nums text-slate-900">{overview.counts[s.key] || 0}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="border shadow-sm">
+                <CardContent className="p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Plans (live agreements)</p>
+                  {overview?.plans?.length ? (
+                    <div className="space-y-2">
+                      {overview.plans.map((p) => (
+                        <div key={p.plan} className="flex items-center gap-2 text-sm">
+                          <Wrench className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          <span className="min-w-0 flex-1 truncate text-slate-700">{p.plan}</span>
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">{p.count}</span>
+                          <span className="w-24 text-right text-xs font-semibold tabular-nums text-slate-900">{fmtMoney(p.annualRevenue)}/yr</span>
+                        </div>
+                      ))}
+                      {overview.liveCount > 0 && (
+                        <p className="pt-2 text-[11px] text-slate-500">
+                          {overview.autoRenewCount} of {overview.liveCount} live agreements auto-renew
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">No live agreements yet</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Cards view */}
+        {view === "cards" && (
+          agreementsLoading ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-[4px]" />
+              ))}
+            </div>
+          ) : filteredAndSortedAgreements.length === 0 ? (
+            <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-16 text-center">
+              <FileCheck className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+              <p className="font-medium text-slate-500">No agreements found</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-testid="agreements-card-grid">
+                {filteredAndSortedAgreements.map((agreement) => {
+                  const calculatedStatus = getAgreementStatus(agreement);
+                  return (
+                    <div
+                      key={agreement.id}
+                      className="group cursor-pointer rounded-[4px] border border-slate-300/70 bg-white p-3 transition-colors hover:border-slate-400"
+                      onClick={() => setSelectedAgreement(agreement)}
+                      data-testid={`card-agreement-${agreement.id}`}
+                    >
+                      <div className="flex flex-wrap items-center gap-1">
+                        <StatusDot pill={`border ${statusColors[calculatedStatus] || statusColors.active} h-4 px-1 text-[10px]`}>
+                          {statusLabels[calculatedStatus] || calculatedStatus}
+                        </StatusDot>
+                        <span className="ml-auto text-[11px] text-slate-400">{agreement.agreementNumber}</span>
+                      </div>
+                      <p className="mt-1.5 truncate text-sm font-semibold leading-tight text-slate-900">
+                        {formatCustomerName(agreement.customerName)}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">{agreement.agreementPlan}</p>
+                      <div className="mt-2 space-y-0.5 border-t border-slate-100 pt-1.5 text-[11px]">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Next service</span>
+                          <span className="text-slate-600">{formatDate(agreement.nextServiceDate)}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Next invoice</span>
+                          <span className="text-slate-600">{formatDate(agreement.nextInvoiceDate)}</span>
+                        </div>
+                        {agreement.address && <p className="truncate text-slate-400">{agreement.address}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-2 text-[#711419] transition-colors hover:text-[#5a1014] disabled:cursor-not-allowed disabled:opacity-30"
+                    data-testid="button-cards-prev-page"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <span className="text-sm text-slate-600">Page {page} of {totalPages}</span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="p-2 text-[#711419] transition-colors hover:text-[#5a1014] disabled:cursor-not-allowed disabled:opacity-30"
+                    data-testid="button-cards-next-page"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
+            </>
+          )
+        )}
+
+        {view === "list" && (
         <Card className="bg-white border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
@@ -942,6 +1212,7 @@ export default function CrmAgreements() {
             </div>
           )}
         </Card>
+        )}
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

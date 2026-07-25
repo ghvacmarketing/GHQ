@@ -369,6 +369,32 @@ export default function AiAssistantModal() {
     setMessages((prev) => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
   };
 
+  // Candidate pick. For sends (text/email) the pick goes BACK to the approval
+  // card with the chosen customer locked in — nothing sends until the user
+  // approves again. Creates (task/work order) run right after the pick.
+  const pickCandidate = (index: number, cand: { id: string; name: string }) => {
+    const msg = messages[index];
+    const param = msg?.actionCandidateParam || "customerId";
+    const isSend = msg?.proposedAction?.type === "send_sms" || msg?.proposedAction?.type === "send_email";
+    if (isSend && param === "customerId") {
+      setMessages((prev) => prev.map((m, j) => (
+        j === index
+          ? {
+              ...m,
+              proposedAction: m.proposedAction
+                ? { ...m.proposedAction, params: { ...m.proposedAction.params, customerId: cand.id, customerName: cand.name } }
+                : m.proposedAction,
+              actionState: "pending" as const,
+              actionError: null,
+              actionCandidates: null,
+            }
+          : m
+      )));
+      return;
+    }
+    runProposedAction(index, { [param]: cand.id });
+  };
+
   if (!open) return null;
 
   const visibleConversations = activeSpace
@@ -664,7 +690,7 @@ export default function AiAssistantModal() {
                             </p>
                             <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                             <div className="mt-1.5 space-y-0.5">
-                              {Object.entries(msg.proposedAction.params).map(([k, v]) => (
+                              {Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId").map(([k, v]) => (
                                 <p key={k} className="text-xs text-slate-500">
                                   <span className="font-semibold capitalize text-slate-600">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
                                   {String(v)}
@@ -700,7 +726,7 @@ export default function AiAssistantModal() {
                                 {msg.actionCandidates.map((cand) => (
                                   <button
                                     key={cand.id}
-                                    onClick={() => runProposedAction(i, { [msg.actionCandidateParam || "customerId"]: cand.id })}
+                                    onClick={() => pickCandidate(i, cand)}
                                     className="block w-full rounded-md border border-slate-300/70 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:border-[#711419] hover:text-[#711419]"
                                     data-testid={`ai-candidate-${cand.id}`}
                                   >

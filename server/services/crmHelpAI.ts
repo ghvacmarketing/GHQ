@@ -1052,6 +1052,21 @@ The Checklist Canvas (/crm/checklists, reached from Settings → Service Checkli
 ## INSTALL PLANNER
 The Install Planner (/crm/install-planner) is a capacity-planning board for tentative and sold installs. Calendar view: drag across days to create a hold, drag/resize blocks, cross month boundaries. Timeline view: Gantt-style bars per crew, draggable across dates and crews; crews can be added/renamed/deleted. Blocks carry confidence (High/Medium/Low, dashed) or Sold (solid green) styling; a "Crews/day" setting caps daily capacity. Each block links a CRM customer with dates, crew, estimated value, and notes; a "Sell" action converts a hold to Sold.
 
+## PROPOSAL BUILDER
+The Proposal Builder (/crm/quotes/proposal, launched from Quotes) is a step-by-step wizard for building install proposals in front of the customer. Steps: pick the unit/system type → tonnage (skipped for Mini-Split, Ducting, and Crawlspace work) → equipment tier from the price book → review the package. It generates a professional proposal (AI-formatted: package description, what's-included by category, line items, warranties & terms, financing text, next steps) that can be presented, saved as a quote, and printed as a PDF. Templates for the written portions are managed in Settings → Proposal Templates (merge fields + image library).
+KEY CONCEPT — the Elite package: turning Elite ON adds the Elite bundle to the proposal and activates a 20% DISCOUNT on the system price. The Elite core bundles are: (1) 10-Year Labor Warranty ($1,000 — all labor covered, no service call fees), (2) 10-Year Maintenance Plan ($2,290 — annual tune-ups, priority scheduling, filter replacements), (3) Install Upgrade Bundle (priced by tonnage, $1,000–$5,000 — new copper lineset, proper condensate drainage, low-voltage wiring upgrade). The pitch: maximum protection and longevity for the new system, and the 20% equipment discount offsets much of the bundle cost.
+
+## CARE PLANS & PROTECTION BUNDLES
+Monthly CARE PLANS (maintenance agreement sign-ups, billed monthly):
+- **Essential Care** — $14/mo: 1 tune-up visit per year, 10% member parts discount, no priority service. Basic protection + compliance.
+- **Priority Care** — $21/mo: 2 tune-up visits per year, 15% member parts discount, priority service. The core recommended plan.
+- **Elite Care** — $30/mo: 2–3 tune-up visits per year, 20% member parts discount, TOP priority service. The premium full-service membership. Benefits of going Elite over the lower tiers: the most visits (catch problems early), the deepest parts discount, and jumping the line when scheduling is tight (which matters most in peak summer/winter).
+One-time INSTALLATION PROTECTION BUNDLES (fixed-price add-ons sold with installs):
+- **Elite Protection (10 Yr)** — $1,200: 10-year coverage, 3 maintenance visits, 20% parts discount, priority scheduling. Maximum protection + longevity.
+- **Advanced Protection (5 Yr)** — $800: 5-year coverage, 2 maintenance visits, 15% parts discount, priority scheduling.
+- **Standard Protection (2 Yr)** — $400: 2-year coverage, 1 maintenance visit, 10% parts discount.
+- **Basic Protection (1 Yr)** — $200: 1-year coverage, no scheduled visits, 5% parts discount.
+
 ## FEATURES THAT DO NOT EXIST IN THIS CRM
 
 **IMPORTANT: The following features do NOT exist. If asked about them, clearly say they are not part of this system.**

@@ -296,6 +296,32 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     setMessages((prev) => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
   };
 
+  // Candidate pick. For sends (text/email) the pick goes BACK to the approval
+  // card with the chosen customer locked in — nothing sends until the user
+  // approves again. Creates (task/work order) run right after the pick.
+  const pickCandidate = (index: number, cand: { id: string; name: string }) => {
+    const msg = messages[index];
+    const param = msg?.actionCandidateParam || "customerId";
+    const isSend = msg?.proposedAction?.type === "send_sms" || msg?.proposedAction?.type === "send_email";
+    if (isSend && param === "customerId") {
+      setMessages((prev) => prev.map((m, j) => (
+        j === index
+          ? {
+              ...m,
+              proposedAction: m.proposedAction
+                ? { ...m.proposedAction, params: { ...m.proposedAction.params, customerId: cand.id, customerName: cand.name } }
+                : m.proposedAction,
+              actionState: "pending" as const,
+              actionError: null,
+              actionCandidates: null,
+            }
+          : m
+      )));
+      return;
+    }
+    runProposedAction(index, { [param]: cand.id });
+  };
+
   if (!open) return null;
 
   return (
@@ -491,7 +517,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         </p>
                         <p className="mt-1.5 text-sm text-slate-200">{msg.proposedAction.summary}</p>
                         <div className="mt-1.5 space-y-0.5">
-                          {Object.entries(msg.proposedAction.params).map(([k, v]) => (
+                          {Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId").map(([k, v]) => (
                             <p key={k} className="text-xs text-slate-400">
                               <span className="font-semibold capitalize text-slate-300">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
                               {String(v)}
@@ -527,7 +553,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                             {msg.actionCandidates.map((cand) => (
                               <button
                                 key={cand.id}
-                                onClick={() => runProposedAction(i, { [msg.actionCandidateParam || "customerId"]: cand.id })}
+                                onClick={() => pickCandidate(i, cand)}
                                 className="block w-full rounded-[3px] border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm font-medium text-slate-200 transition-all active:scale-[0.98] active:border-[#711419]"
                                 data-testid={`assistant-candidate-${cand.id}`}
                               >

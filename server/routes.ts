@@ -15088,6 +15088,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/agreements/:id - Get single agreement
+  // Aggregate stats across ALL agreements — feeds the Agreements Overview tab.
+  app.get("/api/crm/agreements/overview", requireCrmAuth, async (_req, res) => {
+    try {
+      const rows = await db
+        .select({
+          status: crmAgreements.status,
+          price: crmAgreements.price,
+          frequency: crmAgreements.frequency,
+          agreementPlan: crmAgreements.agreementPlan,
+          nextServiceDate: crmAgreements.nextServiceDate,
+          nextInvoiceDate: crmAgreements.nextInvoiceDate,
+          autoRenew: crmAgreements.autoRenew,
+          numberOfSystems: crmAgreements.numberOfSystems,
+        })
+        .from(crmAgreements);
+
+      const annualize = (price: string | null, frequency: string | null) => {
+        const p = Number(price || 0);
+        if (!p) return 0;
+        if (frequency === "weekly") return p * 52;
+        if (frequency === "monthly") return p * 12;
+        return p;
+      };
+      const now = Date.now();
+      const in30 = now + 30 * 24 * 60 * 60 * 1000;
+      const withinNext30 = (d: string | null) => {
+        if (!d) return false;
+        const t = new Date(`${d}T12:00:00`).getTime();
+        return t >= now - 24 * 60 * 60 * 1000 && t <= in30;
+      };
+
+      const counts: Record<string, number> = { pending: 0, active: 0, grace_period: 0, expired: 0, cancelled: 0 };
+      let annualRevenue = 0;
+      let activeSystems = 0;
+      let autoRenewCount = 0;
+      let visitsDue30 = 0;
+      let invoicesDue30 = 0;
+      const planMap = new Map<string, { count: number; annualRevenue: number }>();
+
+      for (const a of rows) {
+        counts[a.status] = (counts[a.status] || 0) + 1;
+        const live = a.status === "active" || a.status === "grace_period";
+        if (!live) continue;
+        const rev = annualize(a.price, a.frequency);
+        annualRevenue += rev;
+        activeSystems += a.numberOfSystems || 0;
+        if (a.autoRenew) autoRenewCount++;
+        if (withinNext30(a.nextServiceDate)) visitsDue30++;
+        if (withinNext30(a.nextInvoiceDate)) invoicesDue30++;
+        const plan = a.agreementPlan || "Other";
+        const entry = planMap.get(plan) || { count: 0, annualRevenue: 0 };
+        entry.count++;
+        entry.annualRevenue += rev;
+        planMap.set(plan, entry);
+      }
+
+      const liveCount = counts.active + counts.grace_period;
+      res.json({
+        counts,
+        liveCount,
+        annualRevenue,
+        monthlyRevenue: annualRevenue / 12,
+        avgAnnualPerAgreement: liveCount ? annualRevenue / liveCount : 0,
+        activeSystems,
+        autoRenewCount,
+        visitsDue30,
+        invoicesDue30,
+        plans: Array.from(planMap.entries())
+          .map(([plan, v]) => ({ plan, ...v }))
+          .sort((a, b) => b.count - a.count),
+      });
+    } catch (error) {
+      console.error("Error computing agreements overview:", error);
+      res.status(500).json({ message: "Error computing agreements overview" });
+    }
+  });
+
   app.get("/api/crm/agreements/:id", requireCrmAuth, async (req, res) => {
     try {
       const [agreement] = await db
