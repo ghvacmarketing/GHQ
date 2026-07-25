@@ -52,6 +52,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [pending, setPending] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const finalTextRef = useRef("");
+  const manualStopRef = useRef(false);
+  const composerRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ y: number; dy: number; active: boolean } | null>(null);
@@ -114,13 +117,28 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
 
-  // Kill any live recognition when the sheet closes or unmounts
+  // While dictating, keep the input scrolled to the newest words so you can
+  // watch the transcript grow instead of staring at the first few.
+  useEffect(() => {
+    if (listening && composerRef.current) {
+      composerRef.current.scrollLeft = composerRef.current.scrollWidth;
+    }
+  }, [input, listening]);
+
+  // Kill any live recognition when the sheet closes or unmounts — and make
+  // sure the aborted session's onend can't restart or send anything.
   useEffect(() => {
     if (!open) {
+      manualStopRef.current = true;
+      finalTextRef.current = "";
       recognitionRef.current?.abort?.();
       setListening(false);
     }
-    return () => recognitionRef.current?.abort?.();
+    return () => {
+      manualStopRef.current = true;
+      finalTextRef.current = "";
+      recognitionRef.current?.abort?.();
+    };
   }, [open]);
 
   const sendQuestion = (raw: string) => {
@@ -153,44 +171,81 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       .finally(() => setPending(false));
   };
 
-  // Voice capture: YOU control how long the mic listens — continuous mode
-  // keeps it open through pauses until you tap the mic again, and only then
-  // does the accumulated transcript send. Interim words stream into the input
-  // so you can see what it heard as you talk.
-  const startVoice = () => {
-    if (!SpeechRecognitionImpl || listening) return;
+  // Voice capture: YOU control how long the mic listens. The browser's
+  // recognizer likes to end itself after a pause — when that happens we
+  // immediately relaunch it and keep accumulating, so the session only truly
+  // ends (and sends) when the mic button is tapped. Finalized text lives in a
+  // ref so it survives across those silent restarts.
+  const finalizeAndSend = () => {
+    setListening(false);
+    const spoken = finalTextRef.current.replace(/\s+/g, " ").trim();
+    finalTextRef.current = "";
+    if (spoken.length >= 3) sendQuestion(spoken);
+  };
+
+  const launchRecognition = () => {
     const rec = new SpeechRecognitionImpl();
     rec.lang = "en-US";
     rec.interimResults = true;
     rec.continuous = true;
-    let finalText = "";
+    rec.maxAlternatives = 1;
     rec.onresult = (e: any) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0]?.transcript || "";
-        if (e.results[i].isFinal) finalText += t;
+        if (e.results[i].isFinal) finalTextRef.current += t + " ";
         else interim += t;
       }
-      setInput((finalText + interim).trimStart());
+      setInput((finalTextRef.current + interim).replace(/\s+/g, " ").trimStart());
     };
     rec.onend = () => {
-      setListening(false);
       recognitionRef.current = null;
-      const spoken = finalText.trim();
-      if (spoken.length >= 3) {
-        sendQuestion(spoken);
+      if (manualStopRef.current) {
+        finalizeAndSend();
+      } else {
+        // The recognizer gave up on its own (silence/network hiccup) — the
+        // user didn't stop it, so spin a fresh one up seamlessly.
+        try {
+          launchRecognition();
+        } catch {
+          finalizeAndSend();
+        }
       }
     };
-    rec.onerror = () => {
-      setListening(false);
-      recognitionRef.current = null;
+    rec.onerror = (e: any) => {
+      // Fatal permission errors end the session; transient ones ("no-speech",
+      // "network", "aborted") fall through to onend and restart.
+      if (e?.error === "not-allowed" || e?.error === "service-not-allowed") {
+        manualStopRef.current = true;
+        finalTextRef.current = "";
+        setListening(false);
+      }
     };
     recognitionRef.current = rec;
-    setListening(true);
     rec.start();
   };
 
-  const stopVoice = () => recognitionRef.current?.stop?.();
+  const startVoice = () => {
+    if (!SpeechRecognitionImpl || listening) return;
+    finalTextRef.current = "";
+    manualStopRef.current = false;
+    setListening(true);
+    try {
+      launchRecognition();
+    } catch {
+      setListening(false);
+    }
+  };
+
+  const stopVoice = () => {
+    manualStopRef.current = true;
+    if (recognitionRef.current) {
+      recognitionRef.current.stop?.();
+    } else {
+      // A restart was mid-flight — finalize directly.
+      finalizeAndSend();
+    }
+  };
 
   const runProposedAction = (index: number) => {
     const msg = messages[index];
@@ -434,6 +489,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           )}
           <div className="flex items-center gap-2">
             <input
+              ref={composerRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
