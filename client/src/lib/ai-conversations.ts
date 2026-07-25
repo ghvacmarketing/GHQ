@@ -28,8 +28,54 @@ export type AiChatMessage = {
 export type AiConversationSummary = {
   id: string;
   title: string | null;
+  spaceId?: string | null;
   updatedAt: string | null;
 };
+
+/** A named group of conversations (like ChatGPT projects — called "spaces"
+ *  because "projects" already means CRM projects in GHQ). */
+export type AiSpace = {
+  id: string;
+  name: string;
+};
+
+export async function createAiSpace(name: string): Promise<AiSpace | null> {
+  try {
+    const res = await fetch("/api/crm/ai/spaces", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteAiSpace(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/crm/ai/spaces/${id}`, { method: "DELETE", credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function moveAiConversation(id: string, spaceId: string | null): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/crm/ai/conversations/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spaceId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 type AiServerMessage = {
   id: string;

@@ -7,17 +7,24 @@ import {
   type AiChatMessage,
   type AiConversationSummary,
   type AiProposedAction,
+  type AiSpace,
+  createAiSpace,
   deleteAiConversation,
+  deleteAiSpace,
   fetchAiConversation,
   fetchLatestAiConversation,
   dismissAiAction,
   formatConversationWhen,
+  moveAiConversation,
 } from "@/lib/ai-conversations";
 import {
+  Folder,
   Loader2,
+  MessagesSquare,
   Mic,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Send,
   ShieldCheck,
   Sparkles,
@@ -88,6 +95,9 @@ export default function AiAssistantModal() {
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeSpace, setActiveSpace] = useState<string | null>(null);
+  const [newSpaceOpen, setNewSpaceOpen] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState("");
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -134,6 +144,37 @@ export default function AiAssistantModal() {
     enabled: open,
   });
 
+  const { data: spaces = [] } = useQuery<AiSpace[]>({
+    queryKey: ["/api/crm/ai/spaces"],
+    enabled: open,
+  });
+
+  const addSpace = () => {
+    const name = newSpaceName.trim();
+    setNewSpaceName("");
+    setNewSpaceOpen(false);
+    if (!name) return;
+    createAiSpace(name).then((created) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/spaces"] });
+      if (created) setActiveSpace(created.id);
+    });
+  };
+
+  const removeSpace = (id: string) => {
+    deleteAiSpace(id).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/spaces"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+      if (activeSpace === id) setActiveSpace(null);
+    });
+  };
+
+  const assignActiveConversation = (spaceId: string | null) => {
+    if (!conversationId) return;
+    moveAiConversation(conversationId, spaceId).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+    });
+  };
+
   const sendQuestion = (raw: string) => {
     const question = raw.trim();
     if (question.length < 3 || pending) return;
@@ -141,7 +182,13 @@ export default function AiAssistantModal() {
     setMessages((prev) => [...prev, { role: "user", content: question }]);
     setInput("");
     setPending(true);
-    apiRequest("POST", "/api/crm/help", { question, conversationHistory: historyForApi, conversationId })
+    apiRequest("POST", "/api/crm/help", {
+      question,
+      conversationHistory: historyForApi,
+      conversationId,
+      // A brand-new chat is filed into whichever space is selected
+      spaceId: conversationId ? undefined : activeSpace ?? undefined,
+    })
       .then(async (r) => {
         const data = (await r.json()) as HelpResponse;
         if (data.conversationId) setConversationId(data.conversationId);
@@ -285,8 +332,12 @@ export default function AiAssistantModal() {
 
   if (!open) return null;
 
-  const grouped = groupConversations(conversations);
-  const activeTitle = conversations.find((c) => c.id === conversationId)?.title;
+  const visibleConversations = activeSpace
+    ? conversations.filter((c) => c.spaceId === activeSpace)
+    : conversations;
+  const grouped = groupConversations(visibleConversations);
+  const activeConvo = conversations.find((c) => c.id === conversationId);
+  const activeTitle = activeConvo?.title;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-3 backdrop-blur-[2px]" data-testid="ai-assistant-modal">
@@ -298,15 +349,18 @@ export default function AiAssistantModal() {
         {sidebarOpen && (
           <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50" data-testid="ai-sidebar">
             <div className="flex items-center justify-between px-3 pb-2 pt-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#711419] text-white">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-slate-400">GHQ Intelligence</p>
-                  <p className="text-sm font-semibold leading-tight text-slate-800">Gibbs</p>
-                </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-slate-400">GHQ Intelligence</p>
+                <p className="text-sm font-semibold leading-tight text-slate-800">Gibbs</p>
               </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
+                aria-label="Hide history"
+                data-testid="ai-toggle-sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
             </div>
             <div className="px-3 pb-2">
               <button
@@ -318,10 +372,84 @@ export default function AiAssistantModal() {
                 New chat
               </button>
             </div>
+
+            {/* Spaces — named groups of conversations. New chats are filed
+                into whichever space is selected. */}
+            <div className="px-2 pb-1">
+              <div className="flex items-center justify-between px-2 pb-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Spaces</p>
+                <button
+                  onClick={() => setNewSpaceOpen((v) => !v)}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-[#711419]"
+                  aria-label="New space"
+                  data-testid="ai-new-space"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {newSpaceOpen && (
+                <input
+                  autoFocus
+                  value={newSpaceName}
+                  onChange={(e) => setNewSpaceName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addSpace();
+                    if (e.key === "Escape") {
+                      setNewSpaceOpen(false);
+                      setNewSpaceName("");
+                    }
+                  }}
+                  placeholder="Name it, press Enter"
+                  className="mb-1 w-full rounded-md border border-[#711419]/40 bg-white px-2 py-1.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                  data-testid="ai-new-space-input"
+                />
+              )}
+              <button
+                onClick={() => setActiveSpace(null)}
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] transition-colors ${
+                  activeSpace === null ? "bg-[#711419]/10 font-semibold text-[#711419]" : "font-medium text-slate-600 hover:bg-slate-200/60"
+                }`}
+                data-testid="ai-space-all"
+              >
+                <MessagesSquare className="h-3.5 w-3.5 shrink-0" />
+                All chats
+              </button>
+              {spaces.map((s) => (
+                <div
+                  key={s.id}
+                  className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+                    activeSpace === s.id ? "bg-[#711419]/10" : "hover:bg-slate-200/60"
+                  }`}
+                >
+                  <button
+                    onClick={() => setActiveSpace(s.id)}
+                    className={`flex min-w-0 flex-1 items-center gap-2 text-left text-[13px] ${
+                      activeSpace === s.id ? "font-semibold text-[#711419]" : "font-medium text-slate-600"
+                    }`}
+                    data-testid={`ai-space-${s.id}`}
+                  >
+                    <Folder className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{s.name}</span>
+                  </button>
+                  <button
+                    onClick={() => removeSpace(s.id)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 opacity-0 transition-all hover:text-red-600 group-hover:opacity-100"
+                    aria-label="Delete space"
+                    data-testid={`ai-space-delete-${s.id}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mx-3 my-1 border-t border-slate-200" />
+
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
               {grouped.length === 0 ? (
                 <p className="px-2 py-6 text-center text-xs text-slate-400">
-                  No conversations yet — ask something and it'll be saved here.
+                  {activeSpace
+                    ? "No chats in this space yet — start one and it'll be filed here."
+                    : "No conversations yet — ask something and it'll be saved here."}
                 </p>
               ) : (
                 grouped.map((group) => (
@@ -366,17 +494,35 @@ export default function AiAssistantModal() {
         {/* ── Main pane: active thread ── */}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-3 py-2.5">
-            <button
-              onClick={() => setSidebarOpen((v) => !v)}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
-              aria-label={sidebarOpen ? "Hide history" : "Show history"}
-              data-testid="ai-toggle-sidebar"
-            >
-              {sidebarOpen ? <PanelLeftClose className="h-4.5 w-4.5" /> : <PanelLeftOpen className="h-4.5 w-4.5" />}
-            </button>
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                aria-label="Show history"
+                data-testid="ai-open-sidebar"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </button>
+            )}
             <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
               {activeTitle || (messages.length > 0 ? "Conversation" : "New chat")}
             </p>
+            {conversationId && (
+              <select
+                value={activeConvo?.spaceId ?? ""}
+                onChange={(e) => assignActiveConversation(e.target.value || null)}
+                className="h-8 max-w-[170px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 focus:border-[#711419]/50 focus:outline-none"
+                title="File this chat into a space"
+                data-testid="ai-conversation-space"
+              >
+                <option value="">No space</option>
+                {spaces.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => setOpen(false)}
               className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"

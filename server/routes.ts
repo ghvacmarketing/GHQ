@@ -99,7 +99,7 @@ import {
   disconnectGmail,
 } from "./services/gmailService";
 import { crmEmailThreads, crmEmailMessages } from "@shared/schema";
-import { aiConversations, aiMessages } from "@shared/schema";
+import { aiConversations, aiMessages, aiSpaces } from "@shared/schema";
 import { fromZonedTime } from "date-fns-tz";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -2272,6 +2272,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .orderBy(desc(aiMessages.createdAt))
             .limit(10);
           history = stored.reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+          // The 10-message window can cut mid-pair; Anthropic requires the
+          // first message to be a user turn, so trim a leading assistant one.
+          while (history.length > 0 && history[0].role === "assistant") history.shift();
         }
       }
 
@@ -2282,9 +2285,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let messageId: string | undefined;
       try {
         if (!convoId) {
+          // New conversations can be filed into a space (owned by this user).
+          let spaceId: string | null = null;
+          if (req.body.spaceId && typeof req.body.spaceId === "string") {
+            const [space] = await db
+              .select({ id: aiSpaces.id })
+              .from(aiSpaces)
+              .where(and(eq(aiSpaces.id, req.body.spaceId), eq(aiSpaces.userId, user.id)));
+            if (space) spaceId = space.id;
+          }
           const [created] = await db
             .insert(aiConversations)
-            .values({ userId: user.id, title: question.trim().slice(0, 80) })
+            .values({ userId: user.id, title: question.trim().slice(0, 80), spaceId })
             .returning({ id: aiConversations.id });
           convoId = created.id;
         } else {
@@ -2322,15 +2334,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await getCurrentCrmUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
       const convos = await db
-        .select({ id: aiConversations.id, title: aiConversations.title, updatedAt: aiConversations.updatedAt })
+        .select({ id: aiConversations.id, title: aiConversations.title, spaceId: aiConversations.spaceId, updatedAt: aiConversations.updatedAt })
         .from(aiConversations)
         .where(eq(aiConversations.userId, user.id))
         .orderBy(desc(aiConversations.updatedAt))
-        .limit(30);
+        .limit(50);
       res.json(convos);
     } catch (error) {
       console.error("Error listing AI conversations:", error);
       res.status(500).json({ message: "Error listing conversations" });
+    }
+  });
+
+  // ── Spaces: named groups for assistant conversations ───────────────────
+  app.get("/api/crm/ai/spaces", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const spaces = await db
+        .select({ id: aiSpaces.id, name: aiSpaces.name })
+        .from(aiSpaces)
+        .where(eq(aiSpaces.userId, user.id))
+        .orderBy(asc(aiSpaces.name));
+      res.json(spaces);
+    } catch (error) {
+      console.error("Error listing AI spaces:", error);
+      res.status(500).json({ message: "Error listing spaces" });
+    }
+  });
+
+  app.post("/api/crm/ai/spaces", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+      if (!name || name.length > 60) {
+        return res.status(400).json({ message: "Space name must be 1–60 characters." });
+      }
+      const [created] = await db
+        .insert(aiSpaces)
+        .values({ userId: user.id, name })
+        .returning({ id: aiSpaces.id, name: aiSpaces.name });
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating AI space:", error);
+      res.status(500).json({ message: "Error creating space" });
+    }
+  });
+
+  app.delete("/api/crm/ai/spaces/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const [space] = await db
+        .select({ id: aiSpaces.id })
+        .from(aiSpaces)
+        .where(and(eq(aiSpaces.id, req.params.id), eq(aiSpaces.userId, user.id)));
+      if (!space) return res.status(404).json({ message: "Space not found" });
+      // Conversations survive the space — they just fall back to unfiled.
+      await db.update(aiConversations).set({ spaceId: null }).where(eq(aiConversations.spaceId, space.id));
+      await db.delete(aiSpaces).where(eq(aiSpaces.id, space.id));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting AI space:", error);
+      res.status(500).json({ message: "Error deleting space" });
+    }
+  });
+
+  // Move a conversation into a space (or out with spaceId: null).
+  app.patch("/api/crm/ai/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const [convo] = await db
+        .select({ id: aiConversations.id })
+        .from(aiConversations)
+        .where(and(eq(aiConversations.id, req.params.id), eq(aiConversations.userId, user.id)));
+      if (!convo) return res.status(404).json({ message: "Conversation not found" });
+      let spaceId: string | null = null;
+      if (req.body?.spaceId != null) {
+        const [space] = await db
+          .select({ id: aiSpaces.id })
+          .from(aiSpaces)
+          .where(and(eq(aiSpaces.id, String(req.body.spaceId)), eq(aiSpaces.userId, user.id)));
+        if (!space) return res.status(404).json({ message: "Space not found" });
+        spaceId = space.id;
+      }
+      await db.update(aiConversations).set({ spaceId }).where(eq(aiConversations.id, convo.id));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error moving AI conversation:", error);
+      res.status(500).json({ message: "Error moving conversation" });
     }
   });
 

@@ -287,6 +287,15 @@ async function runAiConversationMigrations() {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_conversations_user_updated_idx ON ai_conversations(user_id, updated_at)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_messages_conversation_idx ON ai_messages(conversation_id, created_at)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_spaces (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+        name text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS space_id varchar`);
   } catch (err) {
     console.error("AI conversation migration error (non-fatal):", err);
   }

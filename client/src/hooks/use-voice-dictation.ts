@@ -124,7 +124,9 @@ export function useVoiceDictation({ onTranscript, onFinal, onError }: VoiceDicta
       const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
       const form = new FormData();
       form.append("audio", blob, `dictation.${ext}`);
-      form.append("context", "A spoken question or instruction for the CRM's AI assistant");
+      // No cleanup context on purpose: raw Whisper output is the most faithful
+      // transcript of a command ("create a work order for...") — the GPT
+      // cleanup pass can reword it and adds latency and a failure mode.
       const res = await fetch("/api/voice/transcribe-with-context", {
         method: "POST",
         credentials: "include",

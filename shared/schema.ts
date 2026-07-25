@@ -4584,9 +4584,19 @@ export type SignatureField = typeof signatureFields.$inferSelect;
 // overlay share these). Messages also record any AI-proposed action and what
 // the user did with it, so every AI-created task/work order has a traceable
 // "who asked for what, who approved it" trail.
+// Spaces group conversations (like ChatGPT projects — named "spaces" because
+// "projects" already means CRM projects in GHQ).
+export const aiSpaces = pgTable("ai_spaces", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const aiConversations = pgTable("ai_conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  spaceId: varchar("space_id"), // nullable — conversation can live outside any space
   title: text("title"), // first question, trimmed for the history list
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
