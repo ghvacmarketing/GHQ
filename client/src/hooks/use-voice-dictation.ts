@@ -5,11 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *  1. Web Speech API — live interim transcript, no server round-trip. Used
  *     wherever it actually works (desktop Chrome/Edge, Android Chrome).
  *  2. MediaRecorder + server Whisper (`/api/voice/transcribe-with-context`) —
- *     records audio and transcribes on stop. This is the ONLY path that works
- *     in an iOS home-screen PWA: Safari defines webkitSpeechRecognition there
- *     but the OS refuses to service it in standalone mode, so we force the
- *     recorder up front on iOS standalone and also fall back at runtime if a
- *     recognizer reports "service-not-allowed".
+ *     records audio and transcribes on stop. Forced on ALL iOS devices: the
+ *     home-screen PWA defines webkitSpeechRecognition but the OS refuses to
+ *     service it, and Safari proper delivers cumulative/duplicated results.
+ *     Everywhere else it's the runtime fallback when a recognizer reports
+ *     "service-not-allowed".
  *
  *  Either way the session is push-to-talk: start() opens the mic, stop()
  *  finalizes and delivers the text via onFinal. The speech engine's habit of
@@ -40,14 +40,13 @@ const canRecord =
 const isIOS =
   typeof navigator !== "undefined" &&
   (/iP(hone|ad|od)/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)); // iPadOS masquerades as Mac
 
-const isStandalone =
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(display-mode: standalone)").matches ||
-    (navigator as any).standalone === true);
-
-const preferRecorder = canRecord && (!SpeechRecognitionImpl || (isIOS && isStandalone));
+// iOS gets the recorder engine unconditionally: home-screen PWAs define
+// webkitSpeechRecognition but the OS refuses to service it, and even in
+// Safari proper the recognizer delivers cumulative/duplicated garbage.
+// Whisper transcription is strictly more reliable there.
+const preferRecorder = canRecord && (!SpeechRecognitionImpl || isIOS);
 
 /** Merge a newly delivered recognition chunk into accumulated text.
  *
@@ -131,7 +130,14 @@ export function useVoiceDictation({ onTranscript, onFinal, onError }: VoiceDicta
         credentials: "include",
         body: form,
       });
-      if (!res.ok) throw new Error(`Transcription failed (${res.status})`);
+      if (!res.ok) {
+        let msg = `Couldn't transcribe that recording (${res.status}) — try again in a moment.`;
+        try {
+          const err = await res.json();
+          if (err?.message) msg = err.message;
+        } catch {}
+        throw new Error(msg);
+      }
       const data = await res.json();
       const text = (data?.summary || "").trim();
       if (!text || text === "NO_AUDIO_DETECTED") {
@@ -140,8 +146,8 @@ export function useVoiceDictation({ onTranscript, onFinal, onError }: VoiceDicta
       } else {
         cbRef.current.onFinal(text);
       }
-    } catch {
-      cbRef.current.onError?.("Couldn't transcribe that recording — try again in a moment.");
+    } catch (e: any) {
+      cbRef.current.onError?.(e?.message || "Couldn't transcribe that recording — try again in a moment.");
       cbRef.current.onFinal("");
     } finally {
       setProcessing(false);
@@ -154,8 +160,10 @@ export function useVoiceDictation({ onTranscript, onFinal, onError }: VoiceDicta
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
-      // iOS Safari records audio/mp4 (AAC); Chrome records audio/webm.
-      const mimeType = ["audio/webm", "audio/mp4"].find(
+      // Prefer audio/mp4 (AAC): it's iOS's native recording format, and some
+      // Safari versions claim webm support but emit unreadable files. Chrome
+      // doesn't support mp4 recording and falls through to webm.
+      const mimeType = ["audio/mp4", "audio/webm"].find(
         (t) => typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(t),
       );
       const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);

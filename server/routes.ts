@@ -2876,6 +2876,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) {
         return res.status(400).json({ message: "No audio file provided" });
       }
+      const { hasVoiceTranscriptionKey } = await import("./services/voice");
+      if (!hasVoiceTranscriptionKey()) {
+        return res.status(503).json({
+          message: "Voice transcription isn't configured — add OPENAI_API_KEY in the Render environment and redeploy.",
+        });
+      }
 
       const context = req.body.context || '';
       const result = await voiceService.transcribeWithContext(
@@ -2885,9 +2891,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing voice recording:', error);
-      res.status(500).json({ message: "Error processing voice recording" });
+      res.status(500).json({ message: error?.message || "Error processing voice recording" });
     }
   });
 

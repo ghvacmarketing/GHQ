@@ -4,7 +4,23 @@ import path from "path";
 import { randomUUID } from "crypto";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "sk-not-configured" });
+// Same key fallback chain as the other AI services (crmHelpAI/ghqSearchAI) —
+// transcription must not break just because only one of the two env names is set.
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "sk-not-configured",
+});
+
+export const hasVoiceTranscriptionKey = () =>
+  !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY);
+
+/** Turn an OpenAI SDK failure into a message the user can actually act on. */
+function describeTranscriptionError(error: any): string {
+  const status = error?.status ?? error?.response?.status;
+  if (status === 401) return "OpenAI rejected the API key — voice transcription needs a valid OPENAI_API_KEY in Render.";
+  if (status === 429) return "OpenAI quota exceeded — add credits to the OpenAI account to restore voice transcription.";
+  const detail = error?.error?.message || error?.message;
+  return `Voice transcription failed${detail ? `: ${detail}` : ""}`;
+}
 
 export class VoiceService {
   async transcribeWithContext(audioBuffer: Buffer, filename: string, context?: string): Promise<{ summary: string }> {
@@ -27,33 +43,40 @@ export class VoiceService {
 
       const transcribedText = transcription.text.trim();
 
-      // Check if transcription is meaningful (at least 10 characters and contains actual words)
-      if (!transcribedText || transcribedText.length < 10) {
+      // Whisper heard nothing usable (short assistant commands are fine)
+      if (!transcribedText || transcribedText.length < 2) {
         return {
           summary: "NO_AUDIO_DETECTED"
         };
       }
 
-      // If context is provided, use it to better format the response
+      // If context is provided, use it to better format the response.
+      // Cleanup is best-effort — a chat-model failure must not lose a good
+      // transcription, so fall back to the raw text.
       if (context) {
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content: `You are helping format spoken input for a specific field. The user is speaking to fill in: "${context}". Your job is to clean up their speech, fix grammar, and format it appropriately for that field. Keep it concise and natural. Just return the cleaned-up text without any extra commentary.`
-            },
-            {
-              role: "user",
-              content: transcribedText
-            },
-          ],
-          max_tokens: 200,
-          temperature: 0.3,
-        });
+        try {
+          const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              {
+                role: "system",
+                content: `You are helping format spoken input for a specific field. The user is speaking to fill in: "${context}". Your job is to clean up their speech, fix grammar, and format it appropriately for that field. Keep it concise and natural. Just return the cleaned-up text without any extra commentary.`
+              },
+              {
+                role: "user",
+                content: transcribedText
+              },
+            ],
+            max_tokens: 200,
+            temperature: 0.3,
+          });
 
-        const formatted = response.choices[0]?.message?.content?.trim() || transcribedText;
-        return { summary: formatted };
+          const formatted = response.choices[0]?.message?.content?.trim() || transcribedText;
+          return { summary: formatted };
+        } catch (cleanupError) {
+          console.error('Voice cleanup failed, returning raw transcription:', cleanupError);
+          return { summary: transcribedText };
+        }
       }
 
       // Return raw transcription if no context
@@ -61,7 +84,7 @@ export class VoiceService {
 
     } catch (error) {
       console.error('Error processing voice recording:', error);
-      throw new Error('Failed to process voice recording');
+      throw new Error(describeTranscriptionError(error));
     } finally {
       // Clean up temp file
       if (fs.existsSync(tempFilePath)) {
