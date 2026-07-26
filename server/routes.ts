@@ -9459,14 +9459,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           if (!force) {
+            const jobWarning = openJobs > 0
+              ? ` WARNING: their ${openJobs} open work order${openJobs === 1 ? "" : "s"} will be unassigned and moved to the Unassigned Queue — nothing is deleted, but the jobs lose their technician.`
+              : "";
             return res.status(409).json({
               requiresOverride: true,
               alwaysOnByRole,
               openJobs,
               message: alwaysOnByRole
-                ? `${target.name} is a ${target.role} (always on the board)${openJobs > 0 ? ` and has ${openJobs} open job${openJobs === 1 ? "" : "s"}` : ""}. Remove anyway?`
-                : `${target.name} has ${openJobs} open scheduled job${openJobs === 1 ? "" : "s"}. Removing them hides their column but keeps the jobs assigned. Remove anyway?`,
+                ? `${target.name} is a ${target.role} (always on the board).${jobWarning} Remove anyway?`
+                : `${target.name} has ${openJobs} open scheduled job${openJobs === 1 ? "" : "s"}.${jobWarning} Remove anyway?`,
             });
+          }
+          // Forced removal: never leave a removed person's jobs invisible on
+          // the board — unassign the open ones so they land back in the
+          // Unassigned Queue where dispatch can see and re-place them.
+          if (openJobs > 0) {
+            await db.update(crmWorkOrders)
+              .set({ assignedTechId: null, status: "scheduled" })
+              .where(and(
+                eq(crmWorkOrders.assignedTechId, target.id),
+                inArray(crmWorkOrders.status, ["scheduled", "dispatched", "en_route", "on_site"]),
+              ));
           }
         }
       }
@@ -13692,6 +13706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerId: customerFiles.customerId,
           name: customerFiles.name,
           url: customerFiles.url,
+          thumbUrl: customerFiles.thumbUrl,
           objectPath: customerFiles.objectPath,
           contentType: customerFiles.contentType,
           size: customerFiles.size,
@@ -13714,10 +13729,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/photos/feed - live company-wide photo feed (admin monitoring)
   app.get("/api/crm/photos/feed", requireCrmAuth, requireCrmAdmin, async (req, res) => {
     try {
+      // Paged: the CompanyCam import brought thousands of references and
+      // loading them all at once made the Media page crawl. The client pulls
+      // pages of ~120 and offers Load more.
+      const limitNum = Math.min(300, parseInt(String(req.query.limit || "120"), 10) || 120);
+      const offsetNum = Math.max(0, parseInt(String(req.query.offset || "0"), 10) || 0);
       const rows = await db.select({
         id: customerFiles.id,
         name: customerFiles.name,
         url: customerFiles.url,
+        thumbUrl: customerFiles.thumbUrl,
         contentType: customerFiles.contentType,
         createdAt: customerFiles.createdAt,
         customerId: customerFiles.customerId,
@@ -13728,9 +13749,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
         // All file types — the Media page filters photos vs documents client-side.
-        // 5000 cap: the CompanyCam import brought thousands of references.
         .orderBy(desc(customerFiles.createdAt))
-        .limit(5000);
+        .limit(limitNum)
+        .offset(offsetNum);
       res.json(rows);
     } catch (error) {
       console.error("Error fetching photo feed:", error);
@@ -13746,6 +13767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: customerFiles.id,
         name: customerFiles.name,
         url: customerFiles.url,
+        thumbUrl: customerFiles.thumbUrl,
         createdAt: customerFiles.createdAt,
         customerId: customerFiles.customerId,
         customerName: crmCustomers.name,

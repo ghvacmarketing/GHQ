@@ -3980,6 +3980,9 @@ export const customerFiles = pgTable("customer_files", {
   customerId: varchar("customer_id").notNull(),
   name: text("name").notNull(),
   url: text("url").notNull(),
+  // Small variant for grids/strips (CompanyCam web-size, ~400px). Full-size
+  // stays in url for lightboxes/downloads. Null = use url.
+  thumbUrl: text("thumb_url"),
   objectPath: text("object_path"),
   contentType: text("content_type"),
   size: integer("size"),

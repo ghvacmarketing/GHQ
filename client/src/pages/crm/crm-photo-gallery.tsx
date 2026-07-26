@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
 import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, ChevronLeft, ChevronRight, Loader2, Filter, Upload, Search, FileText } from "lucide-react";
@@ -30,6 +30,7 @@ type FeedPhoto = {
   id: string;
   name: string;
   url: string;
+  thumbUrl?: string | null;
   contentType: string | null;
   createdAt: string | null;
   customerId: string | null;
@@ -162,11 +163,28 @@ export default function CrmPhotoGallery() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: photos, isLoading: isLoadingRaw } = useQuery<FeedPhoto[]>({
+  // Paged feed — thousands of CompanyCam references made the all-at-once load
+  // crawl. Pages of 120 with Load more; refresh runs on a calmer cadence.
+  const PAGE_SIZE = 120;
+  const {
+    data: feedPages,
+    isLoading: isLoadingRaw,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["/api/crm/photos/feed"],
-    refetchInterval: 10 * 1000, // near real-time monitoring
+    queryFn: async ({ pageParam }) => {
+      const res = await fetch(`/api/crm/photos/feed?limit=${PAGE_SIZE}&offset=${pageParam}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load the media feed");
+      return res.json() as Promise<FeedPhoto[]>;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (last, all) => (last.length === PAGE_SIZE ? all.reduce((n, p) => n + p.length, 0) : undefined),
+    refetchInterval: 60 * 1000,
     enabled: !!currentUser,
   });
+  const photos = useMemo(() => (feedPages?.pages ?? []).flat(), [feedPages]);
   const isLoading = useSmoothLoading(isLoadingRaw);
 
   // Filter options derived from the loaded feed
@@ -593,7 +611,7 @@ export default function CrmPhotoGallery() {
                   className="shrink-0 overflow-hidden rounded-lg"
                 >
                   {isImageFile(p) ? (
-                    <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
+                    <img src={p.thumbUrl || p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
                   ) : (
                     <span className="flex h-14 w-14 items-center justify-center bg-slate-100">
                       <FileText className="h-6 w-6 text-slate-400" />
@@ -639,6 +657,7 @@ export default function CrmPhotoGallery() {
               <div
                 key={p.id}
                 className={`group relative overflow-hidden rounded-lg border bg-card shadow-sm ${selected.has(p.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
+                style={{ contentVisibility: "auto", containIntrinsicSize: "280px" } as React.CSSProperties}
                 data-testid={`feed-photo-${p.id}`}
               >
                 <button
@@ -647,7 +666,7 @@ export default function CrmPhotoGallery() {
                 >
                   {isImageFile(p) ? (
                     <img
-                      src={p.url}
+                      src={p.thumbUrl || p.url}
                       alt={p.name}
                       loading="lazy"
                       className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
@@ -696,6 +715,25 @@ export default function CrmPhotoGallery() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Load more — the feed comes down in pages so the page stays smooth */}
+        {hasNextPage && !isLoading && (
+          <div className="flex justify-center pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              data-testid="media-load-more"
+            >
+              {isFetchingNextPage ? (
+                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Loading…</>
+              ) : (
+                <>Load more</>
+              )}
+            </Button>
           </div>
         )}
       </div>

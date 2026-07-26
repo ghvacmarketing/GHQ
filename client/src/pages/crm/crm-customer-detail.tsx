@@ -712,6 +712,7 @@ interface CustomerFileData {
   customerId: string;
   name: string;
   url: string;
+  thumbUrl?: string | null;
   objectPath?: string | null;
   contentType?: string | null;
   size?: number | null;
@@ -992,6 +993,7 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
                       <div
                         key={file.id}
                         className={`group relative overflow-hidden rounded-lg border bg-card shadow-sm ${selected.has(file.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
+                        style={{ contentVisibility: "auto", containIntrinsicSize: "280px" } as React.CSSProperties}
                         data-testid={`customer-photo-${file.id}`}
                       >
                         <button
@@ -999,7 +1001,7 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
                           className="block w-full overflow-hidden"
                         >
                           <img
-                            src={file.url}
+                            src={file.thumbUrl || file.url}
                             alt={file.name}
                             loading="lazy"
                             className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"

@@ -84,7 +84,7 @@ export default function MobilePhotos() {
   // Recent company-wide photos for the horizontal gallery strip. Tapping one
   // jumps to the customer it's attached to.
   type FeedPhoto = {
-    id: string; url: string; name: string; createdAt: string | null;
+    id: string; url: string; thumbUrl?: string | null; name: string; createdAt: string | null;
     customerId: string | null; customerName: string | null; uploadedByName: string | null;
   };
   const { data: recentPhotos = [] } = useQuery<FeedPhoto[]>({
@@ -591,7 +591,7 @@ export default function MobilePhotos() {
                   className="w-56 shrink-0 snap-start overflow-hidden rounded-lg border border-slate-100 bg-white text-left shadow-sm transition-transform active:scale-[0.98]"
                   data-testid={`recent-customer-${c.id}`}
                 >
-                  <img src={c.latest.url} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                  <img src={c.latest.thumbUrl || c.latest.url} alt="" loading="lazy" className="h-28 w-full object-cover" />
                   <div className="px-3.5 py-2.5">
                     <p className="truncate text-[14px] font-semibold text-slate-900">{c.name}</p>
                     <p className="mt-0.5 truncate text-[11px] text-slate-500">
@@ -619,7 +619,7 @@ export default function MobilePhotos() {
                   data-testid={`recent-photo-${rp.id}`}
                 >
                   <img
-                    src={rp.url}
+                    src={rp.thumbUrl || rp.url}
                     alt={rp.name}
                     loading="lazy"
                     className="aspect-square w-32 rounded-lg border border-slate-100 object-cover shadow-sm"
@@ -668,7 +668,7 @@ export default function MobilePhotos() {
                     data-testid={`photo-${p.id}`}
                   >
                     <img
-                      src={p.url}
+                      src={p.thumbUrl || p.url}
                       alt={p.name}
                       loading="lazy"
                       draggable={false}

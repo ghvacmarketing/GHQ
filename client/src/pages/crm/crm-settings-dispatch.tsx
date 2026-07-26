@@ -50,6 +50,8 @@ export default function CrmSettingsDispatch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-board/members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/technicians"] });
+      // Forced removal unassigns the person's open jobs into the queue
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       setOverride(null);
     },
     onError: (err: any, vars) => {

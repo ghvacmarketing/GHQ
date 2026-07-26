@@ -431,6 +431,7 @@ async function runDocsAndAccountingMigrations() {
         created_at timestamp DEFAULT now()
       )
     `);
+    await db.execute(sql`ALTER TABLE customer_files ADD COLUMN IF NOT EXISTS thumb_url text`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS companycam_pushed_photos (
         cc_photo_id varchar PRIMARY KEY,

@@ -336,7 +336,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
   const photos = await fetchProjectPhotos(ccProjectId);
 
   const existing = await db
-    .select({ id: customerFiles.id, objectPath: customerFiles.objectPath, uploadedBy: customerFiles.uploadedBy })
+    .select({ id: customerFiles.id, objectPath: customerFiles.objectPath, uploadedBy: customerFiles.uploadedBy, thumbUrl: customerFiles.thumbUrl })
     .from(customerFiles)
     .where(like(customerFiles.objectPath, "companycam:%"));
   const have = new Map(existing.map((r) => [r.objectPath, r]));
@@ -349,12 +349,19 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
     if (photo.status && photo.status !== "active") continue;
     const key = `companycam:${photo.id}`;
     if (pushedIds.has(photo.id)) continue;
+    const webUri = photo.uris.find((u) => u.type === "web")?.uri || null;
     const existingRow = have.get(key);
     if (existingRow) {
-      // Backfill the uploader on rows that predate creator matching
+      // Backfill uploader attribution and grid thumbnails on rows that
+      // predate those features (one combined update when needed).
+      const patch: Record<string, unknown> = {};
       if (!existingRow.uploadedBy) {
         const userId = await matchCreatorToUser(photo.creator_id, photo.creator_name);
-        if (userId) await db.update(customerFiles).set({ uploadedBy: userId }).where(eq(customerFiles.id, existingRow.id));
+        if (userId) patch.uploadedBy = userId;
+      }
+      if (!existingRow.thumbUrl && webUri) patch.thumbUrl = webUri;
+      if (Object.keys(patch).length > 0) {
+        await db.update(customerFiles).set(patch).where(eq(customerFiles.id, existingRow.id));
       }
       continue;
     }
@@ -365,6 +372,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
       customerId,
       name: `CompanyCam ${projectName}${capturedAt ? ` ${new Date(capturedAt * 1000).toISOString().slice(0, 10)}` : ""}.jpg`,
       url: original.uri,
+      thumbUrl: webUri,
       objectPath: key,
       contentType: "image/jpeg",
       size: null,
