@@ -87,15 +87,15 @@ export default function PortalInvoices() {
         </div>
 
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900" data-testid="text-page-title">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
             Your Invoices
           </h1>
           <p className="text-slate-500 mt-1">View and track your invoice history</p>
         </div>
 
-        <Card className="shadow-sm" data-testid="card-invoices">
+        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-invoices">
           <CardHeader>
-            <CardTitle className="text-lg font-medium flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#711419]" />
               Invoice History
             </CardTitle>
@@ -114,7 +114,7 @@ export default function PortalInvoices() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table className="[&_td]:py-4 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-400">
+                <Table className="[&_td]:py-4 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Invoice #</TableHead>
@@ -163,7 +163,7 @@ export default function PortalInvoices() {
                                 variant={payable ? "default" : "ghost"}
                                 size="sm"
                                 className={payable
-                                  ? "text-white bg-[#711419] hover:bg-[#5a1014]"
+                                  ? "text-white bg-[#711419] hover:bg-[#8a1a1f]"
                                   : "text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"}
                                 data-testid={`button-invoice-action-${invoice.id}`}
                               >

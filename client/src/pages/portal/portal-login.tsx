@@ -243,13 +243,13 @@ export default function PortalLogin() {
   const alerts = (
     <>
       {error && (
-        <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700" data-testid="text-error">
+        <div className="flex items-start gap-2 rounded-[4px] bg-red-50 border border-red-200 p-3 text-sm text-red-700" data-testid="text-error">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {info && !error && (
-        <div className="flex items-start gap-2 rounded-md bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700" data-testid="text-info">
+        <div className="flex items-start gap-2 rounded-[4px] bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700" data-testid="text-info">
           <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{info}</span>
         </div>
@@ -269,6 +269,7 @@ export default function PortalLogin() {
           minLength={8}
           required
           placeholder="At least 8 characters"
+          className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
           data-testid="input-new-password"
         />
       </div>
@@ -281,6 +282,7 @@ export default function PortalLogin() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           minLength={8}
           required
+          className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
           data-testid="input-confirm-password"
         />
       </div>
@@ -316,6 +318,7 @@ export default function PortalLogin() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
+              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
               data-testid="input-identifier"
             />
           </div>
@@ -328,6 +331,7 @@ export default function PortalLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
               data-testid="input-password"
             />
           </div>
@@ -372,6 +376,7 @@ export default function PortalLogin() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
+              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
               data-testid="input-signup-phone"
             />
           </div>
@@ -400,6 +405,7 @@ export default function PortalLogin() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               required
+              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
               data-testid="input-signup-code"
             />
           </div>
@@ -430,7 +436,7 @@ export default function PortalLogin() {
                 key={c.customerId}
                 type="button"
                 onClick={() => { setSelectedCustomerId(c.customerId); switchView("signup-password"); }}
-                className="w-full flex items-start gap-3 rounded-lg border border-slate-200 hover:border-[#711419] hover:bg-red-50/40 p-3 text-left transition-colors"
+                className="w-full flex items-start gap-3 rounded-[4px] border border-slate-300/70 hover:border-[#711419] hover:bg-[#711419]/[0.04] p-3 text-left transition-colors"
                 data-testid={`button-candidate-${c.customerId}`}
               >
                 <Home className="h-4 w-4 mt-0.5 shrink-0 text-slate-400" />
@@ -478,6 +484,7 @@ export default function PortalLogin() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
+              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
               data-testid="input-forgot-phone"
             />
           </div>
@@ -509,6 +516,7 @@ export default function PortalLogin() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               required
+              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
               data-testid="input-forgot-code"
             />
           </div>
@@ -547,9 +555,9 @@ export default function PortalLogin() {
   return (
     <PortalLayout showLogout={false}>
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Card className="w-full max-w-md shadow-lg" data-testid="card-login">
+        <Card className="w-full max-w-md rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-login">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold" style={{ color: BRAND }} data-testid="text-login-title">
+            <CardTitle className="text-2xl font-semibold" style={{ color: BRAND }} data-testid="text-login-title">
               {title}
             </CardTitle>
             {description && <CardDescription data-testid="text-login-description">{description}</CardDescription>}

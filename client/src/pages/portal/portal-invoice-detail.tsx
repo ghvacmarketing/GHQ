@@ -155,8 +155,8 @@ export default function PortalInvoiceDetail() {
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-8 px-4">
         <div className="max-w-2xl mx-auto space-y-6">
           <Skeleton className="h-24 w-48 mx-auto" />
-          <Skeleton className="h-64 w-full rounded-lg" />
-          <Skeleton className="h-48 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-[4px]" />
+          <Skeleton className="h-48 w-full rounded-[4px]" />
         </div>
       </div>
     );
@@ -166,7 +166,7 @@ export default function PortalInvoiceDetail() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-8 px-4">
         <div className="max-w-2xl mx-auto">
-          <Card className="shadow-lg border-0">
+          <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none">
             <CardContent className="p-8 text-center">
               <FileText className="h-16 w-16 text-slate-300 mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-slate-900 mb-2">Invoice Not Found</h2>
@@ -190,14 +190,14 @@ export default function PortalInvoiceDetail() {
         </div>
 
         {isPaymentSuccess && (
-          <Card className="shadow-lg border-0 border-l-4 border-l-green-500 bg-green-50">
+          <Card className="rounded-[4px] shadow-none border-0 border-l-4 border-l-green-500 bg-green-50">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 rounded-full">
+                <div className="p-3 bg-green-100 rounded-[3px]">
                   <CheckCircle2 className="h-8 w-8 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-green-800" data-testid="text-payment-success">
+                  <h2 className="text-xl font-semibold text-green-800" data-testid="text-payment-success">
                     Payment Successful!
                   </h2>
                   <p className="text-green-700">
@@ -210,14 +210,14 @@ export default function PortalInvoiceDetail() {
         )}
 
         {!isPaymentSuccess && invoice.status === "paid" && (
-          <Card className="shadow-lg border-0 border-l-4 border-l-green-500 bg-green-50">
+          <Card className="rounded-[4px] shadow-none border-0 border-l-4 border-l-green-500 bg-green-50">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 rounded-full">
+                <div className="p-3 bg-green-100 rounded-[3px]">
                   <CheckCircle2 className="h-8 w-8 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-green-800" data-testid="text-already-paid">
+                  <h2 className="text-xl font-semibold text-green-800" data-testid="text-already-paid">
                     Invoice Already Paid
                   </h2>
                   <p className="text-green-700">
@@ -229,7 +229,7 @@ export default function PortalInvoiceDetail() {
           </Card>
         )}
 
-        <Card className="shadow-lg border-0" data-testid="card-invoice">
+        <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-invoice">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -249,7 +249,7 @@ export default function PortalInvoiceDetail() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+            <div className="bg-slate-50 rounded-[4px] border border-slate-200 p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <div className="text-slate-400 mt-0.5">
                   <User className="h-4 w-4" />
@@ -381,7 +381,7 @@ export default function PortalInvoiceDetail() {
             {invoice.status !== "paid" && invoice.status !== "void" && parseFloat(invoice.balanceDue || "0") > 0 && !isPaymentSuccess && (
               <div className="mt-6">
                 {paymentError && (
-                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-[4px] text-red-700 text-sm">
                     {paymentError}
                   </div>
                 )}

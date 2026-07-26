@@ -93,7 +93,7 @@ export default function PortalServiceHistory() {
         </div>
 
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900" data-testid="text-page-title">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
             Service History
           </h1>
           <p className="text-slate-500 mt-1">View your past and upcoming service visits</p>
@@ -106,7 +106,7 @@ export default function PortalServiceHistory() {
             <Skeleton className="h-32 w-full" />
           </div>
         ) : workOrders.length === 0 ? (
-          <Card className="shadow-sm" data-testid="status-no-history">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="status-no-history">
             <CardContent className="py-12 text-center">
               <Wrench className="h-12 w-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">No service history found</p>
@@ -119,15 +119,15 @@ export default function PortalServiceHistory() {
               const status = statusConfig[wo.status] || statusConfig.scheduled;
               const isCompleted = wo.status === "completed";
               return (
-                <Card key={wo.id} className="shadow-sm hover:shadow-md transition-shadow" data-testid={`card-work-order-${wo.id}`}>
+                <Card key={wo.id} className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid={`card-work-order-${wo.id}`}>
                   <CardContent className="py-4">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${isCompleted ? "bg-green-100" : "bg-blue-100"}`}>
+                        <div className={`p-2 rounded-[3px] ${isCompleted ? "bg-green-100" : "bg-[#711419]/[0.08]"}`}>
                           {isCompleted ? (
                             <CheckCircle className="h-5 w-5 text-green-600" />
                           ) : (
-                            <Wrench className="h-5 w-5 text-blue-600" />
+                            <Wrench className="h-5 w-5 text-[#711419]" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -135,7 +135,7 @@ export default function PortalServiceHistory() {
                             {wo.title}
                           </h3>
                           <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-slate-500">
-                            <Badge variant="secondary" className="text-xs" data-testid={`badge-wo-type-${wo.id}`}>
+                            <Badge variant="secondary" className="rounded-[3px] text-[10px] font-semibold uppercase tracking-wide" data-testid={`badge-wo-type-${wo.id}`}>
                               {visitTypeLabels[wo.visitType] || wo.visitType}
                             </Badge>
                             {wo.orderNumber && (

@@ -128,7 +128,7 @@ export default function PortalAgreements() {
         </div>
 
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900" data-testid="text-page-title">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
             Your Maintenance Agreements
           </h1>
           <p className="text-slate-500 mt-1">View your active service agreements and coverage</p>
@@ -140,7 +140,7 @@ export default function PortalAgreements() {
             <Skeleton className="h-48 w-full" />
           </div>
         ) : agreements.length === 0 ? (
-          <Card className="shadow-sm" data-testid="status-no-agreements">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="status-no-agreements">
             <CardContent className="py-12 text-center">
               <ClipboardCheck className="h-12 w-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">No maintenance agreements found</p>
@@ -157,11 +157,11 @@ export default function PortalAgreements() {
                 : 0;
               
               return (
-                <Card key={agreement.id} className="shadow-sm hover:shadow-md transition-shadow" data-testid={`card-agreement-${agreement.id}`}>
+                <Card key={agreement.id} className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid={`card-agreement-${agreement.id}`}>
                   <CardHeader className="pb-2">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
+                        <div className="p-2 bg-green-100 rounded-[3px]">
                           <ClipboardCheck className="h-5 w-5 text-green-600" />
                         </div>
                         <div>
@@ -181,27 +181,27 @@ export default function PortalAgreements() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-slate-500 mb-1">Billing</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Billing</p>
                         <p className="font-medium flex items-center gap-1" data-testid={`text-agreement-price-${agreement.id}`}>
                           <RefreshCw className="h-3 w-3" />
                           {formatCurrency(agreement.price)}/{formatFrequency(agreement.frequency).toLowerCase()}
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500 mb-1">Visits Included</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Visits Included</p>
                         <p className="font-medium" data-testid={`text-agreement-visits-${agreement.id}`}>
                           {agreement.visitsPerPeriod} per {formatFrequency(agreement.frequency).toLowerCase()}
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500 mb-1">Coverage Period</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Coverage Period</p>
                         <p className="font-medium flex items-center gap-1" data-testid={`text-agreement-period-${agreement.id}`}>
                           <Calendar className="h-3 w-3" />
                           {formatDate(agreement.startDate)} - {formatDate(agreement.endDate)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500 mb-1">Next Service</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Next Service</p>
                         <p className="font-medium" data-testid={`text-agreement-next-service-${agreement.id}`}>
                           {agreement.nextServiceDate ? formatDate(agreement.nextServiceDate) : "Not scheduled"}
                         </p>
@@ -244,13 +244,13 @@ export default function PortalAgreements() {
                           </Button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="pt-2">
-                          <div className="space-y-2 bg-slate-50 rounded-lg p-3">
+                          <div className="space-y-2 bg-slate-50 rounded-[4px] border border-slate-200 p-3">
                             {agreement.visits.map((visit) => {
                               const visitStatus = visitStatusConfig[visit.status] || visitStatusConfig.pending;
                               return (
                                 <div 
                                   key={visit.id} 
-                                  className="flex items-center justify-between bg-white p-3 rounded-md border border-slate-100"
+                                  className="flex items-center justify-between bg-white p-3 rounded-[4px] border border-slate-200"
                                   data-testid={`visit-row-${visit.id}`}
                                 >
                                   <div className="flex items-center gap-3">

@@ -53,7 +53,7 @@ export default function PortalSensors() {
           </Button>
           <div className="flex items-center gap-2">
             <Droplets className="h-5 w-5 text-[#711419]" />
-            <h1 className="text-2xl font-bold text-slate-900">Environment Monitoring</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Environment Monitoring</h1>
           </div>
         </div>
         <p className="text-sm text-slate-500">
@@ -66,7 +66,7 @@ export default function PortalSensors() {
             <Skeleton className="h-40" />
           </div>
         ) : sensors.length === 0 ? (
-          <Card>
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none">
             <CardContent className="p-8 text-center text-sm text-slate-500">
               No sensors are set up for your property yet. Contact us if you'd like remote humidity
               monitoring installed.
@@ -77,7 +77,7 @@ export default function PortalSensors() {
             <div key={g.title}>
               <div className="flex items-center gap-2 mb-2">
                 <Building2 className="h-4 w-4 text-slate-400" />
-                <h2 className="text-sm font-semibold text-slate-700">{g.title}</h2>
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{g.title}</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {g.sensors.map((s) => (

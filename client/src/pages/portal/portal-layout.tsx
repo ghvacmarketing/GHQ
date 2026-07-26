@@ -23,7 +23,7 @@ export function PortalLayout({ children, showLogout = true }: PortalLayoutProps)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#faf9f7]" data-testid="portal-layout">
-      <header className="bg-[#711419] text-white shadow-md">
+      <header className="bg-[#711419] text-white shadow-none">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/portal/dashboard">
             <img 

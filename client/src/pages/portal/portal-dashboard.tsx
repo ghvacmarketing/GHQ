@@ -172,7 +172,7 @@ export default function PortalDashboard() {
     <PortalLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900" data-testid="text-welcome">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-welcome">
             Welcome, {customer.name}
           </h1>
           <p className="text-slate-500 mt-1">View your account information and history</p>
@@ -180,11 +180,11 @@ export default function PortalDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link href="/portal/invoices">
-          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-open-invoices">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-open-invoices">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-slate-500">Open Invoices</CardTitle>
-                <div className="p-2 bg-amber-100 rounded-lg">
+                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Open Invoices</CardTitle>
+                <div className="p-2 bg-amber-100 rounded-[3px]">
                   <DollarSign className="h-5 w-5 text-amber-600" />
                 </div>
               </div>
@@ -207,11 +207,11 @@ export default function PortalDashboard() {
           </Link>
 
           <Link href="/portal/agreements">
-          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-agreements">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-agreements">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-slate-500">Maintenance Agreements</CardTitle>
-                <div className="p-2 bg-green-100 rounded-lg">
+                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Maintenance Agreements</CardTitle>
+                <div className="p-2 bg-green-100 rounded-[3px]">
                   <ClipboardCheck className="h-5 w-5 text-green-600" />
                 </div>
               </div>
@@ -234,12 +234,12 @@ export default function PortalDashboard() {
           </Link>
 
           <Link href="/portal/quotes">
-          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-quotes">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-quotes">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-slate-500">Pending Quotes</CardTitle>
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Receipt className="h-5 w-5 text-purple-600" />
+                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pending Quotes</CardTitle>
+                <div className="p-2 bg-[#711419]/[0.08] rounded-[3px]">
+                  <Receipt className="h-5 w-5 text-[#711419]" />
                 </div>
               </div>
             </CardHeader>
@@ -261,12 +261,12 @@ export default function PortalDashboard() {
           </Link>
 
           <Link href="/portal/service-history">
-          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-recent-service">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-recent-service">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-slate-500">Recent Service</CardTitle>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Wrench className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Recent Service</CardTitle>
+                <div className="p-2 bg-[#711419]/[0.08] rounded-[3px]">
+                  <Wrench className="h-5 w-5 text-[#711419]" />
                 </div>
               </div>
             </CardHeader>
@@ -292,7 +292,7 @@ export default function PortalDashboard() {
 
         {/* Upcoming appointments + request service */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="shadow-sm" data-testid="card-upcoming-appointments">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-upcoming-appointments">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <CalendarDays className="h-5 w-5 text-[#711419]" />
@@ -314,11 +314,11 @@ export default function PortalDashboard() {
                   {appointments?.workOrders?.map((wo) => (
                     <li
                       key={wo.id}
-                      className="flex items-start gap-3 rounded-lg border border-slate-200 p-3"
+                      className="flex items-start gap-3 rounded-[4px] border border-slate-300/70 p-3"
                       data-testid={`appointment-${wo.id}`}
                     >
-                      <div className="p-2 bg-blue-100 rounded-lg shrink-0">
-                        <Truck className="h-4 w-4 text-blue-600" />
+                      <div className="p-2 bg-[#711419]/[0.08] rounded-[3px] shrink-0">
+                        <Truck className="h-4 w-4 text-[#711419]" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-900 truncate">
@@ -336,10 +336,10 @@ export default function PortalDashboard() {
                   {appointments?.maintenanceVisits?.map((v) => (
                     <li
                       key={v.id}
-                      className="flex items-start gap-3 rounded-lg border border-slate-200 p-3"
+                      className="flex items-start gap-3 rounded-[4px] border border-slate-300/70 p-3"
                       data-testid={`visit-${v.id}`}
                     >
-                      <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                      <div className="p-2 bg-green-100 rounded-[3px] shrink-0">
                         <ClipboardCheck className="h-4 w-4 text-green-600" />
                       </div>
                       <div className="min-w-0">
@@ -361,7 +361,7 @@ export default function PortalDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm" data-testid="card-request-service">
+          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-request-service">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <CalendarPlus className="h-5 w-5 text-[#711419]" />
@@ -380,7 +380,7 @@ export default function PortalDashboard() {
               </a>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-slate-400">or request a callback</span></div>
+                <div className="relative flex justify-center text-[11px] font-semibold uppercase tracking-wider"><span className="bg-white px-2 text-slate-500">or request a callback</span></div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="service-request">What's going on?</Label>
@@ -390,6 +390,7 @@ export default function PortalDashboard() {
                   placeholder="e.g. AC isn't cooling upstairs..."
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}
+                  className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                   data-testid="input-service-request"
                 />
               </div>
@@ -400,6 +401,7 @@ export default function PortalDashboard() {
                   placeholder="e.g. weekday mornings"
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
+                  className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                   data-testid="input-preferred-time"
                 />
               </div>
@@ -417,12 +419,12 @@ export default function PortalDashboard() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-800">Quick Links</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Quick Links</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Link href="/portal/invoices">
               <Button
                 variant="outline"
-                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
                 data-testid="button-view-invoices"
               >
                 <span className="flex items-center gap-2">
@@ -435,7 +437,7 @@ export default function PortalDashboard() {
             <Link href="/portal/quotes">
               <Button
                 variant="outline"
-                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
                 data-testid="button-view-quotes"
               >
                 <span className="flex items-center gap-2">
@@ -448,7 +450,7 @@ export default function PortalDashboard() {
             <Link href="/portal/agreements">
               <Button
                 variant="outline"
-                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
                 data-testid="button-view-agreements"
               >
                 <span className="flex items-center gap-2">
@@ -461,7 +463,7 @@ export default function PortalDashboard() {
             <Link href="/portal/service-history">
               <Button
                 variant="outline"
-                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
                 data-testid="button-view-service-history"
               >
                 <span className="flex items-center gap-2">
@@ -474,7 +476,7 @@ export default function PortalDashboard() {
             <Link href="/portal/sensors">
               <Button
                 variant="outline"
-                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
                 data-testid="button-view-sensors"
               >
                 <span className="flex items-center gap-2">

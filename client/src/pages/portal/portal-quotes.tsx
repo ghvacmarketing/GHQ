@@ -87,15 +87,15 @@ export default function PortalQuotes() {
         </div>
 
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900" data-testid="text-page-title">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
             Your Quotes
           </h1>
           <p className="text-slate-500 mt-1">View and manage your quote history</p>
         </div>
 
-        <Card className="shadow-sm" data-testid="card-quotes">
+        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-quotes">
           <CardHeader>
-            <CardTitle className="text-lg font-medium flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <Receipt className="h-5 w-5 text-[#711419]" />
               Quote History
             </CardTitle>
@@ -114,7 +114,7 @@ export default function PortalQuotes() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table className="[&_td]:py-4 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-400">
+                <Table className="[&_td]:py-4 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Quote #</TableHead>

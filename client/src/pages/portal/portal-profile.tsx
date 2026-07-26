@@ -176,14 +176,14 @@ export default function PortalProfile() {
     <PortalLayout>
       <div className="space-y-6 max-w-2xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800" data-testid="text-profile-title">My Profile</h1>
+          <h1 className="text-2xl font-semibold text-slate-900" data-testid="text-profile-title">My Profile</h1>
           <p className="text-slate-500 text-sm mt-1">
             Manage your contact information and login details.
           </p>
         </div>
 
         {/* Contact info */}
-        <Card data-testid="card-contact-info">
+        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-contact-info">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <User className="h-5 w-5" style={{ color: BRAND }} /> Contact Information
@@ -199,6 +199,7 @@ export default function PortalProfile() {
                 id="profile-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                 data-testid="input-profile-name"
               />
             </div>
@@ -209,6 +210,7 @@ export default function PortalProfile() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                 data-testid="input-profile-email"
               />
             </div>
@@ -225,7 +227,7 @@ export default function PortalProfile() {
         </Card>
 
         {/* Phone number */}
-        <Card data-testid="card-phone">
+        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-phone">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Phone className="h-5 w-5" style={{ color: BRAND }} /> Phone Number
@@ -252,6 +254,7 @@ export default function PortalProfile() {
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
                 disabled={phoneCodeSent}
+                className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                 data-testid="input-new-phone"
               />
             </div>
@@ -265,6 +268,7 @@ export default function PortalProfile() {
                   placeholder="123456"
                   value={phoneCode}
                   onChange={(e) => setPhoneCode(e.target.value)}
+                  className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                   data-testid="input-phone-code"
                 />
               </div>
@@ -305,7 +309,7 @@ export default function PortalProfile() {
         </Card>
 
         {/* Password */}
-        <Card data-testid="card-password">
+        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-password">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <KeyRound className="h-5 w-5" style={{ color: BRAND }} />
@@ -327,6 +331,7 @@ export default function PortalProfile() {
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                   data-testid="input-current-password"
                 />
               </div>
@@ -340,6 +345,7 @@ export default function PortalProfile() {
                 placeholder="At least 8 characters"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                 data-testid="input-profile-new-password"
               />
             </div>
@@ -351,6 +357,7 @@ export default function PortalProfile() {
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                 data-testid="input-profile-confirm-password"
               />
             </div>
@@ -367,7 +374,7 @@ export default function PortalProfile() {
         </Card>
 
         {/* Addresses */}
-        <Card data-testid="card-addresses">
+        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-addresses">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <MapPin className="h-5 w-5" style={{ color: BRAND }} /> Service Addresses
@@ -379,12 +386,12 @@ export default function PortalProfile() {
           <CardContent className="space-y-4">
             <ul className="space-y-2">
               {profile.customer.fullAddress && (
-                <li className="text-sm text-slate-700 rounded-md bg-slate-50 border border-slate-200 p-3" data-testid="text-primary-address">
+                <li className="text-sm text-slate-700 rounded-[4px] bg-slate-50 border border-slate-200 p-3" data-testid="text-primary-address">
                   {profile.customer.fullAddress}
                 </li>
               )}
               {profile.properties.map((p) => (
-                <li key={p.id} className="text-sm text-slate-700 rounded-md bg-slate-50 border border-slate-200 p-3" data-testid={`text-property-${p.id}`}>
+                <li key={p.id} className="text-sm text-slate-700 rounded-[4px] bg-slate-50 border border-slate-200 p-3" data-testid={`text-property-${p.id}`}>
                   {[p.address1, p.address2, `${p.city}, ${p.state} ${p.zip}`].filter(Boolean).join(", ")}
                 </li>
               ))}
@@ -400,6 +407,7 @@ export default function PortalProfile() {
                 value={addressMessage}
                 onChange={(e) => setAddressMessage(e.target.value)}
                 rows={3}
+                className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                 data-testid="input-address-message"
               />
             </div>
