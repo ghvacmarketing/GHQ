@@ -9,6 +9,7 @@ import {
   type AiConversationSummary,
   type AiProposedAction,
   type AiSpace,
+  actionLineItems,
   applyActionEdits,
   compressImageForAi,
   createAiSpace,
@@ -801,12 +802,29 @@ export default function AiAssistantModal() {
                                       )}
                                     </p>
                                   ))
-                                : Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId").map(([k, v]) => (
+                                : Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId" && k !== "lineItems").map(([k, v]) => (
                                     <p key={k} className="text-xs text-slate-500">
                                       <span className="font-semibold capitalize text-slate-600">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
                                       {String(v)}
                                     </p>
                                   ))}
+                              {(() => {
+                                const li = actionLineItems(msg.proposedAction.params);
+                                return li && (
+                                  <div className="mt-1.5 overflow-hidden rounded-md border border-slate-200">
+                                    {li.rows.map((r, n) => (
+                                      <p key={n} className="flex justify-between gap-2 border-b border-slate-100 px-2 py-1 text-xs text-slate-600 last:border-0">
+                                        <span className="min-w-0 truncate">{r.quantity} × {r.description}</span>
+                                        <span className="shrink-0 tabular-nums">${r.lineTotal.toFixed(2)}</span>
+                                      </p>
+                                    ))}
+                                    <p className="flex justify-between gap-2 bg-[#711419]/[0.06] px-2 py-1 text-xs font-bold text-[#711419]">
+                                      <span>Total</span>
+                                      <span className="tabular-nums">${li.total.toFixed(2)}</span>
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                             </div>}
                             {editing?.index === i && msg.proposedAction && (
                               <div className="mt-2 space-y-2">

@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
-import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmQuotes, crmUsers, tasks, docFiles, docFolders } from "@shared/schema";
+import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, tasks, docFiles, docFolders } from "@shared/schema";
 import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -363,7 +363,7 @@ import { CRM_FUNCTIONALITY_KNOWLEDGE } from "./crm-knowledge";
 // /api/crm/ai/execute-action, which re-validates against a strict whitelist
 // and runs under the approving user's session with an audit log.
 export interface ProposedAction {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -401,7 +401,7 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order"] },
+            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice"] },
             summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
             params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
           },
@@ -418,6 +418,11 @@ const CRM_TOOLS: ClaudeTool[] = [
     name: "customer_profile",
     description: "Full live profile for one customer by (partial) name: contact info, agreements, recent invoices with balances, recent work orders, recent quotes. Use for ANY question about a specific customer.",
     input_schema: { type: "object", properties: { name: { type: "string", description: "Customer name or part of it" } }, required: ["name"] },
+  },
+  {
+    name: "price_items",
+    description: "Search the CRM items/price catalog by name or description. Returns real prices. ALWAYS use this to price quote/invoice line items the user didn't give an exact amount for — never invent a price.",
+    input_schema: { type: "object", properties: { search: { type: "string", description: "Item/service name or keyword, e.g. 'capacitor', 'maintenance visit'" } }, required: ["search"] },
   },
   {
     name: "list_work_orders",
@@ -536,6 +541,18 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
       recentWorkOrders: workOrders,
       recentQuotes: quotes,
     });
+  }
+
+  if (name === "price_items") {
+    const q = String(input?.search || "").trim();
+    if (!q) return "No search term given.";
+    const items = await db
+      .select({ name: crmItems.name, description: crmItems.description, category: crmItems.category, rate: crmItems.rate, unit: crmItems.unit })
+      .from(crmItems)
+      .where(and(eq(crmItems.isActive, true), or(ilike(crmItems.name, `%${q}%`), ilike(crmItems.description, `%${q}%`))))
+      .limit(10);
+    if (items.length === 0) return `No catalog items matching "${q}". Ask the user for the price instead of inventing one.`;
+    return JSON.stringify(items);
   }
 
   if (name === "list_work_orders") {
@@ -779,13 +796,15 @@ Action types and their params:
 6. update_customer — edits an existing customer's details. ALWAYS look the customer up with customer_profile FIRST, then build the proposal so the approval card shows the full before-and-after. params: { "customerName": string (required), "changes": object with ONLY the fields to change — any of { "name", "phone", "email", "fullAddress", "customerType" ("residential"|"commercial"), "leadSource", "notes" } — and "current": object with the customer's CURRENT values for those same detail fields from your lookup (name, phone, email, fullAddress, customerType, leadSource — include them all so the card shows the complete record being edited). Never put a field in changes unless the user asked for it to change. }
 7. delete_customer — PERMANENTLY deletes a customer. Only propose when the user explicitly says to delete/remove them — never infer it. The server refuses if the customer has any work orders, quotes, or invoices (say so if your lookup shows they do). params: { "customerName": string (required) }
 8. delete_work_order — deletes one work order (the server refuses if an invoice or quote is linked to it, and asks the user to pick when the customer has several). Only propose on an explicit delete/cancel-and-remove request. params: { "customerName": string (required), "workOrderTitle": string (optional — the job's title if the user gave it or your lookup shows it), "workOrderId": string (optional — ONLY if a lookup returned the exact id) }
+9. create_quote — creates a DRAFT quote (nothing is sent to the customer, no signature requested). GUIDE THE USER — a quote is only as good as its line items: (a) confirm who it's for; (b) price every line item honestly — when the user names a service or part WITHOUT a price, look it up with the price_items tool and use the catalog rate; NEVER invent a price — if the catalog has no match and the user didn't say an amount, ASK before proposing; (c) state the total in your answer. params: { "customerName": string (required), "title": string (optional — short summary like "3-ton heat pump replacement"), "lineItems": array of 1-15 { "description": string, "quantity": number, "unitPrice": number (dollars) } (required), "notes": string (optional — internal notes) }
+10. create_invoice — creates a DRAFT invoice (not sent, no payment collected). Invoices MUST be tied to one of the customer's work orders — figure out which visit is being billed (ask, or use their most recent completed job when the user says so; the server offers a pick list when it's ambiguous). Same pricing discipline as quotes: catalog rates via price_items or the user's amounts, never invented. params: { "customerName": string (required), "workOrderTitle": string (optional — which visit to bill), "workOrderId": string (optional — exact id only from a lookup), "lineItems": array of 1-15 { "description": string, "quantity": number, "unitPrice": number (dollars) } (required), "notes": string (optional) }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -808,7 +827,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -838,7 +857,7 @@ Return JSON with:
         await claudeChatWithTools({
           system:
             systemPrompt +
-            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats, company_docs). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up. BUT be efficient: use the fewest lookups that answer the question, and for action proposals (create/send) ONE customer lookup is usually all you need — once you have enough, stop looking and answer. If a lookup fails twice, answer with what you have and say what you couldn't verify.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
+            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, price_items, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats, company_docs). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up. BUT be efficient: use the fewest lookups that answer the question, and for action proposals (create/send) ONE customer lookup is usually all you need — once you have enough, stop looking and answer. If a lookup fails twice, answer with what you have and say what you couldn't verify.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
           messages: [...priorTurns, userTurn],
           tools: [...CRM_TOOLS, PROPOSE_ACTIONS_TOOL],
           executeTool: async (name, input) =>
@@ -971,7 +990,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&

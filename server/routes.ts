@@ -2771,6 +2771,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             workOrderTitle: z.string().trim().max(200).optional(),
           }).strict(),
         }),
+        z.object({
+          type: z.literal("create_quote"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            title: z.string().trim().max(200).optional(),
+            notes: z.string().trim().max(2000).optional(),
+            lineItems: z.array(z.object({
+              description: z.string().trim().min(1).max(300),
+              quantity: z.number().positive().max(999),
+              unitPrice: z.number().min(0).max(1000000),
+            }).strict()).min(1).max(15),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("create_invoice"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            workOrderId: z.string().trim().min(1).max(64).optional(),
+            workOrderTitle: z.string().trim().max(200).optional(),
+            notes: z.string().trim().max(2000).optional(),
+            lineItems: z.array(z.object({
+              description: z.string().trim().min(1).max(300),
+              quantity: z.number().positive().max(999),
+              unitPrice: z.number().min(0).max(1000000),
+            }).strict()).min(1).max(15),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -3045,6 +3074,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const woLabel = `Work order "${target.title || "untitled"}" deleted`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "work_order", id: target.id, label: woLabel, url: "/crm/dispatch" });
         return res.status(201).json({ ok: true, entity: "work_order", id: target.id, label: woLabel, url: "/crm/dispatch" });
+      }
+
+      // create_quote — DRAFT only: nothing goes to the customer until someone
+      // opens it in Quotes and sends it themselves.
+      if (action.type === "create_quote") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const qCustomer = resolved.customer;
+        const subtotal = action.params.lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
+        const quoteNumber = await generateQuoteNumber();
+        const [newQuote] = await db.insert(crmQuotes).values({
+          quoteNumber,
+          customerId: qCustomer.id,
+          customerName: qCustomer.name,
+          customerEmail: qCustomer.email,
+          customerPhone: qCustomer.phone,
+          title: action.params.title || null,
+          scope: "standalone" as any,
+          status: "draft" as any,
+          subtotal: subtotal.toFixed(2),
+          total: subtotal.toFixed(2),
+          internalNotes: action.params.notes || null,
+          createdById: user.id,
+        }).returning();
+        for (let idx = 0; idx < action.params.lineItems.length; idx++) {
+          const li = action.params.lineItems[idx];
+          await db.insert(crmQuoteLineItems).values({
+            quoteId: newQuote.id,
+            lineType: "service",
+            description: li.description,
+            quantity: String(li.quantity),
+            unitPrice: li.unitPrice.toFixed(2),
+            lineTotal: (li.quantity * li.unitPrice).toFixed(2),
+            sortOrder: idx,
+          });
+        }
+        await logCrmAudit(user.id, "ai_action.create_quote", "crm_quote", newQuote.id, { quoteNumber, customerId: qCustomer.id, total: subtotal.toFixed(2) }, req.ip);
+        const quoteLabel = `Draft quote ${quoteNumber} for ${qCustomer.name} — $${subtotal.toFixed(2)}`;
+        const quoteUrl = `/crm/quotes/${newQuote.id}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "quote", id: newQuote.id, label: quoteLabel, url: quoteUrl });
+        return res.status(201).json({ ok: true, entity: "quote", id: newQuote.id, label: quoteLabel, url: quoteUrl });
+      }
+
+      // create_invoice — DRAFT only, and always tied to one of the customer's
+      // work orders (same rule as manual invoices). Ambiguous visit → pick
+      // list, exactly like the delete flow.
+      if (action.type === "create_invoice") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const iCustomer = resolved.customer;
+        const orders = await storage.getWorkOrdersByCustomerId(iCustomer.id);
+        if (orders.length === 0) {
+          return res.status(422).json({ message: `${iCustomer.name} has no work orders — invoices must be tied to a visit. Create the work order first.` });
+        }
+        let targetWo = action.params.workOrderId ? orders.find((w) => w.id === action.params.workOrderId) : undefined;
+        if (!targetWo && action.params.workOrderTitle) {
+          const t = action.params.workOrderTitle.toLowerCase();
+          const matches = orders.filter((w) => (w.title || "").toLowerCase().includes(t) || t.includes((w.title || "").toLowerCase()));
+          if (matches.length === 1) targetWo = matches[0];
+        }
+        if (!targetWo && orders.length === 1) targetWo = orders[0];
+        if (!targetWo) {
+          const describe = (w: (typeof orders)[number]) => {
+            const when = w.scheduledStart
+              ? ` — ${new Date(w.scheduledStart).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}`
+              : "";
+            return `${w.title || "Work order"}${when} (${w.status})`;
+          };
+          return res.status(422).json({
+            message: `Which of ${iCustomer.name}'s visits is this invoice for?`,
+            candidateParam: "workOrderId",
+            candidates: orders.slice(0, 6).map((w) => ({ id: w.id, name: describe(w) })),
+          });
+        }
+        const invSubtotal = action.params.lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
+        const invoiceNumber = await generateInvoiceNumber();
+        const [newInvoice] = await db.insert(crmInvoices).values({
+          invoiceNumber,
+          customerId: iCustomer.id,
+          workOrderId: targetWo.id,
+          status: "draft" as any,
+          subtotal: invSubtotal.toFixed(2),
+          total: invSubtotal.toFixed(2),
+          balanceDue: invSubtotal.toFixed(2),
+          notes: action.params.notes || null,
+          createdBy: user.id,
+        }).returning();
+        for (let idx = 0; idx < action.params.lineItems.length; idx++) {
+          const li = action.params.lineItems[idx];
+          await db.insert(crmInvoiceLineItems).values({
+            invoiceId: newInvoice.id,
+            lineType: "service",
+            description: li.description,
+            quantity: String(li.quantity),
+            unitPrice: li.unitPrice.toFixed(2),
+            lineTotal: (li.quantity * li.unitPrice).toFixed(2),
+            sortOrder: idx,
+          });
+        }
+        await logCrmAudit(user.id, "ai_action.create_invoice", "crm_invoice", newInvoice.id, { invoiceNumber, customerId: iCustomer.id, workOrderId: targetWo.id, total: invSubtotal.toFixed(2) }, req.ip);
+        const invoiceLabel = `Draft invoice ${invoiceNumber} for ${iCustomer.name} — $${invSubtotal.toFixed(2)}`;
+        const invoiceUrl = `/crm/invoices/${newInvoice.id}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "invoice", id: newInvoice.id, label: invoiceLabel, url: invoiceUrl });
+        return res.status(201).json({ ok: true, entity: "invoice", id: newInvoice.id, label: invoiceLabel, url: invoiceUrl });
       }
 
       // create_work_order — resolve the customer via the shared helper.

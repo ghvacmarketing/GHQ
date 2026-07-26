@@ -9,6 +9,7 @@ import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import {
   AI_ACTION_LABELS,
+  actionLineItems,
   type AiChatMessage as ChatMessage,
   type AiConversationSummary,
   type AiSpace,
@@ -832,12 +833,29 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                                   )}
                                 </p>
                               ))
-                            : Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId").map(([k, v]) => (
+                            : Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId" && k !== "lineItems").map(([k, v]) => (
                                 <p key={k} className="text-xs text-slate-400">
                                   <span className="font-semibold capitalize text-slate-300">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
                                   {String(v)}
                                 </p>
                               ))}
+                          {(() => {
+                            const li = actionLineItems(msg.proposedAction.params);
+                            return li && (
+                              <div className="mt-1.5 overflow-hidden rounded-[3px] border border-slate-700/70">
+                                {li.rows.map((r, n) => (
+                                  <p key={n} className="flex justify-between gap-2 border-b border-slate-800 px-2 py-1 text-xs text-slate-300 last:border-0">
+                                    <span className="min-w-0 truncate">{r.quantity} × {r.description}</span>
+                                    <span className="shrink-0 tabular-nums">${r.lineTotal.toFixed(2)}</span>
+                                  </p>
+                                ))}
+                                <p className="flex justify-between gap-2 bg-[#711419]/20 px-2 py-1 text-xs font-bold text-[#e8b4b8]">
+                                  <span>Total</span>
+                                  <span className="tabular-nums">${li.total.toFixed(2)}</span>
+                                </p>
+                              </div>
+                            );
+                          })()}
                         </div>}
                         {editing?.index === i && msg.proposedAction && (
                           <div className="mt-2 space-y-2">

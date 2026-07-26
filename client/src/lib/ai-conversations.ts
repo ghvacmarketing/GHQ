@@ -3,7 +3,7 @@
 // conversation started on one surface resumes on the other.
 
 export type AiProposedAction = {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -18,7 +18,24 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   update_customer: "Update customer",
   delete_customer: "Delete customer — permanent",
   delete_work_order: "Delete work order — permanent",
+  create_quote: "New quote — draft",
+  create_invoice: "New invoice — draft",
 };
+
+/** Normalized line items for quote/invoice approval cards, with the total the
+ *  approval would create. Null when the action has no line items. */
+export function actionLineItems(params: Record<string, unknown>): { rows: { description: string; quantity: number; unitPrice: number; lineTotal: number }[]; total: number } | null {
+  if (!Array.isArray(params.lineItems)) return null;
+  const rows = (params.lineItems as unknown[])
+    .filter((li): li is Record<string, unknown> => !!li && typeof li === "object")
+    .map((li) => {
+      const quantity = Number(li.quantity) || 0;
+      const unitPrice = Number(li.unitPrice) || 0;
+      return { description: String(li.description ?? ""), quantity, unitPrice, lineTotal: quantity * unitPrice };
+    });
+  if (rows.length === 0) return null;
+  return { rows, total: rows.reduce((s, r) => s + r.lineTotal, 0) };
+}
 
 /** Field rows for an update_customer approval card: the FULL record with the
  *  edited fields shown as before → after, so the user sees exactly what Gibbs
