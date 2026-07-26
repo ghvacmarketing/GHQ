@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import MobileShell from "./mobile-shell";
 import {
-  Camera, ChevronRight, Clock, ClipboardList, MessageSquare, Monitor,
+  Camera, CheckSquare, ChevronRight, Clock, ClipboardList, MessageSquare, Monitor,
   Sparkles, UserRound, Users, Wrench,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
@@ -48,6 +48,7 @@ export default function MobileMore() {
       items: [
         { label: "My Jobs", sub: "Today, upcoming, and history", icon: Wrench, onTap: (n) => n("/mobile/job"), testid: "more-jobs" },
         { label: "Photos", sub: "Job-site shots and required photos", icon: Camera, onTap: (n) => n("/mobile/photos"), testid: "more-photos" },
+        { label: "My Tasks", sub: "Your personal to-do list from the CRM", icon: CheckSquare, onTap: (n) => n("/mobile/tasks"), testid: "more-tasks" },
         { label: "Time & Timesheet", sub: "Clock in and review your hours", icon: Clock, onTap: (n) => n("/mobile/time"), testid: "more-time" },
         { label: "Agenda", sub: "Your day at a glance", icon: ClipboardList, onTap: (n) => n("/mobile"), testid: "more-agenda" },
       ],

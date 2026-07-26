@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   ClipboardList, Wrench, Clock, ShieldX, Plus,
-  FileText, Receipt, Camera, LayoutGrid, Briefcase,
+  FileText, Receipt, Camera, LayoutGrid, Briefcase, Sparkles, CheckSquare,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
@@ -224,9 +224,12 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
         </button>
       )}
 
-      {/* Create sheet — things you can MAKE from anywhere */}
+      {/* Create sheet — things you can MAKE from anywhere (+ Gibbs, the
+          quick-access exception) */}
       <DraggableSheet open={createOpen} onOpenChange={setCreateOpen} title="Create" testid="sheet-create">
           <div className="grid grid-cols-4 gap-3">
+            <SheetTile icon={Sparkles} label="Ask Gibbs" onClick={openAssistant} testid="create-ask-gibbs" />
+            <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks?new=1")} testid="create-new-task" />
             <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/photos")} testid="create-add-photo" />
             {isSupervisor && (
               <>
