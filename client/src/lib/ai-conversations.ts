@@ -3,7 +3,7 @@
 // conversation started on one surface resumes on the other.
 
 export type AiProposedAction = {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -16,6 +16,8 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   send_email: "Email",
   create_customer: "New customer",
   update_customer: "Update customer",
+  delete_customer: "Delete customer — permanent",
+  delete_work_order: "Delete work order — permanent",
 };
 
 /** Field rows for an update_customer approval card: the FULL record with the

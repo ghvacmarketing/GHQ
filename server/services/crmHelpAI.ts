@@ -363,7 +363,7 @@ import { CRM_FUNCTIONALITY_KNOWLEDGE } from "./crm-knowledge";
 // /api/crm/ai/execute-action, which re-validates against a strict whitelist
 // and runs under the approving user's session with an audit log.
 export interface ProposedAction {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -401,7 +401,7 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer"] },
+            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order"] },
             summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
             params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
           },
@@ -777,13 +777,15 @@ Action types and their params:
 4. send_email — emails someone from the approving user's connected Gmail. Recipient — set EXACTLY ONE: pass "customerName" when the user names a customer (the CRM looks up the email on their file; it errors if none is on file), OR pass "toEmail" when the user gives a literal email address (use it verbatim, never invent one). params: { "customerName": string (optional — the customer whose on-file email to use), "customerEmail": string (optional but strongly preferred with customerName — the customer's email from your customer_profile lookup, so the approval card shows exactly where the email goes), "toEmail": string (optional — an actual email address the user provided), "subject": string (required), "body": string (required — the COMPLETE plain-text email body, ready to send: professional and warm, proper greeting and sign-off as Giesbrecht HVAC, no markdown, no placeholders unless a detail is genuinely unknown) }
 5. create_customer — adds a new customer to the CRM. Before proposing, check for the same name in LIVE DATA (customer_profile) — if they already exist, say so instead of proposing a duplicate. Include every detail the user gave. params: { "name": string (required — the customer's full name), "phone": string (optional), "email": string (optional), "fullAddress": string (optional — street, city, state ZIP on one line), "customerType": "residential" | "commercial" (optional, default residential), "leadSource": string (optional — where they came from if mentioned, e.g. Google, referral, door hanger), "notes": string (optional — anything else worth keeping, e.g. "has an old gas furnace, interested in a heat pump") }
 6. update_customer — edits an existing customer's details. ALWAYS look the customer up with customer_profile FIRST, then build the proposal so the approval card shows the full before-and-after. params: { "customerName": string (required), "changes": object with ONLY the fields to change — any of { "name", "phone", "email", "fullAddress", "customerType" ("residential"|"commercial"), "leadSource", "notes" } — and "current": object with the customer's CURRENT values for those same detail fields from your lookup (name, phone, email, fullAddress, customerType, leadSource — include them all so the card shows the complete record being edited). Never put a field in changes unless the user asked for it to change. }
+7. delete_customer — PERMANENTLY deletes a customer. Only propose when the user explicitly says to delete/remove them — never infer it. The server refuses if the customer has any work orders, quotes, or invoices (say so if your lookup shows they do). params: { "customerName": string (required) }
+8. delete_work_order — deletes one work order (the server refuses if an invoice or quote is linked to it, and asks the user to pick when the customer has several). Only propose on an explicit delete/cancel-and-remove request. params: { "customerName": string (required), "workOrderTitle": string (optional — the job's title if the user gave it or your lookup shows it), "workOrderId": string (optional — ONLY if a lookup returned the exact id) }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -806,7 +808,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -969,7 +971,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&

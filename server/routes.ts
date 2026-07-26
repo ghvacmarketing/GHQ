@@ -2755,6 +2755,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             current: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
           }).strict(),
         }),
+        z.object({
+          type: z.literal("delete_customer"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("delete_work_order"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            workOrderId: z.string().trim().min(1).max(64).optional(),
+            workOrderTitle: z.string().trim().max(200).optional(),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -2960,6 +2976,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedUrl = `/crm/customers/${row.id}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "customer", id: row.id, label: `${updatedName} updated`, url: updatedUrl });
         return res.status(201).json({ ok: true, entity: "customer", id: row.id, label: `Customer ${updatedName} updated`, url: updatedUrl });
+      }
+
+      // delete_customer — hard delete, but ONLY when nothing hangs off the
+      // record. Anything linked (jobs, quotes, invoices) blocks it: business
+      // history never disappears through Gibbs.
+      if (action.type === "delete_customer") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const target = resolved.customer;
+        const counts = await db.execute(sql`SELECT
+          (SELECT count(*) FROM crm_work_orders WHERE customer_id = ${target.id}) AS wo,
+          (SELECT count(*) FROM crm_quotes WHERE customer_id = ${target.id} OR account_id = ${target.id}) AS q,
+          (SELECT count(*) FROM crm_invoices WHERE customer_id = ${target.id}) AS inv`);
+        const row: any = counts.rows?.[0] || {};
+        const wo = Number(row.wo || 0), q = Number(row.q || 0), inv = Number(row.inv || 0);
+        if (wo + q + inv > 0) {
+          return res.status(422).json({
+            message: `${target.name} has linked records (${wo} work order${wo !== 1 ? "s" : ""}, ${q} quote${q !== 1 ? "s" : ""}, ${inv} invoice${inv !== 1 ? "s" : ""}) — that history can't be deleted through Gibbs. Handle it from their customer page.`,
+          });
+        }
+        await db.delete(crmCustomers).where(eq(crmCustomers.id, target.id));
+        await logCrmAudit(user.id, "ai_action.delete_customer", "customer", target.id, { name: target.name }, req.ip);
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "customer", id: target.id, label: `${target.name} deleted`, url: "/crm/customers" });
+        return res.status(201).json({ ok: true, entity: "customer", id: target.id, label: `Customer ${target.name} deleted`, url: "/crm/customers" });
+      }
+
+      // delete_work_order — resolves the exact visit (asking the user to pick
+      // when it's ambiguous) and mirrors the manual delete's guardrails.
+      if (action.type === "delete_work_order") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const woCustomer = resolved.customer;
+        const orders = await storage.getWorkOrdersByCustomerId(woCustomer.id);
+        if (orders.length === 0) {
+          return res.status(422).json({ message: `${woCustomer.name} has no work orders on file.` });
+        }
+        let target = action.params.workOrderId ? orders.find((w) => w.id === action.params.workOrderId) : undefined;
+        if (!target && action.params.workOrderTitle) {
+          const t = action.params.workOrderTitle.toLowerCase();
+          const matches = orders.filter((w) => (w.title || "").toLowerCase().includes(t) || t.includes((w.title || "").toLowerCase()));
+          if (matches.length === 1) target = matches[0];
+        }
+        if (!target && orders.length === 1) target = orders[0];
+        if (!target) {
+          const describe = (w: (typeof orders)[number]) => {
+            const when = w.scheduledStart
+              ? ` — ${new Date(w.scheduledStart).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}`
+              : "";
+            return `${w.title || "Work order"}${when} (${w.status})`;
+          };
+          return res.status(422).json({
+            message: `Which of ${woCustomer.name}'s work orders should be deleted?`,
+            candidateParam: "workOrderId",
+            candidates: orders.slice(0, 6).map((w) => ({ id: w.id, name: describe(w) })),
+          });
+        }
+        const [linkedInvoice] = await db.select({ id: crmInvoices.id }).from(crmInvoices).where(eq(crmInvoices.workOrderId, target.id)).limit(1);
+        if (linkedInvoice) {
+          return res.status(422).json({ message: "That work order has a linked invoice — delete the invoice first." });
+        }
+        const [linkedQuote] = await db.select({ id: crmQuotes.id }).from(crmQuotes).where(eq(crmQuotes.workOrderId, target.id)).limit(1);
+        if (linkedQuote) {
+          return res.status(422).json({ message: "That work order has a linked quote — delete the quote first." });
+        }
+        await storage.deleteWorkOrder(target.id);
+        await logCrmAudit(user.id, "ai_action.delete_work_order", "work_order", target.id, { customerId: woCustomer.id, title: target.title }, req.ip);
+        const woLabel = `Work order "${target.title || "untitled"}" deleted`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "work_order", id: target.id, label: woLabel, url: "/crm/dispatch" });
+        return res.status(201).json({ ok: true, entity: "work_order", id: target.id, label: woLabel, url: "/crm/dispatch" });
       }
 
       // create_work_order — resolve the customer via the shared helper.
