@@ -358,7 +358,9 @@ export default function MobilePhotos() {
 
   return (
     <MobileShell>
-      <div className="p-4 space-y-4">
+      {/* min-height a hair past full so the page is always scrollable — that
+          keeps the elastic pull/bounce alive even when content is short. */}
+      <div className="p-4 space-y-6" style={{ minHeight: "calc(100% + 1px)" }}>
         {/* Collapsed: just a search icon top right. Tapping it expands the
             iOS-style search bar with Cancel; results ease in below. */}
         {!searchActive ? (

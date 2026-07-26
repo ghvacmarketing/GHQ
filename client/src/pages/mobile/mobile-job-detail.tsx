@@ -42,6 +42,7 @@ import {
   MessageSquare,
   Navigation,
   ChevronLeft,
+  ImagePlus,
 } from "lucide-react";
 import { statusDotColor } from "@/components/ui/status-dot";
 import { useForm } from "react-hook-form";
@@ -646,6 +647,131 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
 
+  // Photos captured PER STEP, right on the step: taken with the camera or
+  // added from the library (multiple), uploaded immediately to the customer's
+  // files, and linked to the step inside the submitted answers under
+  // __photos_<stepId> keys.
+  const [stepPhotos, setStepPhotos] = useState<Record<string, Array<{ id: string; url: string; uploading: boolean }>>>({});
+  const captureInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
+  const activeStepRef = useRef<{ id: string; label: string } | null>(null);
+
+  const uploadStepPhoto = async (step: { id: string; label: string }, file: File) => {
+    if (!workOrder.customerId) {
+      toast({ title: "This job has no customer on file", variant: "destructive" });
+      return;
+    }
+    const localId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const localUrl = URL.createObjectURL(file);
+    setStepPhotos((prev) => ({ ...prev, [step.id]: [...(prev[step.id] ?? []), { id: localId, url: localUrl, uploading: true }] }));
+    try {
+      const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+      });
+      const { uploadURL, objectPath } = await presignRes.json();
+      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
+      await apiRequest("POST", `/api/crm/customers/${workOrder.customerId}/files`, {
+        name: `WO${workOrder.workOrderNumber ?? ""} - ${step.label}.jpg`,
+        url: fileUrl,
+        objectPath,
+        contentType: file.type || "image/jpeg",
+        size: file.size,
+      });
+      setStepPhotos((prev) => ({
+        ...prev,
+        [step.id]: (prev[step.id] ?? []).map((p) => (p.id === localId ? { ...p, url: fileUrl, uploading: false } : p)),
+      }));
+    } catch {
+      setStepPhotos((prev) => ({ ...prev, [step.id]: (prev[step.id] ?? []).filter((p) => p.id !== localId) }));
+      toast({ title: "Photo upload failed", description: "Check your signal and try again.", variant: "destructive" });
+    }
+  };
+
+  const onFilesPicked = (files: FileList | null) => {
+    const step = activeStepRef.current;
+    if (!files || !step) return;
+    for (const f of Array.from(files)) uploadStepPhoto(step, f);
+  };
+
+  const removeStepPhoto = (stepId: string, id: string) =>
+    setStepPhotos((prev) => ({ ...prev, [stepId]: (prev[stepId] ?? []).filter((p) => p.id !== id) }));
+
+  const startCapture = (step: { id: string; label: string }, source: "camera" | "library") => {
+    activeStepRef.current = step;
+    (source === "camera" ? captureInputRef : libraryInputRef).current?.click();
+  };
+
+  const allPhotoSteps = template.photoSteps ?? [];
+  const missingRequiredPhotos = allPhotoSteps.filter(
+    (ps) => ps.isRequired !== false && !(stepPhotos[ps.id] ?? []).some((p) => !p.uploading),
+  ).length;
+  const anyUploading = Object.values(stepPhotos).some((arr) => arr.some((p) => p.uploading));
+
+  // A photo step rendered as a live capture block — count, thumbnails with
+  // remove, Take photo (camera) and Add (library, multiple).
+  const renderPhotoStep = (ps: { id: string; label: string; instructions?: string | null; isRequired?: boolean | null }) => {
+    const photos = stepPhotos[ps.id] ?? [];
+    const doneCount = photos.filter((p) => !p.uploading).length;
+    return (
+      <div key={ps.id} className="rounded-[3px] border border-[#711419]/25 bg-[#711419]/5 p-2.5" data-testid={`fill-photo-${ps.id}`}>
+        <div className="flex items-center gap-1.5">
+          <Camera className="h-3.5 w-3.5 shrink-0 text-[#711419]" />
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[#711419]">
+            {ps.label}
+            {ps.isRequired === false && <span className="font-normal text-[#711419]/70"> (optional)</span>}
+          </span>
+          <span className={`shrink-0 text-[10px] font-bold tabular-nums ${doneCount > 0 ? "text-green-600" : "text-[#711419]/60"}`}>
+            {doneCount} added
+          </span>
+        </div>
+        {ps.instructions && <p className="mt-0.5 text-[11px] text-[#711419]/80">{ps.instructions}</p>}
+        {photos.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {photos.map((p) => (
+              <div key={p.id} className="relative h-16 w-16 overflow-hidden rounded-[3px] border border-slate-300/70 bg-white">
+                <img src={p.url} alt="" className="h-full w-full object-cover" />
+                {p.uploading ? (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => removeStepPhoto(ps.id, p.id)}
+                    className="absolute right-0.5 top-0.5 flex items-center justify-center rounded-full bg-black/60 text-white"
+                    style={{ height: 18, width: 18 }}
+                    aria-label="Remove photo"
+                    data-testid={`photo-remove-${p.id}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => startCapture({ id: ps.id, label: ps.label }, "camera")}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-[3px] bg-[#711419] py-2 text-xs font-semibold text-white transition-transform active:scale-[0.98]"
+            data-testid={`photo-take-${ps.id}`}
+          >
+            <Camera className="h-4 w-4" /> Take photo
+          </button>
+          <button
+            onClick={() => startCapture({ id: ps.id, label: ps.label }, "library")}
+            className="flex items-center justify-center gap-1.5 rounded-[3px] border border-[#711419]/40 bg-white px-3 py-2 text-xs font-semibold text-[#711419] transition-transform active:scale-[0.98]"
+            data-testid={`photo-add-${ps.id}`}
+          >
+            <ImagePlus className="h-4 w-4" /> Add
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const answeredCount = template.questions.filter((q) => {
     const a = answers[q.id];
     return a !== undefined && a !== "";
@@ -656,9 +782,15 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
 
   const submit = useMutation({
     mutationFn: async () => {
+      // Photo links ride inside the answers json under __photos_<stepId>
+      const photoLinks = Object.fromEntries(
+        Object.entries(stepPhotos)
+          .filter(([, arr]) => arr.some((p) => !p.uploading))
+          .map(([sid, arr]) => [`__photos_${sid}`, arr.filter((p) => !p.uploading).map((p) => p.url)]),
+      );
       const res = await apiRequest("POST", `/api/crm/work-orders/${workOrder.id}/checklist-response`, {
         checklistId: template.id,
-        answers,
+        answers: { ...answers, ...photoLinks },
       });
       return res.json();
     },
@@ -791,22 +923,8 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                 </p>
                 {q.helpText && <p className="mt-0.5 text-xs text-slate-500">{q.helpText}</p>}
                 {linkedPhotos.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {linkedPhotos.map((ps) => (
-                      <div
-                        key={ps.id}
-                        className="flex items-start gap-1.5 rounded-[3px] border border-[#711419]/25 bg-[#711419]/5 px-2 py-1.5 text-xs font-semibold text-[#711419]"
-                        data-testid={`fill-photo-${ps.id}`}
-                      >
-                        <Camera className="mt-px h-3.5 w-3.5 shrink-0" />
-                        <span>
-                          Photo required{ps.label ? `: ${ps.label}` : ""}
-                          {ps.instructions && (
-                            <span className="block font-normal text-[#711419]/80">{ps.instructions}</span>
-                          )}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="mt-2 space-y-2">
+                    {linkedPhotos.map((ps) => renderPhotoStep(ps))}
                   </div>
                 )}
                 <div className="mt-2.5">
@@ -902,33 +1020,47 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
               <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                 <Camera className="h-4 w-4 text-[#711419]" /> Required photos
               </p>
-              <p className="mt-0.5 text-xs text-slate-500">Take these in the Photos tab as you work.</p>
-              <div className="mt-2 space-y-1.5">
-                {generalPhotos.map((ps) => (
-                  <div key={ps.id} className="flex items-start gap-2 text-sm text-slate-700">
-                    <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#711419]" />
-                    <span>
-                      {ps.label}
-                      {ps.instructions && <span className="block text-xs text-slate-500">{ps.instructions}</span>}
-                    </span>
-                  </div>
-                ))}
+              <p className="mt-0.5 text-xs text-slate-500">Take them right here — they save to the customer as you go.</p>
+              <div className="mt-2 space-y-2">
+                {generalPhotos.map((ps) => renderPhotoStep(ps))}
               </div>
             </div>
           )}
 
           <Button
             onClick={() => submit.mutate()}
-            disabled={submit.isPending || missingRequired > 0}
+            disabled={submit.isPending || missingRequired > 0 || missingRequiredPhotos > 0 || anyUploading}
             className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
             data-testid="button-submit-checklist"
           >
             {submit.isPending
               ? "Submitting..."
-              : missingRequired > 0
-                ? `${missingRequired} required ${missingRequired === 1 ? "answer" : "answers"} left`
-                : "Submit checklist"}
+              : anyUploading
+                ? "Uploading photos..."
+                : missingRequired > 0
+                  ? `${missingRequired} required ${missingRequired === 1 ? "answer" : "answers"} left`
+                  : missingRequiredPhotos > 0
+                    ? `${missingRequiredPhotos} required ${missingRequiredPhotos === 1 ? "photo" : "photos"} left`
+                    : "Submit checklist"}
           </Button>
+
+      {/* Hidden pickers: camera capture (one at a time) + library (multiple) */}
+      <input
+        ref={captureInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => { onFilesPicked(e.target.files); e.target.value = ""; }}
+      />
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => { onFilesPicked(e.target.files); e.target.value = ""; }}
+      />
     </div>
   );
 }
