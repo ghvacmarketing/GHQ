@@ -2635,6 +2635,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   };
 
+  // Split a one-line "street, city, ST zip" into property fields. Falls back
+  // to dumping the whole line into address1 (city/state/zip empty) so a
+  // Gibbs-created customer can always take a work order — the dispatcher can
+  // tidy the property later.
+  const parseAiFullAddress = (raw: string): { address1: string; city: string; state: string; zip: string } => {
+    const trimmed = raw.trim();
+    const parts = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+    const stateZip = /^([A-Za-z]{2})\.?\s+(\d{5}(?:-\d{4})?)$/;
+    if (parts.length >= 3) {
+      const t = parts[parts.length - 1].match(stateZip);
+      if (t) {
+        return { address1: parts.slice(0, -2).join(", "), city: parts[parts.length - 2], state: t[1].toUpperCase(), zip: t[2] };
+      }
+      if (parts.length >= 4 && /^\d{5}(?:-\d{4})?$/.test(parts[parts.length - 1]) && /^[A-Za-z]{2}$/.test(parts[parts.length - 2])) {
+        return { address1: parts.slice(0, -3).join(", "), city: parts[parts.length - 3], state: parts[parts.length - 2].toUpperCase(), zip: parts[parts.length - 1] };
+      }
+    }
+    if (parts.length === 2) {
+      const t = parts[1].match(/^([A-Za-z .'-]*?)\s*([A-Za-z]{2})\.?\s+(\d{5}(?:-\d{4})?)$/);
+      if (t) return { address1: parts[0], city: t[1].trim(), state: t[2].toUpperCase(), zip: t[3] };
+    }
+    const m = trimmed.match(/^(.+?)\s+([A-Za-z .'-]+?)\s+([A-Za-z]{2})\.?\s+(\d{5}(?:-\d{4})?)$/);
+    if (m) return { address1: m[1], city: m[2], state: m[3].toUpperCase(), zip: m[4] };
+    return { address1: trimmed, city: "", state: "", zip: "" };
+  };
+
   // Execute an AI-proposed action AFTER explicit user approval. The model can
   // only propose; nothing runs until a signed-in user clicks Approve, and only
   // these whitelisted action types exist. Everything is re-validated with zod
@@ -2887,6 +2913,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: action.params.notes || null,
           })
           .returning();
+        // A property row rides along with the address — work orders require
+        // one, and "create customer → work order" in one breath must work.
+        if (action.params.fullAddress) {
+          const addr = parseAiFullAddress(action.params.fullAddress);
+          await db.insert(crmProperties).values({
+            customerId: newCustomer.id,
+            address1: addr.address1,
+            address2: null,
+            city: addr.city,
+            state: addr.state,
+            zip: addr.zip,
+            propertyType: (action.params.customerType as any) || "residential",
+          });
+        }
         autoSyncCustomer(newCustomer.id);
         fireAutomationForCustomer("customer.created", newCustomer.id, { type: "customer", id: newCustomer.id });
         await logCrmAudit(user.id, "ai_action.create_customer", "customer", newCustomer.id, { params: action.params }, req.ip);
@@ -2926,9 +2966,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resolvedCustomer = await resolveAiCustomer(action.params);
       if (!resolvedCustomer.ok) return res.status(resolvedCustomer.status).json(resolvedCustomer.body);
       const customer: { id: string; name: string } = resolvedCustomer.customer;
-      const [property] = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customer.id)).limit(1);
+      let [property] = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customer.id)).limit(1);
       if (!property) {
-        return res.status(422).json({ message: `${customer.name} has no property on file — add one on their customer page first.` });
+        // No property yet — if the customer record carries an address (e.g.
+        // just created through Gibbs), spin the property up from it instead
+        // of blocking the work order.
+        const [custRow] = await db
+          .select({ fullAddress: crmCustomers.fullAddress, customerType: crmCustomers.customerType })
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, customer.id));
+        if (custRow?.fullAddress) {
+          const addr = parseAiFullAddress(custRow.fullAddress);
+          [property] = await db.insert(crmProperties).values({
+            customerId: customer.id,
+            address1: addr.address1,
+            address2: null,
+            city: addr.city,
+            state: addr.state,
+            zip: addr.zip,
+            propertyType: (custRow.customerType as any) === "commercial" ? "commercial" : "residential",
+          }).returning();
+        } else {
+          return res.status(422).json({ message: `${customer.name} has no property or address on file — add one on their customer page first.` });
+        }
       }
       // Scheduling: the model emits Eastern wall-clock time ("2026-07-26T10:00",
       // no offset). The server runs in UTC, so a bare new Date() would land the
