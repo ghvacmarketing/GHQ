@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -201,7 +201,7 @@ export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenCha
               <DialogDescription>Who and what is this quote for?</DialogDescription>
             </DialogHeader>
 
-            <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+            <div className="-mx-1 max-h-[60vh] space-y-4 overflow-y-auto px-1">
               {/* Customer */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Customer</Label>
@@ -227,7 +227,7 @@ export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenCha
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
                         placeholder="Search customers by name or phone..."
-                        className="pl-9"
+                        className="pl-9 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
                         data-testid="quote-setup-customer-search"
                       />
                     </div>
@@ -270,7 +270,7 @@ export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenCha
                   <p className="text-xs text-slate-400">No properties on file — you can continue without one.</p>
                 ) : (
                   <Select value={propertyId} onValueChange={setPropertyId}>
-                    <SelectTrigger data-testid="quote-setup-property">
+                    <SelectTrigger className="focus:ring-0 focus:ring-offset-0" data-testid="quote-setup-property">
                       <SelectValue placeholder="Select a property" />
                     </SelectTrigger>
                     <SelectContent>
@@ -294,7 +294,7 @@ export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenCha
                   <p className="text-xs text-slate-400">No work orders or projects for {customer.name} yet.</p>
                 ) : (
                   <Select value={linkValue} onValueChange={setLinkValue}>
-                    <SelectTrigger data-testid="quote-setup-link">
+                    <SelectTrigger className="focus:ring-0 focus:ring-offset-0" data-testid="quote-setup-link">
                       <SelectValue placeholder="Don't link" />
                     </SelectTrigger>
                     <SelectContent>
@@ -333,7 +333,7 @@ export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenCha
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Salesperson</Label>
                 <Select value={assigneeId} onValueChange={setAssigneeId}>
-                  <SelectTrigger data-testid="quote-setup-assignee">
+                  <SelectTrigger className="focus:ring-0 focus:ring-offset-0" data-testid="quote-setup-assignee">
                     <SelectValue placeholder={usersLoading ? "Loading…" : "Assign to…"} />
                   </SelectTrigger>
                   <SelectContent>

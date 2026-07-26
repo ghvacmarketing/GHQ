@@ -200,8 +200,21 @@ export default function AiAssistantModal() {
     });
   }, [open, hydrated]);
 
+  // Team-chat review (owner/admin): browse any team member's Gibbs history
+  // read-only. viewUser null = your own chats, exactly as before.
+  const [viewUser, setViewUser] = useState<{ id: string; name: string } | null>(null);
+  const { data: me } = useQuery<{ id: string; role: string } | null>({
+    queryKey: ["/api/crm/auth/me"],
+    enabled: open,
+  });
+  const canReview = me?.role === "owner" || me?.role === "admin";
+  const { data: teamUsers = [] } = useQuery<Array<{ id: string; name: string; role: string }>>({
+    queryKey: ["/api/crm/users"],
+    enabled: open && canReview,
+  });
+
   const { data: conversations = [] } = useQuery<AiConversationSummary[]>({
-    queryKey: ["/api/crm/ai/conversations"],
+    queryKey: [viewUser ? `/api/crm/ai/conversations?userId=${viewUser.id}` : "/api/crm/ai/conversations"],
     enabled: open,
   });
 
@@ -238,6 +251,7 @@ export default function AiAssistantModal() {
   };
 
   const sendQuestion = (raw: string) => {
+    if (viewUser) return; // read-only while reviewing someone else's chats
     const photos = attachments;
     const question = raw.trim() || (photos.length > 0 ? "Take a look at this photo." : "");
     if (question.length < 3 || pending) return;
@@ -511,8 +525,39 @@ export default function AiAssistantModal() {
                 <PanelLeftClose className="h-4 w-4" />
               </button>
             </div>
+            {/* Team chats — owners/admins can flip the sidebar to any team
+                member's history (read-only). */}
+            {canReview && (
+              <div className="px-3 pb-2">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing</p>
+                <select
+                  value={viewUser?.id || ""}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setMessages([]);
+                    setConversationId(null);
+                    setActiveSpace(null);
+                    if (!id) {
+                      setViewUser(null);
+                      return;
+                    }
+                    const u = teamUsers.find((x) => x.id === id);
+                    if (u) setViewUser({ id: u.id, name: u.name });
+                  }}
+                  className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 focus:outline-none"
+                  data-testid="ai-view-user"
+                >
+                  <option value="">My chats</option>
+                  {teamUsers.filter((u) => u.id !== me?.id).map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* Spaces — named groups of conversations. New chats are filed
-                into whichever space is selected. */}
+                into whichever space is selected. Hidden while reviewing a
+                teammate's chats (spaces are per-user). */}
+            {!viewUser && (
             <div className="px-2 pb-1">
               <div className="flex items-center justify-between px-2 pb-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Spaces</p>
@@ -580,19 +625,24 @@ export default function AiAssistantModal() {
                 </div>
               ))}
             </div>
+            )}
             <div className="mx-3 my-1 border-t border-slate-200" />
 
             {/* Chats — the + starts a new chat (filed into the selected space) */}
             <div className="flex items-center justify-between px-4 pb-1 pt-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Chats</p>
-              <button
-                onClick={newChat}
-                className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-[#711419]"
-                aria-label="New chat"
-                data-testid="ai-new-chat"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {viewUser ? `${viewUser.name}'s chats` : "Chats"}
+              </p>
+              {!viewUser && (
+                <button
+                  onClick={newChat}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-[#711419]"
+                  aria-label="New chat"
+                  data-testid="ai-new-chat"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -626,6 +676,8 @@ export default function AiAssistantModal() {
                           <p className="text-[11px] text-slate-400">{formatConversationWhen(c.updatedAt)}</p>
                         </button>
                         {/* Move to a space — a chat lives in exactly one */}
+                        {!viewUser && (
+                        <>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
@@ -659,6 +711,8 @@ export default function AiAssistantModal() {
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
+                        </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1020,6 +1074,13 @@ export default function AiAssistantModal() {
                 )}
               </p>
             )}
+            {/* Reviewing a teammate's chat: no composer, just the banner */}
+            {viewUser ? (
+              <div className="mx-auto max-w-3xl rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-center text-sm font-medium text-amber-800" data-testid="ai-review-banner">
+                Viewing {viewUser.name}'s chats — read-only
+              </div>
+            ) : (
+            <>
             {/* One unified bar: photos, typing, voice, and send live together */}
             <div className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white px-2 py-1.5">
               {attachments.length > 0 && (
@@ -1110,6 +1171,8 @@ export default function AiAssistantModal() {
             <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-slate-400">
               Conversations are saved to your account and shared with the mobile app.
             </p>
+            </>
+            )}
           </div>
         </div>
       </div>

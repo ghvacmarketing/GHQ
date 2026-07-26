@@ -2366,10 +2366,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getCurrentCrmUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
+      // Owners/admins can review any team member's chats (?userId=...);
+      // everyone else only ever sees their own.
+      const requestedUserId = String(req.query.userId || "");
+      const canViewOthers = user.role === "owner" || user.role === "admin";
+      const targetUserId = requestedUserId && canViewOthers ? requestedUserId : user.id;
       const convos = await db
         .select({ id: aiConversations.id, title: aiConversations.title, spaceId: aiConversations.spaceId, updatedAt: aiConversations.updatedAt })
         .from(aiConversations)
-        .where(eq(aiConversations.userId, user.id))
+        .where(eq(aiConversations.userId, targetUserId))
         .orderBy(desc(aiConversations.updatedAt))
         .limit(50);
       res.json(convos);
@@ -2501,7 +2506,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getCurrentCrmUser(req);
       if (!user) return res.status(401).json({ message: "Unauthorized" });
-      const convo = await getOwnedAiConversation(user.id, req.params.id);
+      let convo = await getOwnedAiConversation(user.id, req.params.id);
+      // Owners/admins may READ any conversation (team-chat review); writes
+      // and deletes stay owner-of-the-thread only.
+      if (!convo && (user.role === "owner" || user.role === "admin")) {
+        const [anyConvo] = await db.select().from(aiConversations).where(eq(aiConversations.id, req.params.id));
+        convo = anyConvo || null;
+      }
       if (!convo) return res.status(404).json({ message: "Conversation not found" });
       res.json({ conversation: convo, messages: await getAiConversationPayload(convo.id) });
     } catch (error) {
