@@ -2787,6 +2787,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }).strict(),
         }),
         z.object({
+          type: z.literal("delete_quote"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            quoteId: z.string().trim().min(1).max(64).optional(),
+            quoteNumber: z.string().trim().max(40).optional(),
+          }).strict(),
+        }),
+        z.object({
           type: z.literal("create_invoice"),
           params: z.object({
             customerName: z.string().trim().min(1).max(200),
@@ -3124,6 +3133,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quoteUrl = `/crm/quotes/${newQuote.id}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "quote", id: newQuote.id, label: quoteLabel, url: quoteUrl });
         return res.status(201).json({ ok: true, entity: "quote", id: newQuote.id, label: quoteLabel, url: quoteUrl });
+      }
+
+      // delete_quote — resolves the exact quote (pick list when ambiguous);
+      // accepted quotes and quotes an invoice was billed from are protected.
+      if (action.type === "delete_quote") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const qCustomer = resolved.customer;
+        const custQuotes = await db.select().from(crmQuotes).where(eq(crmQuotes.customerId, qCustomer.id)).orderBy(desc(crmQuotes.createdAt)).limit(20);
+        if (custQuotes.length === 0) {
+          return res.status(422).json({ message: `${qCustomer.name} has no quotes on file.` });
+        }
+        let targetQuote = action.params.quoteId ? custQuotes.find((q) => q.id === action.params.quoteId) : undefined;
+        if (!targetQuote && action.params.quoteNumber) {
+          const qn = action.params.quoteNumber.toLowerCase();
+          targetQuote = custQuotes.find((q) => (q.quoteNumber || "").toLowerCase().includes(qn));
+        }
+        if (!targetQuote && custQuotes.length === 1) targetQuote = custQuotes[0];
+        if (!targetQuote) {
+          return res.status(422).json({
+            message: `Which of ${qCustomer.name}'s quotes should be deleted?`,
+            candidateParam: "quoteId",
+            candidates: custQuotes.slice(0, 6).map((q) => ({ id: q.id, name: `${q.quoteNumber}${q.title ? ` — ${q.title}` : ""} · $${Number(q.total || 0).toFixed(2)} (${q.status})` })),
+          });
+        }
+        if (targetQuote.status === "accepted") {
+          return res.status(422).json({ message: `Quote ${targetQuote.quoteNumber} was accepted by the customer — accepted quotes can't be deleted through Gibbs.` });
+        }
+        const [billedInvoice] = await db.select({ id: crmInvoices.id, invoiceNumber: crmInvoices.invoiceNumber }).from(crmInvoices).where(eq(crmInvoices.quoteId, targetQuote.id)).limit(1);
+        if (billedInvoice) {
+          return res.status(422).json({ message: `Quote ${targetQuote.quoteNumber} has invoice ${billedInvoice.invoiceNumber} billed from it — delete the invoice first.` });
+        }
+        await db.delete(crmQuotes).where(eq(crmQuotes.id, targetQuote.id));
+        await logCrmAudit(user.id, "ai_action.delete_quote", "crm_quote", targetQuote.id, { quoteNumber: targetQuote.quoteNumber, customerId: qCustomer.id }, req.ip);
+        const dqLabel = `Quote ${targetQuote.quoteNumber} deleted`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "quote", id: targetQuote.id, label: dqLabel, url: "/crm/quotes" });
+        return res.status(201).json({ ok: true, entity: "quote", id: targetQuote.id, label: dqLabel, url: "/crm/quotes" });
       }
 
       // create_invoice — DRAFT only, in three kinds: quick (ad-hoc line
