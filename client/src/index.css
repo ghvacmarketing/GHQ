@@ -161,6 +161,23 @@
      were removed. */
 }
 
+/* Job-detail tab transitions — pure CSS, restarted by display toggling so the
+   incoming tab can never paint fully-rendered before its animation starts. */
+.job-section-enter {
+  animation: jobSectionEnter 0.24s cubic-bezier(0.32, 0.72, 0.34, 1);
+}
+@keyframes jobSectionEnter {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.job-tab-enter {
+  animation: jobTabEnter 0.16s cubic-bezier(0.32, 0.72, 0.34, 1);
+}
+@keyframes jobTabEnter {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .slide-in {
   animation: slideIn 0.3s ease-out;
 }

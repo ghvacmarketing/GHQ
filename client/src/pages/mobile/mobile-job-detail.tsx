@@ -3968,44 +3968,26 @@ export default function MobileJobDetail() {
     const sec = sectionsRef.current;
     const fromOverview = activeTab === "overview";
     if (sec && !fromOverview) tabScroll.current[activeTab] = sec.scrollTop;
-    // Pre-position the layer BEFORE React commits the tab swap: the animation
-    // only starts on the next frame, so without this the incoming section
-    // paints once fully in place, then snaps to its start position — a
-    // visible flash.
-    if (sec) {
-      if (fromOverview) sec.style.transform = "translateX(100%)";
-      else sec.style.opacity = "0";
-    }
+    // Enter animations are pure CSS keyed off display toggling (the section
+    // container flips display:none→block, each tab wrapper flips hidden→block)
+    // — CSS animations restart synchronously with the reveal paint, so the
+    // incoming tab can never flash fully-rendered before its animation.
     setActiveTab(next);
     requestAnimationFrame(() => {
       const sec2 = sectionsRef.current;
-      if (!sec2) return;
-      sec2.scrollTop = tabScroll.current[next] || 0;
-      if (fromOverview) {
-        // Push the section in over the parallaxing Overview
-        sec2.animate(
-          [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }],
-          { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
-        );
-        overviewRef.current?.animate(
-          [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
-          { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
-        );
-        scrimRef.current?.animate(
-          [{ opacity: "0" }, { opacity: "0.18" }],
-          { duration: 240, easing: "linear" },
-        );
-        setTimeout(setOpenLayerStyles, 230);
-      } else {
-        sec2.animate(
-          [{ transform: "translateX(12px)", opacity: 0 }, { transform: "translateX(0)", opacity: 1 }],
-          { duration: 160, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
-        );
-        setTimeout(() => {
-          if (sectionsRef.current) sectionsRef.current.style.opacity = "";
-        }, 150);
-      }
+      if (sec2) sec2.scrollTop = tabScroll.current[next] || 0;
     });
+    if (fromOverview) {
+      overviewRef.current?.animate(
+        [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
+        { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+      );
+      scrimRef.current?.animate(
+        [{ opacity: "0" }, { opacity: "0.18" }],
+        { duration: 240, easing: "linear" },
+      );
+      setTimeout(setOpenLayerStyles, 230);
+    }
   };
 
   const springBack = () => {
@@ -4579,55 +4561,51 @@ export default function MobileJobDetail() {
       >
       <OfflineIndicator />
       <div className="relative flex h-full flex-col bg-slate-50">
-        <div className="flex-shrink-0 p-4 pb-2">
-          <div className="flex items-center justify-between">
-            {/* In-flow back — tap, or swipe right from the left edge. Only
-                shown on the Overview: Work/Quote/Invoice are just tabs of
-                this job, so no arrow there (the edge swipe still leaves the
-                job from any tab). */}
-            <button
-              onClick={() => goBackAnimated()}
-              className={`flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95 ${activeTab !== "overview" ? "pointer-events-none invisible" : ""}`}
-              data-testid="button-back"
-              aria-label="Back"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-            <div className="flex items-center gap-2">
-              {isSupervisor && !isAssignedToMe && (
-                <Button
-                  onClick={() => assignToMeMutation.mutate()}
-                  disabled={assignToMeMutation.isPending}
-                  className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
-                  data-testid="button-assign-to-me"
-                >
-                  {assignToMeMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  ) : (
-                    <UserPlus className="h-4 w-4 mr-1" />
-                  )}
-                  Assign to Me
-                </Button>
-              )}
-              {isSupervisor && isAssignedToMe && (
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowEditDialog(true)}
-                  className="min-h-[44px]"
-                  data-testid="button-edit-work-order"
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-
         <div className="relative min-h-0 flex-1" data-testid="mobile-job-detail">
           {/* Base layer: the Overview hub — always mounted so it parallaxes
               beneath a section while you swipe it away */}
           <div ref={overviewRef} className="absolute inset-0 overflow-auto px-4 pb-28">
+            {/* In-flow header row — scrolls away with the content (no sticky
+                band). Back is Overview-only; the edge swipe leaves the job
+                from any tab. */}
+            <div className="mb-2 flex items-center justify-between pt-4">
+              <button
+                onClick={() => goBackAnimated()}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
+                data-testid="button-back"
+                aria-label="Back"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <div className="flex items-center gap-2">
+                {isSupervisor && !isAssignedToMe && (
+                  <Button
+                    onClick={() => assignToMeMutation.mutate()}
+                    disabled={assignToMeMutation.isPending}
+                    className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+                    data-testid="button-assign-to-me"
+                  >
+                    {assignToMeMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                      <UserPlus className="h-4 w-4 mr-1" />
+                    )}
+                    Assign to Me
+                  </Button>
+                )}
+                {isSupervisor && isAssignedToMe && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowEditDialog(true)}
+                    className="min-h-[44px]"
+                    data-testid="button-edit-work-order"
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </div>
             <OverviewTab
               onGoTab={(t) => switchTab(t as TabType)}
               workOrder={workOrder}
@@ -4648,16 +4626,16 @@ export default function MobileJobDetail() {
               data and scroll positions survive round trips */}
           <div
             ref={sectionsRef}
-            className="absolute inset-0 z-20 overflow-auto bg-slate-50 px-4 pb-28 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
-            style={{ visibility: activeTab === "overview" ? "hidden" : "visible" }}
+            className="job-section-enter absolute inset-0 z-20 overflow-auto bg-slate-50 px-4 pb-28 pt-4 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+            style={{ display: activeTab === "overview" ? "none" : undefined }}
           >
-            <div className={activeTab === "work" ? "block" : "hidden"}>
+            <div className={activeTab === "work" ? "job-tab-enter block" : "hidden"}>
               <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
             </div>
-            <div className={activeTab === "quote" ? "block" : "hidden"}>
+            <div className={activeTab === "quote" ? "job-tab-enter block" : "hidden"}>
               <QuoteTab workOrder={workOrder} />
             </div>
-            <div className={activeTab === "invoice" ? "block" : "hidden"}>
+            <div className={activeTab === "invoice" ? "job-tab-enter block" : "hidden"}>
               <InvoiceTab
                 workOrder={workOrder}
                 renewalInfo={renewalInfo}

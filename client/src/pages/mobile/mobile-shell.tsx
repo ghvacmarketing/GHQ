@@ -2,8 +2,8 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ClipboardList, Wrench, Clock, ShieldX, MessageSquare, Users, Plus,
-  FileText, Receipt, Camera, Sparkles,
+  ClipboardList, Wrench, Clock, ShieldX, Plus,
+  FileText, Receipt, Camera, LayoutGrid, Briefcase,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
@@ -42,15 +42,23 @@ const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
 export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantLoaded, setAssistantLoaded] = useState(false);
-  const go = (path: string) => { setMoreOpen(false); navigate(path); };
+  const go = (path: string) => { setCreateOpen(false); navigate(path); };
   const openAssistant = () => {
-    setMoreOpen(false);
+    setCreateOpen(false);
     setAssistantLoaded(true);
     setAssistantOpen(true);
   };
+
+  // The More page (and anything else) can summon Gibbs without prop-drilling
+  useEffect(() => {
+    const onOpen = () => openAssistant();
+    window.addEventListener("ghq-mobile-open-assistant", onOpen);
+    return () => window.removeEventListener("ghq-mobile-open-assistant", onOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Suppress the browser/PWA edge-swipe history navigation inside the app.
   // Top-level tabs must not slide back; sub-pages implement their own gesture
@@ -142,7 +150,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           the page and flash white below it */}
       <div className="absolute inset-x-0 bottom-0 z-40" style={{ touchAction: "none" }} data-testid="mobile-nav">
         <nav
-          className="rounded-t-2xl border-t border-slate-200/80 bg-[#f4f4f4]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
+          className="rounded-t-2xl border-t-2 border-slate-300/80 bg-[#e9ebee]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           <div className="flex items-stretch justify-around px-2 pb-2 pt-2.5">
@@ -181,40 +189,53 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
                     </Link>
                   );
                 })}
-                <button
-                  onClick={() => setMoreOpen(true)}
+                <Link
+                  href="/mobile/more"
                   className="flex flex-1 flex-col items-center gap-1 py-0.5 transition-transform active:scale-95"
                   data-testid="nav-tab-more"
                   aria-label="More"
                 >
-                  <Plus className="h-6 w-6 text-slate-500" strokeWidth={1.75} />
-                  <span className="text-[11px] font-medium leading-none text-slate-500">More</span>
-                </button>
+                  <LayoutGrid
+                    className={`h-6 w-6 ${location.startsWith("/mobile/more") ? "text-[#711419]" : "text-slate-500"}`}
+                    strokeWidth={location.startsWith("/mobile/more") ? 2 : 1.75}
+                  />
+                  <span className={`text-[11px] leading-none ${location.startsWith("/mobile/more") ? "font-semibold text-[#711419]" : "font-medium text-slate-500"}`}>
+                    More
+                  </span>
+                </Link>
               </>
             )}
           </div>
         </nav>
       </div>
 
-      {/* "+" sheet — extra destinations and supervisor quick actions */}
-      <DraggableSheet open={moreOpen} onOpenChange={setMoreOpen} title="More" testid="sheet-more">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Go to</p>
-          <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={Sparkles} label="Ask Gibbs" onClick={openAssistant} testid="more-assistant" />
-            <SheetTile icon={Users} label="Customers" onClick={() => go("/mobile/customers")} testid="more-customers" />
-            <SheetTile icon={MessageSquare} label="Messages" onClick={() => go("/mobile/messages")} testid="more-messages" />
-          </div>
+      {/* Floating "+" — the main go-to action button, riding above the nav on
+          the right. Opens the create sheet (actions only; browsing lives on
+          the More page). */}
+      {!customNav && (
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="absolute right-4 z-40 flex items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90"
+          style={{ bottom: "calc(96px + env(safe-area-inset-bottom))", height: 52, width: 52 }}
+          data-testid="fab-create"
+          aria-label="Create"
+        >
+          <Plus className="h-6 w-6" strokeWidth={2.25} />
+        </button>
+      )}
 
-          {isSupervisor && (
-            <>
-              <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick actions</p>
-              <div className="grid grid-cols-4 gap-3">
-                <SheetTile icon={FileText} label="New Quote" onClick={() => go("/crm/quotes/new")} testid="more-new-quote" />
-                <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/crm/invoices/new")} testid="more-new-invoice" />
-                <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/photos")} testid="more-add-photo" />
-              </div>
-            </>
-          )}
+      {/* Create sheet — things you can MAKE from anywhere */}
+      <DraggableSheet open={createOpen} onOpenChange={setCreateOpen} title="Create" testid="sheet-create">
+          <div className="grid grid-cols-4 gap-3">
+            <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/photos")} testid="create-add-photo" />
+            {isSupervisor && (
+              <>
+                <SheetTile icon={Briefcase} label="New Job" onClick={() => go("/mobile/job?new=1")} testid="create-new-job" />
+                <SheetTile icon={FileText} label="New Quote" onClick={() => go("/crm/quotes/new")} testid="create-new-quote" />
+                <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/crm/invoices/new")} testid="create-new-invoice" />
+              </>
+            )}
+          </div>
       </DraggableSheet>
 
       {/* AI assistant popup — slides up over the current screen */}
@@ -229,7 +250,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 
 function SheetTile({
   icon: Icon, label, onClick, testid,
-}: { icon: typeof Users; label: string; onClick: () => void; testid: string }) {
+}: { icon: typeof Camera; label: string; onClick: () => void; testid: string }) {
   return (
     <button
       onClick={onClick}

@@ -66,81 +66,76 @@ function formatSubtype(subtype: string | null | undefined): string {
   return subtype.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// One industrial job card used by every Jobs view (Today / Upcoming / History).
-// showDate adds the calendar date to the time line — used where the list spans
-// more than one day.
+// Timeline-style job card (reference-screenshot driven): time gutter on the
+// left, flat card with an uppercase category row, bold job title, and a muted
+// customer · address line. The next actionable job gets a maroon accent
+// outline + "Up next". showDate swaps the right slot to the calendar date for
+// multi-day lists.
 function JobCard({
-  job, onOpen, showDate = false,
-}: { job: WorkOrderWithDetails; onOpen: () => void; showDate?: boolean }) {
-  const colors = statusColors[job.status] || statusColors.scheduled;
-  const jobTypeStyle = getJobTypeColor(job.visitType);
-  const address = job.property?.address1 || "";
-  const cityState = [job.property?.city, job.property?.state].filter(Boolean).join(", ");
+  job, onOpen, showDate = false, highlight = false,
+}: { job: WorkOrderWithDetails; onOpen: () => void; showDate?: boolean; highlight?: boolean }) {
   const isCompleted = job.status === "completed";
+  const isCancelled = job.status === "cancelled";
+  const start = job.scheduledStart ? toLocalTime(job.scheduledStart) : null;
+  const category = job.workSubtype ? formatSubtype(job.workSubtype) : (job.visitType || "Job");
+  const address = [job.property?.address1, job.property?.city].filter(Boolean).join(", ");
+
+  const rightLabel = isCompleted
+    ? "Closed"
+    : isCancelled
+      ? "Cancelled"
+      : job.status === "on_site"
+        ? "Working"
+        : job.status === "en_route"
+          ? "Traveling"
+          : highlight
+            ? "Up next"
+            : showDate && start
+              ? format(start, "MMM d")
+              : start
+                ? format(start, "h:mm")
+                : "Scheduled";
+  const rightAccent = highlight || job.status === "on_site" || job.status === "en_route";
 
   return (
-    <Card
-      className={`cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white shadow-none transition-transform active:scale-[0.99] ${colors.stripe} ${isCompleted ? "opacity-75" : ""}`}
-      onClick={onOpen}
-      data-testid={`job-card-${job.id}`}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 mt-0.5">
-            {isCompleted ? (
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-            ) : (
-              <Circle className="h-6 w-6 text-slate-300" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
-                {job.customer?.name || "Unknown Customer"}
-              </h3>
-              <span className={`px-2 py-0.5 rounded-[3px] text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
-                {statusLabels[job.status] || job.status}
-              </span>
-            </div>
-
-            {(address || cityState) && (
-              <div className="flex items-start gap-1.5 text-sm text-slate-600">
-                <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-slate-400" />
-                <span className="line-clamp-2">
-                  {address}{address && cityState ? ", " : ""}{cityState}
-                </span>
-              </div>
-            )}
-
-            {job.scheduledStart && (
-              <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                <Clock className="h-4 w-4 text-slate-400" />
-                <span>
-                  {showDate && `${format(toLocalTime(job.scheduledStart), "MMM d")} · `}
-                  {format(toLocalTime(job.scheduledStart), "h:mm a")}
-                  {job.scheduledEnd && ` - ${format(toLocalTime(job.scheduledEnd), "h:mm a")}`}
-                </span>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {job.visitType && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${jobTypeStyle.bg} ${jobTypeStyle.text} ${jobTypeStyle.border}`}>
-                  {job.visitType}
-                  {job.workSubtype && ` - ${formatSubtype(job.workSubtype)}`}
-                </span>
-              )}
-              {job.priority === "high" && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
-                  High Priority
-                </span>
-              )}
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0 mt-1" />
+    <div className="flex gap-3" data-testid={`job-card-${job.id}`}>
+      <div className="w-11 shrink-0 pt-4 text-right">
+        <span className="block text-xs font-semibold tabular-nums text-slate-500">
+          {start ? format(start, "h:mm") : "—"}
+        </span>
+        {start && <span className="block text-[9px] font-semibold uppercase text-slate-400">{format(start, "a")}</span>}
+      </div>
+      <button
+        onClick={onOpen}
+        className={`min-w-0 flex-1 rounded-[4px] border p-4 text-left transition-transform active:scale-[0.99] ${
+          highlight ? "border-[#711419] bg-white" : "border-slate-300/70 bg-slate-100/80"
+        } ${isCompleted || isCancelled ? "opacity-70" : ""}`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{category}</span>
+          {job.priority === "high" && !isCompleted && (
+            <span className="rounded-[3px] bg-red-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+              High
+            </span>
+          )}
+          <span
+            className={`ml-auto flex shrink-0 items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              rightAccent ? "text-[#711419]" : "text-slate-400"
+            }`}
+          >
+            {rightLabel}
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
         </div>
-      </CardContent>
-    </Card>
+        <h3 className={`mt-1.5 line-clamp-2 text-[15px] font-semibold ${isCompleted ? "text-slate-500" : "text-slate-900"}`}>
+          {job.title || `${job.visitType ? job.visitType.charAt(0) + job.visitType.slice(1).toLowerCase() : "Service"} visit`}
+        </h3>
+        <p className="mt-0.5 truncate text-xs text-slate-500">
+          {job.customer?.name || "Unknown customer"}
+          {address && ` · ${address}`}
+        </p>
+      </button>
+    </div>
   );
 }
 
@@ -401,6 +396,14 @@ export default function MobileJob() {
   );
   const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
+  // The floating "+" create sheet deep-links here with ?new=1 to open the
+  // New Job dialog straight away.
+  useEffect(() => {
+    if (isSupervisorPlus && new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowCreateDialog(true);
+    }
+  }, [isSupervisorPlus]);
+
   // For users who can view future jobs: show all jobs (today + future), for others: only today
   const displayedJobs = useMemo(() => {
     return myJobs
@@ -517,9 +520,14 @@ export default function MobileJob() {
   }, [displayedJobs, canViewFutureJobs]);
 
   const todayKey = format(new Date(), "yyyy-MM-dd");
-  const todayJobs = displayedJobs.filter(
-    (j) => j.scheduledStart && format(toLocalTime(j.scheduledStart), "yyyy-MM-dd") === todayKey,
-  );
+  // Chronological agenda order (the timeline gutter reads top-to-bottom);
+  // the first job still awaiting action gets the "Up next" accent.
+  const todayJobs = displayedJobs
+    .filter((j) => j.scheduledStart && format(toLocalTime(j.scheduledStart), "yyyy-MM-dd") === todayKey)
+    .sort(
+      (a, b) => new Date(a.scheduledStart || 0).getTime() - new Date(b.scheduledStart || 0).getTime(),
+    );
+  const upNextId = todayJobs.find((j) => !["completed", "cancelled"].includes(j.status))?.id;
   const upcomingGroups = (groupedJobsByDate || []).filter((g) => g.dateKey > todayKey);
 
   if (userLoading || ordersLoading) {
@@ -585,7 +593,12 @@ export default function MobileJob() {
           ) : (
             <div className="space-y-3">
               {todayJobs.map((job) => (
-                <JobCard key={job.id} job={job} onOpen={() => navigate(`/mobile/job/${job.id}`)} />
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  highlight={job.id === upNextId}
+                  onOpen={() => navigate(`/mobile/job/${job.id}`)}
+                />
               ))}
             </div>
           )
