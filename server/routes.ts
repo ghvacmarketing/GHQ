@@ -2791,15 +2791,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           params: z.object({
             customerName: z.string().trim().min(1).max(200),
             customerId: z.string().trim().min(1).max(64).optional(),
+            invoiceKind: z.enum(["quick", "from_quote", "deposit"]).optional(),
             workOrderId: z.string().trim().min(1).max(64).optional(),
             workOrderTitle: z.string().trim().max(200).optional(),
+            quoteId: z.string().trim().min(1).max(64).optional(),
+            quoteNumber: z.string().trim().max(40).optional(),
+            depositAmount: z.number().positive().max(1000000).optional(),
+            depositPercent: z.number().positive().max(100).optional(),
             notes: z.string().trim().max(2000).optional(),
             lineItems: z.array(z.object({
               description: z.string().trim().min(1).max(300),
               quantity: z.number().positive().max(999),
               unitPrice: z.number().min(0).max(1000000),
-            }).strict()).min(1).max(15),
-          }).strict(),
+            }).strict()).min(1).max(15).optional(),
+          }).strict().refine(
+            (p) => p.invoiceKind === "from_quote" || p.invoiceKind === "deposit" || (p.lineItems && p.lineItems.length > 0),
+            { message: "A quick invoice needs line items." },
+          ),
         }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
@@ -3118,25 +3126,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(201).json({ ok: true, entity: "quote", id: newQuote.id, label: quoteLabel, url: quoteUrl });
       }
 
-      // create_invoice — DRAFT only, and always tied to one of the customer's
-      // work orders (same rule as manual invoices). Ambiguous visit → pick
-      // list, exactly like the delete flow.
+      // create_invoice — DRAFT only, in three kinds: quick (ad-hoc line
+      // items billed to a visit), from_quote (copies an existing quote's
+      // lines), deposit (partial amount against a quote). Ambiguity — which
+      // visit, which quote — resolves through pick lists.
       if (action.type === "create_invoice") {
         const resolved = await resolveAiCustomer(action.params);
         if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
         const iCustomer = resolved.customer;
-        const orders = await storage.getWorkOrdersByCustomerId(iCustomer.id);
-        if (orders.length === 0) {
-          return res.status(422).json({ message: `${iCustomer.name} has no work orders — invoices must be tied to a visit. Create the work order first.` });
+        const invoiceKind = action.params.invoiceKind || "quick";
+
+        // Quote-backed kinds: pin down WHICH quote first.
+        let sourceQuote: typeof crmQuotes.$inferSelect | undefined;
+        if (invoiceKind === "from_quote" || invoiceKind === "deposit") {
+          const custQuotes = await db.select().from(crmQuotes).where(eq(crmQuotes.customerId, iCustomer.id)).orderBy(desc(crmQuotes.createdAt)).limit(20);
+          if (custQuotes.length === 0) {
+            return res.status(422).json({ message: `${iCustomer.name} has no quotes on file — create the quote first.` });
+          }
+          sourceQuote = action.params.quoteId ? custQuotes.find((q) => q.id === action.params.quoteId) : undefined;
+          if (!sourceQuote && action.params.quoteNumber) {
+            const qn = action.params.quoteNumber.toLowerCase();
+            sourceQuote = custQuotes.find((q) => (q.quoteNumber || "").toLowerCase().includes(qn));
+          }
+          if (!sourceQuote && custQuotes.length === 1) sourceQuote = custQuotes[0];
+          if (!sourceQuote) {
+            return res.status(422).json({
+              message: `Which of ${iCustomer.name}'s quotes is this invoice against?`,
+              candidateParam: "quoteId",
+              candidates: custQuotes.slice(0, 6).map((q) => ({ id: q.id, name: `${q.quoteNumber}${q.title ? ` — ${q.title}` : ""} · $${Number(q.total || 0).toFixed(2)} (${q.status})` })),
+            });
+          }
         }
+
+        // Which visit gets billed: the quote's own work order wins; otherwise
+        // the customer's visits (pick list when ambiguous). Quick invoices
+        // always need one; quote-backed kinds may go without.
+        const orders = await storage.getWorkOrdersByCustomerId(iCustomer.id);
         let targetWo = action.params.workOrderId ? orders.find((w) => w.id === action.params.workOrderId) : undefined;
+        if (!targetWo && sourceQuote?.workOrderId) targetWo = orders.find((w) => w.id === sourceQuote!.workOrderId);
         if (!targetWo && action.params.workOrderTitle) {
           const t = action.params.workOrderTitle.toLowerCase();
           const matches = orders.filter((w) => (w.title || "").toLowerCase().includes(t) || t.includes((w.title || "").toLowerCase()));
           if (matches.length === 1) targetWo = matches[0];
         }
         if (!targetWo && orders.length === 1) targetWo = orders[0];
-        if (!targetWo) {
+        if (!targetWo && invoiceKind === "quick") {
+          if (orders.length === 0) {
+            return res.status(422).json({ message: `${iCustomer.name} has no work orders — invoices must be tied to a visit. Create the work order first.` });
+          }
           const describe = (w: (typeof orders)[number]) => {
             const when = w.scheduledStart
               ? ` — ${new Date(w.scheduledStart).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}`
@@ -3149,12 +3186,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
             candidates: orders.slice(0, 6).map((w) => ({ id: w.id, name: describe(w) })),
           });
         }
-        const invSubtotal = action.params.lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
+
+        // Build the lines per kind.
+        type InvLine = { lineType: string; description: string; partNumber?: string | null; quantity: string; unitPrice: string; lineTotal: string };
+        let lines: InvLine[] = [];
+        if (invoiceKind === "from_quote" && sourceQuote) {
+          const qLines = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, sourceQuote.id)).orderBy(crmQuoteLineItems.sortOrder);
+          lines = qLines.length > 0
+            ? qLines.map((l) => ({ lineType: l.lineType, description: l.description, partNumber: l.partNumber, quantity: String(l.quantity), unitPrice: String(l.unitPrice), lineTotal: String(l.lineTotal) }))
+            : [{ lineType: "service", description: sourceQuote.title || `Quote ${sourceQuote.quoteNumber}`, quantity: "1", unitPrice: String(sourceQuote.total || "0"), lineTotal: String(sourceQuote.total || "0") }];
+        } else if (invoiceKind === "deposit" && sourceQuote) {
+          const quoteTotal = Number(sourceQuote.total || 0);
+          const amount = action.params.depositAmount ?? (action.params.depositPercent ? (quoteTotal * action.params.depositPercent) / 100 : null);
+          if (!amount || amount <= 0) {
+            return res.status(422).json({ message: "How much is the deposit — a dollar amount or a percent of the quote?" });
+          }
+          lines = [{
+            lineType: "service",
+            description: `Deposit on Quote ${sourceQuote.quoteNumber}${action.params.depositPercent ? ` (${action.params.depositPercent}%)` : ""}`,
+            quantity: "1",
+            unitPrice: amount.toFixed(2),
+            lineTotal: amount.toFixed(2),
+          }];
+        } else {
+          lines = (action.params.lineItems || []).map((li) => ({
+            lineType: "service",
+            description: li.description,
+            quantity: String(li.quantity),
+            unitPrice: li.unitPrice.toFixed(2),
+            lineTotal: (li.quantity * li.unitPrice).toFixed(2),
+          }));
+        }
+        const invSubtotal = lines.reduce((s, l) => s + Number(l.lineTotal), 0);
+
         const invoiceNumber = await generateInvoiceNumber();
         const [newInvoice] = await db.insert(crmInvoices).values({
           invoiceNumber,
           customerId: iCustomer.id,
-          workOrderId: targetWo.id,
+          workOrderId: targetWo?.id ?? null,
+          quoteId: sourceQuote?.id ?? null,
+          isDepositInvoice: invoiceKind === "deposit",
           status: "draft" as any,
           subtotal: invSubtotal.toFixed(2),
           total: invSubtotal.toFixed(2),
@@ -3162,20 +3233,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: action.params.notes || null,
           createdBy: user.id,
         }).returning();
-        for (let idx = 0; idx < action.params.lineItems.length; idx++) {
-          const li = action.params.lineItems[idx];
+        for (let idx = 0; idx < lines.length; idx++) {
+          const l = lines[idx];
           await db.insert(crmInvoiceLineItems).values({
             invoiceId: newInvoice.id,
-            lineType: "service",
-            description: li.description,
-            quantity: String(li.quantity),
-            unitPrice: li.unitPrice.toFixed(2),
-            lineTotal: (li.quantity * li.unitPrice).toFixed(2),
+            lineType: l.lineType as any,
+            description: l.description,
+            partNumber: l.partNumber ?? null,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            lineTotal: l.lineTotal,
             sortOrder: idx,
           });
         }
-        await logCrmAudit(user.id, "ai_action.create_invoice", "crm_invoice", newInvoice.id, { invoiceNumber, customerId: iCustomer.id, workOrderId: targetWo.id, total: invSubtotal.toFixed(2) }, req.ip);
-        const invoiceLabel = `Draft invoice ${invoiceNumber} for ${iCustomer.name} — $${invSubtotal.toFixed(2)}`;
+        await logCrmAudit(user.id, "ai_action.create_invoice", "crm_invoice", newInvoice.id, { invoiceNumber, invoiceKind, customerId: iCustomer.id, workOrderId: targetWo?.id ?? null, quoteId: sourceQuote?.id ?? null, total: invSubtotal.toFixed(2) }, req.ip);
+        const kindWord = invoiceKind === "deposit" ? "deposit invoice" : invoiceKind === "from_quote" ? `invoice from quote ${sourceQuote?.quoteNumber}` : "invoice";
+        const invoiceLabel = `Draft ${kindWord} ${invoiceNumber} for ${iCustomer.name} — $${invSubtotal.toFixed(2)}`;
         const invoiceUrl = `/crm/invoices/${newInvoice.id}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "invoice", id: newInvoice.id, label: invoiceLabel, url: invoiceUrl });
         return res.status(201).json({ ok: true, entity: "invoice", id: newInvoice.id, label: invoiceLabel, url: invoiceUrl });
