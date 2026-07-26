@@ -9493,25 +9493,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { minRole, exactRole } = req.query as { minRole?: string; exactRole?: string };
       
-      // Define role hierarchy
+      // Define role hierarchy (supervisor sits between admin and sales)
       const roleHierarchy: Record<string, string[]> = {
         owner: ["owner"],
         admin: ["owner", "admin"],
-        sales: ["owner", "admin", "sales"],
-        tech: ["owner", "admin", "sales", "tech"],
+        supervisor: ["owner", "admin", "supervisor"],
+        sales: ["owner", "admin", "supervisor", "sales"],
+        tech: ["owner", "admin", "supervisor", "sales", "tech"],
       };
-      
-      const VALID_ROLES = ["owner", "admin", "sales", "tech"];
+
+      const VALID_ROLES = ["owner", "admin", "supervisor", "sales", "tech"];
       let allowedRoles: string[];
 
       // exactRole takes precedence - filter by exact role only.
       // Validate against the known role set so untrusted query input never
       // reaches the SQL layer (previously interpolated via sql.raw).
+      // Supervisors carry sales duties, so "sales" always includes them —
+      // a supervisor can be assigned quotes like any salesperson.
       if (exactRole) {
         if (!VALID_ROLES.includes(exactRole)) {
           return res.status(400).json({ message: "Invalid role filter" });
         }
-        allowedRoles = [exactRole];
+        allowedRoles = exactRole === "sales" ? ["sales", "supervisor"] : [exactRole];
       } else if (minRole && roleHierarchy[minRole]) {
         allowedRoles = roleHierarchy[minRole];
       } else {

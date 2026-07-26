@@ -901,7 +901,8 @@ export default function CrmProspectFunnel() {
   });
 
   const salesUsers = useMemo(() => {
-    return (users || []).filter(u => u.role === 'sales');
+    // Supervisors carry sales duties — they belong in every salesperson list
+    return (users || []).filter(u => u.role === 'sales' || u.role === 'supervisor');
   }, [users]);
 
   useEffect(() => {

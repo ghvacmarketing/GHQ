@@ -68,6 +68,7 @@ import {
   List,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { NewQuoteSetup } from "@/components/crm/new-quote-setup";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
@@ -165,6 +166,7 @@ export default function CrmQuotes() {
   const [page, setPage] = useState(1);
   const [selectedQuote, setSelectedQuote] = useState<CrmQuote | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   // Prefetch quote detail on hover for instant navigation
   const prefetchQuote = (quoteId: string) => {
@@ -618,12 +620,10 @@ export default function CrmQuotes() {
                 Reset
               </Button>
             )}
-            <Link href="/crm/quotes/new">
-              <Button size="sm" data-testid="button-create-quote">
-                <Plus className="h-4 w-4 mr-1" />
-                New Quote
-              </Button>
-            </Link>
+            <Button size="sm" onClick={() => setSetupOpen(true)} data-testid="button-create-quote">
+              <Plus className="h-4 w-4 mr-1" />
+              New Quote
+            </Button>
           </div>
         </div>
 
@@ -1291,6 +1291,9 @@ export default function CrmQuotes() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* New Quote setup stepper — type → customer → property → link → salesperson */}
+      <NewQuoteSetup open={setupOpen} onOpenChange={setSetupOpen} />
     </CrmLayout>
   );
 }

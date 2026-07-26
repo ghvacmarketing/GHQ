@@ -574,7 +574,7 @@ export default function CrmItems() {
                         )}
                         <TableCell>
                           {item.category === "discount" ? (
-                            (currentUser?.role === "owner" || currentUser?.role === "admin" || currentUser?.role === "sales") ? (
+                            (currentUser?.role === "owner" || currentUser?.role === "admin" || currentUser?.role === "supervisor" || currentUser?.role === "sales") ? (
                               <Button
                                 variant="ghost"
                                 size="sm"

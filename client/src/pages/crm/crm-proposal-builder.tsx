@@ -945,9 +945,12 @@ export default function CrmProposalBuilder() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
   
-  // Assigned user for quotes (install quotes require sales+ role)
+  // Assigned user for quotes (install quotes require sales+ role).
+  // preassigned = the New Quote setup stepper already chose the salesperson,
+  // so the Assign To select is hidden (no redundant question).
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
-  
+  const [preassigned, setPreassigned] = useState(false);
+
   // Parse URL parameters on mount and pre-fill customer if provided
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -960,6 +963,11 @@ export default function CrmProposalBuilder() {
     if (projectId) setPreloadedProjectId(projectId);
     if (workOrderId) setPreloadedWorkOrderId(workOrderId);
     if (propertyId) setPreloadedPropertyId(propertyId);
+    const assignedToParam = queryParams.get("assignedToId");
+    if (assignedToParam) {
+      setAssignedToId(assignedToParam);
+      setPreassigned(true);
+    }
     
     // Fetch CRM customer by ID if provided
     if (customerId) {
@@ -5081,7 +5089,9 @@ export default function CrmProposalBuilder() {
               </div>
             </div>
               
-            {/* Assign To dropdown - for install quotes (sales+ users only) */}
+            {/* Assign To dropdown - for install quotes (sales+ users only).
+                Hidden when the New Quote setup stepper already chose one. */}
+            {!preassigned && (
             <div className="mb-6">
               <Label className="text-xs text-muted-foreground mb-1 block">Assign To (Sales Team)</Label>
               <Select
@@ -5104,6 +5114,7 @@ export default function CrmProposalBuilder() {
                 </SelectContent>
               </Select>
             </div>
+            )}
 
 
             <div className="mb-6">

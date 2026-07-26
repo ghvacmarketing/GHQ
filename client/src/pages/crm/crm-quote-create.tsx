@@ -127,18 +127,26 @@ type AssignableUser = {
 export default function CrmQuoteCreate() {
   usePageTitle("Create Quote");
   const [, navigate] = useLocation();
-  const [currentStep, setCurrentStep] = useState<FormStep>(1);
-  const [formData, setFormData] = useState<FormData>(initialFormData);
-  const stepContainerRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
 
-  // Read URL params for auto-linking
+  // Read URL params for auto-linking. The "setup=1" flow means the New Quote
+  // setup stepper already collected customer/property/link/assignee — the
+  // wizard starts at the details step and skips the redundant questions.
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
   const customerIdFromUrl = urlParams.get("customerId");
   const propertyIdFromUrl = urlParams.get("propertyId");
   const projectIdFromUrl = urlParams.get("projectId");
   const sourceTypeFromUrl = urlParams.get("sourceType");
+  const assignedToIdFromUrl = urlParams.get("assignedToId");
+  const fromSetup = urlParams.get("setup") === "1";
+
+  const [currentStep, setCurrentStep] = useState<FormStep>(fromSetup && customerIdFromUrl ? 2 : 1);
+  const [formData, setFormData] = useState<FormData>(() => ({
+    ...initialFormData,
+    assignedToId: assignedToIdFromUrl || null,
+  }));
+  const stepContainerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
@@ -153,7 +161,7 @@ export default function CrmQuoteCreate() {
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [portalCanView, setPortalCanView] = useState(false);
-  const [hasSelectedQuoteType, setHasSelectedQuoteType] = useState(false);
+  const [hasSelectedQuoteType, setHasSelectedQuoteType] = useState(fromSetup);
 
   // CRM Items catalog state
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
@@ -608,8 +616,11 @@ export default function CrmQuoteCreate() {
     }
   };
 
+  // The setup-stepper flow starts at step 2 (customer already chosen), so
+  // back-navigation bottoms out there instead of the customer step.
+  const minStep: FormStep = fromSetup && customerIdFromUrl ? 2 : 1;
   const handleBack = () => {
-    if (currentStep > 1) {
+    if (currentStep > minStep) {
       setCurrentStep((prev) => (prev - 1) as FormStep);
     }
   };
@@ -738,7 +749,14 @@ export default function CrmQuoteCreate() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => {
-            // Navigate back to source: project > customer > quotes list
+            // Mid-wizard the arrow steps BACK a step (it used to jump to the
+            // customer page from any step). Only on the first visible step
+            // does it leave to the source: project > customer > quotes list.
+            const firstStep = fromSetup && customerIdFromUrl ? 2 : 1;
+            if (currentStep > firstStep) {
+              setCurrentStep((prev) => (prev - 1) as FormStep);
+              return;
+            }
             if (projectIdFromUrl) {
               navigate(`/crm/projects/${projectIdFromUrl}`);
             } else if (customerIdFromUrl) {
@@ -930,11 +948,16 @@ export default function CrmQuoteCreate() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <CardHeader className="px-0 pt-0">
-                  <CardTitle>Quote Type & Details</CardTitle>
-                  <CardDescription>Choose quote type and enter details for {selectedCustomer?.name}</CardDescription>
+                  <CardTitle>{fromSetup ? "Quote Details" : "Quote Type & Details"}</CardTitle>
+                  <CardDescription>
+                    {fromSetup
+                      ? `Details for ${selectedCustomer?.name || "the selected customer"}`
+                      : `Choose quote type and enter details for ${selectedCustomer?.name}`}
+                  </CardDescription>
                 </CardHeader>
-                
-                {/* Quote Type Selection */}
+
+                {/* Quote Type Selection — skipped when the setup stepper already chose it */}
+                {!fromSetup && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {QUOTE_TYPES.map((type) => {
                     const Icon = type.icon;
@@ -973,6 +996,7 @@ export default function CrmQuoteCreate() {
                     );
                   })}
                 </div>
+                )}
 
                 {/* Only show these fields for Quick Quote after selection */}
                 {formData.quoteType === "quick" && (
@@ -996,6 +1020,8 @@ export default function CrmQuoteCreate() {
                         minHeight="min-h-[150px]"
                       />
                     </div>
+                    {/* Assignee — already collected by the setup stepper */}
+                    {!assignedToIdFromUrl && (
                     <div className="space-y-2">
                       <Label htmlFor="assignedTo">Assigned To</Label>
                       <Select
@@ -1023,6 +1049,7 @@ export default function CrmQuoteCreate() {
                         Service quotes can be assigned to admin or owner users
                       </p>
                     </div>
+                    )}
                   </>
                 )}
               </div>
@@ -1314,7 +1341,7 @@ export default function CrmQuoteCreate() {
         </Card>
 
         <div className="flex justify-between">
-          {currentStep > 1 ? (
+          {currentStep > minStep ? (
             <Button variant="outline" onClick={handleBack} data-testid="button-previous">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Previous

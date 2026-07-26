@@ -282,7 +282,7 @@ export default function CrmAgreements() {
     enabled: !!currentUser,
   });
 
-  const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "sales";
+  const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "supervisor" || currentUser?.role === "sales";
   const isAdminOrOwner = currentUser?.role === "admin" || currentUser?.role === "owner";
   const canSendInvoice = ["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "");
 
