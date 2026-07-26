@@ -2776,6 +2776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           params: z.object({
             customerName: z.string().trim().min(1).max(200),
             customerId: z.string().trim().min(1).max(64).optional(),
+            quoteKind: z.enum(["quick", "proposal"]).optional(),
             title: z.string().trim().max(200).optional(),
             notes: z.string().trim().max(2000).optional(),
             lineItems: z.array(z.object({
@@ -3090,7 +3091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName: qCustomer.name,
           customerEmail: qCustomer.email,
           customerPhone: qCustomer.phone,
-          title: action.params.title || null,
+          title: action.params.title || (action.params.quoteKind === "proposal" ? "System proposal" : null),
           scope: "standalone" as any,
           status: "draft" as any,
           subtotal: subtotal.toFixed(2),

@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
-import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, tasks, docFiles, docFolders } from "@shared/schema";
+import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders } from "@shared/schema";
 import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -425,6 +425,19 @@ const CRM_TOOLS: ClaudeTool[] = [
     input_schema: { type: "object", properties: { search: { type: "string", description: "Item/service name or keyword, e.g. 'capacitor', 'maintenance visit'" } }, required: ["search"] },
   },
   {
+    name: "pricebook_packages",
+    description: "The install pricebook: full system packages by unit type (SHP, GP, PHP, SGA, Mini-Split, ...), tonnage (2–5), and package level (Good/Better/Best/Budget) with real equipment names, total investment, and monthly payment (in dollars). ALWAYS use this to price a proposal-kind quote — never guess system pricing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tonnage: { type: "string", description: "System size, e.g. '3' or '3.5'" },
+        unitType: { type: "string", description: "Unit type, e.g. 'SHP', 'GP', 'Mini-Split'" },
+        packageLevel: { type: "string", description: "Good | Better | Best | Budget" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "list_work_orders",
     description: "Live work orders with optional filters. Use for schedule questions, job status, or what a technician is doing.",
     input_schema: {
@@ -553,6 +566,32 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
       .limit(10);
     if (items.length === 0) return `No catalog items matching "${q}". Ask the user for the price instead of inventing one.`;
     return JSON.stringify(items);
+  }
+
+  if (name === "pricebook_packages") {
+    const conds: any[] = [];
+    if (input?.tonnage) conds.push(ilike(pricebookPackages.tonnage, `%${String(input.tonnage).replace(/[^\d.]/g, "")}%`));
+    if (input?.unitType) conds.push(ilike(pricebookPackages.unitType, `%${String(input.unitType)}%`));
+    if (input?.packageLevel) conds.push(ilike(pricebookPackages.packageLevel, `%${String(input.packageLevel)}%`));
+    const packages = await db
+      .select({
+        unitType: pricebookPackages.unitType,
+        tier: pricebookPackages.tier,
+        tonnage: pricebookPackages.tonnage,
+        packageLevel: pricebookPackages.packageLevel,
+        totalInvestment: pricebookPackages.totalInvestment,
+        monthlyPayment: pricebookPackages.monthlyPayment,
+        outdoorName: pricebookPackages.outdoorName,
+        coilName: pricebookPackages.coilName,
+        indoorHeatName: pricebookPackages.indoorHeatName,
+        thermostatName: pricebookPackages.thermostatName,
+      })
+      .from(pricebookPackages)
+      .where(conds.length > 0 ? and(...conds) : undefined)
+      .limit(12);
+    if (packages.length === 0) return "No pricebook packages match those filters — ask the user to clarify unit type, tonnage, or package level.";
+    // Money is stored in cents — hand the model dollars so it can't slip.
+    return JSON.stringify(packages.map((p) => ({ ...p, totalInvestment: (p.totalInvestment ?? 0) / 100, monthlyPayment: (p.monthlyPayment ?? 0) / 100 })));
   }
 
   if (name === "list_work_orders") {
@@ -796,7 +835,10 @@ Action types and their params:
 6. update_customer — edits an existing customer's details. ALWAYS look the customer up with customer_profile FIRST, then build the proposal so the approval card shows the full before-and-after. params: { "customerName": string (required), "changes": object with ONLY the fields to change — any of { "name", "phone", "email", "fullAddress", "customerType" ("residential"|"commercial"), "leadSource", "notes" } — and "current": object with the customer's CURRENT values for those same detail fields from your lookup (name, phone, email, fullAddress, customerType, leadSource — include them all so the card shows the complete record being edited). Never put a field in changes unless the user asked for it to change. }
 7. delete_customer — PERMANENTLY deletes a customer. Only propose when the user explicitly says to delete/remove them — never infer it. The server refuses if the customer has any work orders, quotes, or invoices (say so if your lookup shows they do). params: { "customerName": string (required) }
 8. delete_work_order — deletes one work order (the server refuses if an invoice or quote is linked to it, and asks the user to pick when the customer has several). Only propose on an explicit delete/cancel-and-remove request. params: { "customerName": string (required), "workOrderTitle": string (optional — the job's title if the user gave it or your lookup shows it), "workOrderId": string (optional — ONLY if a lookup returned the exact id) }
-9. create_quote — creates a DRAFT quote (nothing is sent to the customer, no signature requested). GUIDE THE USER — a quote is only as good as its line items: (a) confirm who it's for; (b) price every line item honestly — when the user names a service or part WITHOUT a price, look it up with the price_items tool and use the catalog rate; NEVER invent a price — if the catalog has no match and the user didn't say an amount, ASK before proposing; (c) state the total in your answer. params: { "customerName": string (required), "title": string (optional — short summary like "3-ton heat pump replacement"), "lineItems": array of 1-15 { "description": string, "quantity": number, "unitPrice": number (dollars) } (required), "notes": string (optional — internal notes) }
+9. create_quote — creates a DRAFT quote (nothing is sent to the customer, no signature requested). There are TWO KINDS of quote and you MUST determine which one the user wants BEFORE proposing — if it isn't obvious from what they said, ASK ("Quick line-item quote, or a full system proposal from the pricebook?"):
+   • quoteKind "quick" — an ad-hoc line-item quote for repairs, parts, add-on work. REQUIRED INFO: the customer, and every line item with an honest price — use the price_items tool for catalog rates when the user names work without an amount; NEVER invent a price — if the catalog has no match and the user didn't say a number, ASK for it before proposing.
+   • quoteKind "proposal" — a full system replacement/install proposal priced from the install pricebook (what the Proposal Builder produces). REQUIRED INFO before you may propose: the customer, the unit type (SHP heat pump, GP gas package, PHP, SGA, Mini-Split, ...), the tonnage (2, 2.5, 3, 3.5, 4, 5), and the package level (Good, Better, Best, or Budget). If ANY of these is missing from the conversation, DO NOT propose — ask for exactly the missing pieces and list the choices. Then look the package up with pricebook_packages and build the line items from its REAL numbers: one line for the system install at the package's total investment (describe the equipment in the line), plus any add-ons the user asked for (care plan, ductwork, IAQ — priced via price_items or the user's amount). Mention the monthly payment option in your answer if the pricebook returned one.
+   In every case, state the total in your answer. params: { "customerName": string (required), "quoteKind": "quick" | "proposal" (required), "title": string (optional — e.g. "3-ton SHP Ultimate — Best package"), "lineItems": array of 1-15 { "description": string, "quantity": number, "unitPrice": number (dollars) } (required), "notes": string (optional — internal notes) }
 10. create_invoice — creates a DRAFT invoice (not sent, no payment collected). Invoices MUST be tied to one of the customer's work orders — figure out which visit is being billed (ask, or use their most recent completed job when the user says so; the server offers a pick list when it's ambiguous). Same pricing discipline as quotes: catalog rates via price_items or the user's amounts, never invented. params: { "customerName": string (required), "workOrderTitle": string (optional — which visit to bill), "workOrderId": string (optional — exact id only from a lookup), "lineItems": array of 1-15 { "description": string, "quantity": number, "unitPrice": number (dollars) } (required), "notes": string (optional) }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
@@ -857,7 +899,7 @@ Return JSON with:
         await claudeChatWithTools({
           system:
             systemPrompt +
-            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, price_items, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats, company_docs). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up. BUT be efficient: use the fewest lookups that answer the question, and for action proposals (create/send) ONE customer lookup is usually all you need — once you have enough, stop looking and answer. If a lookup fails twice, answer with what you have and say what you couldn't verify.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
+            "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, price_items, pricebook_packages, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats, company_docs). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up. BUT be efficient: use the fewest lookups that answer the question, and for action proposals (create/send) ONE customer lookup is usually all you need — once you have enough, stop looking and answer. If a lookup fails twice, answer with what you have and say what you couldn't verify.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
           messages: [...priorTurns, userTurn],
           tools: [...CRM_TOOLS, PROPOSE_ACTIONS_TOOL],
           executeTool: async (name, input) =>
