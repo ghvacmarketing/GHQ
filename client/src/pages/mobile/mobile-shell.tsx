@@ -216,11 +216,11 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
         <button
           onClick={() => setCreateOpen(true)}
           className="absolute right-4 z-40 flex items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90"
-          style={{ bottom: "calc(96px + env(safe-area-inset-bottom))", height: 52, width: 52 }}
+          style={{ bottom: "calc(76px + env(safe-area-inset-bottom))", height: 60, width: 60 }}
           data-testid="fab-create"
           aria-label="Create"
         >
-          <Plus className="h-6 w-6" strokeWidth={2.25} />
+          <Plus className="h-7 w-7" strokeWidth={2.25} />
         </button>
       )}
 

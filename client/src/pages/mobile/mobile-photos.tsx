@@ -371,24 +371,6 @@ export default function MobilePhotos() {
             >
               <Search className="h-4 w-4" />
             </button>
-            {/* Quick add — straight to the camera when a customer is picked,
-                otherwise nudge into search to pick who the shots save to */}
-            <button
-              onClick={() => {
-                if (activeCustomer) {
-                  openCamera();
-                } else {
-                  toast({ title: "Pick a customer first", description: "Photos save to a customer — search and select one." });
-                  setSearchActive(true);
-                  setTimeout(() => searchInputRef.current?.focus(), 60);
-                }
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white shadow-sm transition-transform active:scale-95"
-              aria-label="Take and add photos"
-              data-testid="button-quick-add-photo"
-            >
-              <Camera className="h-4 w-4" />
-            </button>
           </div>
         ) : (
           <div className="flex items-center animate-in fade-in slide-in-from-right-8 duration-300 ease-out">

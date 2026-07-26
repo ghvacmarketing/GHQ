@@ -80,7 +80,8 @@ function JobCard({
   const category = job.workSubtype ? formatSubtype(job.workSubtype) : (job.visitType || "Job");
   const address = [job.property?.address1, job.property?.city].filter(Boolean).join(", ");
 
-  const rightLabel = isCompleted
+  const timeStr = start ? format(start, showDate ? "MMM d, h:mm a" : "h:mm a") : null;
+  const statusWord = isCompleted
     ? "Closed"
     : isCancelled
       ? "Cancelled"
@@ -90,24 +91,15 @@ function JobCard({
           ? "Traveling"
           : highlight
             ? "Up next"
-            : showDate && start
-              ? format(start, "MMM d")
-              : start
-                ? format(start, "h:mm")
-                : "Scheduled";
+            : null;
+  const rightLabel = statusWord ? (timeStr ? `${statusWord} · ${timeStr}` : statusWord) : (timeStr || "Scheduled");
   const rightAccent = highlight || job.status === "on_site" || job.status === "en_route";
 
   return (
-    <div className="flex gap-3" data-testid={`job-card-${job.id}`}>
-      <div className="w-11 shrink-0 pt-4 text-right">
-        <span className="block text-xs font-semibold tabular-nums text-slate-500">
-          {start ? format(start, "h:mm") : "—"}
-        </span>
-        {start && <span className="block text-[9px] font-semibold uppercase text-slate-400">{format(start, "a")}</span>}
-      </div>
+    <div data-testid={`job-card-${job.id}`}>
       <button
         onClick={onOpen}
-        className={`min-w-0 flex-1 rounded-[4px] border p-4 text-left transition-transform active:scale-[0.99] ${
+        className={`w-full min-w-0 rounded-[4px] border p-4 text-left transition-transform active:scale-[0.99] ${
           highlight ? "border-[#711419] bg-white" : "border-slate-300/70 bg-slate-100/80"
         } ${isCompleted || isCancelled ? "opacity-70" : ""}`}
       >
@@ -569,16 +561,6 @@ export default function MobileJob() {
               </button>
             ))}
           </div>
-          {isSupervisorPlus && (
-            <button
-              onClick={() => setShowCreateDialog(true)}
-              className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
-              aria-label="New job"
-              data-testid="button-create-work-order"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-          )}
         </div>
 
         {jobsView === "today" && (
