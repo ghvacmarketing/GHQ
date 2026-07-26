@@ -5,7 +5,7 @@ import { isAppActive } from "./activity-tracker";
 // shape the dashboard and the weather-impact job consume, so only this file
 // knows the provider. The home base writes through to the weather_cache DB row
 // (the impact job aggregates from it); other dispatch-area cities are served
-// from an in-memory cache with a 30-minute TTL.
+// from an in-memory cache with a 5-minute TTL.
 const WEATHERAPI_KEY = process.env.WEATHERAPI_KEY || "bf49aa77a7794369be0143857262507";
 const WEATHER_LAT = process.env.WEATHER_LAT || "33.2071";
 const WEATHER_LON = process.env.WEATHER_LON || "-82.3915";
@@ -144,7 +144,9 @@ async function fetchAndAdaptWeather(lat: string, lon: string): Promise<AdaptedWe
 export async function refreshWeather(): Promise<{ success: boolean; error?: string }> {
   try {
     const adapted = await fetchAndAdaptWeather(WEATHER_LAT, WEATHER_LON);
-    const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1000);
+    // Marks the cache stale (and self-heal eligible) if the 5-minute refresh
+    // loop misses a few beats, e.g. after idle skips.
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await storage.upsertWeatherCache({
       id: 1,
@@ -173,16 +175,16 @@ export function scheduleWeatherRefresh(): void {
 
   refreshWeather().catch(console.error);
 
-  // Current conditions + forecast shift during the day — refresh hourly.
+  // Current conditions + forecast shift during the day — refresh every 5 minutes.
   weatherRefreshInterval = setInterval(() => {
     if (!isAppActive()) {
       console.log("[Weather] App idle, skipping refresh");
       return;
     }
     refreshWeather().catch(console.error);
-  }, 60 * 60 * 1000);
+  }, 5 * 60 * 1000);
 
-  console.log("[Weather] Refresh scheduled (hourly, via weatherapi.com)");
+  console.log("[Weather] Refresh scheduled (every 5 minutes, via weatherapi.com)");
 }
 
 export async function getWeatherData() {
@@ -220,11 +222,11 @@ export async function getWeatherDataSelfHealing() {
 }
 
 // ── Per-city weather for the dispatch service area ───────────────────────
-const LOCATION_TTL_MS = 30 * 60 * 1000;
+const LOCATION_TTL_MS = 5 * 60 * 1000;
 const locationCache = new Map<string, { payload: AdaptedWeather; fetchedAt: Date }>();
 
 /** Weather for any roster city. Home base reads the DB cache (shared with the
- *  impact job); other cities hit an in-memory cache with a 30-minute TTL. */
+ *  impact job); other cities hit an in-memory cache with a 5-minute TTL. */
 export async function getWeatherForLocation(slug: string) {
   const location = WEATHER_LOCATIONS.find((l) => l.slug === slug) || WEATHER_LOCATIONS[0];
 

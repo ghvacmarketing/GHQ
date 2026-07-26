@@ -123,8 +123,8 @@ export function WeatherPanel() {
 
   const { data: weather, isLoading } = useQuery<WeatherPayload>({
     queryKey: [`/api/weather?location=${slug}`],
-    staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 10,
+    staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60 * 5,
     retry: false,
   });
 
