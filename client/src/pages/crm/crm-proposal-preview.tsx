@@ -437,71 +437,77 @@ export default function CrmProposalPreview() {
 
   return (
     <CrmLayout>
-      {/* Sticky top bar */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-950 border-b px-4 sm:px-6 py-3 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setIsNavigatingAway(true);
-            setTimeout(() => setLocation(previewData.returnUrl || "/crm/quotes/proposal"), 100);
-          }}
-          className="text-slate-600 dark:text-slate-300"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <img src={redlogo} alt="GHVAC" className="h-8 w-auto hidden sm:block" />
-          <div className="min-w-0">
-            <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight truncate">Equipment Proposal</p>
-            <p className="text-xs text-muted-foreground leading-tight">
-              {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-            </p>
-          </div>
-          <Badge variant="outline" className="text-xs ml-2 hidden sm:flex shrink-0">Valid 30 Days</Badge>
-        </div>
-      </div>
-
       {/* Main content */}
-      <div className="w-full px-4 sm:px-6 py-8 space-y-8">
+      <div className="w-full px-4 sm:px-6 py-6 space-y-8">
 
-        {/* Customer */}
-        <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-          <div className="flex items-center gap-3 flex-wrap">
-            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-            <span className="font-semibold text-lg">{selectedCustomer?.name || "No Customer Selected"}</span>
-            {selectedCustomer?.fullAddress && (
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {selectedCustomer.fullAddress}
-              </span>
-            )}
-            {customerProperties.length === 1 && (
-              <span className="text-sm text-muted-foreground">
-                ({customerProperties[0].city}, {customerProperties[0].state})
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Assign To */}
-        <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Assign To (Sales Team)</Label>
-          <Select value={assignedToId || ""} onValueChange={(v) => setAssignedToId(v || null)}>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Select team member..." />
-            </SelectTrigger>
-            <SelectContent>
-              {assignableUsers && assignableUsers.length > 0 ? (
-                assignableUsers.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.displayName}</SelectItem>
-                ))
+        {/* Proposal info — one card carrying what the setup flow already
+            decided (customer, salesperson) plus the proposal identity. The old
+            sticky header strip, green customer banner, and Assign To select
+            all collapsed into this. */}
+        <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-proposal-info">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4 px-5 py-4">
+            <button
+              onClick={() => {
+                setIsNavigatingAway(true);
+                setTimeout(() => setLocation(previewData.returnUrl || "/crm/quotes/proposal"), 100);
+              }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+              aria-label="Back"
+              data-testid="button-preview-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <img src={redlogo} alt="GHVAC" className="hidden h-9 w-auto sm:block" />
+              <div>
+                <p className="font-semibold leading-tight text-slate-900">Equipment Proposal</p>
+                <p className="text-xs leading-tight text-slate-500">
+                  {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                  <span className="mx-1.5 text-slate-300">·</span>
+                  Valid 30 days
+                </p>
+              </div>
+            </div>
+            <div className="hidden h-9 w-px bg-slate-200 sm:block" />
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Customer</p>
+              <p className="truncate text-sm font-medium text-slate-900">
+                {selectedCustomer?.name || "No customer selected"}
+                {customerProperties.length === 1 ? (
+                  <span className="ml-1.5 font-normal text-slate-500">
+                    ({customerProperties[0].city}, {customerProperties[0].state})
+                  </span>
+                ) : selectedCustomer?.fullAddress ? (
+                  <span className="ml-1.5 font-normal text-slate-500">({selectedCustomer.fullAddress})</span>
+                ) : null}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Salesperson</p>
+              {assignedToId ? (
+                <p className="truncate text-sm font-medium text-slate-900" data-testid="text-assigned-salesperson">
+                  {assignableUsers?.find((u) => u.id === assignedToId)?.displayName || "Assigned"}
+                </p>
               ) : (
-                <SelectItem value="" disabled>No users available</SelectItem>
+                /* Fallback for flows that reached the preview without an
+                   upfront assignment — save still requires one. */
+                <Select value={assignedToId || ""} onValueChange={(v) => setAssignedToId(v || null)}>
+                  <SelectTrigger className="h-8 w-56 focus:ring-0 focus:ring-offset-0">
+                    <SelectValue placeholder="Select team member..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableUsers && assignableUsers.length > 0 ? (
+                      assignableUsers.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.displayName}</SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>No users available</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               )}
-            </SelectContent>
-          </Select>
+            </div>
+          </div>
         </div>
 
         {/* Equipment */}
