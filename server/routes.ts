@@ -21490,7 +21490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/crm/quotes/:id/send - Mark quote as sent
   app.post("/api/crm/quotes/:id/send", requireCrmTechOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -22198,8 +22198,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
+      // Surface the first concrete failure so the client toast can say WHY —
+      // success:false with no reason showed only a generic "Failed to send".
+      const firstError = anySuccess
+        ? undefined
+        : (emailResults.find((r) => r.error)?.error
+            || smsResult?.errorMessage
+            || "Sending failed — check the quote's email/phone and the email service configuration");
+
       return res.json({
         success: anySuccess,
+        error: firstError,
         emailSent,
         smsSent,
         emailResults,
@@ -22207,16 +22216,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         successCount: emailResults.filter(r => r.success).length,
         totalCount: emailList.length,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending quote email:", error);
-      return res.status(500).json({ message: "Failed to send quote email" });
+      return res.status(500).json({ message: error?.message ? `Failed to send quote email: ${error.message}` : "Failed to send quote email" });
     }
   });
 
   // POST /api/crm/quotes/:id/mark-sent - Manually mark quote as sent without sending email
   app.post("/api/crm/quotes/:id/mark-sent", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
