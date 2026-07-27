@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -275,46 +274,6 @@ export default function CrmItems() {
     }).format(num);
   };
 
-  const getCategoryBadgeClass = (category: string | null | undefined) => {
-    switch (category) {
-      case "parts":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "equipment":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      case "install":
-        return "bg-indigo-100 text-indigo-700 border-indigo-200";
-      case "maintenance":
-        return "bg-cyan-100 text-cyan-700 border-cyan-200";
-      case "protection":
-        return "bg-emerald-100 text-emerald-700 border-emerald-200";
-      case "field_edge":
-        return "bg-violet-100 text-violet-700 border-violet-200";
-      case "service":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "supplies":
-        return "bg-amber-100 text-amber-700 border-amber-200";
-      case "fees":
-        return "bg-orange-100 text-orange-700 border-orange-200";
-      case "discount":
-        return "bg-pink-100 text-pink-700 border-pink-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
-    }
-  };
-
-  const getTypeBadgeClass = (itemType: string | null | undefined) => {
-    switch (itemType) {
-      case "residential":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "commercial":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      case "crawlspace":
-        return "bg-amber-100 text-amber-700 border-amber-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
-    }
-  };
-
   const formatCategoryLabel = (category: string | null | undefined) => {
     if (!category) return "Uncategorized";
     return categoryLabels[category] || category.charAt(0).toUpperCase() + category.slice(1);
@@ -559,13 +518,8 @@ export default function CrmItems() {
                           </>
                         ) : (
                           <>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={getCategoryBadgeClass(item.category)}
-                              >
-                                {formatCategoryLabel(item.category)}
-                              </Badge>
+                            <TableCell className="text-slate-600">
+                              {formatCategoryLabel(item.category)}
                             </TableCell>
                             <TableCell className="text-slate-900 font-medium text-right">
                               {formatCurrency(item.rate)}
@@ -625,9 +579,7 @@ export default function CrmItems() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-xs text-slate-500">Category</Label>
-                    <Badge variant="outline" className={getCategoryBadgeClass(selectedItem.category)}>
-                      {formatCategoryLabel(selectedItem.category)}
-                    </Badge>
+                    <p className="font-medium text-slate-700">{formatCategoryLabel(selectedItem.category)}</p>
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Rate</Label>

@@ -29,15 +29,11 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
-  Zap,
-  FileText,
   Check,
   Plus,
   Trash2,
-  Calculator,
   Tag,
   Search,
-  User,
   Loader2,
   Package,
   Info,
@@ -52,28 +48,7 @@ import {
 } from "@/lib/protection-discount";
 import type { CrmUser, CrmCustomer, CrmItem } from "@shared/schema";
 
-const QUOTE_TYPES = [
-  {
-    value: "quick",
-    label: "Quick Quote",
-    description: "Create a simple quote with line items",
-    icon: Zap,
-  },
-  {
-    value: "proposal",
-    label: "From Proposal Builder",
-    description: "Build a detailed proposal with templates",
-    icon: FileText,
-  },
-  {
-    value: "worksheet",
-    label: "Custom Pricing",
-    description: "Calculate install pricing with labor, materials, and margins",
-    icon: Calculator,
-  },
-];
-
-type FormStep = 1 | 2 | 3 | 4;
+type FormStep = 2 | 3 | 4;
 
 interface LineItem {
   id: string;
@@ -128,9 +103,9 @@ export default function CrmQuoteCreate() {
   usePageTitle("Create Quote");
   const [, navigate] = useLocation();
 
-  // Read URL params for auto-linking. The "setup=1" flow means the New Quote
-  // setup stepper already collected customer/property/link/assignee — the
-  // wizard starts at the details step and skips the redundant questions.
+  // This page is the quick-quote form only. Customer, property, link, and
+  // assignee arrive via URL params (from the New Quote setup dialog or a
+  // customer/work-order/project page) — there is no customer-picking step.
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
   const customerIdFromUrl = urlParams.get("customerId");
@@ -138,9 +113,8 @@ export default function CrmQuoteCreate() {
   const projectIdFromUrl = urlParams.get("projectId");
   const sourceTypeFromUrl = urlParams.get("sourceType");
   const assignedToIdFromUrl = urlParams.get("assignedToId");
-  const fromSetup = urlParams.get("setup") === "1";
 
-  const [currentStep, setCurrentStep] = useState<FormStep>(fromSetup && customerIdFromUrl ? 2 : 1);
+  const [currentStep, setCurrentStep] = useState<FormStep>(2);
   const [formData, setFormData] = useState<FormData>(() => ({
     ...initialFormData,
     assignedToId: assignedToIdFromUrl || null,
@@ -156,12 +130,9 @@ export default function CrmQuoteCreate() {
   // Protection bundle parts-discount prompt
   const [protectionPrompt, setProtectionPrompt] = useState<{ pct: number; bundleName: string } | null>(null);
 
-  // Customer search state
-  const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [portalCanView, setPortalCanView] = useState(false);
-  const [hasSelectedQuoteType, setHasSelectedQuoteType] = useState(fromSetup);
 
   // CRM Items catalog state
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
@@ -177,24 +148,6 @@ export default function CrmQuoteCreate() {
       return res.json();
     },
     enabled: !!selectedCustomer?.parentCustomerId && !!selectedCustomer?.billToParent,
-  });
-
-  // Customer search query — use the merged endpoint so both CRM-native customers
-  // AND the FieldEdge customer master (Google Sheet) are searchable. Selecting a
-  // FieldEdge customer is fine: the server promotes it into crm_customers on submit.
-  const { data: customerSearchResults, isLoading: isSearchingCustomers } = useQuery<CrmCustomer[]>({
-    queryKey: ["/api/crm/customers/merged", "search", customerSearch],
-    queryFn: async () => {
-      if (!customerSearch.trim()) return [];
-      const response = await fetch(
-        `/api/crm/customers/merged?search=${encodeURIComponent(customerSearch)}&limit=25`,
-        { credentials: "include" },
-      );
-      if (!response.ok) throw new Error("Failed to search customers");
-      const data = await response.json();
-      return data.customers || [];
-    },
-    enabled: customerSearch.trim().length >= 2,
   });
 
   // CRM Items search query
@@ -359,31 +312,6 @@ export default function CrmQuoteCreate() {
     return item.category === categoryFilter;
   }) || [];
 
-  const handleCustomerSelect = (customer: CrmCustomer) => {
-    setSelectedCustomer(customer);
-    setFormData(prev => ({
-      ...prev,
-      customerId: customer.id,
-      customerName: customer.name,
-      customerEmail: customer.email || "",
-      customerPhone: customer.phone || "",
-      serviceAddress: customer.fullAddress || "",
-    }));
-    setCustomerSearch("");
-  };
-
-  const clearCustomer = () => {
-    setSelectedCustomer(null);
-    setFormData(prev => ({
-      ...prev,
-      customerId: null,
-      customerName: "",
-      customerEmail: "",
-      customerPhone: "",
-      serviceAddress: "",
-    }));
-  };
-
   useEffect(() => {
     setTimeout(() => {
       if (stepContainerRef.current) {
@@ -407,6 +335,13 @@ export default function CrmQuoteCreate() {
       navigate("/crm/login");
     }
   }, [authLoading, currentUser, navigate]);
+
+  // No customer in the URL means this page was reached directly — send the
+  // user to the quotes list, where the New Quote setup dialog starts the flow.
+  useEffect(() => {
+    if (!customerIdFromUrl) navigate("/crm/quotes", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-fetch customer when coming from work order
   useEffect(() => {
@@ -437,32 +372,6 @@ export default function CrmQuoteCreate() {
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleQuoteTypeSelect = (type: "quick" | "proposal" | "worksheet") => {
-    if (type === "proposal") {
-      // Use route param for customer ID when available, then add projectId as query param
-      const effectiveCustomerId = customerIdFromUrl || formData.customerId;
-      const queryParams = new URLSearchParams();
-      if (projectIdFromUrl) {
-        queryParams.set("projectId", projectIdFromUrl);
-      }
-      const queryStr = queryParams.toString();
-      
-      if (effectiveCustomerId) {
-        navigate(`/crm/quotes/proposal/${effectiveCustomerId}${queryStr ? `?${queryStr}` : ""}`);
-      } else {
-        navigate(`/crm/quotes/proposal${queryStr ? `?${queryStr}` : ""}`);
-      }
-      return;
-    }
-    if (type === "worksheet") {
-      navigate("/crm/quotes/install-worksheet/new");
-      return;
-    }
-    updateField("quoteType", type);
-    setHasSelectedQuoteType(true);
-    // Don't auto-advance - let user fill in title/description/assignee first
   };
 
   const addLineItem = () => {
@@ -616,9 +525,7 @@ export default function CrmQuoteCreate() {
     }
   };
 
-  // The setup-stepper flow starts at step 2 (customer already chosen), so
-  // back-navigation bottoms out there instead of the customer step.
-  const minStep: FormStep = fromSetup && customerIdFromUrl ? 2 : 1;
+  const minStep: FormStep = 2;
   const handleBack = () => {
     if (currentStep > minStep) {
       setCurrentStep((prev) => (prev - 1) as FormStep);
@@ -708,11 +615,8 @@ export default function CrmQuoteCreate() {
 
   const canProceed = (step: FormStep): boolean => {
     switch (step) {
-      case 1:
-        return formData.customerId !== null;
       case 2:
-        // Require explicit quote type selection before proceeding
-        return hasSelectedQuoteType && formData.quoteType === "quick";
+        return formData.customerId !== null;
       case 3:
         return formData.lineItems.some(item => item.description.trim().length > 0);
       case 4:
@@ -738,8 +642,7 @@ export default function CrmQuoteCreate() {
   }
 
   const steps = [
-    { number: 1, label: "Customer" },
-    { number: 2, label: "Quote Type" },
+    { number: 2, label: "Details" },
     { number: 3, label: "Line Items" },
     { number: 4, label: "Review" },
   ];
@@ -749,11 +652,9 @@ export default function CrmQuoteCreate() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => {
-            // Mid-wizard the arrow steps BACK a step (it used to jump to the
-            // customer page from any step). Only on the first visible step
-            // does it leave to the source: project > customer > quotes list.
-            const firstStep = fromSetup && customerIdFromUrl ? 2 : 1;
-            if (currentStep > firstStep) {
+            // Mid-form the arrow steps BACK a step; on the first step it
+            // leaves to the source: project > customer > quotes list.
+            if (currentStep > minStep) {
               setCurrentStep((prev) => (prev - 1) as FormStep);
               return;
             }
@@ -768,8 +669,10 @@ export default function CrmQuoteCreate() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Create New Quote</h1>
-            <p className="text-slate-500 text-sm mt-1">Start by selecting a customer</p>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Quick Quote</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {selectedCustomer ? `For ${selectedCustomer.name}` : "Simple quote with line items"}
+            </p>
           </div>
         </div>
 
@@ -787,7 +690,7 @@ export default function CrmQuoteCreate() {
                 )}
                 data-testid={`step-indicator-${step.number}`}
               >
-                {currentStep > step.number ? <Check className="h-5 w-5" /> : step.number}
+                {currentStep > step.number ? <Check className="h-5 w-5" /> : index + 1}
               </div>
               <span
                 className={cn(
@@ -811,191 +714,27 @@ export default function CrmQuoteCreate() {
 
         <Card className="bg-white shadow-sm">
           <CardContent ref={stepContainerRef} className="p-6">
-            {currentStep === 1 && (
-              <div className="space-y-6">
-                <CardHeader className="px-0 pt-0">
-                  <CardTitle>Select Customer</CardTitle>
-                  <CardDescription>Start by selecting the customer for this quote</CardDescription>
-                </CardHeader>
-                
-                {/* Customer Search/Selection */}
-                {!selectedCustomer ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="customerSearch">Search Customer *</Label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <Input
-                          id="customerSearch"
-                          placeholder="Search by name, phone, email, or address..."
-                          value={customerSearch}
-                          onChange={(e) => setCustomerSearch(e.target.value)}
-                          className="pl-10"
-                          data-testid="input-customer-search"
-                        />
-                        {isSearchingCustomers && (
-                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 animate-spin" />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Search Results */}
-                    {customerSearch.trim().length >= 2 && (
-                      <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
-                        {isSearchingCustomers ? (
-                          <div className="p-4 text-center text-slate-500">
-                            <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                            Searching...
-                          </div>
-                        ) : customerSearchResults && customerSearchResults.length > 0 ? (
-                          <div className="divide-y">
-                            {[...customerSearchResults].sort((a, b) => {
-                              const t = customerSearch.trim().toLowerCase();
-                              const aName = (a.name || "").toLowerCase();
-                              const bName = (b.name || "").toLowerCase();
-                              if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
-                              if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
-                              return 0;
-                            }).map((customer) => (
-                              <button
-                                key={customer.id}
-                                type="button"
-                                onClick={() => handleCustomerSelect(customer)}
-                                className="w-full p-3 text-left hover:bg-slate-50 transition-colors"
-                                data-testid={`customer-result-${customer.id}`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="p-2 bg-slate-100 rounded-full">
-                                    <User className="h-4 w-4 text-slate-600" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-slate-900 truncate">{customer.name}</p>
-                                    <p className="text-sm text-slate-500 truncate">
-                                      {customer.phone || customer.email || "No contact info"}
-                                    </p>
-                                    {customer.fullAddress && (
-                                      <p className="text-sm text-slate-400 truncate">{customer.fullAddress}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="p-4 text-center text-slate-500">
-                            No customers found matching "{customerSearch}"
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {customerSearch.trim().length > 0 && customerSearch.trim().length < 2 && (
-                      <p className="text-sm text-slate-500">Type at least 2 characters to search</p>
-                    )}
-                  </div>
-                ) : (
-                  /* Selected Customer Display */
-                  <div className="space-y-2">
-                    <div className="border-2 border-[#d3b07d] bg-[#faf6ef] rounded-lg p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 bg-[#d3b07d] rounded-full">
-                            <User className="h-5 w-5 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-900">{selectedCustomer.name}</p>
-                            {selectedCustomer.phone && (
-                              <p className="text-sm text-slate-600">{selectedCustomer.phone}</p>
-                            )}
-                            {selectedCustomer.email && (
-                              <p className="text-sm text-slate-600">{selectedCustomer.email}</p>
-                            )}
-                            {selectedCustomer.fullAddress && (
-                              <p className="text-sm text-slate-500 mt-1">{selectedCustomer.fullAddress}</p>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearCustomer}
-                          className="text-slate-500 hover:text-slate-700"
-                          data-testid="button-clear-customer"
-                        >
-                          Change
-                        </Button>
-                      </div>
-                    </div>
-                    {/* Billing-to-parent notice */}
-                    {selectedCustomer.billToParent && (
-                      <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-                        <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                        <p className="text-sm text-amber-800">
-                          <span className="font-medium">Billing to parent: </span>
-                          {parentCustomerForBanner
-                            ? parentCustomerForBanner.name
-                            : "parent account"}
-                          {" — invoices for this sub-account go to the parent."}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
             {currentStep === 2 && (
               <div className="space-y-6">
                 <CardHeader className="px-0 pt-0">
-                  <CardTitle>{fromSetup ? "Quote Details" : "Quote Type & Details"}</CardTitle>
+                  <CardTitle>Quote Details</CardTitle>
                   <CardDescription>
-                    {fromSetup
-                      ? `Details for ${selectedCustomer?.name || "the selected customer"}`
-                      : `Choose quote type and enter details for ${selectedCustomer?.name}`}
+                    Details for {selectedCustomer?.name || "the selected customer"}
                   </CardDescription>
                 </CardHeader>
 
-                {/* Quote Type Selection — skipped when the setup stepper already chose it */}
-                {!fromSetup && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {QUOTE_TYPES.map((type) => {
-                    const Icon = type.icon;
-                    const isSelected = formData.quoteType === type.value;
-                    return (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() => handleQuoteTypeSelect(type.value as "quick" | "proposal" | "worksheet")}
-                        className={cn(
-                          "flex flex-col items-center p-6 rounded-lg border-2 transition-all text-left",
-                          isSelected
-                            ? "border-[#d3b07d] bg-[#faf6ef]"
-                            : "border-slate-200 hover:border-[#e5cfa6] hover:bg-slate-50"
-                        )}
-                        data-testid={`select-type-${type.value}`}
-                      >
-                        <div
-                          className={cn(
-                            "p-3 rounded-full mb-3",
-                            isSelected ? "bg-[#d3b07d] text-white" : "bg-slate-100 text-slate-600"
-                          )}
-                        >
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <h3 className={cn("font-semibold", isSelected ? "text-[#b8944d]" : "text-slate-900")}>
-                          {type.label}
-                        </h3>
-                        <p className="text-sm text-slate-500 text-center mt-1">{type.description}</p>
-                        {isSelected && (
-                          <div className="mt-3">
-                            <Check className="h-5 w-5 text-[#d3b07d]" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Billing-to-parent notice */}
+                {selectedCustomer?.billToParent && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                    <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-amber-800">
+                      <span className="font-medium">Billing to parent: </span>
+                      {parentCustomerForBanner
+                        ? parentCustomerForBanner.name
+                        : "parent account"}
+                      {" — invoices for this sub-account go to the parent."}
+                    </p>
+                  </div>
                 )}
 
                 {/* Only show these fields for Quick Quote after selection */}

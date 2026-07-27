@@ -18,13 +18,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import {
   PenLine, Plus, FileText, Loader2, Trash2, Upload, CheckCircle2, Send,
-  Download, Clock, Users, DollarSign,
-  FileUp,
+  Download, FileUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { CrmUser, SignatureDocument } from "@shared/schema";
@@ -324,8 +326,7 @@ export default function CrmEsign() {
                   className="group flex flex-col rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-colors hover:border-slate-900"
                   data-testid={`doc-card-${doc.id}`}
                 >
-                  <div className="flex w-full items-start justify-between gap-2">
-                    <FileText className="h-5 w-5 text-[#711419]" strokeWidth={1.75} />
+                  <div className="flex w-full items-start">
                     <StatusDot pill={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
                       {STATUS_LABELS[doc.status] || doc.status}
                     </StatusDot>
@@ -346,90 +347,107 @@ export default function CrmEsign() {
           </div>
         ) : (
           <SectionCard title="Documents" description={`${filtered.length} of ${docs.length}`} noBodyPadding>
-            <ul className="divide-y divide-border">
-              {filtered.map((doc) => {
-                const pct = doc.recipientCount > 0 ? Math.round((doc.signedCount / doc.recipientCount) * 100) : 0;
-                return (
-                  <li key={doc.id}>
-                    <div
-                      className="group flex cursor-pointer items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted"
-                      onClick={() => navigate(`/crm/esign/${doc.id}`)}
-                      data-testid={`card-document-${doc.id}`}
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate font-medium text-foreground" data-testid={`text-title-${doc.id}`}>{doc.title}</span>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="font-semibold">Document</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Signed</TableHead>
+                    <TableHead className="font-semibold">Deposit</TableHead>
+                    <TableHead className="font-semibold text-right">Pages</TableHead>
+                    <TableHead className="font-semibold">Created</TableHead>
+                    <TableHead className="font-semibold text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((doc) => {
+                    const pct = doc.recipientCount > 0 ? Math.round((doc.signedCount / doc.recipientCount) * 100) : 0;
+                    return (
+                      <TableRow
+                        key={doc.id}
+                        className="cursor-pointer transition-colors hover:bg-muted"
+                        onClick={() => navigate(`/crm/esign/${doc.id}`)}
+                        data-testid={`card-document-${doc.id}`}
+                      >
+                        <TableCell className="max-w-[320px]">
+                          <span className="block truncate font-medium text-foreground" data-testid={`text-title-${doc.id}`}>{doc.title}</span>
+                        </TableCell>
+                        <TableCell>
                           <StatusDot pill={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
-                            {doc.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                            {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
                             {STATUS_LABELS[doc.status] || doc.status}
                           </StatusDot>
-                          {doc.depositEnabled && (doc.depositAmountCents ?? 0) > 0 && (
+                        </TableCell>
+                        <TableCell>
+                          {doc.recipientCount > 0 ? (
+                            <div className="flex items-center gap-2">
+                              <span className="tabular-nums text-sm text-foreground">{doc.signedCount}/{doc.recipientCount}</span>
+                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className={`h-full rounded-full transition-all ${doc.status === "completed" ? "bg-emerald-500" : "bg-blue-500"}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {doc.depositEnabled && (doc.depositAmountCents ?? 0) > 0 ? (
                             <StatusDot
                               pill={doc.depositPaidAt
                                 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-300"
                                 : "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-300"}
                               data-testid={`badge-deposit-${doc.id}`}
                             >
-                              <DollarSign className="mr-0.5 h-3 w-3" />
                               {doc.depositPaidAt
-                                ? `Deposit paid $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`
-                                : `Deposit due $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`}
+                                ? `Paid $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`
+                                : `Due $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`}
                             </StatusDot>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
                           )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <FileText className="h-3 w-3" /> {doc.pageCount} page{doc.pageCount === 1 ? "" : "s"}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {doc.recipientCount > 0 ? `${doc.signedCount}/${doc.recipientCount} signed` : "No recipients"}
-                          </span>
-                          {doc.createdAt && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> {format(new Date(doc.createdAt), "MMM d, yyyy")}
-                            </span>
-                          )}
-                        </div>
-                        {doc.status === "sent" && doc.recipientCount > 0 && (
-                          <div className="mt-2 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{doc.pageCount}</TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {doc.createdAt ? format(new Date(doc.createdAt), "MMM d, yyyy") : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {doc.status === "completed" && doc.signedObjectPath && (
+                              <Button
+                                variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-slate-900"
+                                title="Download signed PDF"
+                                onClick={(e) => { e.stopPropagation(); window.open(doc.signedObjectPath!, "_blank"); }}
+                                data-testid={`button-download-${doc.id}`}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-slate-900"
+                              title="Restore PDF — re-upload the original if this document won't load"
+                              onClick={(e) => { e.stopPropagation(); setRestoreTargetId(doc.id); restoreInputRef.current?.click(); }}
+                              data-testid={`button-restore-${doc.id}`}
+                            >
+                              <FileUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-red-600"
+                              onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}
+                              data-testid={`button-delete-${doc.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                      {doc.status === "completed" && doc.signedObjectPath && (
-                        <Button
-                          variant="outline" size="sm" className="shrink-0"
-                          onClick={(e) => { e.stopPropagation(); window.open(doc.signedObjectPath!, "_blank"); }}
-                          data-testid={`button-download-${doc.id}`}
-                        >
-                          <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-slate-900"
-                        title="Restore PDF — re-upload the original if this document won't load"
-                        onClick={(e) => { e.stopPropagation(); setRestoreTargetId(doc.id); restoreInputRef.current?.click(); }}
-                        data-testid={`button-restore-${doc.id}`}
-                      >
-                        <FileUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-red-600"
-                        onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}
-                        data-testid={`button-delete-${doc.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </SectionCard>
         )}
       </div>

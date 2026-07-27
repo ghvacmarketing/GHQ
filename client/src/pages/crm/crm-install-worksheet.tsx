@@ -558,7 +558,7 @@ export default function CrmInstallWorksheet() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/crm/quotes/new")} data-testid="button-back">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/crm/quotes")} data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>

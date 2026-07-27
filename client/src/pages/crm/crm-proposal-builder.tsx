@@ -2976,8 +2976,9 @@ export default function CrmProposalBuilder() {
         {/* Fixed Header */}
         <div className="flex flex-col gap-4 pb-4 mb-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => {
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => {
                 const queryParams = new URLSearchParams(window.location.search);
                 const projectId = queryParams.get("projectId");
                 const customerId = routeParams.customerId;
@@ -2988,13 +2989,10 @@ export default function CrmProposalBuilder() {
                 } else {
                   setLocation("/crm/quotes");
                 }
-              }} data-testid="button-back-to-quotes">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
+              }} data-testid="button-exit-builder">
+                <X className="h-4 w-4 mr-1" />
+                Exit
               </Button>
-              <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
-            </div>
-            <div className="flex items-center space-x-2">
               <Sheet open={cartOpen} onOpenChange={setCartOpen}>
               <SheetTrigger asChild>
                 <Button
@@ -3358,151 +3356,29 @@ export default function CrmProposalBuilder() {
             </div>
           </div>
           
-          {/* Customer Selection Section */}
-          <Card className={`border-2 ${selectedCustomer ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' : 'border-muted'}`}>
-            <CardContent className="py-4 px-5">
-              {selectedCustomer ? (
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Customer
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-lg">{selectedCustomer.name}</span>
-                      {selectedCustomer.fullAddress && (
-                        <span className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {selectedCustomer.fullAddress}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Property selection for customers with multiple sites */}
-                    {customerProperties.length > 1 && (
-                      <select
-                        value={selectedPropertyId || ""}
-                        onChange={(e) => setSelectedPropertyId(e.target.value || null)}
-                        className="h-9 px-3 border rounded-md bg-white dark:bg-gray-900 text-sm"
-                        data-testid="select-property-main"
-                      >
-                        <option value="">Select Property...</option>
-                        {customerProperties.map((prop) => (
-                          <option key={prop.id} value={prop.id}>
-                            {prop.address1}, {prop.city}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {isLoadingProperties && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedCustomer(null);
-                        setCustomerName('');
-                        setCustomerAddress('');
-                        setCustomerProperties([]);
-                        setSelectedPropertyId(null);
-                      }}
-                    >
-                      <Pencil className="h-3 w-3 mr-1" />
-                      Change Customer
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">Search and attach a customer to this proposal (optional)</p>
-                  <div className="max-w-lg">
-                    <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            value={customerSearchTerm}
-                            onChange={(e) => {
-                              setCustomerSearchTerm(e.target.value);
-                              if (e.target.value.length >= 2) {
-                                setIsCustomerPopoverOpen(true);
-                              }
-                            }}
-                            onFocus={() => {
-                              if (customerSearchTerm.length >= 2) {
-                                setIsCustomerPopoverOpen(true);
-                              }
-                            }}
-                            placeholder="Search by name, phone, email, or address..."
-                            className="pl-10 pr-10 h-11 bg-white dark:bg-gray-900 text-base"
-                            data-testid="input-customer-search-main"
-                            autoFocus
-                          />
-                          {isSearchingCustomers && (
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                      </PopoverTrigger>
-                      <PopoverContent 
-                        className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" 
-                        align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()}
-                      >
-                        <div className="p-2 border-b">
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="searchAllMain"
-                              checked={searchAllFields}
-                              onCheckedChange={(checked) => setSearchAllFields(checked === true)}
-                            />
-                            <label htmlFor="searchAllMain" className="text-xs text-muted-foreground cursor-pointer">
-                              Search all fields (address, email, phone)
-                            </label>
-                          </div>
-                        </div>
-                        <ScrollArea className="max-h-64">
-                          {customerSearchResults.length === 0 && debouncedCustomerSearch.length >= 2 && !isSearchingCustomers && (
-                            <div className="p-4 text-center text-muted-foreground text-sm">
-                              No customers found for "{debouncedCustomerSearch}"
-                            </div>
-                          )}
-                          {[...customerSearchResults].sort((a, b) => {
-                            const t = debouncedCustomerSearch.trim().toLowerCase();
-                            const aName = (a.name || "").toLowerCase();
-                            const bName = (b.name || "").toLowerCase();
-                            if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
-                            if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
-                            return 0;
-                          }).map((customer) => (
-                            <div
-                              key={customer.id}
-                              className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
-                              onClick={() => handleSelectCustomer(customer)}
-                              data-testid={`customer-result-main-${customer.id}`}
-                            >
-                              <p className="font-medium">{customer.name}</p>
-                              <div className="text-sm text-muted-foreground space-y-0.5">
-                                {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
-                                {(customer.phone || customer.email) && (
-                                  <p className="truncate">
-                                    {customer.phone && <span>{customer.phone}</span>}
-                                    {customer.phone && customer.email && <span> • </span>}
-                                    {customer.email && <span>{customer.email}</span>}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </ScrollArea>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
+          {/* Property selection — only surfaces when the customer has multiple
+              sites and the setup flow didn't already pick one. */}
+          {selectedCustomer && customerProperties.length > 1 && !preloadedPropertyId && (
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground shrink-0">Property</Label>
+              <select
+                value={selectedPropertyId || ""}
+                onChange={(e) => setSelectedPropertyId(e.target.value || null)}
+                className="h-9 px-3 border rounded-md bg-white dark:bg-gray-900 text-sm"
+                data-testid="select-property-main"
+              >
+                <option value="">Select Property...</option>
+                {customerProperties.map((prop) => (
+                  <option key={prop.id} value={prop.id}>
+                    {prop.address1}, {prop.city}
+                  </option>
+                ))}
+              </select>
+              {isLoadingProperties && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
@@ -3532,7 +3408,7 @@ export default function CrmProposalBuilder() {
 
           <TabsContent value="preset">
             <div className="flex items-center gap-2 mb-4">
-              {currentStep > 1 ? (
+              {currentStep > 1 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -3543,13 +3419,6 @@ export default function CrmProposalBuilder() {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-              ) : (
-                <Link href="/crm/quotes/new">
-                  <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Quotes
-                  </Button>
-                </Link>
               )}
               <div className="text-sm text-muted-foreground flex items-center">
                 <span className="font-medium">Step {currentStep} of {totalSteps}</span>
@@ -4050,7 +3919,7 @@ export default function CrmProposalBuilder() {
 
           <TabsContent value="custom">
             <div className="flex items-center gap-2 mb-4">
-              {customBuildStep > 1 ? (
+              {customBuildStep > 1 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -4061,13 +3930,6 @@ export default function CrmProposalBuilder() {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-              ) : (
-                <Link href="/crm/quotes/new">
-                  <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home-custom">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Quotes
-                  </Button>
-                </Link>
               )}
               <div className="text-sm text-muted-foreground flex items-center">
                 <span className="font-medium">Step {customBuildStep} of 3</span>
@@ -4762,12 +4624,6 @@ export default function CrmProposalBuilder() {
 
           <TabsContent value="crawlspace">
             <div className="flex items-center gap-2 mb-4">
-              <Link href="/crm/quotes/new">
-                <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home-crawlspace">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Quotes
-                </Button>
-              </Link>
               <div className="text-sm text-muted-foreground flex items-center">
                 <span className="font-medium">Crawlspace Encapsulation</span>
               </div>
