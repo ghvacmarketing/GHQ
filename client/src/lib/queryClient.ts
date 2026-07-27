@@ -1,5 +1,18 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// A newer login displaced this device's CRM session (single-active-session
+// policy). Send the user to the login page with an explanation — every authed
+// endpoint returns this code once it happens, so whichever request lands
+// first triggers the notice.
+let sessionReplacedHandled = false;
+function handleSessionReplaced(payload: unknown) {
+  if (sessionReplacedHandled) return;
+  if (!payload || typeof payload !== "object" || (payload as Record<string, unknown>).code !== "SESSION_REPLACED") return;
+  if (window.location.pathname.startsWith("/crm/login")) return;
+  sessionReplacedHandled = true;
+  window.location.replace("/crm/login?reason=session-replaced");
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -13,6 +26,7 @@ async function throwIfResNotOk(res: Response) {
     }
     
     if (jsonError && typeof jsonError === 'object') {
+      if (res.status === 401) handleSessionReplaced(jsonError);
       // Create an error object that carries the full JSON payload
       const error = new Error(jsonError.message as string || `${res.status}: ${text}`);
       Object.assign(error, jsonError);
@@ -103,6 +117,12 @@ export const getQueryFn: <T>(options: {
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      // Even a swallowed 401 must surface a displaced-session notice.
+      try {
+        handleSessionReplaced(await res.clone().json());
+      } catch {
+        // non-JSON 401 — nothing to surface
+      }
       return null;
     }
 

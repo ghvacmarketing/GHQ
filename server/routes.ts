@@ -85,7 +85,7 @@ import { fieldEdgeCustomerService, type FieldEdgeCustomer } from "./services/fie
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { recordUserActivity } from "./activity-tracker";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, revokeOtherCrmSessions, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
 import { startGmailConnect, handleGmailConnectCallback } from "./crm-gmail-auth";
 import {
@@ -6698,6 +6698,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userAgent = req.headers["user-agent"];
       const ipAddress = req.ip || req.socket.remoteAddress;
       const session = await createCrmSession(user.id, userAgent, ipAddress);
+
+      // Single active session: this login displaces every other live session
+      // for the account — the displaced devices are told someone signed in.
+      const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken).catch(() => 0);
+      if (kicked > 0) {
+        logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "password", ip: ipAddress }, req.ip).catch(() => {});
+      }
 
       res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {
         httpOnly: true,

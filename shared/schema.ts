@@ -875,6 +875,11 @@ export const crmSessions = pgTable("crm_sessions", {
   createdAt: timestamp("created_at").defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
   lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  // Set when a newer login displaced this session (single-active-session
+  // policy) — kept until expiry so the old device can be TOLD why it was
+  // signed out instead of getting a bare 401.
+  revokedAt: timestamp("revoked_at"),
+  revokedReason: text("revoked_reason"),
 });
 
 // CRM Audit Log

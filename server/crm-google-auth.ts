@@ -4,6 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import {
   getCrmUserByEmail,
   createCrmSession,
+  revokeOtherCrmSessions,
   logCrmAudit,
   CRM_SESSION_COOKIE,
 } from "./crm-auth";
@@ -139,6 +140,12 @@ export async function handleGoogleOAuthCallback(
     const userAgent = req.headers["user-agent"];
     const ipAddress = req.ip || req.socket.remoteAddress;
     const session = await createCrmSession(user.id, userAgent, ipAddress);
+
+    // Single active session: displace other live sessions for this account.
+    const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken).catch(() => 0);
+    if (kicked > 0) {
+      await logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "google", ip: ipAddress }, req.ip).catch(() => {});
+    }
 
     res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {
       httpOnly: true,

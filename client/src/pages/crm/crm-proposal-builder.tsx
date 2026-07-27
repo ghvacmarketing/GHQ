@@ -1101,6 +1101,13 @@ export default function CrmProposalBuilder() {
     refetchOnWindowFocus: false,
   });
 
+  // The quote dialog no longer has an Assign To dropdown (the New Quote setup
+  // picks the salesperson) — an entry that skipped setup falls back to the
+  // signed-in user so saving to CRM never dead-ends on a missing assignee.
+  useEffect(() => {
+    if (!assignedToId && currentUser?.id) setAssignedToId(currentUser.id);
+  }, [assignedToId, currentUser?.id]);
+
   // Accept quote mutation
   const acceptQuoteMutation = useMutation({
     mutationFn: async (data: {
@@ -4904,74 +4911,43 @@ export default function CrmProposalBuilder() {
 
       <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
         <DialogContent className="sm:max-w-3xl h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="bg-gray-50 dark:bg-gray-900 border-b mx-4 mt-4 rounded-lg px-5 py-4 sm:px-6 sm:py-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <img
-                  src={redlogo}
-                  alt="GHVAC"
-                  className="h-12 sm:h-14 w-auto"
-                />
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">Equipment Proposal</h1>
-                  <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-sm hidden sm:flex">
-                Valid 30 Days
-              </Badge>
-            </div>
-          </div>
-          
           <ScrollArea className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6">
-            {/* Customer Display - Read-only, selected on main page */}
-            <div className="mb-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
+            {/* Proposal overview — one card carrying what used to be three
+                strips: title/date/validity, the customer, and who it's
+                assigned to (chosen in the New Quote setup). */}
+            <div className="mb-6 overflow-hidden rounded-lg border shadow-sm">
+              <div className="flex items-center justify-between gap-4 border-b bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="font-semibold text-lg">{selectedCustomer?.name || 'No Customer Selected'}</span>
-                  {selectedCustomer?.fullAddress && (
-                    <span className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {selectedCustomer.fullAddress}
-                    </span>
-                  )}
-                  {customerProperties.length === 1 && (
-                    <span className="text-sm text-muted-foreground">
-                      ({customerProperties[0].city}, {customerProperties[0].state})
-                    </span>
-                  )}
+                  <img src={redlogo} alt="GHVAC" className="h-9 w-auto" />
+                  <p className="font-semibold leading-tight text-gray-900 dark:text-white">Equipment Proposal</p>
                 </div>
+                <p className="shrink-0 text-xs text-muted-foreground">
+                  {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · Valid 30 days
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 px-4 py-3 text-sm">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+                  {selectedCustomer?.name || 'No Customer Selected'}
+                </span>
+                {selectedCustomer?.fullAddress && (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    {selectedCustomer.fullAddress}
+                  </span>
+                )}
+                {(() => {
+                  const salesperson = assignableUsers?.find((u) => u.id === assignedToId);
+                  const preparedBy = salesperson?.displayName
+                    || (assignedToId && assignedToId === currentUser?.id ? currentUser?.name : null);
+                  return preparedBy ? (
+                    <span className="text-muted-foreground">
+                      Prepared by <span className="font-medium text-foreground">{preparedBy}</span>
+                    </span>
+                  ) : null;
+                })()}
               </div>
             </div>
-              
-            {/* Assign To dropdown - for install quotes (sales+ users only).
-                Hidden when the New Quote setup stepper already chose one. */}
-            {!preassigned && (
-            <div className="mb-6">
-              <Label className="text-xs text-muted-foreground mb-1 block">Assign To (Sales Team)</Label>
-              <Select
-                value={assignedToId || ""}
-                onValueChange={(value) => setAssignedToId(value || null)}
-              >
-                <SelectTrigger className="w-full" data-testid="select-assigned-user">
-                  <SelectValue placeholder="Select team member..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableUsers && assignableUsers.length > 0 ? (
-                    assignableUsers.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.displayName}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="" disabled>No users available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            )}
-
 
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">

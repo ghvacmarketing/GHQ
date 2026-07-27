@@ -47,6 +47,13 @@ export default function CrmLogin() {
     return GOOGLE_ERROR_MESSAGES[code] || "Sign-in failed. Please try again.";
   }, [location]);
 
+  // This device's session was displaced by a login somewhere else — surface
+  // it loudly so an account takeover doesn't read as a random logout.
+  const sessionReplaced = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("reason") === "session-replaced";
+  }, [location]);
+
   const handleGoogleSignIn = () => {
     window.location.href = "/api/crm/auth/google";
   };
@@ -150,6 +157,16 @@ export default function CrmLogin() {
             <div className="mt-6 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="banner-google-error">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{googleError}</span>
+            </div>
+          )}
+
+          {sessionReplaced && (
+            <div className="mt-6 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="banner-session-replaced">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <span className="font-semibold">You were signed out — someone just signed in to your account on another device.</span>{" "}
+                If that was you, sign back in. If it wasn't, sign in and change your password right away.
+              </span>
             </div>
           )}
 

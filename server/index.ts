@@ -183,6 +183,17 @@ app.use("/assets", express.static(assetsPath));
 const salesbookPagesPath = path.resolve(import.meta.dirname, "..", "public", "salesbook-pages");
 app.use("/salesbook-pages", express.static(salesbookPagesPath, { maxAge: '30d' }));
 
+async function runSessionRevocationMigration() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`ALTER TABLE crm_sessions ADD COLUMN IF NOT EXISTS revoked_at timestamp`);
+    await db.execute(sql`ALTER TABLE crm_sessions ADD COLUMN IF NOT EXISTS revoked_reason text`);
+  } catch (err) {
+    console.error("Session revocation migration error (non-fatal):", err);
+  }
+}
+
 async function runTaggedCommentMigrations() {
   try {
     const { db } = await import("./db");
@@ -938,6 +949,7 @@ async function runWaterHeaterSeeds() {
 }
 
 (async () => {
+  await runSessionRevocationMigration();
   await runTaggedCommentMigrations();
   await runInstallPlannerMigrations();
   await runChecklistPhotoStepsMigration();

@@ -3,7 +3,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { db } from "./db";
 import { crmUsers, crmSessions, crmAuditLog, type CrmUser, type CrmSession } from "@shared/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, ne, isNull } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
@@ -68,7 +68,8 @@ export async function validateCrmSession(sessionToken: string): Promise<CrmSessi
     .where(
       and(
         eq(crmSessions.sessionToken, sessionToken),
-        gt(crmSessions.expiresAt, new Date())
+        gt(crmSessions.expiresAt, new Date()),
+        isNull(crmSessions.revokedAt)
       )
     );
 
@@ -87,6 +88,41 @@ export async function validateCrmSession(sessionToken: string): Promise<CrmSessi
   }
 
   return session;
+}
+
+/** Single-active-session policy: a fresh login displaces every other live
+ *  session for that user. The displaced rows are MARKED (not deleted) so the
+ *  old device's next request can be answered with a "someone signed in to
+ *  your account" 401 instead of a silent one. Returns how many were kicked. */
+export async function revokeOtherCrmSessions(userId: string, keepSessionToken: string): Promise<number> {
+  const revoked = await db
+    .update(crmSessions)
+    .set({ revokedAt: new Date(), revokedReason: "new_login" })
+    .where(
+      and(
+        eq(crmSessions.userId, userId),
+        ne(crmSessions.sessionToken, keepSessionToken),
+        isNull(crmSessions.revokedAt),
+        gt(crmSessions.expiresAt, new Date())
+      )
+    )
+    .returning({ id: crmSessions.id });
+  return revoked.length;
+}
+
+/** A session that was displaced by a newer login (still unexpired). Used to
+ *  turn the old device's 401 into an explicit security notice. */
+export async function findRevokedCrmSession(sessionToken: string): Promise<CrmSession | null> {
+  const [session] = await db
+    .select()
+    .from(crmSessions)
+    .where(
+      and(
+        eq(crmSessions.sessionToken, sessionToken),
+        gt(crmSessions.expiresAt, new Date())
+      )
+    );
+  return session?.revokedAt ? session : null;
 }
 
 export async function destroyCrmSession(sessionToken: string): Promise<boolean> {
@@ -270,8 +306,22 @@ export async function getCurrentCrmUser(req: Request): Promise<CrmUser | null> {
 
 export function requireCrmAuth(req: Request, res: Response, next: NextFunction) {
   getCurrentCrmUser(req)
-    .then((user) => {
+    .then(async (user) => {
       if (!user) {
+        // Was this session displaced by a newer login? Tell the device so —
+        // the client shows a "someone signed in to your account" notice
+        // instead of silently bouncing to the login page.
+        const token = getCrmSessionToken(req);
+        if (token) {
+          const revoked = await findRevokedCrmSession(token).catch(() => null);
+          if (revoked) {
+            return res.status(401).json({
+              message: "You were signed out because your account was just signed in on another device.",
+              code: "SESSION_REPLACED",
+              revokedAt: revoked.revokedAt,
+            });
+          }
+        }
         return res.status(401).json({ message: "Unauthorized - CRM authentication required" });
       }
       next();
