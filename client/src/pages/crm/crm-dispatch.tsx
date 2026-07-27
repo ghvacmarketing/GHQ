@@ -521,7 +521,7 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
       <div
         ref={setNodeRef}
         style={style}
-        className={`flex flex-col gap-2 rounded-lg border bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md ${
+        className={`flex flex-col gap-2 rounded-lg border bg-white p-3 shadow-sm transition-shadow hover:border-slate-300 hover:shadow-md ${
           needsSchedulingNow ? "border-red-200 bg-red-50" : "border-slate-200"
         } ${isDragging ? "z-50 shadow-lg cursor-grabbing ring-2 ring-[#711419]/50" : "cursor-grab"}`}
         data-testid={`queue-card-${workOrder.id}`}
@@ -1502,7 +1502,7 @@ function DraggableScheduleCard({
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       style={{ ...style, transform: undefined, opacity: isDragging ? 0.2 : 1 }}
-      className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 ${bgColor} shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
+      className={`absolute top-2 bottom-2 cursor-grab transition-shadow group rounded-md border border-slate-300 ${bgColor} shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
       title={isCompactCard ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
       data-dispatch-card="true"
