@@ -64,7 +64,7 @@ import { equipmentSheetsService } from "./equipment-sheets";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
-import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
+import { sendCrmQuoteEmail, buildQuoteEmailContent } from "./services/crmQuoteEmail";
 import { sendCrmInvoiceEmail } from "./services/crmInvoiceEmail";
 import { sendQuoteSms, sendInvoiceSms } from "./services/documentSmsService";
 import { twilioService } from "./sms";
@@ -22118,15 +22118,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send emails if requested
       if (sendEmail && emailList.length > 0) {
         console.log("[Quote Email] Sending to multiple recipients:", emailList);
-        
+
+        // Send from the logged-in user's own connected Gmail when available —
+        // the quote goes out as them (Chandler's email, Ryo's email), lands in
+        // their Sent mail, and replies come straight back to their inbox.
+        // Resend (quotes@ghvacinc.com) is the fallback when Gmail isn't
+        // connected or the Gmail send errors.
+        const useGmail = !!user.gmailRefreshTokenEnc;
+
         for (const email of emailList) {
-          const result = await sendCrmQuoteEmail(quote, lineItems, email, personalMessage, sentByName, {
-            senderEmail: user.email,
-            senderName: sentByName,
-            quoteViewUrl,
-            replyToEmail,
-            isManual: true,
-          });
+          let result: Awaited<ReturnType<typeof sendCrmQuoteEmail>>;
+          if (useGmail) {
+            try {
+              const content = await buildQuoteEmailContent(quote, lineItems, personalMessage, sentByName, { quoteViewUrl });
+              const { sendEmail: sendGmail } = await import("./services/gmailService");
+              const { gmailThreadId } = await sendGmail(user, { to: [email], subject: content.subject, html: content.html });
+              result = {
+                success: true,
+                messageId: gmailThreadId,
+                htmlContent: content.html,
+                textContent: content.text,
+                fromEmail: user.gmailAddress || user.email,
+                replyToEmail: user.gmailAddress || user.email,
+                subject: content.subject,
+              };
+            } catch (gmailErr: any) {
+              console.error("[Quote Email] Gmail send failed, falling back to Resend:", gmailErr?.message || gmailErr);
+              result = await sendCrmQuoteEmail(quote, lineItems, email, personalMessage, sentByName, {
+                senderEmail: user.email,
+                senderName: sentByName,
+                quoteViewUrl,
+                replyToEmail,
+                isManual: true,
+              });
+            }
+          } else {
+            result = await sendCrmQuoteEmail(quote, lineItems, email, personalMessage, sentByName, {
+              senderEmail: user.email,
+              senderName: sentByName,
+              quoteViewUrl,
+              replyToEmail,
+              isManual: true,
+            });
+          }
 
           await db.insert(quoteEmailLogs).values({
             quoteId: quote.id,

@@ -106,6 +106,43 @@ export interface CrmQuoteEmailOptions {
   isManual?: boolean;
 }
 
+/** The rendered quote email (subject/html/text) — shared by the Resend path
+ *  and the send-from-the-user's-own-Gmail path. */
+export async function buildQuoteEmailContent(
+  quote: CrmQuote,
+  lineItems: CrmQuoteLineItem[],
+  personalMessage?: string,
+  sentBy?: string,
+  options?: { quoteViewUrl?: string }
+): Promise<{ subject: string; html: string; text: string }> {
+  // Filter out labor/internal line items from client-facing email
+  const clientVisibleItems = lineItems.filter(item =>
+    item.lineType !== "labor" && item.lineType !== "other"
+  );
+
+  // Calculate quote total for placeholder replacement
+  const quoteTotal = clientVisibleItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
+
+  const subjectTemplate = await getEmailTemplate("email_template_quote_subject", EMAIL_TEMPLATE_DEFAULTS.subject);
+  const introTemplate = await getEmailTemplate("email_template_quote_intro", EMAIL_TEMPLATE_DEFAULTS.intro);
+  const signatureTemplate = await getEmailTemplate("email_template_quote_signature", EMAIL_TEMPLATE_DEFAULTS.signature);
+
+  const placeholderData: Record<string, string> = {
+    brand_name: brandDefaults.name,
+    quote_number: quote.quoteNumber || "",
+    customer_name: quote.customerName || "Valued Customer",
+    quote_total: asCurrency(quoteTotal),
+  };
+
+  const subject = replacePlaceholders(subjectTemplate, placeholderData);
+  const introText = replacePlaceholders(introTemplate, placeholderData);
+  const signatureText = replacePlaceholders(signatureTemplate, placeholderData);
+
+  const html = buildHtmlBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl, introText, signatureText);
+  const text = buildTextBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl, introText, signatureText);
+  return { subject, html, text };
+}
+
 export async function sendCrmQuoteEmail(
   quote: CrmQuote,
   lineItems: CrmQuoteLineItem[],
@@ -159,34 +196,9 @@ export async function sendCrmQuoteEmail(
   
   console.log("[CRM Email] Sending quote email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
 
-  // Filter out labor/internal line items from client-facing email
-  const clientVisibleItems = lineItems.filter(item => 
-    item.lineType !== "labor" && item.lineType !== "other"
-  );
-
-  // Calculate quote total for placeholder replacement
-  const quoteTotal = clientVisibleItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
-  
-  // Fetch email templates
-  const subjectTemplate = await getEmailTemplate("email_template_quote_subject", EMAIL_TEMPLATE_DEFAULTS.subject);
-  const introTemplate = await getEmailTemplate("email_template_quote_intro", EMAIL_TEMPLATE_DEFAULTS.intro);
-  const signatureTemplate = await getEmailTemplate("email_template_quote_signature", EMAIL_TEMPLATE_DEFAULTS.signature);
-  
-  // Prepare placeholder data
-  const placeholderData: Record<string, string> = {
-    brand_name: brandName,
-    quote_number: quote.quoteNumber || "",
-    customer_name: quote.customerName || "Valued Customer",
-    quote_total: asCurrency(quoteTotal),
-  };
-  
-  // Replace placeholders in templates
-  const subject = replacePlaceholders(subjectTemplate, placeholderData);
-  const introText = replacePlaceholders(introTemplate, placeholderData);
-  const signatureText = replacePlaceholders(signatureTemplate, placeholderData);
-  
-  const html = buildHtmlBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl, introText, signatureText);
-  const text = buildTextBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl, introText, signatureText);
+  const { subject, html, text } = await buildQuoteEmailContent(quote, lineItems, personalMessage, sentBy, {
+    quoteViewUrl: options?.quoteViewUrl,
+  });
 
   try {
     const { data, error } = await resend.emails.send({
