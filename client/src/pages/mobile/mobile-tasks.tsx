@@ -8,14 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { Check, CheckCircle2, ClipboardList, Loader2, Plus } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -215,14 +208,11 @@ export default function MobileTasks() {
         )}
       </div>
 
-      {/* Clean create dialog — title, optional due date, optional notes */}
-      <Dialog open={createOpen} onOpenChange={(o) => !createMutation.isPending && setCreateOpen(o)}>
-        <DialogContent className="max-w-[calc(100vw-2rem)] rounded-lg sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New task</DialogTitle>
-            <DialogDescription>For you — it lands on your CRM task list too.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
+      {/* Clean create sheet — title, optional due date, optional notes */}
+      <DraggableSheet tall open={createOpen} onOpenChange={(o) => !createMutation.isPending && setCreateOpen(o)} title="New task" testid="sheet-new-task">
+        <h2 className="text-lg font-semibold text-slate-900">New task</h2>
+        <p className="mt-0.5 text-sm text-slate-500">For you — it lands on your CRM task list too.</p>
+        <div className="mt-4 space-y-3.5">
             <div>
               <Label htmlFor="task-title" className="mb-1.5 block">What needs doing?</Label>
               <Input
@@ -256,23 +246,17 @@ export default function MobileTasks() {
                 data-testid="task-notes-input"
               />
             </div>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={createMutation.isPending}>
-              Cancel
-            </Button>
             <Button
-              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending || title.trim().length === 0}
               data-testid="task-create-save"
             >
-              {createMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
+              {createMutation.isPending ? <Loader2 className="mr-1.5 h-5 w-5 animate-spin" /> : <Plus className="mr-1.5 h-5 w-5" />}
               Add task
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+      </DraggableSheet>
     </MobileShell>
   );
 }

@@ -11,12 +11,15 @@ export function DraggableSheet({
   title,
   children,
   testid,
+  tall = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   children: ReactNode;
   testid?: string;
+  /** Big form sheets: cap at 90vh and scroll the content inside. */
+  tall?: boolean;
 }) {
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragStartY = useRef<number | null>(null);
@@ -60,7 +63,7 @@ export function DraggableSheet({
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        className="rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden"
+        className={`rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${tall ? "flex max-h-[90vh] flex-col" : ""}`}
         style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
         data-testid={testid}
       >
@@ -75,7 +78,7 @@ export function DraggableSheet({
         <SheetHeader className="sr-only">
           <SheetTitle>{title}</SheetTitle>
         </SheetHeader>
-        {children}
+        {tall ? <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5">{children}</div> : children}
       </SheetContent>
     </Sheet>
   );

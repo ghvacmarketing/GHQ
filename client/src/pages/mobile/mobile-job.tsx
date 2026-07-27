@@ -733,20 +733,21 @@ export default function MobileJob() {
         );
       })()}
 
-      {/* Create Work Order Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={(open) => { 
-        setShowCreateDialog(open); 
-        if (!open) resetCreateForm(); 
-      }}>
-        {/* Phones cap at ~72dvh so it floats like a card instead of filling
-            the screen; tablets keep the roomier popup. */}
-        <DialogContent className="max-w-md max-h-[72dvh] sm:max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Job</DialogTitle>
-            <DialogDescription>
-              Create a work order and assign it to yourself or a teammate
-            </DialogDescription>
-          </DialogHeader>
+      {/* Create Work Order — big bottom sheet */}
+      <DraggableSheet
+        tall
+        open={showCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) resetCreateForm();
+        }}
+        title="Create New Job"
+        testid="sheet-new-job"
+      >
+          <h2 className="text-lg font-semibold text-slate-900">New job</h2>
+          <p className="mt-0.5 mb-3 text-sm text-slate-500">
+            Create a work order and assign it to yourself or a teammate.
+          </p>
 
           <div className="space-y-4 py-4">
             {/* Customer Search */}
@@ -1018,32 +1019,22 @@ export default function MobileJob() {
             )}
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowCreateDialog(false)}
-              data-testid="button-cancel-create"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateSubmit}
-              disabled={createWorkOrderMutation.isPending || !selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
-              className="bg-[#711419] hover:bg-[#5a1014]"
-              data-testid="button-submit-create"
-            >
-              {createWorkOrderMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  Creating...
-                </>
-              ) : (
-                "Create & Schedule"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <Button
+            onClick={handleCreateSubmit}
+            disabled={createWorkOrderMutation.isPending || !selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
+            className="mt-3 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#5a1014]"
+            data-testid="button-submit-create"
+          >
+            {createWorkOrderMutation.isPending ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin mr-1.5" />
+                Creating...
+              </>
+            ) : (
+              "Create & Schedule"
+            )}
+          </Button>
+      </DraggableSheet>
     </MobileShell>
   );
 }
