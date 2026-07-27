@@ -97,6 +97,9 @@ type PreviewState = {
   customerNotes: string;
   proposalNotes: string;
   assignedToId: string | null;
+  /** Resolved assignee display name from the builder — covers assignees who
+   *  aren't in the sales list (e.g. the signed-in owner fallback). */
+  assignedToName?: string | null;
   selectedPropertyId: string | null;
   preloadedPropertyId: string | null;
   preloadedProjectId: string | null;
@@ -486,7 +489,9 @@ export default function CrmProposalPreview() {
               <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Salesperson</p>
               {assignedToId ? (
                 <p className="truncate text-sm font-medium text-slate-900" data-testid="text-assigned-salesperson">
-                  {assignableUsers?.find((u) => u.id === assignedToId)?.displayName || "Assigned"}
+                  {assignableUsers?.find((u) => u.id === assignedToId)?.displayName
+                    || previewData.assignedToName
+                    || "Assigned"}
                 </p>
               ) : (
                 /* Fallback for flows that reached the preview without an

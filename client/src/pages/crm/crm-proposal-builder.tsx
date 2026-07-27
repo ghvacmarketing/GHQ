@@ -2408,6 +2408,13 @@ export default function CrmProposalBuilder() {
       customerNotes,
       proposalNotes,
       assignedToId,
+      // Resolved display name so the preview can show WHO it's assigned to
+      // even when the assignee isn't in the sales list (e.g. the signed-in
+      // owner via the setup-skipped fallback).
+      assignedToName:
+        assignableUsers?.find((u) => u.id === assignedToId)?.displayName
+        || (assignedToId && assignedToId === currentUser?.id ? currentUser?.name : null)
+        || null,
       selectedPropertyId,
       preloadedPropertyId,
       preloadedProjectId,
