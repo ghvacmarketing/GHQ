@@ -91,6 +91,43 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     return saved === "conversation" || saved === "implementation" ? saved : "general";
   });
   const [modeSheetOpen, setModeSheetOpen] = useState(false);
+  // Drag-to-dismiss for the mode sheet — same feel as DraggableSheet: follow
+  // the finger, commit past ~90px, spring back otherwise.
+  const modeSheetRef = useRef<HTMLDivElement>(null);
+  const modeDragY = useRef<number | null>(null);
+  const onModeDragDown = (e: React.PointerEvent) => {
+    modeDragY.current = e.clientY;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    if (modeSheetRef.current) modeSheetRef.current.style.transition = "none";
+  };
+  const onModeDragMove = (e: React.PointerEvent) => {
+    if (modeDragY.current == null) return;
+    const dy = e.clientY - modeDragY.current;
+    const el = modeSheetRef.current;
+    if (el) el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+  };
+  const onModeDragEnd = (e: React.PointerEvent) => {
+    if (modeDragY.current == null) return;
+    const dy = e.clientY - modeDragY.current;
+    modeDragY.current = null;
+    const el = modeSheetRef.current;
+    if (!el) return;
+    if (dy > 90) {
+      el.style.transition = "transform 0.2s ease-in";
+      el.style.transform = "translateY(100%)";
+      setTimeout(() => {
+        setModeSheetOpen(false);
+        el.style.transition = "";
+        el.style.transform = "";
+      }, 180);
+    } else {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateY(0)";
+      setTimeout(() => {
+        if (el) el.style.transition = "";
+      }, 260);
+    }
+  };
   const pickMode = (m: GibbsMode) => {
     setMode(m);
     try {
@@ -291,19 +328,37 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [kbInset, setKbInset] = useState(0);
   useEffect(() => {
     if (!open) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => {
-      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    const measure = () => {
+      const vv = window.visualViewport;
+      // Bottom edge of what's actually visible, in layout-viewport coords —
+      // anything below it is under the keyboard.
+      const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight;
+      const covered = Math.max(0, window.innerHeight - visibleBottom);
       // Ignore sub-keyboard-size shifts (URL bar, rotation chrome).
       setKbInset(covered > 80 ? covered : 0);
     };
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
+    measure();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", measure);
+    vv?.addEventListener("scroll", measure);
+    window.addEventListener("resize", measure);
+    // iOS home-screen PWAs miss or lag the viewport events around the
+    // keyboard's show/hide animation — after any focus change, re-measure a
+    // few times across the animation window so the inset always lands.
+    let timers: number[] = [];
+    const burst = () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      timers = [50, 150, 300, 500, 750, 1100].map((ms) => window.setTimeout(measure, ms));
+    };
+    window.addEventListener("focusin", burst);
+    window.addEventListener("focusout", burst);
     return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
+      vv?.removeEventListener("resize", measure);
+      vv?.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("focusin", burst);
+      window.removeEventListener("focusout", burst);
+      timers.forEach((t) => window.clearTimeout(t));
       setKbInset(0);
     };
   }, [open]);
@@ -1380,10 +1435,20 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           <div className="absolute inset-0 z-40" data-testid="assistant-mode-sheet">
             <div className="absolute inset-0 bg-black/40" onClick={() => setModeSheetOpen(false)} />
             <div
-              className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 pt-3 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
+              ref={modeSheetRef}
+              className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
               style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
             >
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300" />
+              <div
+                className="-mx-4 cursor-grab touch-none px-4 pb-3 pt-3 active:cursor-grabbing"
+                onPointerDown={onModeDragDown}
+                onPointerMove={onModeDragMove}
+                onPointerUp={onModeDragEnd}
+                onPointerCancel={onModeDragEnd}
+                data-testid="assistant-mode-drag-handle"
+              >
+                <div className="mx-auto h-1 w-10 rounded-full bg-slate-300" />
+              </div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Gibbs mode</p>
               <p className="mb-3 mt-0.5 text-sm font-semibold text-slate-900">How should Gibbs work right now?</p>
               <div className="space-y-2">
