@@ -9,7 +9,7 @@ import {
   type CrmEmailMessage,
   type CrmUser,
 } from "@shared/schema";
-import { sendEmail as gmailSendEmail, getAttachmentBytes, type OutgoingAttachment } from "./gmailService";
+import { sendEmail as gmailSendEmail, getAttachmentBytes, syncUser as gmailSyncUser, type OutgoingAttachment } from "./gmailService";
 
 /** Auto-forwarding pass, run right after each Gmail background sync: for every
  *  active rule, any newly-synced inbound message whose sender matches is
@@ -38,9 +38,54 @@ export async function runEmailForwardingPass(): Promise<void> {
   }
 }
 
+export type RuleRunResult = {
+  ok: boolean;
+  reason?: string;
+  syncedThreads?: number;
+  matching?: number;
+  alreadyForwarded?: number;
+  forwardedNow?: number;
+  errors?: string[];
+};
+
+/** On-demand run of one rule with a full diagnosis — syncs the mailbox first,
+ *  then forwards anything fresh, and reports exactly where things stand so a
+ *  "why didn't it forward?" question answers itself from the UI. */
+export async function runForwardRuleNow(ruleId: string): Promise<RuleRunResult> {
+  const [rule] = await db.select().from(crmEmailForwardRules).where(eq(crmEmailForwardRules.id, ruleId));
+  if (!rule) return { ok: false, reason: "Rule not found" };
+  const [user] = await db.select().from(crmUsers).where(eq(crmUsers.id, rule.userId));
+  if (!user) return { ok: false, reason: "Mailbox user not found" };
+  const who = user.name || user.email;
+  if (!user.gmailRefreshTokenEnc) {
+    return { ok: false, reason: `${who} hasn't connected Gmail — the rule can't read or send from their mailbox until they connect it on the Mail page.` };
+  }
+  if (!user.gmailSyncEnabled) {
+    return { ok: false, reason: `${who}'s Gmail sync is turned off — enable it so new mail reaches the CRM.` };
+  }
+  const recipients = (rule.forwardTo || []).filter((e) => e && e.includes("@"));
+  if (recipients.length === 0) return { ok: false, reason: "The rule has no valid forward-to addresses." };
+
+  const errors: string[] = [];
+  let syncedThreads = 0;
+  try {
+    const r = await gmailSyncUser(user);
+    syncedThreads = r.threads;
+  } catch (e) {
+    errors.push(`Mailbox sync failed: ${(e as Error).message}`);
+  }
+  const stats = await forwardForRule(user, rule, recipients, errors);
+  return { ok: true, syncedThreads, ...stats, errors };
+}
+
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-async function forwardForRule(user: CrmUser, rule: CrmEmailForwardRule, recipients: string[]): Promise<void> {
+async function forwardForRule(
+  user: CrmUser,
+  rule: CrmEmailForwardRule,
+  recipients: string[],
+  collectErrors?: string[],
+): Promise<{ matching: number; alreadyForwarded: number; forwardedNow: number }> {
   const match = rule.matchFrom.trim().toLowerCase();
   const isDomainRule = !match.includes("@");
   const since = rule.createdAt ?? new Date(0);
@@ -62,7 +107,7 @@ async function forwardForRule(user: CrmUser, rule: CrmEmailForwardRule, recipien
     const from = (m.fromEmail || "").toLowerCase();
     return isDomainRule ? from.endsWith(`@${match}`) : from === match;
   });
-  if (matching.length === 0) return;
+  if (matching.length === 0) return { matching: 0, alreadyForwarded: 0, forwardedNow: 0 };
 
   const already = await db
     .select({ gmailMessageId: crmEmailForwardLog.gmailMessageId })
@@ -76,9 +121,18 @@ async function forwardForRule(user: CrmUser, rule: CrmEmailForwardRule, recipien
   const done = new Set(already.map((a) => a.gmailMessageId));
   const fresh = matching.filter((m) => !done.has(m.gmailMessageId)).reverse(); // oldest first
 
+  let forwardedNow = 0;
   for (const msg of fresh) {
-    await forwardMessage(user, rule, msg, recipients);
+    try {
+      await forwardMessage(user, rule, msg, recipients);
+      forwardedNow++;
+    } catch (e) {
+      const errMsg = `Forward of "${msg.subject || "(no subject)"}" failed: ${(e as Error).message}`;
+      console.error(`[MailForward] ${errMsg}`);
+      collectErrors?.push(errMsg);
+    }
   }
+  return { matching: matching.length, alreadyForwarded: done.size, forwardedNow };
 }
 
 async function forwardMessage(user: CrmUser, rule: CrmEmailForwardRule, msg: CrmEmailMessage, recipients: string[]): Promise<void> {

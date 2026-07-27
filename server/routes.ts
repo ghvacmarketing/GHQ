@@ -6956,6 +6956,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) return res.status(401).json({ message: "Unauthorized" });
       if (!user.gmailRefreshTokenEnc) return res.json({ connected: false });
       const result = await gmailSyncUser(user);
+      // Newly-synced mail may match auto-forward rules — fire and forget so
+      // the 4s polling sync stays fast.
+      import("./services/emailForwarding")
+        .then(({ runEmailForwardingPass }) => runEmailForwardingPass())
+        .catch((e) => console.error("[MailForward] on-demand pass failed:", e?.message || e));
       res.json({ ok: true, ...result });
     } catch (e) {
       const msg = (e as Error).message;
@@ -7052,6 +7057,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e) {
       console.error("mail/forward-rules patch", e);
       res.status(500).json({ message: "Failed to update forwarding rule" });
+    }
+  });
+
+  // POST /api/crm/mail/forward-rules/:id/run — sync the mailbox and forward
+  // now, returning a full diagnosis (connection state, matches, sends, errors)
+  app.post("/api/crm/mail/forward-rules/:id/run", requireCrmAdmin, async (req, res) => {
+    try {
+      const { runForwardRuleNow } = await import("./services/emailForwarding");
+      const result = await runForwardRuleNow(req.params.id);
+      res.json(result);
+    } catch (e) {
+      console.error("mail/forward-rules run", e);
+      res.status(500).json({ message: `Run failed: ${(e as Error).message}` });
     }
   });
 

@@ -1265,6 +1265,32 @@ function ForwardRulesDialog({ open, onOpenChange, isAdmin }: { open: boolean; on
     onError: (e: Error) => toast({ title: "Couldn't remove rule", description: e.message, variant: "destructive" }),
   });
 
+  const runRule = useMutation({
+    mutationFn: async (id: string) =>
+      (await apiRequest("POST", `/api/crm/mail/forward-rules/${id}/run`)).json() as Promise<{
+        ok: boolean; reason?: string; syncedThreads?: number; matching?: number;
+        alreadyForwarded?: number; forwardedNow?: number; errors?: string[];
+      }>,
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/forward-rules"] });
+      if (!r.ok) {
+        toast({ title: "Rule can't run", description: r.reason, variant: "destructive" });
+        return;
+      }
+      const bits = [
+        `${r.matching ?? 0} matching email${(r.matching ?? 0) === 1 ? "" : "s"} since the rule was created`,
+        `${r.forwardedNow ?? 0} forwarded just now`,
+      ];
+      if (r.alreadyForwarded) bits.push(`${r.alreadyForwarded} sent earlier`);
+      toast({
+        title: r.errors?.length ? "Ran with errors" : "Rule ran",
+        description: [bits.join(" · "), ...(r.errors || [])].join(" — "),
+        variant: r.errors?.length ? "destructive" : undefined,
+      });
+    },
+    onError: (e: Error) => toast({ title: "Run failed", description: e.message, variant: "destructive" }),
+  });
+
   const rules = data?.rules || [];
   const recent = data?.recent || [];
 
@@ -1306,6 +1332,17 @@ function ForwardRulesDialog({ open, onOpenChange, isAdmin }: { open: boolean; on
                     </div>
                     {isAdmin && (
                       <div className="flex shrink-0 items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          disabled={runRule.isPending}
+                          onClick={() => runRule.mutate(r.id)}
+                          title="Sync the mailbox and forward matching mail right now"
+                          data-testid={`forward-rule-run-${r.id}`}
+                        >
+                          {runRule.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Run now"}
+                        </Button>
                         <Switch
                           checked={r.active}
                           onCheckedChange={(v) => toggleRule.mutate({ id: r.id, active: v })}
