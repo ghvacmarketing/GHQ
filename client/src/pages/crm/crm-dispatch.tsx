@@ -3001,11 +3001,50 @@ export default function CrmDispatch() {
   });
   const [showTimeBreakdown, setShowTimeBreakdown] = useState(false);
 
+  // In-flight scheduling edits, overlaid onto every server payload until the
+  // server echoes them back. Guards the fast-consecutive-drag race: a refetch
+  // started by drop #1 can resolve AFTER drop #2's optimistic update and would
+  // otherwise clobber card #2 back to its old slot for a beat before the next
+  // refetch moves it forward again.
+  const pendingWoEditsRef = useRef<Map<string, { fields: Record<string, unknown>; at: number }>>(new Map());
+
+  const overlayPendingEdits = useCallback((rows: DispatchWorkOrder[]): DispatchWorkOrder[] => {
+    const pending = pendingWoEditsRef.current;
+    if (pending.size === 0) return rows;
+    const now = Date.now();
+    const sameField = (key: string, pendingVal: unknown, serverVal: unknown) => {
+      if (key === "scheduledStart" || key === "scheduledEnd") {
+        if (pendingVal == null || serverVal == null) return pendingVal == null && serverVal == null;
+        return new Date(pendingVal as string).getTime() === new Date(serverVal as string).getTime();
+      }
+      return (pendingVal ?? null) === (serverVal ?? null);
+    };
+    return rows.map((wo) => {
+      const p = pending.get(wo.id);
+      if (!p) return wo;
+      // Safety valve — never pin a card to a phantom position forever.
+      if (now - p.at > 20000) {
+        pending.delete(wo.id);
+        return wo;
+      }
+      const echoed = Object.entries(p.fields).every(([k, v]) => sameField(k, v, (wo as any)[k]));
+      if (echoed) {
+        pending.delete(wo.id);
+        return wo;
+      }
+      const overlaid: any = { ...wo, ...p.fields };
+      if ("assignedTechId" in p.fields) {
+        overlaid.techName = techniciansList.find((t) => t.id === p.fields.assignedTechId)?.name ?? null;
+      }
+      return overlaid as DispatchWorkOrder;
+    });
+  }, [techniciansList]);
+
   useEffect(() => {
     if (workOrdersData) {
-      setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
+      setLocalWorkOrders(overlayPendingEdits(workOrdersData.map(enrichWorkOrder)));
     }
-  }, [workOrdersData]);
+  }, [workOrdersData, overlayPendingEdits]);
 
   const technicians: Technician[] = techniciansList.map((u, idx) => ({
     id: u.id,
@@ -3058,6 +3097,18 @@ export default function CrmDispatch() {
       const res = await apiRequest("PATCH", `/api/crm/work-orders/${data.workOrderId}`, data.updates);
       return res.json();
     },
+    onMutate: (data) => {
+      // Remember the scheduling fields being written so a stale refetch can't
+      // clobber the optimistic position (see overlayPendingEdits above).
+      const fields: Record<string, unknown> = {};
+      for (const key of ["assignedTechId", "scheduledStart", "scheduledEnd"]) {
+        if (data.updates && key in data.updates) fields[key] = data.updates[key];
+      }
+      if (Object.keys(fields).length > 0) {
+        const prev = pendingWoEditsRef.current.get(data.workOrderId);
+        pendingWoEditsRef.current.set(data.workOrderId, { fields: { ...prev?.fields, ...fields }, at: Date.now() });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateRangeParams] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
@@ -3068,8 +3119,9 @@ export default function CrmDispatch() {
         }
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
       // Revert optimistic update
+      pendingWoEditsRef.current.delete(variables.workOrderId);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
       
       // Check if it's a scheduling conflict error
@@ -3092,7 +3144,8 @@ export default function CrmDispatch() {
       }
       
       if (workOrdersData) {
-        setLocalWorkOrders(workOrdersData.map(enrichWorkOrder));
+        // Keep other cards' still-in-flight edits overlaid while this one reverts.
+        setLocalWorkOrders(overlayPendingEdits(workOrdersData.map(enrichWorkOrder)));
       }
     },
   });
