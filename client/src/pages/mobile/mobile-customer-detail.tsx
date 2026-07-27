@@ -1,25 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { format } from "date-fns";
-import { 
-  ArrowLeft, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Wrench, 
-  FileText, 
+import {
+  ArrowLeft,
+  Phone,
+  Mail,
+  MapPin,
+  Wrench,
+  FileText,
   ChevronRight,
   AlertCircle,
   User
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
 import type { CrmCustomer, CrmWorkOrder, CrmAgreement } from "@shared/schema";
-
-const BRAND_COLOR = "#711419";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
   property?: { address1?: string; city?: string } | null;
@@ -29,28 +25,22 @@ function DetailSkeleton() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-3 mb-4">
-        <Skeleton className="h-10 w-10 rounded-full" />
+        <Skeleton className="h-12 w-12 rounded-[4px]" />
         <div className="space-y-2">
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-32" />
         </div>
       </div>
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-5 w-36" />
-          <Skeleton className="h-5 w-52" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </CardContent>
-      </Card>
+      <div className="rounded-[4px] border border-slate-300/70 bg-white p-4 space-y-3">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-5 w-36" />
+        <Skeleton className="h-5 w-52" />
+      </div>
+      <div className="rounded-[4px] border border-slate-300/70 bg-white p-4 space-y-2">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
     </div>
   );
 }
@@ -58,20 +48,16 @@ function DetailSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="error-state">
-      <div
-        className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-        style={{ backgroundColor: "#fee2e2" }}
-      >
-        <AlertCircle className="h-8 w-8 text-red-600" />
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[4px] border border-red-200 bg-red-50">
+        <AlertCircle className="h-6 w-6 text-red-600" />
       </div>
-      <h3 className="text-lg font-medium text-slate-800 mb-1">Failed to load customer</h3>
+      <h3 className="text-base font-semibold text-slate-900 mb-1">Failed to load customer</h3>
       <p className="text-sm text-slate-500 mb-4">
         There was an error loading the customer details.
       </p>
       <Button
         onClick={onRetry}
-        style={{ backgroundColor: BRAND_COLOR }}
-        className="hover:opacity-90"
+        className="rounded-[4px] bg-[#711419] text-white hover:bg-[#8a1a1f]"
         data-testid="retry-button"
       >
         Try Again
@@ -82,11 +68,11 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 
 function WorkOrderItem({ workOrder }: { workOrder: WorkOrderWithDetails }) {
   const statusConfig: Record<string, { label: string; className: string }> = {
-    scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700" },
+    scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-600" },
     dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700" },
-    en_route: { label: "Traveling", className: "bg-yellow-100 text-yellow-700" },
+    en_route: { label: "Traveling", className: "bg-amber-100 text-amber-700" },
     on_site: { label: "Working", className: "bg-green-100 text-green-700" },
-    completed: { label: "Completed", className: "bg-slate-200 text-slate-600" },
+    completed: { label: "Completed", className: "bg-slate-100 text-slate-500" },
     cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700" },
   };
 
@@ -95,13 +81,13 @@ function WorkOrderItem({ workOrder }: { workOrder: WorkOrderWithDetails }) {
   return (
     <Link href={`/mobile/job/${workOrder.id}`}>
       <div
-        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg active:bg-slate-100 min-h-[56px]"
+        className="flex min-h-[56px] items-center justify-between px-3.5 py-3 active:bg-slate-50"
         data-testid={`work-order-${workOrder.id}`}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <Wrench className="h-4 w-4 text-slate-400 flex-shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-800 truncate">
+            <p className="text-sm font-semibold text-slate-900 truncate">
               {workOrder.title || `WO #${workOrder.id.slice(0, 8)}`}
             </p>
             {workOrder.scheduledStart && (
@@ -112,9 +98,9 @@ function WorkOrderItem({ workOrder }: { workOrder: WorkOrderWithDetails }) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge variant="outline" className={`text-xs ${status.className}`}>
+          <span className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${status.className}`}>
             {status.label}
-          </Badge>
+          </span>
           <ChevronRight className="h-4 w-4 text-slate-400" />
         </div>
       </div>
@@ -125,13 +111,13 @@ function WorkOrderItem({ workOrder }: { workOrder: WorkOrderWithDetails }) {
 function AgreementItem({ agreement }: { agreement: CrmAgreement }) {
   return (
     <div
-      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg min-h-[56px]"
+      className="flex min-h-[56px] items-center justify-between px-3.5 py-3"
       data-testid={`agreement-${agreement.id}`}
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-slate-800 truncate">
+          <p className="text-sm font-semibold text-slate-900 truncate">
             {agreement.agreementType || "Service Agreement"}
           </p>
           {agreement.endDate && (
@@ -141,9 +127,9 @@ function AgreementItem({ agreement }: { agreement: CrmAgreement }) {
           )}
         </div>
       </div>
-      <Badge variant="outline" className="bg-green-100 text-green-700 text-xs">
+      <span className="rounded-[3px] bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700">
         Active
-      </Badge>
+      </span>
     </div>
   );
 }
@@ -193,33 +179,30 @@ export default function MobileCustomerDetail() {
   });
 
   const customerTypeConfig = {
-    residential: { label: "Residential", className: "bg-blue-100 text-blue-700 border-blue-300" },
-    commercial: { label: "Commercial", className: "bg-purple-100 text-purple-700 border-purple-300" },
+    residential: { label: "Residential", className: "bg-slate-100 text-slate-600" },
+    commercial: { label: "Commercial", className: "bg-slate-100 text-slate-600" },
   };
 
   const customerStatusConfig = {
-    prospect: { label: "Lead", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-    customer: { label: "Customer", className: "bg-green-100 text-green-700 border-green-300" },
+    prospect: { label: "Lead", className: "bg-amber-100 text-amber-700" },
+    customer: { label: "Customer", className: "bg-green-100 text-green-700" },
   };
 
   return (
     <MobileShell>
       <div className="min-h-full" data-testid="mobile-customer-detail-page">
-        <div
-          className="px-4 py-3 flex items-center gap-3"
-          style={{ backgroundColor: BRAND_COLOR }}
-        >
+        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
           <Link href="/mobile/customers">
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-white/10 h-10 w-10"
+              className="h-10 w-10 rounded-[4px] text-[#711419] hover:bg-slate-100"
               data-testid="back-button"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-lg font-semibold text-white" data-testid="header-title">
+          <h1 className="text-base font-bold text-slate-900" data-testid="header-title">
             Customer Details
           </h1>
         </div>
@@ -231,110 +214,99 @@ export default function MobileCustomerDetail() {
         ) : customer ? (
           <div className="p-4 space-y-4">
             <div className="flex items-start gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${BRAND_COLOR}15` }}
-              >
-                <User className="h-6 w-6" style={{ color: BRAND_COLOR }} />
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5">
+                <User className="h-6 w-6 text-[#711419]" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-slate-800 truncate" data-testid="customer-name">
+                <h2 className="text-xl font-bold text-slate-900 truncate" data-testid="customer-name">
                   {customer.name}
                 </h2>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  <Badge
-                    variant="outline"
-                    className={`text-xs ${customerTypeConfig[customer.customerType as keyof typeof customerTypeConfig]?.className || customerTypeConfig.residential.className}`}
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  <span
+                    className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${customerTypeConfig[customer.customerType as keyof typeof customerTypeConfig]?.className || customerTypeConfig.residential.className}`}
                     data-testid="customer-type-badge"
                   >
                     {customerTypeConfig[customer.customerType as keyof typeof customerTypeConfig]?.label || "Residential"}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs ${customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.className || customerStatusConfig.customer.className}`}
+                  </span>
+                  <span
+                    className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.className || customerStatusConfig.customer.className}`}
                     data-testid="customer-status-badge"
                   >
                     {customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.label || "Customer"}
-                  </Badge>
+                  </span>
                 </div>
               </div>
             </div>
 
-            <Card data-testid="contact-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="contact-card">
+              <div className="border-b border-slate-200 px-3.5 py-2.5">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact Information</h3>
+              </div>
+              <div className="divide-y divide-slate-200 px-3.5">
                 {customer.phone && (
                   <a
                     href={`tel:${customer.phone}`}
-                    className="flex items-center gap-3 text-blue-600 hover:underline min-h-[44px]"
+                    className="flex min-h-[44px] items-center gap-3 py-2.5 text-sm font-medium text-[#711419] active:opacity-80"
                     data-testid="customer-phone"
                   >
-                    <Phone className="h-5 w-5 flex-shrink-0" />
+                    <Phone className="h-4 w-4 flex-shrink-0" />
                     <span>{customer.phone}</span>
                   </a>
                 )}
                 {customer.email && (
                   <a
                     href={`mailto:${customer.email}`}
-                    className="flex items-center gap-3 text-blue-600 hover:underline min-h-[44px]"
+                    className="flex min-h-[44px] items-center gap-3 py-2.5 text-sm font-medium text-[#711419] active:opacity-80"
                     data-testid="customer-email"
                   >
-                    <Mail className="h-5 w-5 flex-shrink-0" />
+                    <Mail className="h-4 w-4 flex-shrink-0" />
                     <span className="truncate">{customer.email}</span>
                   </a>
                 )}
                 {customer.fullAddress && (
-                  <div className="flex items-start gap-3 text-slate-600 min-h-[44px]">
-                    <MapPin className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <div className="flex min-h-[44px] items-start gap-3 py-2.5 text-sm text-slate-600">
+                    <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
                     <span data-testid="customer-address">{customer.fullAddress}</span>
                   </div>
                 )}
                 {!customer.phone && !customer.email && !customer.fullAddress && (
-                  <p className="text-sm text-slate-400 italic">No contact information available</p>
+                  <p className="py-3 text-sm text-slate-400">No contact information available</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {workOrders && workOrders.length > 0 && (
-              <Card data-testid="work-orders-card">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Wrench className="h-4 w-4" />
-                    Recent Work Orders
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
+              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="work-orders-card">
+                <div className="flex items-center gap-2 border-b border-slate-200 px-3.5 py-2.5">
+                  <Wrench className="h-3.5 w-3.5 text-slate-400" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Recent Work Orders</h3>
+                </div>
+                <div className="divide-y divide-slate-200">
                   {workOrders.map((wo) => (
                     <WorkOrderItem key={wo.id} workOrder={wo} />
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
             {agreements && agreements.length > 0 && (
-              <Card data-testid="agreements-card">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Active Agreements
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
+              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="agreements-card">
+                <div className="flex items-center gap-2 border-b border-slate-200 px-3.5 py-2.5">
+                  <FileText className="h-3.5 w-3.5 text-slate-400" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Agreements</h3>
+                </div>
+                <div className="divide-y divide-slate-200">
                   {agreements.map((agreement) => (
                     <AgreementItem key={agreement.id} agreement={agreement} />
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
             {(!workOrders || workOrders.length === 0) && (!agreements || agreements.length === 0) && (
-              <Card data-testid="no-history-card">
-                <CardContent className="py-8 text-center">
-                  <p className="text-sm text-slate-500">No work orders or agreements found</p>
-                </CardContent>
-              </Card>
+              <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-8 text-center" data-testid="no-history-card">
+                <p className="text-sm text-slate-500">No work orders or agreements found</p>
+              </div>
             )}
           </div>
         ) : null}

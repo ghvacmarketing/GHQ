@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { ArrowUpRight, CheckCircle2, Folder, ImagePlus, Loader2, MessagesSquare, Mic, PanelLeftOpen, Plus, RotateCcw, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import {
@@ -27,7 +27,7 @@ import {
   groupAiConversations,
 } from "@/lib/ai-conversations";
 
-/** The mobile GHQ assistant — an immersive dark-industrial popup that slides
+/** The mobile GHQ assistant — a light, Notion-AI-style popup that slides
  *  up over whatever screen you're on (not a page of its own). Same brain and
  *  the same hard safeguards as the desktop Ask AI: the model can only PROPOSE
  *  whitelisted actions; nothing runs until the user taps Approve, and the
@@ -638,14 +638,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           rubber-band bounce never exposes bare page behind it. */}
       <div className="absolute inset-x-0 -bottom-40 -top-40 bg-black/50 backdrop-blur-[2px]" style={{ touchAction: "none" }} onClick={onClose} />
       {/* Bleed guard — a bounce lifts the whole view, including fixed
-          elements; this dark strip sits just below the viewport so what
-          slides up from under the sheet is sheet-colored, never white. */}
-      <div className="absolute inset-x-0 -bottom-40 h-40 bg-slate-950" aria-hidden="true" />
+          elements; this strip sits just below the viewport so what slides up
+          from under the sheet is sheet-colored, never a bare page. */}
+      <div className="absolute inset-x-0 -bottom-40 h-40 bg-white" aria-hidden="true" />
 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-slate-950 shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
+        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
         style={{ top: "calc(44px + env(safe-area-inset-top))" }}
       >
         {/* Chat page — drifts right (about a third of the panel width) as
@@ -676,11 +676,12 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           data-vdrag=""
           data-testid="assistant-drag-handle"
         >
-          <span className="h-1 w-10 rounded-full bg-slate-700" />
+          <span className="h-1 w-10 rounded-full bg-slate-300" />
         </div>
-        {/* Header — the assistant's identity strip */}
+        {/* Header — Notion-style corner controls; the whole strip still
+            drag-dismisses (buttons are exempted inside onDragStart) */}
         <div
-          className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 pb-3.5 pt-2"
+          className="flex shrink-0 items-center justify-between px-3 pb-2 pt-1.5"
           style={{ touchAction: "none" }}
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
@@ -688,38 +689,30 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           onPointerCancel={onDragEnd}
           data-vdrag=""
         >
-          <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
+            aria-label="History and spaces"
+            data-testid="assistant-panel-open"
+          >
+            <History className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setPanelOpen(true)}
-              className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors active:text-slate-200"
-              aria-label="History and spaces"
-              data-testid="assistant-panel-open"
+              onClick={startNewChat}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
+              aria-label="New conversation"
+              data-testid="assistant-new-conversation"
             >
-              <PanelLeftOpen className="h-5 w-5" />
+              <SquarePen className="h-5 w-5" />
             </button>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
-              <h1 className="text-sm font-semibold leading-tight text-slate-100">Gibbs</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {messages.length > 0 && (
-              <button
-                onClick={startNewChat}
-                className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
-                aria-label="New conversation"
-                data-testid="assistant-new-conversation"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-            )}
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
               aria-label="Close assistant"
               data-testid="assistant-close"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -729,25 +722,34 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             pane and drag the whole chat sideways off screen */}
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4">
           {messages.length === 0 && !pending ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-10 w-10 rotate-45 text-[#711419]">
-                <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
-                <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
-                <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
-                <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
-              </svg>
-              <h2 className="mt-4 text-lg font-semibold text-slate-100">
-                {firstName ? `Gibbs here — what can I get done, ${firstName}?` : "Gibbs here — what can I get done?"}
-              </h2>
-              <p className="mt-1 max-w-[260px] text-sm text-slate-500">
-                Ask about the business, or tell me what to create. Anything I set up waits for your approval.
+            <div className="flex h-full flex-col items-center pt-[7vh] text-center">
+              {/* Persona block — Gibbs' face for an empty conversation */}
+              <div className="flex h-[88px] w-[88px] items-center justify-center rounded-full border border-slate-200 bg-slate-100">
+                <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-9 w-9 rotate-45 text-[#711419]">
+                  <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
+                  <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
+                  <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
+                  <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
+                </svg>
+              </div>
+              <button
+                onClick={() => setPanelOpen(true)}
+                className="mt-4 flex items-center gap-1 rounded-full border border-slate-300/70 bg-white px-4 py-1.5 text-sm font-semibold text-slate-800 transition-colors active:bg-slate-50"
+                aria-label="Gibbs — history and spaces"
+                data-testid="assistant-persona-pill"
+              >
+                Gibbs
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+              <p className="mt-3 max-w-[260px] text-sm text-slate-500">
+                {firstName ? `What can I get done, ${firstName}?` : "What can I get done?"} Anything I set up waits for your approval.
               </p>
-              <div className="mt-6 flex w-full max-w-sm flex-col gap-2">
+              <div className="mt-7 flex w-full max-w-sm flex-col gap-2">
                 {STARTERS.map((s) => (
                   <button
                     key={s}
                     onClick={() => sendQuestion(s)}
-                    className="rounded-[4px] border border-slate-800 bg-slate-900 px-4 py-3 text-left text-sm font-medium text-slate-300 transition-all active:scale-[0.98] active:border-[#711419]/60"
+                    className="rounded-[4px] border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 transition-all active:scale-[0.98] active:border-[#711419]/50"
                     data-testid={`assistant-starter-${s.slice(0, 10)}`}
                   >
                     {s}
@@ -755,7 +757,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 ))}
               </div>
               {supportsVoice && (
-                <p className="mt-5 flex items-center gap-1.5 text-xs text-slate-600">
+                <p className="mt-5 flex items-center gap-1.5 text-xs text-slate-400">
                   <Mic className="h-3.5 w-3.5" /> Or tap the mic and just say it
                 </p>
               )}
@@ -770,7 +772,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="flex flex-wrap justify-end gap-1.5">
                             {msg.attachments.map((src, j) => (
-                              <img key={j} src={src} alt="Attached photo" className="max-h-40 rounded-[4px] border border-slate-800 object-cover" />
+                              <img key={j} src={src} alt="Attached photo" className="max-h-40 rounded-[4px] border border-slate-200 object-cover" />
                             ))}
                           </div>
                         )}
@@ -789,7 +791,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 return (
                   <div key={i} className="space-y-2">
                     {msg.content.trim() !== "" && (
-                      <div className="max-w-[92%] whitespace-pre-wrap break-words rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3 text-sm leading-relaxed text-slate-200">
+                      <div className="max-w-[92%] whitespace-pre-wrap break-words rounded-[4px] rounded-tl-[1px] border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-800">
                         <TypewriterText
                           text={stripMarkdown(msg.content)}
                           animate={i === freshIndex}
@@ -806,27 +808,27 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                       </div>
                     )}
                     {revealed && msg.proposedAction && msg.actionState !== "dismissed" && (
-                      <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 break-words rounded-[4px] border border-[#711419]/50 bg-[#711419]/10 p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
-                        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e8b4b8]">
+                      <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 break-words rounded-[4px] border border-[#711419]/30 bg-[#711419]/[0.05] p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
+                        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#711419]">
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
                           {msg.actionBatch && (
-                            <span className="ml-auto rounded-[3px] bg-[#711419]/30 px-1.5 py-0.5 tracking-normal text-[#e8b4b8]">
+                            <span className="ml-auto rounded-[3px] bg-[#711419]/10 px-1.5 py-0.5 tracking-normal text-[#711419]">
                               Step {msg.actionBatch.step} of {msg.actionBatch.total}
                             </span>
                           )}
                         </p>
-                        <p className="mt-1.5 text-sm text-slate-200">{msg.proposedAction.summary}</p>
+                        <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                         {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
                           {msg.proposedAction.type === "update_customer"
                             ? customerUpdateRows(msg.proposedAction.params).map((row) => (
-                                <p key={row.label} className="text-xs text-slate-400">
-                                  <span className="font-semibold capitalize text-slate-300">{row.label}:</span>{" "}
+                                <p key={row.label} className="text-xs text-slate-500">
+                                  <span className="font-semibold capitalize text-slate-700">{row.label}:</span>{" "}
                                   {row.changed ? (
                                     <>
                                       <span className="line-through opacity-60">{row.before ?? "—"}</span>
-                                      <span className="mx-1 text-[#e8b4b8]">→</span>
-                                      <span className="font-semibold text-slate-200">{row.after ?? "—"}</span>
+                                      <span className="mx-1 text-[#711419]">→</span>
+                                      <span className="font-semibold text-slate-800">{row.after ?? "—"}</span>
                                     </>
                                   ) : (
                                     <span>{row.before ?? "—"}</span>
@@ -834,22 +836,22 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                                 </p>
                               ))
                             : Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId" && k !== "lineItems").map(([k, v]) => (
-                                <p key={k} className="text-xs text-slate-400">
-                                  <span className="font-semibold capitalize text-slate-300">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
+                                <p key={k} className="text-xs text-slate-500">
+                                  <span className="font-semibold capitalize text-slate-700">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
                                   {String(v)}
                                 </p>
                               ))}
                           {(() => {
                             const li = actionLineItems(msg.proposedAction.params);
                             return li && (
-                              <div className="mt-1.5 overflow-hidden rounded-[3px] border border-slate-700/70">
+                              <div className="mt-1.5 overflow-hidden rounded-[3px] border border-slate-300/70">
                                 {li.rows.map((r, n) => (
-                                  <p key={n} className="flex justify-between gap-2 border-b border-slate-800 px-2 py-1 text-xs text-slate-300 last:border-0">
+                                  <p key={n} className="flex justify-between gap-2 border-b border-slate-200 px-2 py-1 text-xs text-slate-700 last:border-0">
                                     <span className="min-w-0 truncate">{r.quantity} × {r.description}</span>
                                     <span className="shrink-0 tabular-nums">${r.lineTotal.toFixed(2)}</span>
                                   </p>
                                 ))}
-                                <p className="flex justify-between gap-2 bg-[#711419]/20 px-2 py-1 text-xs font-bold text-[#e8b4b8]">
+                                <p className="flex justify-between gap-2 bg-[#711419]/10 px-2 py-1 text-xs font-bold text-[#711419]">
                                   <span>Total</span>
                                   <span className="tabular-nums">${li.total.toFixed(2)}</span>
                                 </p>
@@ -867,13 +869,13 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                                     rows={3}
                                     value={editing.draft[f.path] ?? f.value}
                                     onChange={(e) => setEditing((prev) => prev && { ...prev, draft: { ...prev.draft, [f.path]: e.target.value } })}
-                                    className="mt-0.5 w-full resize-none rounded-[3px] border border-slate-700 bg-slate-950 px-2.5 py-2 text-[16px] leading-5 text-slate-100 focus:border-[#711419] focus:outline-none"
+                                    className="mt-0.5 w-full resize-none rounded-[3px] border border-slate-300 bg-white px-2.5 py-2 text-[16px] leading-5 text-slate-900 focus:border-[#711419] focus:outline-none"
                                   />
                                 ) : (
                                   <input
                                     value={editing.draft[f.path] ?? f.value}
                                     onChange={(e) => setEditing((prev) => prev && { ...prev, draft: { ...prev.draft, [f.path]: e.target.value } })}
-                                    className="mt-0.5 w-full rounded-[3px] border border-slate-700 bg-slate-950 px-2.5 py-2 text-[16px] leading-5 text-slate-100 focus:border-[#711419] focus:outline-none"
+                                    className="mt-0.5 w-full rounded-[3px] border border-slate-300 bg-white px-2.5 py-2 text-[16px] leading-5 text-slate-900 focus:border-[#711419] focus:outline-none"
                                   />
                                 )}
                               </label>
@@ -888,7 +890,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                               </button>
                               <button
                                 onClick={() => setEditing(null)}
-                                className="rounded-[3px] border border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-400 transition-transform active:scale-95"
+                                className="rounded-[3px] border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition-transform active:scale-95"
                               >
                                 Cancel
                               </button>
@@ -904,7 +906,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           return (
                             <>
                               {msg.actionState === "error" && (
-                                <p className="mt-2 text-xs font-medium text-red-400">{msg.actionError}</p>
+                                <p className="mt-2 text-xs font-medium text-red-600">{msg.actionError}</p>
                               )}
                               <div className="mt-2.5 flex flex-wrap gap-2">
                                 <button
@@ -917,14 +919,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                                 </button>
                                 <button
                                   onClick={() => setEditing({ index: i, draft: {} })}
-                                  className="rounded-[3px] border border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-400 transition-transform active:scale-95"
+                                  className="rounded-[3px] border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition-transform active:scale-95"
                                   data-testid={`assistant-action-edit-${i}`}
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => dismissProposedAction(i)}
-                                  className="rounded-[3px] border border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-400 transition-transform active:scale-95"
+                                  className="rounded-[3px] border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition-transform active:scale-95"
                                   data-testid={`assistant-action-dismiss-${i}`}
                                 >
                                   Dismiss
@@ -940,7 +942,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         })()}
                         {msg.actionState === "choose" && msg.actionCandidates && (
                           <div className="mt-2.5 space-y-1.5">
-                            <p className="text-xs font-medium text-slate-300">{msg.actionError}</p>
+                            <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>
                             {msg.actionCandidates.map((cand) => {
                               // For sends, show where it would actually go
                               const contact = msg.proposedAction?.type === "send_email"
@@ -952,10 +954,10 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                                 <button
                                   key={cand.id}
                                   onClick={() => pickCandidate(i, cand)}
-                                  className="block w-full rounded-[3px] border border-slate-700 bg-slate-900 px-3 py-2 text-left transition-all active:scale-[0.98] active:border-[#711419]"
+                                  className="block w-full rounded-[3px] border border-slate-300 bg-white px-3 py-2 text-left transition-all active:scale-[0.98] active:border-[#711419]"
                                   data-testid={`assistant-candidate-${cand.id}`}
                                 >
-                                  <span className="block text-sm font-medium text-slate-200">{cand.name}</span>
+                                  <span className="block text-sm font-medium text-slate-800">{cand.name}</span>
                                   {contact !== null && (
                                     <span className="block text-xs text-slate-500">{contact}</span>
                                   )}
@@ -971,25 +973,25 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           </div>
                         )}
                         {msg.actionState === "executing" && (
-                          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-400">
+                          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running with your approval...
                           </p>
                         )}
                         {msg.actionState === "done" && msg.actionResult && (
                           <div className="mt-2.5 animate-in fade-in slide-in-from-bottom-1 space-y-2 duration-300">
-                            <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
                               <CheckCircle2 className="h-3.5 w-3.5" /> Done
                             </p>
                             <button
                               onClick={() => { onClose(); navigate(msg.actionResult!.url); }}
-                              className="flex w-full items-center justify-between gap-2 rounded-[4px] border border-slate-700 bg-slate-900 px-3 py-2.5 text-left transition-all active:scale-[0.98] active:border-[#711419]"
+                              className="flex w-full items-center justify-between gap-2 rounded-[4px] border border-slate-300 bg-white px-3 py-2.5 text-left transition-all active:scale-[0.98] active:border-[#711419]"
                               data-testid={`assistant-action-open-${i}`}
                             >
                               <span className="min-w-0">
-                                <span className="block truncate text-sm font-semibold text-slate-100">{msg.actionResult.label}</span>
+                                <span className="block truncate text-sm font-semibold text-slate-900">{msg.actionResult.label}</span>
                                 <span className="block text-[11px] text-slate-500">Tap to see what Gibbs set up</span>
                               </span>
-                              <ArrowUpRight className="h-4 w-4 shrink-0 text-[#e8b4b8]" />
+                              <ArrowUpRight className="h-4 w-4 shrink-0 text-[#711419]" />
                             </button>
                           </div>
                         )}
@@ -1001,7 +1003,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           <button
                             key={j}
                             onClick={() => sendQuestion(topic)}
-                            className="rounded-[3px] border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-400 transition-colors active:border-[#711419]/60 active:text-slate-200"
+                            className="rounded-[3px] border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors active:border-[#711419]/60 active:text-slate-900"
                           >
                             {topic}
                           </button>
@@ -1012,10 +1014,10 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 );
               })}
               {pending && (
-                <div className="flex max-w-[92%] items-center gap-1.5 rounded-[4px] rounded-tl-[1px] border border-slate-800 bg-slate-900 px-3.5 py-3.5">
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#e8b4b8] [animation-delay:0ms]" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#e8b4b8] [animation-delay:200ms]" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#e8b4b8] [animation-delay:400ms]" />
+                <div className="flex max-w-[92%] items-center gap-1.5 rounded-[4px] rounded-tl-[1px] border border-slate-200 bg-slate-50 px-3.5 py-3.5">
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:0ms]" />
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:200ms]" />
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:400ms]" />
                 </div>
               )}
               <div ref={bottomRef} />
@@ -1023,16 +1025,17 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           )}
         </div>
 
-        {/* Composer */}
+        {/* Composer — Notion-style docked card: borderless textarea on top,
+            controls row underneath */}
         <div
-          className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-3 pt-2.5 backdrop-blur-xl"
+          className="shrink-0 px-3 pt-1.5"
           style={{ paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}
         >
           {/* Same centered column as the thread so the bar lines up with the
               messages on wide screens */}
           <div className="mx-auto w-full max-w-2xl">
           {listening && (
-            <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#e8b4b8]">
+            <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#711419]">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#711419] opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#711419]" />
@@ -1041,50 +1044,28 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             </p>
           )}
           {transcribing && (
-            <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#e8b4b8]">
+            <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#711419]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Got it — writing that down...
             </p>
           )}
-          {attachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {attachments.map((src, i) => (
-                <div key={i} className="relative">
-                  <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-700 object-cover" />
-                  <button
-                    onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
-                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-white"
-                    aria-label="Remove photo"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* One unified strip — photos, typing, voice, and send all live in
-              a single bar, same as the desktop composer */}
-          <div className="flex items-end gap-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => {
-                pickImages(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={attachments.length >= 4 || pending}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all active:scale-95 active:text-slate-200 disabled:opacity-40"
-              aria-label="Attach photos"
-              data-testid="assistant-attach"
-            >
-              <ImagePlus className="h-5 w-5" />
-            </button>
+          <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-sm">
+            {attachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachments.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
+                    <button
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
+                      aria-label="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               ref={composerRef}
               rows={1}
@@ -1096,38 +1077,61 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                   sendQuestion(input);
                 }
               }}
-              placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask or tell me what to do..."}
-              className="max-h-32 min-h-[36px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-[6px] text-[16px] leading-6 text-slate-100 placeholder:text-slate-600 focus:outline-none"
+              placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask Gibbs anything…"}
+              className="max-h-32 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:outline-none focus-visible:ring-0"
               data-testid="assistant-input"
             />
-            {supportsVoice && (
+            <div className="mt-1.5 flex items-center gap-0.5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  pickImages(e.target.files);
+                  e.target.value = "";
+                }}
+              />
               <button
-                onClick={listening ? stopVoice : startVoice}
-                disabled={transcribing}
-                className={cn(
-                  "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95",
-                  listening ? "bg-[#711419] text-white" : "text-slate-400 active:text-slate-200",
-                )}
-                aria-label={listening ? "Stop listening" : "Speak to the assistant"}
-                data-testid="assistant-mic"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={attachments.length >= 4 || pending}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-40"
+                aria-label="Attach photos"
+                data-testid="assistant-attach"
               >
-                {listening && <span className="absolute inset-0 animate-ping rounded-lg border border-[#711419]" />}
-                {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                <ImagePlus className="h-5 w-5" />
               </button>
-            )}
-            <button
-              onClick={() => sendQuestion(input)}
-              disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-              className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:opacity-30"
-              aria-label="Send"
-              data-testid="assistant-send"
-            >
-              {pending ? (
-                <Loader2 className="h-4.5 w-4.5 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 transition-transform duration-200 ease-out group-active:-translate-y-0.5 group-active:translate-x-0.5" />
+              {supportsVoice && (
+                <button
+                  onClick={listening ? stopVoice : startVoice}
+                  disabled={transcribing}
+                  className={cn(
+                    "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95",
+                    listening ? "bg-[#711419] text-white" : "text-slate-500 active:bg-slate-100",
+                  )}
+                  aria-label={listening ? "Stop listening" : "Speak to the assistant"}
+                  data-testid="assistant-mic"
+                >
+                  {listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
+                  {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                </button>
               )}
-            </button>
+              <div className="flex-1" />
+              <button
+                onClick={() => sendQuestion(input)}
+                disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:bg-slate-200 disabled:text-slate-400"
+                aria-label="Send"
+                data-testid="assistant-send"
+              >
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
           </div>
         </div>
@@ -1139,7 +1143,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <div
           ref={scrimRef}
           className={cn(
-            "absolute inset-0 z-20 bg-black/60 transition-opacity duration-300",
+            "absolute inset-0 z-20 bg-black/30 transition-opacity duration-300",
             panelOpen ? "opacity-100" : "pointer-events-none opacity-0",
           )}
           style={{ touchAction: "none" }}
@@ -1155,7 +1159,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <aside
           ref={panelRef}
           className={cn(
-            "absolute inset-y-0 left-0 z-30 flex w-[86%] max-w-[340px] flex-col border-r border-slate-800 bg-slate-950 shadow-[24px_0_56px_rgba(0,0,0,0.75)] transition-transform duration-300 ease-out",
+            "absolute inset-y-0 left-0 z-30 flex w-[86%] max-w-[340px] flex-col border-r border-slate-200 bg-white shadow-[24px_0_56px_rgba(15,23,42,0.18)] transition-transform duration-300 ease-out",
             panelOpen ? "translate-x-0" : "-translate-x-full",
           )}
           style={{ touchAction: "pan-y" }}
@@ -1166,18 +1170,18 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           onClickCapture={guardClick}
           data-testid="assistant-panel"
         >
-          <div className="shrink-0 border-b border-slate-800 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
-            <p className="text-sm font-semibold leading-tight text-slate-100">Gibbs</p>
+          <div className="shrink-0 border-b border-slate-200 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">GHQ Intelligence</p>
+            <p className="text-sm font-semibold leading-tight text-slate-900">Gibbs</p>
           </div>
 
           {/* Spaces */}
           <div className="shrink-0 px-3 pt-3">
             <div className="mb-1 flex items-center justify-between px-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Spaces</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Spaces</p>
               <button
                 onClick={() => setNewSpaceOpen((v) => !v)}
-                className="flex h-6 w-6 items-center justify-center rounded-[4px] text-slate-500 transition-colors active:text-[#e8b4b8]"
+                className="flex h-6 w-6 items-center justify-center rounded-[4px] text-slate-400 transition-colors active:text-[#711419]"
                 aria-label="New space"
                 data-testid="assistant-new-space"
               >
@@ -1197,7 +1201,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                   }
                 }}
                 placeholder="Name it, press Enter"
-                className="mb-1.5 w-full rounded-[4px] border border-[#711419]/60 bg-slate-900 px-2.5 py-2 text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
+                className="mb-1.5 w-full rounded-[4px] border border-[#711419]/50 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 data-testid="assistant-new-space-input"
               />
             )}
@@ -1205,7 +1209,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               onClick={() => setActiveSpace(null)}
               className={cn(
                 "flex w-full items-center gap-2 rounded-[4px] px-2 py-2 text-[13px] transition-colors",
-                activeSpace === null ? "bg-[#711419]/15 font-semibold text-[#e8b4b8]" : "font-medium text-slate-400 active:bg-slate-900",
+                activeSpace === null ? "bg-[#711419]/10 font-semibold text-[#711419]" : "font-medium text-slate-600 active:bg-slate-100",
               )}
               data-testid="assistant-space-all"
             >
@@ -1217,14 +1221,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 key={s.id}
                 className={cn(
                   "flex items-center gap-1 rounded-[4px] px-2 transition-colors",
-                  activeSpace === s.id ? "bg-[#711419]/15" : "",
+                  activeSpace === s.id ? "bg-[#711419]/10" : "",
                 )}
               >
                 <button
                   onClick={() => setActiveSpace(s.id)}
                   className={cn(
                     "flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-[13px]",
-                    activeSpace === s.id ? "font-semibold text-[#e8b4b8]" : "font-medium text-slate-400",
+                    activeSpace === s.id ? "font-semibold text-[#711419]" : "font-medium text-slate-600",
                   )}
                   data-testid={`assistant-space-${s.id}`}
                 >
@@ -1233,7 +1237,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 </button>
                 <button
                   onClick={() => removeSpace(s.id)}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-slate-600 transition-colors active:text-red-400"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-slate-400 transition-colors active:text-red-500"
                   aria-label="Delete space"
                   data-testid={`assistant-space-delete-${s.id}`}
                 >
@@ -1242,14 +1246,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               </div>
             ))}
           </div>
-          <div className="mx-3 my-2 shrink-0 border-t border-slate-800" />
+          <div className="mx-3 my-2 shrink-0 border-t border-slate-200" />
 
           {/* Chats */}
           <div className="mb-1 flex shrink-0 items-center justify-between px-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Chats</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Chats</p>
             <button
               onClick={startNewChat}
-              className="flex h-6 w-6 items-center justify-center rounded-[4px] text-slate-500 transition-colors active:text-[#e8b4b8]"
+              className="flex h-6 w-6 items-center justify-center rounded-[4px] text-slate-400 transition-colors active:text-[#711419]"
               aria-label="New chat"
               data-testid="assistant-panel-new-chat"
             >
@@ -1258,7 +1262,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
             {groupedConversations.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs text-slate-600">
+              <p className="px-2 py-6 text-center text-xs text-slate-400">
                 {activeSpace
                   ? "No chats in this space yet — start one and it'll be filed here."
                   : "No conversations yet — ask something and it'll be saved here."}
@@ -1266,7 +1270,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             ) : (
               groupedConversations.map((group) => (
                 <div key={group.label} className="mb-2">
-                  <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                  <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                     {group.label}
                   </p>
                   {group.items.map((c) => (
@@ -1274,7 +1278,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                       key={c.id}
                       className={cn(
                         "flex items-center gap-1 rounded-[4px] px-2 py-1.5",
-                        c.id === conversationId ? "bg-[#711419]/15" : "",
+                        c.id === conversationId ? "bg-[#711419]/10" : "",
                       )}
                     >
                       <button
@@ -1282,14 +1286,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         className="min-w-0 flex-1 text-left"
                         data-testid={`assistant-conversation-${c.id}`}
                       >
-                        <p className={cn("truncate text-[13px]", c.id === conversationId ? "font-semibold text-[#e8b4b8]" : "font-medium text-slate-300")}>
+                        <p className={cn("truncate text-[13px]", c.id === conversationId ? "font-semibold text-[#711419]" : "font-medium text-slate-700")}>
                           {c.title || "Conversation"}
                         </p>
-                        <p className="text-[11px] text-slate-600">{formatConversationWhen(c.updatedAt)}</p>
+                        <p className="text-[11px] text-slate-400">{formatConversationWhen(c.updatedAt)}</p>
                       </button>
                       <button
                         onClick={() => removeConversation(c.id)}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-slate-600 transition-colors active:text-red-400"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-slate-400 transition-colors active:text-red-500"
                         aria-label="Delete conversation"
                         data-testid={`assistant-conversation-delete-${c.id}`}
                       >

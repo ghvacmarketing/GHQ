@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { MoreIcon } from "@/components/crm/more-icon";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, Link } from "wouter";
@@ -88,6 +89,9 @@ import {
   Check,
   X,
   MessageSquare,
+  Activity,
+  Briefcase,
+  Tag,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -321,6 +325,46 @@ function getPropertyAddress(property: CrmProperty | null): string {
   if (property.address2) parts.push(property.address2);
   parts.push(`${property.city}, ${property.state} ${property.zip}`);
   return parts.join(", ");
+}
+
+function StatTile({
+  icon: Icon, label, value, sub, valueClass, testid,
+}: {
+  icon: typeof Wrench;
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+  testid?: string;
+}) {
+  return (
+    <div className="rounded-[4px] border border-slate-300/70 bg-white px-4 py-3.5" data-testid={testid}>
+      <div className="flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5 text-slate-400" />
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+      </div>
+      <p className={`mt-1.5 truncate text-lg font-bold leading-tight ${valueClass || "text-slate-900"}`}>{value}</p>
+      {sub && <p className="mt-0.5 truncate text-xs text-slate-500">{sub}</p>}
+    </div>
+  );
+}
+
+function DetailField({
+  icon: Icon, label, children,
+}: {
+  icon: typeof Wrench;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+      <div className="min-w-0">
+        <p className="mb-1 text-xs text-slate-500">{label}</p>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default function CrmWorkOrderDetail() {
@@ -946,89 +990,83 @@ export default function CrmWorkOrderDetail() {
   const statusColor = workOrderStatusColors[workOrder.status] || workOrderStatusColors.scheduled;
   const priorityColor = priorityColors[workOrder.priority || "normal"];
 
+  const checklistTotal = workOrder.checklist?.length || 0;
+  const checklistDone = workOrder.checklist?.filter((item) => item.completed).length || 0;
+  const partsTotal = (workOrder.partsUsed || []).reduce((sum, part) => sum + part.price * part.qty, 0);
+  const quotesTotal = (quotes || []).reduce((sum, q) => sum + (parseFloat(q.total as any) || 0), 0);
+  const invoicesTotal = (invoices || []).reduce((sum, inv) => sum + (parseFloat(inv.total as any) || 0), 0);
+
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate("/crm/work-orders")}
-                    className="-ml-2"
-                    data-testid="button-back"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Work Orders
-                  </Button>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1
-                    className="text-xl font-bold text-slate-900"
-                    data-testid="text-work-order-title"
-                  >
-                    {workOrder.title || `Work Order #${workOrder.workOrderNumber}`}
-                  </h1>
-                  <StatusDot
-                    pill={`${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}
-                    data-testid="badge-status"
-                  >
-                    {statusLabels[workOrder.status] || workOrder.status}
-                  </StatusDot>
-                  {workOrder.isPending && (
-                    <StatusDot pill="bg-amber-100 text-amber-800 border border-amber-200">
-                      Waiting
-                    </StatusDot>
-                  )}
-                  <Badge
-                    variant="outline"
-                    data-testid="badge-visit-type"
-                  >
-                    {visitTypeLabels[workOrder.visitType || "SERVICE"]}
-                  </Badge>
-                  <span
-                    className={`text-sm font-medium ${priorityColor.text}`}
-                    data-testid="badge-priority"
-                  >
-                    {(workOrder.priority || "normal").charAt(0).toUpperCase() + (workOrder.priority || "normal").slice(1)} Priority
-                  </span>
-                </div>
-                {propertyAddress && (
-                  <p className="text-sm text-slate-500 mt-1" data-testid="text-property-address">
-                    {propertyAddress}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                {workOrder.scheduledStart && (
-                  <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg">
-                    <CalendarIcon className="h-4 w-4 text-slate-500" />
-                    <span>{formatShortDate(workOrder.scheduledStart)}</span>
-                    <Clock className="h-4 w-4 text-slate-500 ml-2" />
-                    <span>{formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}</span>
-                  </div>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDeleteDialogOpen(true)}
-                  disabled={deleteWorkOrderMutation.isPending}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                  data-testid="button-delete-work-order"
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-4">
+            <button
+              onClick={() => navigate("/crm/work-orders")}
+              className="mt-1.5 flex shrink-0 items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Work Orders
+            </button>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1
+                  className="text-xl font-bold text-slate-900"
+                  data-testid="text-work-order-title"
                 >
-                  {deleteWorkOrderMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
+                  {workOrder.title || `Work Order #${workOrder.workOrderNumber}`}
+                </h1>
+                {workOrder.isPending && (
+                  <StatusDot pill="bg-amber-100 text-amber-800 border border-amber-200">
+                    Waiting
+                  </StatusDot>
+                )}
               </div>
+              <p className="mt-0.5 text-sm text-slate-500" data-testid="text-work-order-subtitle">
+                {[
+                  workOrder.customer?.name,
+                  `${visitTypeLabels[workOrder.visitType || "SERVICE"]}${workOrder.workSubtype ? ` · ${workOrder.workSubtype}` : ""}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            {workOrder.scheduledStart && (
+              <div className="flex items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-3 py-2">
+                <CalendarIcon className="h-4 w-4 text-slate-500" />
+                <span>{formatShortDate(workOrder.scheduledStart)}</span>
+                <Clock className="ml-2 h-4 w-4 text-slate-500" />
+                <span>{formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}</span>
+              </div>
+            )}
+            <Button
+              size="sm"
+              onClick={() => setCreateQuoteDialogOpen(true)}
+              className="rounded-[4px] bg-[#711419] text-white hover:bg-[#8a1a1f]"
+              data-testid="button-header-new-quote"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              New Quote
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={deleteWorkOrderMutation.isPending}
+              className="rounded-[4px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              data-testid="button-delete-work-order"
+            >
+              {deleteWorkOrderMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4">
@@ -1077,185 +1115,192 @@ export default function CrmWorkOrderDetail() {
           </TabsList>
 
           <TabsContent value="details" className="mt-6">
-            {/* Overview — same hero-card style as the customer detail overview,
-                with work-order data */}
-            <Card className="border shadow-sm mb-6" data-testid="card-wo-overview">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="p-3 bg-[#711419]/10 rounded-full">
-                    <Wrench className="h-6 w-6 text-[#711419]" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      {workOrder.title || `Work Order #${workOrder.workOrderNumber}`}
-                    </h2>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      {visitTypeLabels[workOrder.visitType || "SERVICE"]}
-                      {workOrder.workSubtype ? ` · ${workOrder.workSubtype}` : ""}
-                      {workOrder.workOrderNumber ? ` · #${workOrder.workOrderNumber}` : ""}
-                    </p>
-                  </div>
-                  <StatusDot pill={`${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
-                    {statusLabels[workOrder.status] || workOrder.status}
-                  </StatusDot>
-                </div>
+            {/* Stat tile strip — status / job type / checklist / parts / billing at a glance */}
+            <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <StatTile
+                icon={Activity}
+                label="Status"
+                value={statusLabels[workOrder.status] || workOrder.status}
+                valueClass={statusColor.text}
+                sub={workOrder.isPending ? "Waiting" : undefined}
+                testid="tile-status"
+              />
+              <StatTile
+                icon={Briefcase}
+                label="Job Type"
+                value={visitTypeLabels[workOrder.visitType || "SERVICE"]}
+                sub={workOrder.workSubtype || undefined}
+                testid="tile-job-type"
+              />
+              <StatTile
+                icon={CheckCircle}
+                label="Checklist"
+                value={`${checklistDone}/${checklistTotal}`}
+                sub="items done"
+                testid="tile-checklist"
+              />
+              <StatTile
+                icon={Package}
+                label="Parts Used"
+                value={formatCurrency(partsTotal)}
+                sub={`${workOrder.partsUsed?.length || 0} lines`}
+                testid="tile-parts"
+              />
+              <StatTile
+                icon={FileText}
+                label="Quotes"
+                value={`${quotes?.length || 0}`}
+                sub={formatCurrency(quotesTotal)}
+                testid="tile-quotes"
+              />
+              <StatTile
+                icon={DollarSign}
+                label="Invoices"
+                value={`${invoices?.length || 0}`}
+                sub={formatCurrency(invoicesTotal)}
+                testid="tile-invoices"
+              />
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                {/* Work order details — icon field grid + scope, per the reference layout */}
+                <div className="mb-6 rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-wo-overview">
+                  <div className="border-b border-slate-200 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Work Order Details</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-x-10 gap-y-5 px-5 py-5 md:grid-cols-2">
+                    <DetailField icon={User} label="Customer">
                       {workOrder.customer ? (
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
+                        <button
+                          className="flex items-center gap-1 text-sm font-medium text-slate-900 hover:text-[#711419]"
                           onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
                           data-testid="link-customer"
                         >
                           {workOrder.customer.name}
-                          <ExternalLink className="h-3 w-3 ml-1" />
-                        </Button>
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
                       ) : (
                         <p className="text-sm text-slate-400">No customer</p>
                       )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
+                    </DetailField>
+                    <DetailField icon={Tag} label="Job Type">
+                      <p className="text-sm text-slate-900">
+                        {visitTypeLabels[workOrder.visitType || "SERVICE"]}
+                        {workOrder.workSubtype ? ` · ${workOrder.workSubtype}` : ""}
+                      </p>
+                    </DetailField>
+                    <DetailField icon={Wrench} label="Technician">
+                      <p className="text-sm font-medium text-slate-900" data-testid="text-tech-name">
+                        {workOrder.tech?.name || "Unassigned"}
+                      </p>
+                    </DetailField>
+                    <DetailField icon={MapPin} label="Property">
                       {workOrder.property ? (
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm text-slate-700" data-testid="text-address-line1">
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm text-slate-900" data-testid="text-address-line1">
                             {workOrder.property.address1}
                             <br />
                             {workOrder.property.city}, {workOrder.property.state} {workOrder.property.zip}
                           </p>
-                          <Button variant="ghost" size="sm" asChild data-testid="button-directions">
-                            <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
-                              <Navigation className="h-4 w-4" />
-                            </a>
-                          </Button>
+                          <a
+                            href={getGoogleMapsUrl(workOrder.property)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 text-slate-400 hover:text-[#711419]"
+                            data-testid="button-directions"
+                          >
+                            <Navigation className="h-4 w-4" />
+                          </a>
                         </div>
                       ) : (
                         <p className="text-sm text-slate-400">No address on file</p>
                       )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
+                    </DetailField>
+                    <DetailField icon={CalendarIcon} label="Scheduled">
+                      <p className="text-sm text-slate-900">
+                        {workOrder.scheduledStart
+                          ? `${formatShortDate(workOrder.scheduledStart)} · ${formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}`
+                          : "Not scheduled"}
+                      </p>
+                    </DetailField>
+                    <DetailField icon={Clock} label="Completed">
+                      <p className="text-sm text-slate-900">
+                        {workOrder.completedAt ? formatDateTime(workOrder.completedAt) : "—"}
+                      </p>
+                    </DetailField>
+                    <DetailField icon={Phone} label="Phone">
                       {workOrder.customer?.phone ? (
-                        <a href={`tel:${workOrder.customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1" data-testid="link-phone">
-                          <Phone className="h-3.5 w-3.5" />
+                        <a href={`tel:${workOrder.customer.phone}`} className="text-sm text-slate-900 hover:text-[#711419]" data-testid="link-phone">
                           {workOrder.customer.phone}
                         </a>
                       ) : (
                         <p className="text-sm text-slate-400">No phone</p>
                       )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                    </DetailField>
+                    <DetailField icon={Mail} label="Email">
                       {workOrder.customer?.email ? (
-                        <a href={`mailto:${workOrder.customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1" data-testid="link-email">
-                          <Mail className="h-3.5 w-3.5" />
+                        <a href={`mailto:${workOrder.customer.email}`} className="break-all text-sm text-slate-900 hover:text-[#711419]" data-testid="link-email">
                           {workOrder.customer.email}
                         </a>
                       ) : (
                         <p className="text-sm text-slate-400">No email</p>
                       )}
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled</p>
-                      <p className="text-sm text-slate-700">
-                        {workOrder.scheduledStart
-                          ? `${formatShortDate(workOrder.scheduledStart)} · ${formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}`
-                          : "Not scheduled"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Technician</p>
-                      <p className="text-sm font-medium text-slate-900" data-testid="text-tech-name">
-                        {workOrder.tech?.name || "Unassigned"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
-                      <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${priorityColor.bg} ${priorityColor.text}`}>
+                    </DetailField>
+                    <DetailField icon={AlertTriangle} label="Priority">
+                      <span className={`inline-flex rounded-[3px] px-2 py-0.5 text-xs font-semibold ${priorityColor.bg} ${priorityColor.text}`} data-testid="badge-priority">
                         {(workOrder.priority || "normal").charAt(0).toUpperCase() + (workOrder.priority || "normal").slice(1)}
                       </span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Billing</p>
-                      <p className="text-sm text-slate-700" data-testid="text-billing-disposition">
-                        {workOrder.billingDisposition || "Not set"}
-                        {` · ${quotes?.length || 0} quote(s) · ${invoices?.length || 0} invoice(s)`}
-                      </p>
-                      {workOrder.billingNotes && (
-                        <p className="mt-0.5 text-sm text-slate-500">{workOrder.billingNotes}</p>
-                      )}
-                    </div>
-                    {workOrder.project && (
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Linked Project</p>
-                        <p className="text-sm font-medium text-slate-900" data-testid="text-project-name">
-                          {workOrder.project.title || workOrder.project.projectType}
-                        </p>
-                      </div>
-                    )}
+                    </DetailField>
                     {workOrder.job && (
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Linked Job</p>
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
+                      <DetailField icon={Briefcase} label="Linked Job">
+                        <button
+                          className="flex items-center gap-1 text-sm font-medium text-slate-900 hover:text-[#711419]"
                           onClick={() => navigate(`/crm/jobs/${workOrder.job!.id}`)}
                           data-testid="link-job"
                         >
                           {workOrder.job.jobType} - #{workOrder.job.id.slice(-6)}
-                          <ExternalLink className="h-3 w-3 ml-1" />
-                        </Button>
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                      </DetailField>
+                    )}
+                    {workOrder.project && (
+                      <DetailField icon={FolderOpen} label="Linked Project">
+                        <p className="text-sm font-medium text-slate-900" data-testid="text-project-name">
+                          {workOrder.project.title || workOrder.project.projectType}
+                        </p>
+                      </DetailField>
+                    )}
+                  </div>
+                  <div className="border-t border-slate-200 px-5 py-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Scope &amp; Instructions</p>
+                    {workOrder.description ? (
+                      <p className="whitespace-pre-wrap text-sm text-slate-700" data-testid="text-description">
+                        {workOrder.description}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-400">No instructions on this work order yet.</p>
+                    )}
+                    {workOrder.completionSummary && (
+                      <div className="mt-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-green-700">Completion Summary</p>
+                        <div className="rounded-[4px] border border-green-200 bg-green-50 p-3">
+                          <p className="whitespace-pre-wrap text-sm text-slate-700" data-testid="text-completion-summary">
+                            {workOrder.completionSummary}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {workOrder.techNotes && (
+                      <div className="mt-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Work Order Notes</p>
+                        <p className="whitespace-pre-wrap text-sm text-slate-700" data-testid="text-tech-notes">
+                          {workOrder.techNotes}
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border shadow-sm mb-6" data-testid="card-wo-quick-actions">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    size="sm"
-                    onClick={handleCreateQuote}
-                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                    data-testid="button-quick-create-quote"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Quote
-                  </Button>
-                  {workOrder.customer && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                      onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
-                      data-testid="button-quick-view-customer"
-                    >
-                      <User className="h-4 w-4 mr-1" />
-                      View Customer
-                    </Button>
-                  )}
-                  {workOrder.property && (
-                    <Button size="sm" variant="outline" asChild data-testid="button-quick-directions">
-                      <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
-                        <Navigation className="h-4 w-4 mr-1" />
-                        Directions
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Pending Status Toggle */}
             <Card className={`shadow-sm mb-6 ${workOrder.isPending ? 'border-amber-300 bg-amber-50/30' : ''}`}>
@@ -1423,53 +1468,133 @@ export default function CrmWorkOrderDetail() {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="text-base font-semibold">Description & Notes</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-4">
-                  {workOrder.description && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Description</p>
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-description">
-                        {workOrder.description}
-                      </p>
-                    </div>
-                  )}
-                  {workOrder.completionSummary && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-green-600 mb-1 uppercase tracking-wide font-semibold">Completion Summary</p>
-                      <div className="bg-green-50 border border-green-200 rounded p-3">
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-completion-summary">
-                          {workOrder.completionSummary}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {workOrder.techNotes && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Work Order Notes</p>
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-tech-notes">
-                        {workOrder.techNotes}
-                      </p>
-                    </div>
-                  )}
-                  {!workOrder.description && !workOrder.techNotes && !workOrder.completionSummary && (
-                    <p className="text-sm text-slate-500 italic">No description or notes available</p>
-                  )}
-                </CardContent>
-              </Card>
+              </div>
 
+              {/* Right rail — billing, completion requirements, activity, checklist, parts */}
               <div className="space-y-6">
-                <Card className="shadow-sm">
-                  <CardHeader className="pb-3 border-b bg-slate-50/50">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                      <CheckCircle className="h-4 w-4 text-[#711419]" />
-                      Checklist
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
+                <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-wo-billing">
+                  <div className="border-b border-slate-200 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Billing</p>
+                  </div>
+                  <div className="px-5 py-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setActiveTab("quotes")}
+                        className="flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3 py-3 text-left transition-colors hover:border-[#711419]/40 hover:bg-[#711419]/5"
+                        data-testid="button-billing-quotes"
+                      >
+                        <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                        <span>
+                          <span className="block text-lg font-bold leading-none text-slate-900">{quotes?.length || 0}</span>
+                          <span className="mt-1 block text-xs text-slate-500">Quotes</span>
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("invoices")}
+                        className="flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3 py-3 text-left transition-colors hover:border-[#711419]/40 hover:bg-[#711419]/5"
+                        data-testid="button-billing-invoices"
+                      >
+                        <DollarSign className="h-4 w-4 shrink-0 text-slate-400" />
+                        <span>
+                          <span className="block text-lg font-bold leading-none text-slate-900">{invoices?.length || 0}</span>
+                          <span className="mt-1 block text-xs text-slate-500">Invoices</span>
+                        </span>
+                      </button>
+                    </div>
+                    <p className="mt-3 text-sm text-slate-600" data-testid="text-billing-disposition">
+                      Disposition: {workOrder.billingDisposition || "Not set"}
+                    </p>
+                    {workOrder.billingNotes && (
+                      <p className="mt-0.5 text-sm text-slate-500">{workOrder.billingNotes}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-wo-completion">
+                  <div className="border-b border-slate-200 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Completion Requirements</p>
+                  </div>
+                  <div className="space-y-3 px-5 py-4">
+                    <div className="flex items-center gap-2.5">
+                      {checklistTotal === 0 || checklistDone === checklistTotal ? (
+                        <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
+                      ) : (
+                        <Circle className="h-5 w-5 shrink-0 text-slate-300" />
+                      )}
+                      <span className="text-sm text-slate-700">
+                        {checklistTotal === 0
+                          ? "No required checklist items"
+                          : checklistDone === checklistTotal
+                            ? `Checklist complete (${checklistDone}/${checklistTotal})`
+                            : `Checklist ${checklistDone}/${checklistTotal} done`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      {!checklistResponse ? (
+                        <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
+                      ) : checklistResponse.completedAt ? (
+                        <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
+                      ) : (
+                        <Circle className="h-5 w-5 shrink-0 text-slate-300" />
+                      )}
+                      <span className="text-sm text-slate-700">
+                        {!checklistResponse
+                          ? "No service checklist required"
+                          : checklistResponse.completedAt
+                            ? "Service checklist submitted"
+                            : "Service checklist pending"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      {workOrder.billingDisposition ? (
+                        <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
+                      ) : (
+                        <Circle className="h-5 w-5 shrink-0 text-slate-300" />
+                      )}
+                      <span className="text-sm text-slate-700">
+                        {workOrder.billingDisposition ? "Billing disposition set" : "Billing disposition not set"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-wo-activity">
+                  <div className="border-b border-slate-200 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Recent Activity</p>
+                  </div>
+                  <div className="px-5 py-4">
+                    {(() => {
+                      const milestones = [
+                        { label: "Dispatched", at: workOrder.dispatchedAt, dot: "bg-yellow-500" },
+                        { label: "En route", at: workOrder.enRouteAt, dot: "bg-orange-500" },
+                        { label: "On site", at: workOrder.onSiteAt, dot: "bg-purple-500" },
+                        { label: "Completed", at: workOrder.completedAt, dot: "bg-green-600" },
+                      ].filter((m) => m.at);
+                      if (milestones.length === 0) {
+                        return <p className="text-sm text-slate-400">No activity recorded yet.</p>;
+                      }
+                      return (
+                        <ul className="space-y-3">
+                          {milestones.map((m) => (
+                            <li key={m.label} className="flex items-start gap-2.5">
+                              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${m.dot}`} />
+                              <span>
+                                <span className="block text-sm font-medium text-slate-900">{m.label}</span>
+                                <span className="block text-xs text-slate-500">{formatDateTime(m.at as any)}</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-wo-checklist">
+                  <div className="border-b border-slate-200 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Checklist</p>
+                  </div>
+                  <div className="px-5 py-4">
                     {workOrder.checklist && workOrder.checklist.length > 0 ? (
                       <ul className="space-y-2">
                         {workOrder.checklist.map((item, index) => (
@@ -1486,19 +1611,16 @@ export default function CrmWorkOrderDetail() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-slate-500 italic">No checklist items</p>
+                      <p className="text-sm text-slate-400">No checklist items.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card className="shadow-sm">
-                  <CardHeader className="pb-3 border-b bg-slate-50/50">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                      <Package className="h-4 w-4 text-[#711419]" />
-                      Parts Used
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
+                <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-wo-parts">
+                  <div className="border-b border-slate-200 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Parts Used</p>
+                  </div>
+                  <div className="px-5 py-4">
                     {workOrder.partsUsed && workOrder.partsUsed.length > 0 ? (
                       <ul className="space-y-2">
                         {workOrder.partsUsed.map((part, index) => (
@@ -1509,10 +1631,10 @@ export default function CrmWorkOrderDetail() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-slate-500 italic">No parts recorded</p>
+                      <p className="text-sm text-slate-400">No parts recorded.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </div>
             </div>
           </TabsContent>

@@ -3,7 +3,7 @@
 // conversation started on one surface resumes on the other.
 
 export type AiProposedAction = {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -21,6 +21,7 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   create_quote: "New quote — draft",
   create_invoice: "New invoice — draft",
   delete_quote: "Delete quote — permanent",
+  log_call: "Log a call",
 };
 
 /** Normalized line items for quote/invoice approval cards, with the total the

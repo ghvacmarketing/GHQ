@@ -487,6 +487,12 @@ Classes route revenue to proper income accounts for P&L reporting:
 ### What is the Phone Page?
 The Phone page (sidebar: "Phone", URL: /crm/phone) provides integrated calling features for the CRM.
 
+### Call Log
+The Phone page keeps a shared day-by-day call log: each entry records who called (any name — the caller doesn't have to be a CRM customer), what the call was about, an optional phone number, a category tag (service, install, sales, maintenance, billing, other), and whether it's billable. Entries can carry follow-up tasks.
+
+### Logging a call through Gibbs
+Gibbs can add an entry to TODAY's call log as an approval-gated action (log_call) — useful when someone on the road answers the phone and dictates what the call was about right after hanging up ("log a call from Mrs. Jenkins, her heat pump is icing up again"). Gibbs prepares the entry (caller, summary, optional phone/tag/billable) and nothing is saved until the user approves the card. The entry lands on the Phone page's log for today under the approving user's name.
+
 ---
 
 ## NOTIFICATIONS

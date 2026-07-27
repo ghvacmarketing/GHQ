@@ -2829,6 +2829,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { message: "A quick invoice needs line items." },
           ),
         }),
+        z.object({
+          type: z.literal("log_call"),
+          params: z.object({
+            clientName: z.string().trim().min(1).max(200),
+            description: z.string().trim().min(1).max(2000),
+            phone: z.string().trim().max(40).optional(),
+            tag: z.enum(["service", "install", "sales", "maintenance", "billing", "other"]).optional(),
+            billable: z.boolean().optional(),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -2858,6 +2868,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await logCrmAudit(user.id, "ai_action.create_task", "task", task.id, { params: action.params }, req.ip);
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
         return res.status(201).json({ ok: true, entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
+      }
+
+      // log_call — add an entry to today's call log (Comms console), so someone
+      // on the road can dictate what a call was about. The day is the Eastern
+      // business day, not the UTC date.
+      if (action.type === "log_call") {
+        const logDate = formatInTimeZone(new Date(), APP_TIMEZONE, "yyyy-MM-dd");
+        const day = await storage.getOrCreateCallLogDay(logDate);
+        const callLog = await storage.createCallLog({
+          dayId: day.id,
+          clientName: action.params.clientName,
+          description: action.params.description,
+          phone: action.params.phone || null,
+          tag: action.params.tag || null,
+          billable: action.params.billable || false,
+          createdByName: user.name,
+          createdByUserId: user.id,
+        });
+        await logCrmAudit(user.id, "ai_action.log_call", "call_log", callLog.id, { params: action.params }, req.ip);
+        const label = `Logged call from ${action.params.clientName}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "call_log", id: callLog.id, label, url: "/crm/phone" });
+        return res.status(201).json({ ok: true, entity: "call_log", id: callLog.id, label, url: "/crm/phone" });
       }
 
       // send_sms — text a customer through the CRM messaging line (Textline).

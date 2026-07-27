@@ -363,7 +363,7 @@ import { CRM_FUNCTIONALITY_KNOWLEDGE } from "./crm-knowledge";
 // /api/crm/ai/execute-action, which re-validates against a strict whitelist
 // and runs under the approving user's session with an audit log.
 export interface ProposedAction {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -401,7 +401,7 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote"] },
+            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call"] },
             summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
             params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
           },
@@ -845,13 +845,14 @@ Action types and their params:
    • invoiceKind "deposit" — a partial payment against a quote. REQUIRED: the customer, which quote (same rules as from_quote), and the deposit size — pass "depositAmount" (dollars) OR "depositPercent" (of the quote total), whichever the user gave; if they gave neither, ASK before proposing. Do NOT send lineItems.
    params: { "customerName": string (required), "invoiceKind": "quick" | "from_quote" | "deposit" (required), "workOrderTitle"/"workOrderId": string (optional — which visit, for quick), "quoteNumber"/"quoteId": string (optional — which quote, for from_quote/deposit), "depositAmount": number (optional, dollars), "depositPercent": number (optional), "lineItems": array of 1-15 { "description", "quantity", "unitPrice" } (REQUIRED for quick, OMIT otherwise), "notes": string (optional) }
 11. delete_quote — deletes one quote. Only propose on an explicit delete/remove request. The server refuses accepted quotes and quotes an invoice was billed from, and asks the user to pick when the customer has several. params: { "customerName": string (required), "quoteNumber": string (optional — if the user said it or your lookup shows it), "quoteId": string (optional — ONLY from a lookup) }
+12. log_call — adds an entry to TODAY's call log (the Phone page's shared log of who called and why), so someone on the road can dictate a call right after hanging up ("log a call from Mrs. Jenkins, her heat pump is icing up again", "add to the call log: Brian Smith called about his invoice"). Write the description as a clean one-or-two-sentence summary of what the call was about, keeping every concrete detail the user said (symptoms, addresses, promises made, callback times). The caller does NOT need to be an existing CRM customer — log the name exactly as given. params: { "clientName": string (required — who called), "description": string (required — what the call was about), "phone": string (optional — the caller's number if the user said it), "tag": "service" | "install" | "sales" | "maintenance" | "billing" | "other" (optional — categorize when obvious), "billable": boolean (optional — only if the user says it's billable work) }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -874,7 +875,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -1037,7 +1038,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&
