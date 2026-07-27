@@ -183,6 +183,49 @@ app.use("/assets", express.static(assetsPath));
 const salesbookPagesPath = path.resolve(import.meta.dirname, "..", "public", "salesbook-pages");
 app.use("/salesbook-pages", express.static(salesbookPagesPath, { maxAge: '30d' }));
 
+async function runEmailForwardingMigration() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_email_forward_rules (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+        match_from text NOT NULL,
+        forward_to json NOT NULL DEFAULT '[]',
+        active boolean NOT NULL DEFAULT true,
+        created_by_id varchar,
+        forward_count integer NOT NULL DEFAULT 0,
+        last_forwarded_at timestamp,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_email_forward_log (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        rule_id varchar NOT NULL REFERENCES crm_email_forward_rules(id) ON DELETE CASCADE,
+        gmail_message_id text NOT NULL,
+        subject text,
+        forwarded_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS crm_email_forward_log_uniq ON crm_email_forward_log (rule_id, gmail_message_id)`);
+    // Seed the requested rule: Neighborly Software notifications arriving in
+    // Chandler's mailbox forward to Earnest and Gefa. Idempotent — only if a
+    // Chandler account exists and no Neighborly rule exists yet.
+    await db.execute(sql`
+      INSERT INTO crm_email_forward_rules (user_id, match_from, forward_to)
+      SELECT id, 'no-reply@neighborlysoftware.com', '["earnest@ghvacinc.com","gefa@ghvacinc.com"]'::json
+      FROM crm_users
+      WHERE lower(email) LIKE 'chandler%' AND is_active = true
+        AND NOT EXISTS (SELECT 1 FROM crm_email_forward_rules WHERE match_from = 'no-reply@neighborlysoftware.com')
+      LIMIT 1
+    `);
+  } catch (err) {
+    console.error("Email forwarding migration error (non-fatal):", err);
+  }
+}
+
 async function runSessionRevocationMigration() {
   try {
     const { db } = await import("./db");
@@ -951,6 +994,7 @@ async function runWaterHeaterSeeds() {
 
 (async () => {
   await runSessionRevocationMigration();
+  await runEmailForwardingMigration();
   await runTaggedCommentMigrations();
   await runInstallPlannerMigrations();
   await runChecklistPhotoStepsMigration();

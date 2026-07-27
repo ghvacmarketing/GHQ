@@ -482,6 +482,14 @@ export function startGmailBackgroundSync(intervalMinutes = 3): void {
           console.error(`[Gmail] sync failed for ${u.email}:`, (e as Error).message);
         }
       }
+      // Freshly-synced inbound mail may match auto-forward rules (dynamic
+      // import breaks the module cycle — the forwarder sends through us).
+      try {
+        const { runEmailForwardingPass } = await import("./emailForwarding");
+        await runEmailForwardingPass();
+      } catch (e) {
+        console.error("[Gmail] forwarding pass error:", (e as Error).message);
+      }
     } catch (e) {
       console.error("[Gmail] background sync loop error:", (e as Error).message);
     }

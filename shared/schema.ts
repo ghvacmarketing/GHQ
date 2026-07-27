@@ -3081,6 +3081,34 @@ export const crmEmailMessages = pgTable("crm_email_messages", {
   threadIdx: index("crm_email_messages_thread_idx").on(table.threadId),
 }));
 
+// Auto-forwarding rules for synced Gmail mailboxes: inbound mail whose sender
+// matches a rule is re-sent (via the mailbox owner's own Gmail) to the listed
+// addresses. The log guarantees each message forwards at most once per rule.
+export const crmEmailForwardRules = pgTable("crm_email_forward_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }), // whose mailbox
+  matchFrom: text("match_from").notNull(), // sender address, or bare domain to match any sender there
+  forwardTo: json("forward_to").$type<string[]>().notNull().default([]),
+  active: boolean("active").notNull().default(true),
+  createdById: varchar("created_by_id").references(() => crmUsers.id),
+  forwardCount: integer("forward_count").notNull().default(0),
+  lastForwardedAt: timestamp("last_forwarded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmEmailForwardLog = pgTable("crm_email_forward_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: varchar("rule_id").notNull().references(() => crmEmailForwardRules.id, { onDelete: "cascade" }),
+  gmailMessageId: text("gmail_message_id").notNull(),
+  subject: text("subject"),
+  forwardedAt: timestamp("forwarded_at").defaultNow(),
+}, (table) => ({
+  forwardOnceIdx: uniqueIndex("crm_email_forward_log_uniq").on(table.ruleId, table.gmailMessageId),
+}));
+
+export type CrmEmailForwardRule = typeof crmEmailForwardRules.$inferSelect;
+export type CrmEmailForwardLogEntry = typeof crmEmailForwardLog.$inferSelect;
+
 export const insertCrmEmailThreadSchema = createInsertSchema(crmEmailThreads).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCrmEmailMessageSchema = createInsertSchema(crmEmailMessages).omit({ id: true, createdAt: true });
 export type CrmEmailThread = typeof crmEmailThreads.$inferSelect;

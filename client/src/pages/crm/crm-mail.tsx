@@ -22,9 +22,16 @@ import {
 import { format } from "date-fns";
 import {
   Mail, Search, Loader2, Inbox, Send, Paperclip, X, Plus, Trash2, Archive,
-  CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download,
+  CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download, Forward,
   FileText, FileSpreadsheet, FileImage, FileArchive, FileAudio, FileVideo, File as FileIconLucide,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import type { CrmUser } from "@shared/schema";
 
 const MAROON = "#711419";
@@ -220,6 +227,7 @@ export default function CrmMail() {
   const [replyFiles, setReplyFiles] = useState<OutAttachment[]>([]);
   const replyFileInput = useRef<HTMLInputElement | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [forwardRulesOpen, setForwardRulesOpen] = useState(false);
 
   const addReplyFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -456,17 +464,35 @@ export default function CrmMail() {
               <div className="font-display text-lg font-semibold text-slate-900">Mail</div>
               <div className="truncate text-[11px] text-slate-400">{status?.gmailAddress}</div>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              onClick={() => setComposeOpen(true)}
-              title="New message"
-              data-testid="button-compose"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => setForwardRulesOpen(true)}
+                title="Auto-forwarding rules"
+                data-testid="button-forward-rules"
+              >
+                <Forward className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => setComposeOpen(true)}
+                title="New message"
+                data-testid="button-compose"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
+
+          <ForwardRulesDialog
+            open={forwardRulesOpen}
+            onOpenChange={setForwardRulesOpen}
+            isAdmin={currentUser.role === "admin" || currentUser.role === "owner"}
+          />
 
           {/* Search */}
           <div className="px-4 pb-3">
@@ -1166,5 +1192,197 @@ function AttachmentViewer({ item, onClose }: { item: { url: string; name: string
         )}
       </div>
     </div>
+  );
+}
+
+/** Auto-forwarding rules manager — "mail from X arriving in Y's mailbox gets
+ *  re-sent to Z". Rules run server-side after every Gmail background sync, so
+ *  they work even with the CRM closed. Admins/owner manage; everyone can view. */
+function ForwardRulesDialog({ open, onOpenChange, isAdmin }: { open: boolean; onOpenChange: (o: boolean) => void; isAdmin: boolean }) {
+  const { toast } = useToast();
+
+  type ForwardRule = {
+    id: string;
+    userId: string;
+    matchFrom: string;
+    forwardTo: string[];
+    active: boolean;
+    forwardCount: number;
+    lastForwardedAt: string | null;
+    createdAt: string | null;
+    mailboxName: string | null;
+    mailboxEmail: string | null;
+    mailboxGmailConnected: boolean;
+  };
+  type RecentForward = { id: string; ruleId: string; subject: string | null; forwardedAt: string | null };
+
+  const { data, isLoading } = useQuery<{ rules: ForwardRule[]; recent: RecentForward[] }>({
+    queryKey: ["/api/crm/mail/forward-rules"],
+    enabled: open,
+  });
+
+  const { data: users = [] } = useQuery<{ id: string; name: string; email: string }[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: open && isAdmin,
+  });
+
+  const [mailboxId, setMailboxId] = useState("");
+  const [matchFrom, setMatchFrom] = useState("");
+  const [forwardTo, setForwardTo] = useState("");
+
+  const createRule = useMutation({
+    mutationFn: async () => {
+      const recipients = forwardTo.split(/[,;\s]+/).map((e) => e.trim()).filter((e) => e.includes("@"));
+      const res = await apiRequest("POST", "/api/crm/mail/forward-rules", {
+        userId: mailboxId,
+        matchFrom: matchFrom.trim(),
+        forwardTo: recipients,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/forward-rules"] });
+      setMatchFrom("");
+      setForwardTo("");
+      toast({ title: "Forwarding rule added", description: "New matching mail forwards within a few minutes of arriving." });
+    },
+    onError: (e: Error) => toast({ title: "Couldn't add rule", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleRule = useMutation({
+    mutationFn: async (p: { id: string; active: boolean }) =>
+      (await apiRequest("PATCH", `/api/crm/mail/forward-rules/${p.id}`, { active: p.active })).json(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/forward-rules"] }),
+    onError: (e: Error) => toast({ title: "Couldn't update rule", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteRule = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/mail/forward-rules/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/forward-rules"] });
+      toast({ title: "Forwarding rule removed" });
+    },
+    onError: (e: Error) => toast({ title: "Couldn't remove rule", description: e.message, variant: "destructive" }),
+  });
+
+  const rules = data?.rules || [];
+  const recent = data?.recent || [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Auto-forwarding</DialogTitle>
+          <DialogDescription>
+            Mail from a matching sender is automatically re-sent to the listed addresses — runs in the background, even with the CRM closed.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+          ) : rules.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">No forwarding rules yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {rules.map((r) => (
+                <div key={r.id} className="rounded-md border border-slate-200 p-3" data-testid={`forward-rule-${r.id}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 text-sm">
+                      <p className="font-medium text-slate-900">
+                        From <span className="font-semibold">{r.matchFrom}</span>
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        In {r.mailboxName || r.mailboxEmail || "mailbox"}'s mailbox → {(r.forwardTo || []).join(", ")}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {r.forwardCount > 0
+                          ? `${r.forwardCount} forwarded${r.lastForwardedAt ? ` · last ${format(new Date(r.lastForwardedAt), "MMM d, h:mm a")}` : ""}`
+                          : "Nothing forwarded yet"}
+                        {!r.mailboxGmailConnected && (
+                          <span className="ml-1 font-medium text-amber-600">— mailbox Gmail not connected</span>
+                        )}
+                      </p>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <Switch
+                          checked={r.active}
+                          onCheckedChange={(v) => toggleRule.mutate({ id: r.id, active: v })}
+                          data-testid={`forward-rule-toggle-${r.id}`}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
+                          onClick={() => deleteRule.mutate(r.id)}
+                          data-testid={`forward-rule-delete-${r.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="space-y-2 rounded-md border border-dashed border-slate-300 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">New rule</p>
+              <Select value={mailboxId} onValueChange={setMailboxId}>
+                <SelectTrigger className="h-9 text-sm" data-testid="forward-rule-mailbox">
+                  <SelectValue placeholder="Whose mailbox?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name} ({u.email})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={matchFrom}
+                onChange={(e) => setMatchFrom(e.target.value)}
+                placeholder="From address (or bare domain), e.g. no-reply@neighborlysoftware.com"
+                className="h-9 text-sm"
+                data-testid="forward-rule-from"
+              />
+              <Input
+                value={forwardTo}
+                onChange={(e) => setForwardTo(e.target.value)}
+                placeholder="Forward to (comma-separated emails)"
+                className="h-9 text-sm"
+                data-testid="forward-rule-to"
+              />
+              <Button
+                size="sm"
+                className="w-full"
+                disabled={!mailboxId || !matchFrom.trim() || !forwardTo.includes("@") || createRule.isPending}
+                onClick={() => createRule.mutate()}
+                data-testid="forward-rule-create"
+              >
+                {createRule.isPending && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                Add rule
+              </Button>
+            </div>
+          )}
+
+          {recent.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Recently forwarded</p>
+              <div className="space-y-1">
+                {recent.map((f) => (
+                  <p key={f.id} className="truncate text-xs text-slate-500">
+                    <span className="text-slate-700">{f.subject || "(no subject)"}</span>
+                    {f.forwardedAt ? ` · ${format(new Date(f.forwardedAt), "MMM d, h:mm a")}` : ""}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

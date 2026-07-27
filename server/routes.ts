@@ -98,7 +98,7 @@ import {
   getAttachmentBytes as gmailGetAttachmentBytes,
   disconnectGmail,
 } from "./services/gmailService";
-import { crmEmailThreads, crmEmailMessages } from "@shared/schema";
+import { crmEmailThreads, crmEmailMessages, crmEmailForwardRules, crmEmailForwardLog } from "@shared/schema";
 import { aiConversations, aiMessages, aiSpaces } from "@shared/schema";
 import { fromZonedTime } from "date-fns-tz";
 import cookieParser from "cookie-parser";
@@ -6965,6 +6965,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // "Gmail API has not been used in project …") so the failure is actionable
       // instead of a generic "Failed to sync".
       res.status(500).json({ message: `Sync failed: ${msg}` });
+    }
+  });
+
+  // ── Mail forwarding rules — auto-forward matching inbound mail ────────────
+  // GET /api/crm/mail/forward-rules — rules plus the most recent forwards
+  app.get("/api/crm/mail/forward-rules", requireCrmAuth, async (req, res) => {
+    try {
+      const rules = await db
+        .select({
+          id: crmEmailForwardRules.id,
+          userId: crmEmailForwardRules.userId,
+          matchFrom: crmEmailForwardRules.matchFrom,
+          forwardTo: crmEmailForwardRules.forwardTo,
+          active: crmEmailForwardRules.active,
+          forwardCount: crmEmailForwardRules.forwardCount,
+          lastForwardedAt: crmEmailForwardRules.lastForwardedAt,
+          createdAt: crmEmailForwardRules.createdAt,
+          mailboxName: crmUsers.name,
+          mailboxEmail: crmUsers.email,
+          mailboxGmailConnected: crmUsers.gmailRefreshTokenEnc,
+        })
+        .from(crmEmailForwardRules)
+        .leftJoin(crmUsers, eq(crmEmailForwardRules.userId, crmUsers.id))
+        .orderBy(desc(crmEmailForwardRules.createdAt));
+      const recent = await db
+        .select({
+          id: crmEmailForwardLog.id,
+          ruleId: crmEmailForwardLog.ruleId,
+          subject: crmEmailForwardLog.subject,
+          forwardedAt: crmEmailForwardLog.forwardedAt,
+        })
+        .from(crmEmailForwardLog)
+        .orderBy(desc(crmEmailForwardLog.forwardedAt))
+        .limit(20);
+      res.json({
+        rules: rules.map((r) => ({ ...r, mailboxGmailConnected: !!r.mailboxGmailConnected })),
+        recent,
+      });
+    } catch (e) {
+      console.error("mail/forward-rules list", e);
+      res.status(500).json({ message: "Failed to load forwarding rules" });
+    }
+  });
+
+  // POST /api/crm/mail/forward-rules — create a rule (admin+)
+  app.post("/api/crm/mail/forward-rules", requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const { userId, matchFrom, forwardTo } = req.body || {};
+      const match = typeof matchFrom === "string" ? matchFrom.trim().toLowerCase() : "";
+      const recipients = Array.isArray(forwardTo)
+        ? forwardTo.map((e: unknown) => String(e).trim().toLowerCase()).filter((e: string) => e.includes("@"))
+        : [];
+      if (!userId || !match || recipients.length === 0) {
+        return res.status(400).json({ message: "Mailbox, sender to match, and at least one forward-to address are required" });
+      }
+      const [mailbox] = await db.select().from(crmUsers).where(eq(crmUsers.id, userId));
+      if (!mailbox) return res.status(400).json({ message: "Mailbox user not found" });
+      const [rule] = await db
+        .insert(crmEmailForwardRules)
+        .values({ userId, matchFrom: match, forwardTo: recipients, createdById: user.id })
+        .returning();
+      await logCrmAudit(user.id, "mail.forward_rule_created", "crm_user", userId, { matchFrom: match, forwardTo: recipients }, req.ip);
+      res.json(rule);
+    } catch (e) {
+      console.error("mail/forward-rules create", e);
+      res.status(500).json({ message: "Failed to create forwarding rule" });
+    }
+  });
+
+  // PATCH /api/crm/mail/forward-rules/:id — pause/resume
+  app.patch("/api/crm/mail/forward-rules/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      if (typeof req.body?.active !== "boolean") {
+        return res.status(400).json({ message: "active (boolean) is required" });
+      }
+      const [rule] = await db
+        .update(crmEmailForwardRules)
+        .set({ active: req.body.active })
+        .where(eq(crmEmailForwardRules.id, req.params.id))
+        .returning();
+      if (!rule) return res.status(404).json({ message: "Rule not found" });
+      res.json(rule);
+    } catch (e) {
+      console.error("mail/forward-rules patch", e);
+      res.status(500).json({ message: "Failed to update forwarding rule" });
+    }
+  });
+
+  // DELETE /api/crm/mail/forward-rules/:id
+  app.delete("/api/crm/mail/forward-rules/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const [rule] = await db
+        .delete(crmEmailForwardRules)
+        .where(eq(crmEmailForwardRules.id, req.params.id))
+        .returning();
+      if (!rule) return res.status(404).json({ message: "Rule not found" });
+      if (user) {
+        await logCrmAudit(user.id, "mail.forward_rule_deleted", "crm_user", rule.userId, { matchFrom: rule.matchFrom }, req.ip);
+      }
+      res.json({ ok: true });
+    } catch (e) {
+      console.error("mail/forward-rules delete", e);
+      res.status(500).json({ message: "Failed to delete forwarding rule" });
     }
   });
 
