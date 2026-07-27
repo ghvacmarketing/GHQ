@@ -880,6 +880,10 @@ export const crmSessions = pgTable("crm_sessions", {
   // signed out instead of getting a bare 401.
   revokedAt: timestamp("revoked_at"),
   revokedReason: text("revoked_reason"),
+  // "mobile" | "desktop" (from the login's user agent). Displacement is scoped
+  // per class: a phone login kicks other phones, a desktop kicks other
+  // desktops — one of each can stay signed in at the same time.
+  deviceClass: text("device_class"),
 });
 
 // CRM Audit Log

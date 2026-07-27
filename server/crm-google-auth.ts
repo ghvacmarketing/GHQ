@@ -141,10 +141,11 @@ export async function handleGoogleOAuthCallback(
     const ipAddress = req.ip || req.socket.remoteAddress;
     const session = await createCrmSession(user.id, userAgent, ipAddress);
 
-    // Single active session: displace other live sessions for this account.
-    const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken).catch(() => 0);
+    // One active session per device class: displace this account's other
+    // sessions of the same kind (phone kicks phone, desktop kicks desktop).
+    const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken, session.deviceClass === "mobile" ? "mobile" : "desktop").catch(() => 0);
     if (kicked > 0) {
-      await logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "google", ip: ipAddress }, req.ip).catch(() => {});
+      await logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "google", deviceClass: session.deviceClass, ip: ipAddress }, req.ip).catch(() => {});
     }
 
     res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {

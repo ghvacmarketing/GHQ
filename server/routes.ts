@@ -6699,11 +6699,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipAddress = req.ip || req.socket.remoteAddress;
       const session = await createCrmSession(user.id, userAgent, ipAddress);
 
-      // Single active session: this login displaces every other live session
-      // for the account — the displaced devices are told someone signed in.
-      const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken).catch(() => 0);
+      // One active session per device class: this login displaces the
+      // account's other sessions of the same kind (phone kicks phone,
+      // desktop kicks desktop) — displaced devices are told someone signed in.
+      const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken, session.deviceClass === "mobile" ? "mobile" : "desktop").catch(() => 0);
       if (kicked > 0) {
-        logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "password", ip: ipAddress }, req.ip).catch(() => {});
+        logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "password", deviceClass: session.deviceClass, ip: ipAddress }, req.ip).catch(() => {});
       }
 
       res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {

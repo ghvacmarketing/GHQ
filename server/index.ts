@@ -189,6 +189,7 @@ async function runSessionRevocationMigration() {
     const { sql } = await import("drizzle-orm");
     await db.execute(sql`ALTER TABLE crm_sessions ADD COLUMN IF NOT EXISTS revoked_at timestamp`);
     await db.execute(sql`ALTER TABLE crm_sessions ADD COLUMN IF NOT EXISTS revoked_reason text`);
+    await db.execute(sql`ALTER TABLE crm_sessions ADD COLUMN IF NOT EXISTS device_class text`);
   } catch (err) {
     console.error("Session revocation migration error (non-fatal):", err);
   }

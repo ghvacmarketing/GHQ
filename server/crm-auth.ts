@@ -3,7 +3,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { db } from "./db";
 import { crmUsers, crmSessions, crmAuditLog, type CrmUser, type CrmSession } from "@shared/schema";
-import { eq, and, gt, ne, isNull } from "drizzle-orm";
+import { eq, and, gt, ne, isNull, or } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
@@ -36,6 +36,12 @@ export function generateSessionToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+/** Phone/tablet vs desktop, from the login's user agent. Displacement is
+ *  scoped by this so one mobile and one desktop session can coexist. */
+export function classifyDevice(userAgent?: string | null): "mobile" | "desktop" {
+  return userAgent && /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent) ? "mobile" : "desktop";
+}
+
 export async function createCrmSession(
   userId: string,
   userAgent?: string,
@@ -51,6 +57,7 @@ export async function createCrmSession(
       sessionToken,
       userAgent: userAgent || null,
       ipAddress: ipAddress || null,
+      deviceClass: classifyDevice(userAgent),
       expiresAt,
     })
     .returning();
@@ -90,11 +97,18 @@ export async function validateCrmSession(sessionToken: string): Promise<CrmSessi
   return session;
 }
 
-/** Single-active-session policy: a fresh login displaces every other live
- *  session for that user. The displaced rows are MARKED (not deleted) so the
- *  old device's next request can be answered with a "someone signed in to
- *  your account" 401 instead of a silent one. Returns how many were kicked. */
-export async function revokeOtherCrmSessions(userId: string, keepSessionToken: string): Promise<number> {
+/** One active session PER DEVICE CLASS: a fresh login displaces the user's
+ *  other live sessions of the same class (phone kicks phone, desktop kicks
+ *  desktop), so one mobile and one desktop can stay signed in together. The
+ *  displaced rows are MARKED (not deleted) so the old device's next request
+ *  can be answered with a "someone signed in to your account" 401 instead of
+ *  a silent one. Legacy rows with no recorded class are treated as matching.
+ *  Returns how many were kicked. */
+export async function revokeOtherCrmSessions(
+  userId: string,
+  keepSessionToken: string,
+  deviceClass: "mobile" | "desktop"
+): Promise<number> {
   const revoked = await db
     .update(crmSessions)
     .set({ revokedAt: new Date(), revokedReason: "new_login" })
@@ -103,7 +117,8 @@ export async function revokeOtherCrmSessions(userId: string, keepSessionToken: s
         eq(crmSessions.userId, userId),
         ne(crmSessions.sessionToken, keepSessionToken),
         isNull(crmSessions.revokedAt),
-        gt(crmSessions.expiresAt, new Date())
+        gt(crmSessions.expiresAt, new Date()),
+        or(eq(crmSessions.deviceClass, deviceClass), isNull(crmSessions.deviceClass))
       )
     )
     .returning({ id: crmSessions.id });
