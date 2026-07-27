@@ -53,7 +53,16 @@ type CustomerLite = {
   salesStage?: string | null;
 };
 
-export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+/** Optional prefill so other pages (customer detail, work orders, projects,
+ *  leads) launch the SAME setup flow with their context already selected. */
+export type NewQuoteSetupInitial = {
+  customer?: CustomerLite;
+  workOrderId?: string;
+  projectId?: string;
+  lead?: boolean;
+};
+
+export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; onOpenChange: (o: boolean) => void; initial?: NewQuoteSetupInitial }) {
   const [, navigate] = useLocation();
   const [step, setStep] = useState<"type" | "details">("type");
   const [kind, setKind] = useState<QuoteKind | null>(null);
@@ -63,17 +72,23 @@ export function NewQuoteSetup({ open, onOpenChange }: { open: boolean; onOpenCha
   const [linkValue, setLinkValue] = useState<string>("none"); // none | lead | wo:<id> | pr:<id>
   const [assigneeId, setAssigneeId] = useState<string>("");
 
-  // Fresh dialog every open
+  // Fresh dialog every open, seeded with whatever context the launcher had
   useEffect(() => {
     if (open) {
       setStep("type");
       setKind(null);
       setCustomerSearch("");
-      setCustomer(null);
+      setCustomer(initial?.customer || null);
       setPropertyId("none");
-      setLinkValue("none");
+      setLinkValue(
+        initial?.workOrderId ? `wo:${initial.workOrderId}`
+          : initial?.projectId ? `pr:${initial.projectId}`
+          : initial?.lead ? "lead"
+          : "none",
+      );
       setAssigneeId("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const { data: customerResults = [], isFetching: searching } = useQuery<CustomerLite[]>({

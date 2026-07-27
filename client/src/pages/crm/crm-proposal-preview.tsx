@@ -317,8 +317,12 @@ export default function CrmProposalPreview() {
         setTimeout(() => setLocation(`/crm/quotes/${data.quote.id}`), 150);
       }
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save to CRM. Please try again.", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({
+        title: "Couldn't save to CRM",
+        description: error?.message || "Failed to save to CRM. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 

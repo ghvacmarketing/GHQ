@@ -97,6 +97,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { NewQuoteSetup } from "@/components/crm/new-quote-setup";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import { format } from "date-fns";
 import type { 
@@ -276,6 +277,9 @@ export default function CrmProjectDetail() {
 
   const [activeTab, setActiveTab] = useState("overview");
   const [createQuoteDialogOpen, setCreateQuoteDialogOpen] = useState(false);
+  // Create Quote runs the same setup stepper as the Quotes section, with
+  // this project's customer and link preselected.
+  const [quoteSetupOpen, setQuoteSetupOpen] = useState(false);
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
   
@@ -2430,13 +2434,8 @@ export default function CrmProjectDetail() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Quotes</CardTitle>
-                <Button 
-                  onClick={() => {
-                    const customerId = project?.customerId || project?.customer?.id;
-                    if (customerId) {
-                      navigate(`/crm/quotes/new?customerId=${customerId}&projectId=${projectId}`);
-                    }
-                  }} 
+                <Button
+                  onClick={() => setQuoteSetupOpen(true)}
                   data-testid="button-create-quote"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -2488,12 +2487,7 @@ export default function CrmProjectDetail() {
                     <Button
                       variant="outline"
                       className="mt-3"
-                      onClick={() => {
-                        const customerId = project?.customerId || project?.customer?.id;
-                        if (customerId) {
-                          navigate(`/crm/quotes/new?customerId=${customerId}&projectId=${projectId}`);
-                        }
-                      }}
+                      onClick={() => setQuoteSetupOpen(true)}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Create First Quote
@@ -2502,6 +2496,23 @@ export default function CrmProjectDetail() {
                 )}
               </CardContent>
             </Card>
+            {/* Same New Quote setup stepper as the Quotes section */}
+            <NewQuoteSetup
+              open={quoteSetupOpen}
+              onOpenChange={setQuoteSetupOpen}
+              initial={{
+                customer: project?.customer
+                  ? {
+                      id: project.customer.id,
+                      name: project.customer.name,
+                      phone: project.customer.phone,
+                      fullAddress: project.customer.fullAddress,
+                      salesStage: (project.customer as any).salesStage ?? null,
+                    }
+                  : undefined,
+                projectId: projectId,
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="invoices" className="mt-4">

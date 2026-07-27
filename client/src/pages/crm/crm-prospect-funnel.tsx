@@ -5,6 +5,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { NewQuoteSetup } from "@/components/crm/new-quote-setup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -708,6 +709,9 @@ export default function CrmProspectFunnel() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
   
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
+  // Create Quote runs the same setup stepper as the Quotes section, with the
+  // lead's customer preselected and the quote linked to their open lead.
+  const [quoteSetupOpen, setQuoteSetupOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("details");
   
   const [followUpDialogOpen, setFollowUpDialogOpen] = useState(false);
@@ -3193,12 +3197,24 @@ export default function CrmProspectFunnel() {
                     <TabsContent value="quotes" className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-medium">Quotes</h4>
-                        <Link href={`/crm/quotes/new?customerId=${expandedLead.customerId}&sourceType=lead`}>
-                          <Button size="sm" className="h-8 text-xs">
-                            <Plus className="h-3 w-3 mr-1" />
-                            Create Quote
-                          </Button>
-                        </Link>
+                        <Button size="sm" className="h-8 text-xs" onClick={() => setQuoteSetupOpen(true)} data-testid="button-lead-create-quote">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Create Quote
+                        </Button>
+                        <NewQuoteSetup
+                          open={quoteSetupOpen}
+                          onOpenChange={setQuoteSetupOpen}
+                          initial={{
+                            customer: expandedLead.customerId
+                              ? {
+                                  id: expandedLead.customerId,
+                                  name: expandedLead.customerName || "Customer",
+                                  salesStage: expandedLead.salesStage,
+                                }
+                              : undefined,
+                            lead: true,
+                          }}
+                        />
                       </div>
                       
                       {leadQuotes.length === 0 ? (

@@ -20705,15 +20705,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       const calcs = calcWorksheet(inputs, worksheetLines);
 
-      // Validate assignedToId if provided - install quotes require exactly sales role
+      // Validate assignedToId if provided — install quotes go to anyone who can
+      // sell (supervisors count as salespeople; the owner may self-assign).
       if (assignedToId) {
         const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
         if (!assignedUser) {
           return res.status(400).json({ message: "Assigned user not found" });
         }
-        const validRoles = ["sales"];
+        const validRoles = ["sales", "supervisor", "owner"];
         if (!validRoles.includes(assignedUser.role)) {
-          return res.status(400).json({ message: "Assigned user must have sales role for install quotes" });
+          return res.status(400).json({ message: "Assigned user must be a salesperson (sales, supervisor, or owner) for install quotes" });
         }
       }
 
@@ -20932,20 +20933,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Customer not found" });
       }
 
-      // Validate assignedToId if provided
-      // Service quotes (quick, custom_service) require exactly admin role
-      // Install quotes (proposal, custom_install) require exactly sales role
+      // Validate assignedToId if provided — anyone who can sell may carry a
+      // quote (supervisors count as salespeople, the owner may self-assign,
+      // and admins additionally handle service quotes).
       if (assignedToId) {
         const [assignedUser] = await db.select().from(crmUsers).where(eq(crmUsers.id, assignedToId));
         if (!assignedUser) {
           return res.status(400).json({ message: "Assigned user not found" });
         }
         const isServiceQuote = quoteType === "quick" || quoteType === "custom_service";
-        const validRoles = isServiceQuote ? ["admin"] : ["sales"];
+        const validRoles = isServiceQuote
+          ? ["admin", "sales", "supervisor", "owner"]
+          : ["sales", "supervisor", "owner"];
         if (!validRoles.includes(assignedUser.role)) {
-          const roleMsg = isServiceQuote 
-            ? "Assigned user must have admin role for service quotes" 
-            : "Assigned user must have sales role for install quotes";
+          const roleMsg = isServiceQuote
+            ? "Assigned user can't carry service quotes (needs admin, sales, supervisor, or owner role)"
+            : "Assigned user must be a salesperson (sales, supervisor, or owner) for install quotes";
           return res.status(400).json({ message: roleMsg });
         }
       }

@@ -91,6 +91,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { NewQuoteSetup } from "@/components/crm/new-quote-setup";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { EntityTasksTab } from "@/components/crm/entity-tasks-tab";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
@@ -2443,6 +2444,9 @@ function CustomerTabbedView({
   });
   const customerSensors = sensorData?.sensors || [];
   const [sensorDetail, setSensorDetail] = useState<SensorView | null>(null);
+  // Create Quote runs the same setup stepper as the Quotes section, with
+  // this customer preselected.
+  const [quoteSetupOpen, setQuoteSetupOpen] = useState(false);
 
   // Maintenance agreements (same cache key as the Agreements tab)
   const { data: overviewAgreements } = useQuery<AgreementWithVisits[]>({
@@ -3504,16 +3508,28 @@ function CustomerTabbedView({
               <FileText className="h-5 w-5 text-[#711419]" />
               Quotes {crmQuotes?.length || 0}
             </CardTitle>
-            <Link href={`/crm/quotes/new?customerId=${customer.id}`}>
-              <Button 
-                size="sm"
-                className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                data-testid="button-create-quote"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Create Quote
-              </Button>
-            </Link>
+            <Button
+              size="sm"
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              onClick={() => setQuoteSetupOpen(true)}
+              data-testid="button-create-quote"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Create Quote
+            </Button>
+            <NewQuoteSetup
+              open={quoteSetupOpen}
+              onOpenChange={setQuoteSetupOpen}
+              initial={{
+                customer: {
+                  id: customer.id,
+                  name: customer.name,
+                  phone: customer.phone,
+                  fullAddress: customer.fullAddress,
+                  salesStage: (customer as any).salesStage ?? null,
+                },
+              }}
+            />
           </CardHeader>
           <CardContent>
             {quotesLoading ? (

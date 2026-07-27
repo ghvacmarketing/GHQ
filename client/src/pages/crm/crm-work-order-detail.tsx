@@ -102,6 +102,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { NewQuoteSetup } from "@/components/crm/new-quote-setup";
 import { format } from "date-fns";
 import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProject, WorkOrderStatus } from "@shared/schema";
 import { CommentComposer } from "@/components/crm/comment-composer";
@@ -376,6 +377,9 @@ export default function CrmWorkOrderDetail() {
 
   const [activeTab, setActiveTab] = useState("details");
   const [createQuoteDialogOpen, setCreateQuoteDialogOpen] = useState(false);
+  // New Quote goes through the same setup stepper as the Quotes section,
+  // preseeded with this work order's customer and link.
+  const [quoteSetupOpen, setQuoteSetupOpen] = useState(false);
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -1044,7 +1048,7 @@ export default function CrmWorkOrderDetail() {
             )}
             <Button
               size="sm"
-              onClick={() => setCreateQuoteDialogOpen(true)}
+              onClick={() => setQuoteSetupOpen(true)}
               className="rounded-[4px] bg-[#711419] text-white hover:bg-[#8a1a1f]"
               data-testid="button-header-new-quote"
             >
@@ -1650,13 +1654,7 @@ export default function CrmWorkOrderDetail() {
                   <Button
                     size="sm"
                     className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                    onClick={() => {
-                      const params = new URLSearchParams();
-                      params.set("workOrderId", workOrder.id);
-                      if (workOrder.customerId) params.set("customerId", workOrder.customerId);
-                      if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
-                      navigate(`/crm/quotes/new?${params.toString()}`);
-                    }}
+                    onClick={() => setQuoteSetupOpen(true)}
                     data-testid="button-create-quote"
                   >
                     <Plus className="h-4 w-4 mr-1" />
@@ -1779,13 +1777,7 @@ export default function CrmWorkOrderDetail() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => {
-                        const params = new URLSearchParams();
-                        params.set("workOrderId", workOrder.id);
-                        if (workOrder.customerId) params.set("customerId", workOrder.customerId);
-                        if (workOrder.propertyId) params.set("propertyId", workOrder.propertyId);
-                        navigate(`/crm/quotes/new?${params.toString()}`);
-                      }}
+                      onClick={() => setQuoteSetupOpen(true)}
                       data-testid="button-create-quote-empty"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -2624,6 +2616,25 @@ export default function CrmWorkOrderDetail() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Same New Quote setup stepper as the Quotes section, with this work
+            order's customer and link preselected */}
+        <NewQuoteSetup
+          open={quoteSetupOpen}
+          onOpenChange={setQuoteSetupOpen}
+          initial={{
+            customer: workOrder.customer
+              ? {
+                  id: workOrder.customer.id,
+                  name: workOrder.customer.name,
+                  phone: workOrder.customer.phone,
+                  fullAddress: workOrder.customer.fullAddress,
+                  salesStage: (workOrder.customer as any).salesStage ?? null,
+                }
+              : undefined,
+            workOrderId: workOrder.id,
+          }}
+        />
 
         <Dialog open={createQuoteDialogOpen} onOpenChange={setCreateQuoteDialogOpen}>
           <DialogContent>
