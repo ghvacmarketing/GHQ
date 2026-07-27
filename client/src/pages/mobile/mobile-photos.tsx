@@ -23,17 +23,19 @@ export default function MobilePhotos() {
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
-  // Full-screen search overlay height — tracks the iOS visual viewport so the
-  // bottom-docked input rides above the keyboard.
-  const [overlayHeight, setOverlayHeight] = useState<string>("100%");
+  // Keyboard inset for the search overlay: the overlay itself always covers
+  // the full viewport (so the page never shows through); only the bottom
+  // input bar rides up by however much the iOS keyboard eats.
+  const [keyboardInset, setKeyboardInset] = useState(0);
   useEffect(() => {
-    if (!searchActive) return;
-    const vv = window.visualViewport;
-    if (!vv) {
-      setOverlayHeight("100%");
+    if (!searchActive) {
+      setKeyboardInset(0);
       return;
     }
-    const update = () => setOverlayHeight(`${vv.height}px`);
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () =>
+      setKeyboardInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
     update();
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
@@ -376,7 +378,14 @@ export default function MobilePhotos() {
     <MobileShell>
       {/* min-height a hair past full so the page is always scrollable — that
           keeps the elastic pull/bounce alive even when content is short. */}
-      <div className="p-4 space-y-6" style={{ minHeight: "calc(100% + 1px)" }}>
+      <div
+        className="p-4 space-y-6"
+        style={{
+          minHeight: "calc(100% + 1px)",
+          // The search overlay fully replaces the page — nothing behind it.
+          display: searchActive ? "none" : undefined,
+        }}
+      >
         {/* Search icon top right — opens the full-screen search overlay */}
         <div className="flex items-center justify-end gap-2">
           <button
@@ -619,8 +628,7 @@ export default function MobilePhotos() {
           window.visualViewport height tracking. */}
       {searchActive && (
         <div
-          className="fixed left-0 right-0 top-0 z-50 flex flex-col bg-slate-50"
-          style={{ height: overlayHeight }}
+          className="fixed inset-0 z-50 flex flex-col bg-slate-50"
           data-testid="photos-search-overlay"
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
@@ -653,7 +661,14 @@ export default function MobilePhotos() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 px-4 pb-3 pt-2">
+          <div
+            className="flex items-center gap-2 px-4 pt-2"
+            style={{
+              paddingBottom: keyboardInset > 0
+                ? `${keyboardInset + 10}px`
+                : "calc(env(safe-area-inset-bottom) + 12px)",
+            }}
+          >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
