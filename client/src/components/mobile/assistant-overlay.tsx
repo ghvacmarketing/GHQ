@@ -771,8 +771,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="absolute inset-x-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
-        style={{ top: "calc(44px + env(safe-area-inset-top))", bottom: kbInset }}
+        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
+        style={{ top: "calc(44px + env(safe-area-inset-top))" }}
       >
         {/* Chat page — drifts right (about a third of the panel width) as
             the panel slides in ON TOP of it, so the panel overlaps the chat
@@ -1257,6 +1257,18 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </div>
           </div>
         </div>
+
+        {/* Keyboard spacer — the sheet keeps its full height (its white
+            background fills the screen, never the page behind); this strip
+            grows to the keyboard's height so the composer and thread glide up
+            above the keys with an ease that tracks iOS's keyboard animation.
+            A dedicated element, because the drag gestures overwrite inline
+            transitions on the sheet and chat containers. */}
+        <div
+          aria-hidden="true"
+          className="shrink-0"
+          style={{ height: kbInset, transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)" }}
+        />
         </div>
 
         {/* Side panel — history + Spaces. A layer that slides in OVER the
