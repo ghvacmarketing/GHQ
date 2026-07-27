@@ -756,12 +756,15 @@ const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; 
 const CACHE_TTL_STATIC = 1000 * 60 * 60; // 1 hour for static help questions
 const CACHE_TTL_LIVE = 1000 * 60 * 5; // 5 minutes for live data questions
 
+export type GibbsMode = "general" | "conversation" | "implementation";
+
 export async function askCrmHelp(
   question: string,
   conversationHistory?: Array<{role: 'user'|'assistant', content: string}>,
   images?: string[],
+  mode: GibbsMode = "general",
 ): Promise<CrmHelpResponse> {
-  const normalizedQuestion = question.toLowerCase().trim();
+  const normalizedQuestion = `${mode}:${question.toLowerCase().trim()}`;
   const hasImages = !!images && images.length > 0;
 
   // Detect what live data might be needed
@@ -793,6 +796,14 @@ export async function askCrmHelp(
       console.log("[CRM Help AI] Fetched live data for:", dataNeeds.join(", "));
     }
     
+    // User-selected behavior mode (the Gibbs button on mobile). Conversation
+    // mode is also hard-enforced below — no proposals survive it.
+    const modeSection = mode === "conversation"
+      ? `\n\nMODE — CONVERSATION ONLY (the user selected this): Do NOT propose any actions this turn — no propose_actions tool calls and no proposedActions in your JSON, no matter how imperative the request sounds. If the user asks you to create or send something, answer helpfully with what you know and mention they have you in conversation-only mode — tapping the Gibbs icon switches modes.`
+      : mode === "implementation"
+        ? `\n\nMODE — IMPLEMENTATION (the user selected this): They're here to get things DONE. Bias strongly toward preparing concrete proposed actions (every standard proposal rule and approval requirement still applies). Keep answers short and operational — gather exactly the missing required details, then propose. Answer informational side-questions briefly and steer back to what to set up.`
+        : "";
+
     const systemPrompt = `You are Gibbs — the AI teammate at Giesbrecht HVAC, a family HVAC company based in Wrens, Georgia serving the Augusta–Wrens area. Your name comes from Giesbrecht; if someone asks who or what you are, that's your answer. You know the CRM inside out, you can see live business data, and you're also a seasoned HVAC pro who can talk shop.
 
 VOICE — sound like one of us, not like software: plain-spoken, warm, practical, small-town Georgia professional. Direct answers, real numbers, no corporate fluff. Talk to techs like techs, to the office like a helpful coworker. When company documents (brand guide, SOPs) are available via the company_docs tool, let them shape how you talk about the company.
@@ -852,7 +863,7 @@ Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]`;
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]${modeSection}`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -907,7 +918,8 @@ Return JSON with:
             systemPrompt +
             "\n\nLIVE LOOKUP TOOLS: you have read-only tools that query the CRM database live (customer_profile, price_items, pricebook_packages, list_work_orders, list_invoices, list_quotes, list_agreements, list_tasks, business_stats, company_docs). If a question involves any specific customer, schedule, balance, or record that isn't already in LIVE DATA above, USE A TOOL to look it up rather than saying you don't know or guessing. Never invent numbers, dates, or names — look them up. BUT be efficient: use the fewest lookups that answer the question, and for action proposals (create/send) ONE customer lookup is usually all you need — once you have enough, stop looking and answer. If a lookup fails twice, answer with what you have and say what you couldn't verify.\n\nYour FINAL message must be ONLY the JSON object — the very first character is { and the very last is }, with no text before or after it.",
           messages: [...priorTurns, userTurn],
-          tools: [...CRM_TOOLS, PROPOSE_ACTIONS_TOOL],
+          // Conversation mode: the proposal tool isn't even on the table.
+          tools: mode === "conversation" ? CRM_TOOLS : [...CRM_TOOLS, PROPOSE_ACTIONS_TOOL],
           executeTool: async (name, input) =>
             name === "propose_actions" ? collectProposedActions(input) : executeCrmTool(name, input),
           maxTokens: 3500,
@@ -1049,8 +1061,11 @@ Return JSON with:
     }
 
     // Tool-registered actions are authoritative (parse-proof); JSON-embedded
-    // ones remain the fallback for models without the tool.
-    const mergedActions = toolProposed.length > 0 ? toolProposed.slice(0, 5) : proposedActions;
+    // ones remain the fallback for models without the tool. Conversation-only
+    // mode drops every proposal regardless of what the model returned.
+    const mergedActions = mode === "conversation"
+      ? []
+      : toolProposed.length > 0 ? toolProposed.slice(0, 5) : proposedActions;
 
     const result: CrmHelpResponse = {
       answer: parsed.answer || "I don't have information about that feature.",

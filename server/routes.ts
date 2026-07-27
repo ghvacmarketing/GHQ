@@ -2290,8 +2290,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .slice(0, 4)
         : [];
 
+      // User-selected Gibbs mode (mobile mode sheet): conversation-only,
+      // implementation-focused, or the default do-both general.
+      const mode = req.body.mode === "conversation" || req.body.mode === "implementation"
+        ? req.body.mode
+        : "general";
+
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question, history, images);
+      const result = await askCrmHelp(question, history, images, mode);
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;

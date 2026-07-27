@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { ArrowUp, ArrowUpRight, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import {
@@ -42,6 +42,32 @@ const STARTERS = [
   "Add a task for tomorrow",
 ];
 
+/** Behavior modes for Gibbs, picked from the floating Gibbs button. The mode
+ *  rides every /api/crm/help call; conversation-only is also hard-enforced
+ *  server-side (no proposal tool, proposals stripped). */
+type GibbsMode = "general" | "conversation" | "implementation";
+
+const GIBBS_MODES: Array<{ value: GibbsMode; label: string; description: string; icon: typeof Sparkles }> = [
+  {
+    value: "general",
+    label: "General",
+    description: "The full Gibbs — talk through anything and set things up, all in one chat.",
+    icon: Sparkles,
+  },
+  {
+    value: "conversation",
+    label: "Conversation only",
+    description: "Just talk — questions, advice, shop talk. Gibbs won't prepare any actions.",
+    icon: MessagesSquare,
+  },
+  {
+    value: "implementation",
+    label: "Implementation only",
+    description: "All business — short answers focused on preparing actions for your approval.",
+    icon: Wrench,
+  },
+];
+
 function stripMarkdown(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, "$1")
@@ -59,6 +85,21 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  // Gibbs behavior mode — survives restarts; picked from the floating icon.
+  const [mode, setMode] = useState<GibbsMode>(() => {
+    const saved = typeof localStorage !== "undefined" ? localStorage.getItem("gibbs-mode") : null;
+    return saved === "conversation" || saved === "implementation" ? saved : "general";
+  });
+  const [modeSheetOpen, setModeSheetOpen] = useState(false);
+  const pickMode = (m: GibbsMode) => {
+    setMode(m);
+    try {
+      localStorage.setItem("gibbs-mode", m);
+    } catch {
+      // private-mode storage failure — the mode still applies this session
+    }
+    setModeSheetOpen(false);
+  };
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
@@ -242,6 +283,35 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     e.preventDefault();
     e.stopPropagation();
   };
+
+  // Keyboard-aware layout: the on-screen keyboard shrinks the visual viewport
+  // but not the layout viewport, so a bottom-anchored sheet ends up with its
+  // composer (and the last messages) hidden behind the keys. Track how much of
+  // the window the keyboard covers and lift the sheet's bottom by that much.
+  const [kbInset, setKbInset] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      // Ignore sub-keyboard-size shifts (URL bar, rotation chrome).
+      setKbInset(covered > 80 ? covered : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setKbInset(0);
+    };
+  }, [open]);
+
+  // When the keyboard claims its space, keep the newest messages in view.
+  useEffect(() => {
+    if (kbInset > 0) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [kbInset]);
 
   // iOS keyboard hangover: focusing the composer can scroll the whole PWA up
   // to keep the input visible, and after the keyboard closes the window stays
@@ -457,6 +527,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       images: photos.length > 0 ? photos : undefined,
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
+      mode,
     })
       .then(async (r) => {
         const data = await r.json();
@@ -645,8 +716,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
-        style={{ top: "calc(44px + env(safe-area-inset-top))" }}
+        className="absolute inset-x-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
+        style={{ top: "calc(44px + env(safe-area-inset-top))", bottom: kbInset }}
       >
         {/* Chat page — drifts right (about a third of the panel width) as
             the panel slides in ON TOP of it, so the panel overlaps the chat
@@ -667,7 +738,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         >
         {/* Drag handle — swipe down anywhere on the handle/header to dismiss */}
         <div
-          className="flex shrink-0 justify-center pt-2"
+          className="flex shrink-0 justify-center pb-2 pt-2"
           style={{ touchAction: "none" }}
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
@@ -678,49 +749,45 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         >
           <span className="h-1 w-10 rounded-full bg-slate-300" />
         </div>
-        {/* Header — Notion-style corner controls; the whole strip still
-            drag-dismisses (buttons are exempted inside onDragStart) */}
-        <div
-          className="flex shrink-0 items-center justify-between px-3 pb-2 pt-1.5"
-          style={{ touchAction: "none" }}
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-          data-vdrag=""
-        >
+        {/* Floating corner controls — glassy, no header strip, so the chat
+            runs all the way to the top and just blurs underneath them.
+            History left, Gibbs (mode) center, new chat right. */}
+        <div className="pointer-events-none absolute inset-x-0 top-5 z-10 flex items-center justify-between px-3">
           <button
             onClick={() => setPanelOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
             aria-label="History and spaces"
             data-testid="assistant-panel-open"
           >
             <History className="h-5 w-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={startNewChat}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
-              aria-label="New conversation"
-              data-testid="assistant-new-conversation"
-            >
-              <SquarePen className="h-5 w-5" />
-            </button>
-            <button
-              onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors active:bg-slate-200"
-              aria-label="Close assistant"
-              data-testid="assistant-close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            onClick={() => setModeSheetOpen(true)}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            aria-label="Gibbs mode"
+            data-testid="assistant-mode-open"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-[18px] w-[18px] rotate-45 text-[#711419]">
+              <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
+              <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
+              <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
+              <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
+            </svg>
+          </button>
+          <button
+            onClick={startNewChat}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            aria-label="New conversation"
+            data-testid="assistant-new-conversation"
+          >
+            <SquarePen className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Conversation — overflow-x-hidden is load-bearing: overflow-y-auto
             alone lets one long unbroken string (a URL, an address) widen the
             pane and drag the whole chat sideways off screen */}
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16">
           {messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center pt-[7vh] text-center">
               {/* Persona block — Gibbs' face for an empty conversation */}
@@ -1029,7 +1096,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             controls row underneath */}
         <div
           className="shrink-0 px-3 pt-1.5"
-          style={{ paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(10px + env(safe-area-inset-bottom))" }}
         >
           {/* Same centered column as the thread so the bar lines up with the
               messages on wide screens */}
@@ -1306,6 +1373,55 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             )}
           </div>
         </aside>
+
+        {/* Mode sheet — pops over everything from the floating Gibbs icon.
+            Sets how Gibbs behaves; the pick persists across sessions. */}
+        {modeSheetOpen && (
+          <div className="absolute inset-0 z-40" data-testid="assistant-mode-sheet">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setModeSheetOpen(false)} />
+            <div
+              className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 pt-3 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
+              style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
+            >
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Gibbs mode</p>
+              <p className="mb-3 mt-0.5 text-sm font-semibold text-slate-900">How should Gibbs work right now?</p>
+              <div className="space-y-2">
+                {GIBBS_MODES.map((m) => {
+                  const Icon = m.icon;
+                  const active = mode === m.value;
+                  return (
+                    <button
+                      key={m.value}
+                      onClick={() => pickMode(m.value)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-[4px] border p-3 text-left transition-all active:scale-[0.98]",
+                        active ? "border-[#711419] bg-[#711419]/[0.05]" : "border-slate-200 bg-white",
+                      )}
+                      data-testid={`assistant-mode-${m.value}`}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                          active ? "bg-[#711419] text-white" : "bg-slate-100 text-slate-600",
+                        )}
+                      >
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={cn("block text-sm font-semibold", active ? "text-[#711419]" : "text-slate-900")}>
+                          {m.label}
+                        </span>
+                        <span className="block text-xs leading-snug text-slate-500">{m.description}</span>
+                      </span>
+                      {active && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
