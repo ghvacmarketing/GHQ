@@ -1006,6 +1006,9 @@ export const crmProperties = pgTable("crm_properties", {
   state: text("state").notNull(),
   zip: text("zip").notNull(),
   notes: text("notes"),
+  // Geocoded once (Nominatim) and cached — powers drive-distance/ETA chips
+  latitude: text("latitude"),
+  longitude: text("longitude"),
   tenantName: text("tenant_name"),
   tenantPhone: text("tenant_phone"),
   tenantEmail: text("tenant_email"),

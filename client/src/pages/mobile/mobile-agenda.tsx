@@ -829,6 +829,30 @@ export default function MobileAgenda() {
   const upNext = notDone.find((j) => IN_PROGRESS.includes(j.status)) || notDone[0] || null;
   const laterToday = notDone.filter((j) => j.id !== upNext?.id);
   const wrappedUp = myJobs.filter((j) => j.status === "completed");
+
+  // Live distance/ETA to the next job — phone GPS + the property's geocoded
+  // position (server caches the geocode). Falls back to the status chip.
+  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { maximumAge: 120000, timeout: 8000 },
+    );
+  }, []);
+  const upNextPropertyId = (upNext as any)?.property?.id ?? (upNext as any)?.propertyId ?? null;
+  const { data: upNextEta } = useQuery<{ available: boolean; miles?: number; minutes?: number }>({
+    queryKey: ["/api/mobile/eta", upNextPropertyId, geo?.lat, geo?.lng],
+    queryFn: async () => {
+      const res = await fetch(`/api/mobile/eta?propertyId=${upNextPropertyId}&lat=${geo!.lat}&lng=${geo!.lng}`, { credentials: "include" });
+      if (!res.ok) return { available: false };
+      return res.json();
+    },
+    enabled: !!upNextPropertyId && !!geo,
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  });
   const mapsUrl = (j: WorkOrderWithDetails) =>
     `https://maps.google.com/?q=${encodeURIComponent(getPropertyAddress(j.property))}`;
 
@@ -911,9 +935,18 @@ export default function MobileAgenda() {
                             {upNext.scheduledStart ? formatLocal(upNext.scheduledStart, "a") : ""}
                           </span>
                         </p>
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-600">
-                          <span className={`h-2 w-2 rounded-[2px] ${statusDotColor(statusConfig[upNext.status]?.className)}`} />
-                          {statusConfig[upNext.status]?.label || upNext.status}
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-600" data-testid="up-next-eta">
+                          {upNextEta?.available && upNextEta.minutes != null ? (
+                            <>
+                              <Navigation className="h-3.5 w-3.5 text-[#711419]" />
+                              {upNextEta.minutes} min · {upNextEta.miles} mi
+                            </>
+                          ) : (
+                            <>
+                              <span className={`h-2 w-2 rounded-[2px] ${statusDotColor(statusConfig[upNext.status]?.className)}`} />
+                              {statusConfig[upNext.status]?.label || upNext.status}
+                            </>
+                          )}
                         </span>
                       </div>
                       <p className="mt-2 text-xl font-bold text-slate-900" data-testid="up-next-name">
@@ -1057,16 +1090,23 @@ export default function MobileAgenda() {
                         <div className="mt-1 flex justify-center">
                           <PerformanceGauge sold={revenue} quoted={isTech ? pd.quotedAmount : pd.quoted} goal={isTech ? pd.goal : pd.goal} goalTarget={goalTarget} />
                         </div>
-                        <p className="text-center text-3xl font-bold tracking-tight text-slate-900" data-testid="perf-revenue-value">
-                          {fmt(revenue)}
-                        </p>
-                        {goalTarget > 0 && (
-                          <p
-                            className={`mt-0.5 text-center text-sm font-semibold ${onPace ? "text-green-600" : "text-amber-600"}`}
-                            data-testid="perf-pace"
-                          >
-                            {onPace ? "On pace" : "Behind pace"}
-                          </p>
+                        {/* The big dollar figure + pace line only earn their
+                            space once there's actual revenue — a $0 headline
+                            is just noise. */}
+                        {revenue > 0 && (
+                          <>
+                            <p className="text-center text-3xl font-bold tracking-tight text-slate-900" data-testid="perf-revenue-value">
+                              {fmt(revenue)}
+                            </p>
+                            {goalTarget > 0 && (
+                              <p
+                                className={`mt-0.5 text-center text-sm font-semibold ${onPace ? "text-green-600" : "text-amber-600"}`}
+                                data-testid="perf-pace"
+                              >
+                                {onPace ? "On pace" : "Behind pace"}
+                              </p>
+                            )}
+                          </>
                         )}
                       </>
                     )}

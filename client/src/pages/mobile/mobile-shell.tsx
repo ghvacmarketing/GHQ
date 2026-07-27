@@ -220,7 +220,11 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           data-testid="fab-create"
           aria-label="Create"
         >
-          <Plus className="h-7 w-7" strokeWidth={2.25} />
+          {/* Quarter-turn while the sheet is open, easing back on close */}
+          <Plus
+            className={`h-7 w-7 transition-transform duration-300 ease-out ${createOpen ? "rotate-45" : "rotate-0"}`}
+            strokeWidth={2.25}
+          />
         </button>
       )}
 
@@ -234,8 +238,8 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
               <>
                 <SheetTile icon={UserRoundPlus} label="New Customer" onClick={() => go("/mobile/customers?new=1")} testid="create-new-customer" />
                 <SheetTile icon={Briefcase} label="New Job" onClick={() => go("/mobile/job?new=1")} testid="create-new-job" />
-                <SheetTile icon={FileText} label="New Quote" onClick={() => go("/crm/quotes/new")} testid="create-new-quote" />
-                <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/crm/invoices/new")} testid="create-new-invoice" />
+                <SheetTile icon={FileText} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
+                <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
               </>
             )}
           </div>

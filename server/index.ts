@@ -432,6 +432,8 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`ALTER TABLE customer_files ADD COLUMN IF NOT EXISTS thumb_url text`);
+    await db.execute(sql`ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS latitude text`);
+    await db.execute(sql`ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS longitude text`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS companycam_pushed_photos (
         cc_photo_id varchar PRIMARY KEY,

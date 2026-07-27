@@ -13797,6 +13797,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/mobile/eta — distance + drive-time estimate from the tech's
+  // current position to a property. Property coordinates are geocoded once
+  // via Nominatim and cached on the row; distance is haversine with a
+  // road-factor drive-time estimate.
+  app.get("/api/mobile/eta", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { propertyId, lat, lng } = req.query as { propertyId?: string; lat?: string; lng?: string };
+      const fromLat = parseFloat(lat || "");
+      const fromLng = parseFloat(lng || "");
+      if (!propertyId || isNaN(fromLat) || isNaN(fromLng)) {
+        return res.status(400).json({ message: "propertyId, lat, and lng are required" });
+      }
+      const [property] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
+      if (!property) return res.status(404).json({ message: "Property not found" });
+
+      let pLat = parseFloat(property.latitude || "");
+      let pLng = parseFloat(property.longitude || "");
+      if (isNaN(pLat) || isNaN(pLng)) {
+        const q = encodeURIComponent([property.address1, property.city, property.state, property.zip].filter(Boolean).join(", "));
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${q}`, {
+          headers: { "User-Agent": "GHQ-FieldApp/1.0 (ghvac.app)" },
+        });
+        const results: any[] = geoRes.ok ? await geoRes.json() : [];
+        if (!results[0]?.lat) return res.json({ available: false });
+        pLat = parseFloat(results[0].lat);
+        pLng = parseFloat(results[0].lon);
+        await db.update(crmProperties)
+          .set({ latitude: String(pLat), longitude: String(pLng) })
+          .where(eq(crmProperties.id, property.id));
+      }
+
+      const R = 3958.8; // miles
+      const toRad = (d: number) => (d * Math.PI) / 180;
+      const dLat = toRad(pLat - fromLat);
+      const dLng = toRad(pLng - fromLng);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(fromLat)) * Math.cos(toRad(pLat)) * Math.sin(dLng / 2) ** 2;
+      const straight = 2 * R * Math.asin(Math.sqrt(a));
+      // Roads aren't straight lines: pad by ~25%, then assume ~34 mph average
+      const roadMiles = straight * 1.25;
+      const minutes = Math.max(1, Math.round((roadMiles / 34) * 60));
+      return res.json({ available: true, miles: Math.round(roadMiles * 10) / 10, minutes });
+    } catch (error) {
+      console.error("Error computing ETA:", error);
+      res.status(500).json({ message: "Failed to compute ETA" });
+    }
+  });
+
   // Today's jobs photo status — powers the Photos page "Required photos"
   // tracker and the missing-photos nudge. Photos attach to customers, so a
   // job's "photos today" = image files created today for that job's customer.
