@@ -72,7 +72,7 @@ export default function CrmEsign() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"overview" | "list" | "card">("list");
+  const [view, setView] = useState<"overview" | "list">("list");
 
   const { uploadFile, isUploading } = useUpload();
 
@@ -218,8 +218,7 @@ export default function CrmEsign() {
               onSelect={(k) => setView(k as typeof view)}
               tabs={[
                 { key: "overview", label: "Overview" },
-                { key: "list", label: "List" },
-                { key: "card", label: "Card" },
+                { key: "list", label: "Documents", count: docs.length },
               ]}
             />
           </div>
@@ -293,7 +292,7 @@ export default function CrmEsign() {
           />
         )}
 
-        {/* Data — list or card view */}
+        {/* Data — documents table */}
         {view === "overview" ? null : isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-lg" />)}
@@ -315,42 +314,12 @@ export default function CrmEsign() {
           <SectionCard noBodyPadding>
             <EmptyState icon={FileText} title="No matches" message={`No documents match "${search}".`} />
           </SectionCard>
-        ) : view === "card" ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((doc) => {
-              const pct = doc.recipientCount > 0 ? Math.round((doc.signedCount / doc.recipientCount) * 100) : 0;
-              return (
-                <button
-                  key={doc.id}
-                  onClick={() => navigate(`/crm/esign/${doc.id}`)}
-                  className="group flex flex-col rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-colors hover:border-slate-900"
-                  data-testid={`doc-card-${doc.id}`}
-                >
-                  <div className="flex w-full items-start">
-                    <StatusDot pill={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
-                      {STATUS_LABELS[doc.status] || doc.status}
-                    </StatusDot>
-                  </div>
-                  <p className="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{doc.title}</p>
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {doc.recipientCount > 0 ? `${doc.signedCount}/${doc.recipientCount} signed` : "No recipients"}
-                    {doc.createdAt ? ` · ${format(new Date(doc.createdAt), "MMM d, yyyy")}` : ""}
-                  </p>
-                  {doc.recipientCount > 0 && (
-                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-[2px] bg-slate-100">
-                      <div className="h-full bg-[#711419]" style={{ width: `${pct}%` }} />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
         ) : (
-          <SectionCard title="Documents" description={`${filtered.length} of ${docs.length}`} noBodyPadding>
+          <SectionCard noBodyPadding className="overflow-hidden">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
+                  <TableRow>
                     <TableHead className="font-semibold">Document</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Signed</TableHead>
