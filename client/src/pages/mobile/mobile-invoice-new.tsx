@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import MobileShell from "./mobile-shell";
+import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import type { CrmCustomer, CrmProperty, CrmWorkOrder } from "@shared/schema";
 
 /** New Invoice — one-page invoice creator. Pick a job (customer → work
@@ -169,6 +169,7 @@ export default function MobileInvoiceNew() {
   const validItems = lineItems.filter((item) => item.description.trim());
   const hasPositiveTotal = validItems.some((item) => calculateLineTotal(item) > 0);
   const canSubmit = !!pickedWorkOrder && validItems.length > 0 && hasPositiveTotal && !createInvoiceMutation.isPending;
+  const dirty = !!pickedCustomer || !!pickedWorkOrder || lineItems.length > 0;
 
   const handleCreateInvoice = () => {
     if (!canSubmit) return;
@@ -186,13 +187,13 @@ export default function MobileInvoiceNew() {
   };
 
   return (
-    <MobileShell>
-      <div className="space-y-4 p-4 pb-6" data-testid="mobile-invoice-new-page">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">New invoice</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Pick the job, add line items, done.</p>
-        </div>
-
+    <MobileCreatePage
+      title="New invoice"
+      subtitle="Pick the job, add line items, done."
+      dirty={dirty}
+      testid="mobile-invoice-new-page"
+    >
+      <div className="space-y-4">
         {/* --- Job picker --- */}
         {pickedWorkOrder ? (
           <div
@@ -466,6 +467,6 @@ export default function MobileInvoiceNew() {
           <p className="-mt-2 text-center text-xs text-slate-400">Pick a job above to enable the button.</p>
         )}
       </div>
-    </MobileShell>
+    </MobileCreatePage>
   );
 }

@@ -45,11 +45,12 @@ export default function MobileCustomers() {
   const [cAddress, setCAddress] = useState("");
   const [cType, setCType] = useState<"residential" | "commercial">("residential");
 
+  // Legacy deep-link: creation now lives on its own page.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("new") === "1") {
-      setCreateOpen(true);
+      navigate("/mobile/customers/new", { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
   const createCustomer = useMutation({
     mutationFn: async () => {

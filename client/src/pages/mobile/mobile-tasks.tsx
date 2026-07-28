@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { format, isBefore, startOfDay } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -29,6 +30,7 @@ type TaskRow = {
 
 export default function MobileTasks() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [view, setView] = useState<"open" | "done">("open");
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -45,12 +47,12 @@ export default function MobileTasks() {
     staleTime: 60 * 1000,
   });
 
-  // The floating "+" create sheet deep-links here with ?new=1
+  // Legacy deep-link: creation now lives on its own page.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("new") === "1") {
-      setCreateOpen(true);
+      navigate("/mobile/tasks/new", { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
     queryKey: ["/api/tasks", "mine", currentUser?.id],
@@ -128,7 +130,7 @@ export default function MobileTasks() {
             ))}
           </div>
           <button
-            onClick={() => setCreateOpen(true)}
+            onClick={() => navigate("/mobile/tasks/new")}
             className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
             aria-label="New task"
             data-testid="button-new-task"

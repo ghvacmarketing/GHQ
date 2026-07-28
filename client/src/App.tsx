@@ -128,6 +128,9 @@ const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-det
 const MobileMessages = lazy(() => import("@/pages/mobile/mobile-messages"));
 const MobileCustomers = lazy(() => import("@/pages/mobile/mobile-customers"));
 const MobileCustomerDetail = lazy(() => import("@/pages/mobile/mobile-customer-detail"));
+const MobileJobNew = lazy(() => import("@/pages/mobile/mobile-job-new"));
+const MobileTaskNew = lazy(() => import("@/pages/mobile/mobile-task-new"));
+const MobileCustomerNew = lazy(() => import("@/pages/mobile/mobile-customer-new"));
 
 // Lazy-load Customer Portal pages
 const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
@@ -395,6 +398,7 @@ function Router() {
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTasksSimple /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/mine">{() => <ProtectedCrmWrapper><CrmTasksSimple /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
+      <Route path="/mobile/job/new">{() => <MobileWrapper><MobileJobNew /></MobileWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/job">{() => <MobileWrapper><MobileJob /></MobileWrapper>}</Route>
       <Route path="/mobile/quotes/new">{() => <MobileWrapper><MobileQuoteNew /></MobileWrapper>}</Route>
@@ -404,9 +408,11 @@ function Router() {
       <Route path="/mobile/invoices/:id">{() => <MobileWrapper><MobileInvoiceDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
       <Route path="/mobile/more">{() => <MobileWrapper><MobileMore /></MobileWrapper>}</Route>
+      <Route path="/mobile/tasks/new">{() => <MobileWrapper><MobileTaskNew /></MobileWrapper>}</Route>
       <Route path="/mobile/tasks">{() => <MobileWrapper><MobileTasks /></MobileWrapper>}</Route>
       <Route path="/mobile/photos">{() => <MobileWrapper><MobilePhotos /></MobileWrapper>}</Route>
       <Route path="/mobile/messages">{() => <MobileWrapper><MobileMessages /></MobileWrapper>}</Route>
+      <Route path="/mobile/customers/new">{() => <MobileWrapper><MobileCustomerNew /></MobileWrapper>}</Route>
       <Route path="/mobile/customers/:id">{() => <MobileWrapper><MobileCustomerDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/customers">{() => <MobileWrapper><MobileCustomers /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>

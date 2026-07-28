@@ -388,13 +388,12 @@ export default function MobileJob() {
   );
   const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
-  // The floating "+" create sheet deep-links here with ?new=1 to open the
-  // New Job dialog straight away.
+  // Legacy deep-link: job creation now lives on its own page (/mobile/job/new).
   useEffect(() => {
-    if (isSupervisorPlus && new URLSearchParams(window.location.search).get("new") === "1") {
-      setShowCreateDialog(true);
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      navigate("/mobile/job/new", { replace: true });
     }
-  }, [isSupervisorPlus]);
+  }, [navigate]);
 
   // For users who can view future jobs: show all jobs (today + future), for others: only today
   const displayedJobs = useMemo(() => {

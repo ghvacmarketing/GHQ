@@ -232,12 +232,12 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       <DraggableSheet open={createOpen} onOpenChange={setCreateOpen} title="Create" testid="sheet-create">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks?new=1")} testid="create-new-task" />
+            <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
             <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/photos")} testid="create-add-photo" />
             {isSupervisor && (
               <>
-                <SheetTile icon={UserRoundPlus} label="New Customer" onClick={() => go("/mobile/customers?new=1")} testid="create-new-customer" />
-                <SheetTile icon={Briefcase} label="New Job" onClick={() => go("/mobile/job?new=1")} testid="create-new-job" />
+                <SheetTile icon={UserRoundPlus} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
+                <SheetTile icon={Briefcase} label="New Job" onClick={() => go("/mobile/job/new")} testid="create-new-job" />
                 <SheetTile icon={FileText} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
                 <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
               </>

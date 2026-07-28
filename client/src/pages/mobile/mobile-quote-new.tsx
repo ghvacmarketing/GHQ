@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import MobileShell from "./mobile-shell";
+import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import type { CrmCustomer, CrmProperty, CrmUser, CrmWorkOrder } from "@shared/schema";
 
 /** New Quote — one-page quick-quote creator. Pick a job (customer → work
@@ -185,6 +185,7 @@ export default function MobileQuoteNew() {
 
   const validItems = lineItems.filter((item) => item.description.trim() && item.unitPrice !== 0);
   const canSubmit = !!pickedWorkOrder && validItems.length > 0 && !!selectedAssigneeId && !createQuoteMutation.isPending;
+  const dirty = !!pickedCustomer || !!pickedWorkOrder || quoteTitle.trim().length > 0 || lineItems.length > 0 || !!selectedAssigneeId;
 
   const handleCreateQuote = () => {
     if (!canSubmit) return;
@@ -203,13 +204,13 @@ export default function MobileQuoteNew() {
   };
 
   return (
-    <MobileShell>
-      <div className="space-y-4 p-4 pb-6" data-testid="mobile-quote-new-page">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">New quote</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Pick the job, add line items, done.</p>
-        </div>
-
+    <MobileCreatePage
+      title="New quote"
+      subtitle="Pick the job, add line items, done."
+      dirty={dirty}
+      testid="mobile-quote-new-page"
+    >
+      <div className="space-y-4">
         {/* --- Job picker --- */}
         {pickedWorkOrder ? (
           <div
@@ -515,6 +516,6 @@ export default function MobileQuoteNew() {
           <p className="-mt-2 text-center text-xs text-slate-400">Pick a job above to enable the button.</p>
         )}
       </div>
-    </MobileShell>
+    </MobileCreatePage>
   );
 }
