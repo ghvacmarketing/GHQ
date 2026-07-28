@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { PageHeader, StatCard, SectionCard, EmptyState, FilterBar } from "@/components/crm/ui-kit";
+import { StatCard, SectionCard, EmptyState } from "@/components/crm/ui-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,12 +21,15 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import {
   PenLine, Plus, FileText, Loader2, Trash2, Upload, CheckCircle2, Send,
-  Download, FileUp,
+  Download, FileUp, Search, Filter,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { CrmUser, SignatureDocument } from "@shared/schema";
@@ -73,6 +76,8 @@ export default function CrmEsign() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"overview" | "list">("list");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [depositFilter, setDepositFilter] = useState<string>("all");
 
   const { uploadFile, isUploading } = useUpload();
 
@@ -159,6 +164,7 @@ export default function CrmEsign() {
       draft: docs.filter((d) => d.status === "draft").length,
       sent: docs.filter((d) => d.status === "sent").length,
       completed: docs.filter((d) => d.status === "completed").length,
+      voided: docs.filter((d) => d.status === "voided").length,
     };
   }, [docs]);
 
@@ -188,9 +194,18 @@ export default function CrmEsign() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return docs;
-    return docs.filter((d) => d.title.toLowerCase().includes(q));
-  }, [docs, search]);
+    return docs.filter((d) => {
+      if (statusFilter !== "all" && d.status !== statusFilter) return false;
+      const hasDeposit = !!d.depositEnabled && (d.depositAmountCents ?? 0) > 0;
+      if (depositFilter === "with" && !hasDeposit) return false;
+      if (depositFilter === "due" && !(hasDeposit && !d.depositPaidAt)) return false;
+      if (depositFilter === "paid" && !d.depositPaidAt) return false;
+      if (q && !d.title.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [docs, search, statusFilter, depositFilter]);
+
+  const hasActiveFilters = statusFilter !== "all" || depositFilter !== "all" || search.trim().length > 0;
 
   if (!currentUser) return null;
 
@@ -205,10 +220,11 @@ export default function CrmEsign() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="w-full space-y-6">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="space-y-4">
+        {/* Title + subheading · centered view switcher · action — all on one row */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
           <div className="min-w-0 shrink-0">
-            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Signatures</h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground truncate" data-testid="text-esign-title">Signatures</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Upload a PDF, place fields, and send it for e-signature.</p>
           </div>
           <div className="mx-auto">
@@ -218,7 +234,7 @@ export default function CrmEsign() {
               onSelect={(k) => setView(k as typeof view)}
               tabs={[
                 { key: "overview", label: "Overview" },
-                { key: "list", label: "Documents", count: docs.length },
+                { key: "list", label: "Documents" },
               ]}
             />
           </div>
@@ -282,14 +298,69 @@ export default function CrmEsign() {
           </>
         )}
 
-        {/* Search */}
+        {/* Status tabs left · search + filter right */}
         {view !== "overview" && docs.length > 0 && (
-          <FilterBar
-            search={search}
-            onSearchChange={setSearch}
-            placeholder="Search documents…"
-            className="max-w-md"
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <IndustrialTabs
+              testidPrefix="esign-status"
+              activeKey={statusFilter}
+              onSelect={setStatusFilter}
+              tabs={[
+                { key: "all", label: "All", count: stats.total },
+                { key: "draft", label: "Draft", count: stats.draft || null },
+                { key: "sent", label: "Sent", count: stats.sent || null },
+                { key: "completed", label: "Completed", count: stats.completed || null },
+                { key: "voided", label: "Voided", count: stats.voided || null },
+              ]}
+            />
+            <div className="flex shrink-0 items-center gap-2">
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setStatusFilter("all"); setDepositFilter("all"); setSearch(""); }}
+                  className="text-xs text-muted-foreground"
+                  data-testid="button-reset-filters"
+                >
+                  Reset
+                </Button>
+              )}
+              <div className="relative w-56">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search documents…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                  data-testid="input-search"
+                />
+              </div>
+              <Select value={depositFilter} onValueChange={setDepositFilter}>
+                <SelectTrigger
+                  className={`relative h-9 w-9 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
+                    depositFilter !== "all"
+                      ? "border-[#711419] text-[#711419]"
+                      : "border-input text-slate-600 hover:text-foreground"
+                  }`}
+                  title="Filter by deposit"
+                  data-testid="select-deposit-filter"
+                >
+                  <span className="flex items-center justify-center">
+                    <Filter className="h-4 w-4" />
+                  </span>
+                  {depositFilter !== "all" && (
+                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
+                  )}
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All deposits</SelectItem>
+                  <SelectItem value="with" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">With deposit</SelectItem>
+                  <SelectItem value="due" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">Deposit due</SelectItem>
+                  <SelectItem value="paid" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">Deposit paid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         )}
 
         {/* Data — documents table */}
@@ -312,7 +383,7 @@ export default function CrmEsign() {
           </SectionCard>
         ) : filtered.length === 0 ? (
           <SectionCard noBodyPadding>
-            <EmptyState icon={FileText} title="No matches" message={`No documents match "${search}".`} />
+            <EmptyState icon={FileText} title="No matches" message={search.trim() ? `No documents match "${search}".` : "No documents match these filters."} />
           </SectionCard>
         ) : (
           <SectionCard noBodyPadding className="overflow-hidden">
