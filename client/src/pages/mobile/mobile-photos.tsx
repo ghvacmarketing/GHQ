@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, Loader2, Search, Trash2, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -102,7 +102,7 @@ export default function MobilePhotos() {
   // Recent company-wide photos for the horizontal gallery strip. Tapping one
   // jumps to the customer it's attached to.
   type FeedPhoto = {
-    id: string; url: string; thumbUrl?: string | null; name: string; createdAt: string | null;
+    id: string; url: string; thumbUrl?: string | null; name: string; contentType?: string | null; createdAt: string | null;
     customerId: string | null; customerName: string | null; uploadedByName: string | null;
   };
   const { data: recentPhotos = [] } = useQuery<FeedPhoto[]>({
@@ -140,7 +140,12 @@ export default function MobilePhotos() {
     },
     enabled: !!customerId,
   });
-  const photos = (files || []).filter((f) => f.contentType?.startsWith("image/"));
+  // Photos AND CompanyCam video references — videos play in a lightweight
+  // fullscreen player (the annotation viewer is image-only).
+  const photos = (files || []).filter(
+    (f) => f.contentType?.startsWith("image/") || f.contentType?.startsWith("video/"),
+  );
+  const isVideo = (f: { contentType?: string | null }) => !!f.contentType?.startsWith("video/");
 
   // Supervisor+ can pull photos down or remove bad shots from the record.
   const isSupervisorPlus = !!currentUser && ["supervisor", "admin", "owner"].includes(currentUser.role);
@@ -269,6 +274,8 @@ export default function MobilePhotos() {
   // Shots appear instantly with a local preview while uploading in the background
   const [pendingShots, setPendingShots] = useState<Array<{ id: string; url: string; status: "uploading" | "done" | "error" }>>([]);
   const [viewer, setViewer] = useState<{ src: string; name: string } | null>(null);
+  // Fullscreen video player — separate from the annotation viewer.
+  const [videoViewer, setVideoViewer] = useState<{ src: string; name: string; poster?: string | null } | null>(null);
 
   const openCamera = async () => {
     try {
@@ -558,12 +565,25 @@ export default function MobilePhotos() {
                   className="w-32 shrink-0 snap-start text-left transition-transform active:scale-95"
                   data-testid={`recent-photo-${rp.id}`}
                 >
-                  <img
-                    src={rp.thumbUrl || rp.url}
-                    alt={rp.name}
-                    loading="lazy"
-                    className="aspect-square w-32 rounded-lg border border-slate-100 object-cover shadow-sm"
-                  />
+                  {rp.contentType?.startsWith("video/") ? (
+                    <span className="relative block aspect-square w-32 overflow-hidden rounded-lg border border-slate-100 bg-slate-900 shadow-sm">
+                      {rp.thumbUrl && (
+                        <img src={rp.thumbUrl} alt={rp.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+                      )}
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50">
+                          <Play className="h-4 w-4 fill-white text-white" />
+                        </span>
+                      </span>
+                    </span>
+                  ) : (
+                    <img
+                      src={rp.thumbUrl || rp.url}
+                      alt={rp.name}
+                      loading="lazy"
+                      className="aspect-square w-32 rounded-lg border border-slate-100 object-cover shadow-sm"
+                    />
+                  )}
                   <p className="mt-2 truncate text-[12px] font-semibold text-slate-800">{rp.customerName || "No customer"}</p>
                   <p className="mt-0.5 truncate text-[11px] text-slate-400">
                     {rp.uploadedByName || "Unknown"}
@@ -595,9 +615,10 @@ export default function MobilePhotos() {
                   <button
                     onClick={() => {
                       if (suppressClick.current) { suppressClick.current = false; return; }
-                      setViewer({ src: p.url, name: p.name });
+                      if (isVideo(p)) setVideoViewer({ src: p.url, name: p.name, poster: p.thumbUrl });
+                      else setViewer({ src: p.url, name: p.name });
                     }}
-                    onPointerDown={(e) => startPress(p, e)}
+                    onPointerDown={(e) => { if (!isVideo(p)) startPress(p, e); }}
                     onPointerMove={movePress}
                     onPointerUp={cancelPress}
                     onPointerCancel={cancelPress}
@@ -607,14 +628,34 @@ export default function MobilePhotos() {
                     style={{ WebkitTouchCallout: "none" }}
                     data-testid={`photo-${p.id}`}
                   >
-                    <img
-                      src={p.thumbUrl || p.url}
-                      alt={p.name}
-                      loading="lazy"
-                      draggable={false}
-                      className="pointer-events-none aspect-square w-full select-none rounded-lg object-cover"
-                      style={{ WebkitTouchCallout: "none" }}
-                    />
+                    {isVideo(p) ? (
+                      <span className="relative block aspect-square w-full overflow-hidden rounded-lg bg-slate-900">
+                        {p.thumbUrl && (
+                          <img
+                            src={p.thumbUrl}
+                            alt={p.name}
+                            loading="lazy"
+                            draggable={false}
+                            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover opacity-80"
+                            style={{ WebkitTouchCallout: "none" }}
+                          />
+                        )}
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50">
+                            <Play className="h-5 w-5 fill-white text-white" />
+                          </span>
+                        </span>
+                      </span>
+                    ) : (
+                      <img
+                        src={p.thumbUrl || p.url}
+                        alt={p.name}
+                        loading="lazy"
+                        draggable={false}
+                        className="pointer-events-none aspect-square w-full select-none rounded-lg object-cover"
+                        style={{ WebkitTouchCallout: "none" }}
+                      />
+                    )}
                   </button>
                 </div>
               ))}
@@ -772,6 +813,30 @@ export default function MobilePhotos() {
           onClose={() => setViewer(null)}
           onSaved={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "files"] })}
         />
+      )}
+
+      {/* Fullscreen video player — CompanyCam videos stream straight from
+          the CDN (nothing stored on our side) */}
+      {videoViewer && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black" data-testid="video-viewer">
+          <button
+            onClick={() => setVideoViewer(null)}
+            className="absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition-transform active:scale-90"
+            style={{ top: "calc(12px + env(safe-area-inset-top))" }}
+            data-testid="button-close-video"
+            aria-label="Close video"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <video
+            src={videoViewer.src}
+            poster={videoViewer.poster || undefined}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-full w-full"
+          />
+        </div>
       )}
 
       {/* Fullscreen in-app camera — every shutter press auto-saves to the account */}

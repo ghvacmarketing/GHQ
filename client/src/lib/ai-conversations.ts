@@ -63,7 +63,9 @@ export type AiChatMessage = {
   attachments?: string[] | null;
   relatedTopics?: string[];
   proposedAction?: AiProposedAction | null;
-  actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose";
+  /** "superseded" = a newer proposal replaced this card before it was
+   *  approved — it renders as a collapsed stub, never as a live approval. */
+  actionState?: "pending" | "executing" | "done" | "dismissed" | "error" | "choose" | "superseded";
   actionResult?: { label: string; url: string } | null;
   actionError?: string | null;
   actionCandidates?: { id: string; name: string; phone?: string | null; email?: string | null }[] | null;
@@ -196,7 +198,9 @@ export function mapServerAiMessage(m: AiServerMessage): AiChatMessage {
         ? "done"
         : m.actionStatus === "dismissed"
           ? "dismissed"
-          : "pending"
+          : m.actionStatus === "superseded"
+            ? "superseded"
+            : "pending"
       : undefined,
     actionResult: m.actionResult ? { label: m.actionResult.label, url: m.actionResult.url } : null,
     messageId: m.id,

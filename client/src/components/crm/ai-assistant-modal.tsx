@@ -70,6 +70,9 @@ interface HelpResponse {
   /** One spoken message can carry several creation requests — each extra
    *  action arrives as its own approval card with its own message id. */
   extraActions?: Array<{ messageId?: string; proposedAction?: AiProposedAction | null }>;
+  /** Older still-pending cards this reply replaced (adjustment/expansion
+   *  re-proposals) — they collapse so only one live set can be approved. */
+  supersededMessageIds?: string[];
 }
 
 const STARTERS = [
@@ -336,8 +339,15 @@ export default function AiAssistantModal() {
         const totalActions = (data.proposedAction ? 1 : 0) + extras.length;
         const batchId = totalActions > 1 ? String(data.messageId || `batch-${assistantIndex}`) : null;
         const extraStepStart = data.proposedAction ? 2 : 1;
+        // Cards this reply replaced collapse immediately — leaving them live
+        // would let the user approve the same work order twice.
+        const superseded = new Set(data.supersededMessageIds || []);
         setMessages((prev) => [
-          ...prev,
+          ...prev.map((m) =>
+            m.messageId && superseded.has(m.messageId) && m.actionState !== "done" && m.actionState !== "dismissed"
+              ? { ...m, actionState: "superseded" as const }
+              : m,
+          ),
           {
             role: "assistant",
             content: data.answer,
@@ -921,7 +931,14 @@ export default function AiAssistantModal() {
                             />
                           </div>
                         )}
-                        {revealed && msg.proposedAction && msg.actionState !== "dismissed" && (
+                        {revealed && msg.proposedAction && msg.actionState === "superseded" && (
+                          <p className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-400" data-testid={`ai-action-superseded-${i}`}>
+                            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                            <span className="line-through">{AI_ACTION_LABELS[msg.proposedAction.type] || "Action"}: {msg.proposedAction.summary}</span>
+                            <span className="ml-1 shrink-0 font-semibold no-underline">Replaced by a newer proposal below</span>
+                          </p>
+                        )}
+                        {revealed && msg.proposedAction && msg.actionState !== "dismissed" && msg.actionState !== "superseded" && (
                           <div className="animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3 duration-300" data-testid={`ai-action-card-${i}`}>
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
@@ -1015,7 +1032,7 @@ export default function AiAssistantModal() {
                               // A later step of a batch stays locked until every
                               // earlier step is done or dismissed.
                               const waitingOn = msg.actionBatch
-                                ? messages.find((m) => m.actionBatch?.id === msg.actionBatch!.id && (m.actionBatch?.step ?? 0) < msg.actionBatch!.step && m.actionState !== "done" && m.actionState !== "dismissed")
+                                ? messages.find((m) => m.actionBatch?.id === msg.actionBatch!.id && (m.actionBatch?.step ?? 0) < msg.actionBatch!.step && m.actionState !== "done" && m.actionState !== "dismissed" && m.actionState !== "superseded")
                                 : undefined;
                               return (
                                 <>

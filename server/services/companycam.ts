@@ -15,7 +15,10 @@ import { eq, sql, like } from "drizzle-orm";
  *  the anchor); each matched project's photos land in customer_files as
  *  reference rows (url = CompanyCam CDN, objectPath = "companycam:<id>" as
  *  the dedupe key) so every existing gallery surface shows them with zero UI
- *  changes. Deletes never propagate in either direction.
+ *  changes. VIDEOS come along the same way (objectPath =
+ *  "companycam-video:<id>", contentType video/*, thumbUrl = poster frame) —
+ *  the bytes stay on CompanyCam's CDN. Deletes never propagate in either
+ *  direction.
  *
  *  Push: new CRM photo uploads for a linked customer are sent up to the
  *  matching CompanyCam project via URL ingest (/objects is public); the
@@ -55,6 +58,23 @@ async function ccPost(path: string, body: any): Promise<any> {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`CompanyCam POST ${path} -> ${res.status} ${text.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+async function ccPut(path: string, body: any): Promise<any> {
+  const res = await fetch(`${CC_BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${process.env.COMPANYCAM_API_TOKEN}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`CompanyCam PUT ${path} -> ${res.status} ${text.slice(0, 200)}`);
   }
   return res.json();
 }
@@ -102,6 +122,38 @@ async function fetchProjectPhotos(projectId: string): Promise<CcPhoto[]> {
     if (rows.length < 100) break;
   }
   return all;
+}
+
+/** Same shape as photos: id, creator, captured_at, uris[]. Videos stay on
+ *  CompanyCam's CDN — we only import reference rows, never the bytes. */
+type CcVideo = {
+  id: string;
+  project_id: string;
+  creator_id: string | null;
+  creator_name: string | null;
+  captured_at: number | null;
+  created_at?: number | null;
+  status?: string;
+  uris: Array<{ type: string; uri: string; url?: string }>;
+};
+
+async function fetchProjectVideos(projectId: string): Promise<CcVideo[]> {
+  const all: CcVideo[] = [];
+  for (let page = 1; page <= 50; page++) {
+    const rows: CcVideo[] = await ccFetch(`/projects/${projectId}/videos?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) break;
+    all.push(...rows);
+    if (rows.length < 100) break;
+  }
+  return all;
+}
+
+/** Content type from a CDN url's extension — CompanyCam videos are mp4/mov. */
+function videoContentType(uri: string): string {
+  const ext = (uri.split("?")[0].split(".").pop() || "").toLowerCase();
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "webm") return "video/webm";
+  return "video/mp4";
 }
 
 // ---- Address matching ---------------------------------------------------
@@ -329,16 +381,25 @@ async function matchCreatorToUser(creatorId: string | null, creatorName: string 
   return byFirst.length === 1 ? byFirst[0].id : null;
 }
 
-/** Import one project's photos as reference rows on the customer. Returns the
- *  number of NEW rows. Also backfills uploader attribution on rows imported
- *  before creator matching existed. */
+/** Import one project's photos AND videos as reference rows on the customer.
+ *  Returns the number of NEW rows. Also backfills uploader attribution on
+ *  rows imported before creator matching existed. */
 export async function importProjectPhotos(ccProjectId: string, customerId: string, projectName: string): Promise<number> {
-  const photos = await fetchProjectPhotos(ccProjectId);
+  // Videos are best-effort: an accounts-without-video plan (or an API shape
+  // change) must never block the photo import.
+  const [photos, videos] = await Promise.all([
+    fetchProjectPhotos(ccProjectId),
+    fetchProjectVideos(ccProjectId).catch((e) => {
+      console.error(`[CompanyCam] video fetch failed for project ${ccProjectId}:`, e?.message || e);
+      return [] as CcVideo[];
+    }),
+  ]);
 
+  // "companycam%" covers both key shapes: companycam:<id> and companycam-video:<id>
   const existing = await db
     .select({ id: customerFiles.id, objectPath: customerFiles.objectPath, uploadedBy: customerFiles.uploadedBy, thumbUrl: customerFiles.thumbUrl })
     .from(customerFiles)
-    .where(like(customerFiles.objectPath, "companycam:%"));
+    .where(like(customerFiles.objectPath, "companycam%"));
   const have = new Map(existing.map((r) => [r.objectPath, r]));
 
   const pushed = await db.select({ ccPhotoId: companycamPushedPhotos.ccPhotoId }).from(companycamPushedPhotos);
@@ -381,6 +442,31 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
     });
     imported++;
   }
+
+  for (const video of videos) {
+    if (video.status && video.status !== "active") continue;
+    const key = `companycam-video:${video.id}`;
+    if (have.has(key)) continue;
+    const uris = Array.isArray(video.uris) ? video.uris : [];
+    const source = uris.find((u) => u.type === "original") || uris.find((u) => u.type === "web") || uris[0];
+    if (!source?.uri) continue;
+    // Poster frame for grids — any image-ish uri CompanyCam provides.
+    const thumb = uris.find((u) => u.type === "thumbnail")?.uri || uris.find((u) => u.type === "poster")?.uri || null;
+    const capturedAt = video.captured_at || video.created_at || null;
+    await db.insert(customerFiles).values({
+      customerId,
+      name: `CompanyCam ${projectName} video${capturedAt ? ` ${new Date(capturedAt * 1000).toISOString().slice(0, 10)}` : ""}.mp4`,
+      url: source.uri,
+      thumbUrl: thumb,
+      objectPath: key,
+      contentType: videoContentType(source.uri),
+      size: null,
+      uploadedBy: await matchCreatorToUser(video.creator_id, video.creator_name),
+      createdAt: capturedAt ? new Date(capturedAt * 1000) : new Date(),
+    });
+    imported++;
+  }
+
   if (imported > 0) {
     await db
       .update(companycamProjectLinks)
@@ -424,22 +510,16 @@ export async function pushPhotoToCompanycam(customerId: string, fileId: string, 
   }
 }
 
-/** Near-realtime pull: CompanyCam's photo.created webhook pokes us with ids.
- *  The payload is treated as UNTRUSTED — we re-fetch the photo from the API
- *  with our own token and import only what's really there, so a spoofed POST
- *  can at worst trigger a legitimate import. */
+/** Near-realtime pull: CompanyCam's photo.created / video.created webhooks
+ *  poke us with ids. The payload is treated as UNTRUSTED — we re-fetch the
+ *  resource from the API with our own token and import only what's really
+ *  there, so a spoofed POST can at worst trigger a legitimate import. */
 let lastWebhookFullSync = 0;
-export async function handleWebhookPhoto(photoId: string, projectId: string | null): Promise<void> {
-  if (!companycamConfigured()) return;
-  const photo: any = await ccFetch(`/photos/${photoId}`).catch(() => null);
-  if (!photo?.id) return;
-  const projId = String(photo.project_id || projectId || "");
-  if (!projId) return;
-
+async function handleWebhookMedia(projId: string): Promise<void> {
   const [link] = await db.select().from(companycamProjectLinks).where(eq(companycamProjectLinks.ccProjectId, projId));
   if (link?.customerId && link.matchType !== "ignored") {
     const imported = await importProjectPhotos(projId, link.customerId, link.ccProjectName || "CompanyCam");
-    if (imported > 0) console.log(`[CompanyCam] webhook imported ${imported} photo(s) for project ${projId}`);
+    if (imported > 0) console.log(`[CompanyCam] webhook imported ${imported} item(s) for project ${projId}`);
     return;
   }
   // Unknown or unmatched project (e.g. brand new job) — run a full sync so it
@@ -450,22 +530,59 @@ export async function handleWebhookPhoto(photoId: string, projectId: string | nu
   }
 }
 
-/** Make sure our photo.created webhook is registered (idempotent). */
+export async function handleWebhookPhoto(photoId: string, projectId: string | null): Promise<void> {
+  if (!companycamConfigured()) return;
+  const photo: any = await ccFetch(`/photos/${photoId}`).catch(() => null);
+  if (!photo?.id) return;
+  const projId = String(photo.project_id || projectId || "");
+  if (!projId) return;
+  await handleWebhookMedia(projId);
+}
+
+export async function handleWebhookVideo(videoId: string, projectId: string | null): Promise<void> {
+  if (!companycamConfigured()) return;
+  const video: any = await ccFetch(`/videos/${videoId}`).catch(() => null);
+  // Some plans 404 the videos API — fall back to the payload's project id so
+  // a video event still triggers a project import attempt.
+  const projId = String(video?.project_id || projectId || "");
+  if (!projId) return;
+  await handleWebhookMedia(projId);
+}
+
+/** Webhook scopes we need registered. */
+const WEBHOOK_SCOPES = ["photo.created", "video.created"];
+
+/** Make sure our webhook is registered, ENABLED, and carries every scope we
+ *  rely on (idempotent; re-enables/upgrades a stale registration in place).
+ *  Called at boot and again on every reconciliation tick — a failed boot-time
+ *  registration used to leave photos arriving only on the hourly sync. */
 async function ensureWebhook(): Promise<void> {
   try {
     const publicBase = process.env.PUBLIC_BASE_URL || "https://www.ghvac.app";
     const target = `${publicBase}/api/webhooks/companycam`;
     const hooks: any[] = await ccFetch("/webhooks");
-    if (hooks.some((h) => h.url === target && h.enabled)) return;
-    await ccPost("/webhooks", { webhook: { url: target, scopes: ["photo.created"], enabled: true } });
-    console.log(`[CompanyCam] registered photo.created webhook -> ${target}`);
+    const ours = hooks.find((h) => h.url === target);
+    if (ours) {
+      const scopes: string[] = Array.isArray(ours.scopes) ? ours.scopes : [];
+      const missingScopes = WEBHOOK_SCOPES.filter((s) => !scopes.includes(s));
+      if (ours.enabled && missingScopes.length === 0) return;
+      await ccPut(`/webhooks/${ours.id}`, {
+        webhook: { url: target, scopes: Array.from(new Set([...scopes, ...WEBHOOK_SCOPES])), enabled: true },
+      });
+      console.log(`[CompanyCam] webhook updated (enabled=${ours.enabled} -> true, added scopes: ${missingScopes.join(", ") || "none"})`);
+      return;
+    }
+    await ccPost("/webhooks", { webhook: { url: target, scopes: WEBHOOK_SCOPES, enabled: true } });
+    console.log(`[CompanyCam] registered webhook (${WEBHOOK_SCOPES.join(", ")}) -> ${target}`);
   } catch (e: any) {
     console.error("[CompanyCam] webhook registration failed:", e?.message || e);
   }
 }
 
-/** Boot-time scheduler: first sync shortly after start, then hourly (the
- *  webhook handles the instant pulls; this is the reconciliation pass). */
+/** Boot-time scheduler: first sync shortly after start, then every 15 minutes
+ *  (the webhook handles the instant pulls; this is the reconciliation pass —
+ *  and it re-verifies the webhook registration each tick, so a boot-time
+ *  registration failure heals itself instead of degrading to slow pulls). */
 export function scheduleCompanycamSync(): void {
   if (!companycamConfigured()) {
     console.log("[CompanyCam] no token configured — sync disabled");
@@ -475,5 +592,8 @@ export function scheduleCompanycamSync(): void {
     ensureWebhook();
     syncCompanycam().catch((e) => console.error("[CompanyCam] initial sync failed:", e?.message || e));
   }, 30_000);
-  setInterval(() => syncCompanycam().catch((e) => console.error("[CompanyCam] hourly sync failed:", e?.message || e)), 60 * 60 * 1000);
+  setInterval(() => {
+    ensureWebhook();
+    syncCompanycam().catch((e) => console.error("[CompanyCam] scheduled sync failed:", e?.message || e));
+  }, 15 * 60 * 1000);
 }

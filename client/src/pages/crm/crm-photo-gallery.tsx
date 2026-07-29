@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
-import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, ChevronLeft, ChevronRight, Loader2, Filter, Upload, Search, FileText } from "lucide-react";
+import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, ChevronLeft, ChevronRight, Loader2, Filter, Upload, Search, FileText, Play } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -72,9 +72,10 @@ async function downloadPhoto(p: FeedPhoto) {
 }
 
 const isImageFile = (p: FeedPhoto) => (p.contentType || "").startsWith("image/");
+const isVideoFile = (p: FeedPhoto) => (p.contentType || "").startsWith("video/");
 const isPdfFile = (p: FeedPhoto) =>
   (p.contentType || "") === "application/pdf" || /\.pdf$/i.test(p.name || "");
-const isViewableFile = (p: FeedPhoto) => isImageFile(p) || isPdfFile(p);
+const isViewableFile = (p: FeedPhoto) => isImageFile(p) || isVideoFile(p) || isPdfFile(p);
 
 export default function CrmPhotoGallery() {
   usePageTitle("Media");
@@ -98,7 +99,7 @@ export default function CrmPhotoGallery() {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [typeTab, setTypeTab] = useState<"all" | "photos" | "documents" | "checklist" | "recent">("all");
+  const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent">("all");
   const [searchQ, setSearchQ] = useState("");
 
   // Upload — pick a customer, then attach files to them
@@ -226,7 +227,8 @@ export default function CrmPhotoGallery() {
 
     const isImg = (p: FeedPhoto) => (p.contentType || "").startsWith("image/");
     if (typeTab === "photos") list = list.filter(isImg);
-    else if (typeTab === "documents") list = list.filter((p) => !isImg(p));
+    else if (typeTab === "videos") list = list.filter(isVideoFile);
+    else if (typeTab === "documents") list = list.filter((p) => !isImg(p) && !isVideoFile(p));
     else if (typeTab === "checklist") list = list.filter((p) => isImg(p) && (/checklist/i.test(p.name) || /^WO-/.test(p.name)));
     else if (typeTab === "recent") {
       const cutoff = subDays(startOfDay(new Date()), 7);
@@ -437,6 +439,7 @@ export default function CrmPhotoGallery() {
             tabs={[
               { key: "all", label: "All" },
               { key: "photos", label: "Photos" },
+              { key: "videos", label: "Videos" },
               { key: "documents", label: "Documents" },
               { key: "checklist", label: "Checklist Photos" },
               { key: "recent", label: "Recent" },
@@ -612,6 +615,11 @@ export default function CrmPhotoGallery() {
                 >
                   {isImageFile(p) ? (
                     <img src={p.thumbUrl || p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
+                  ) : isVideoFile(p) ? (
+                    <span className="relative flex h-14 w-14 items-center justify-center overflow-hidden bg-slate-900">
+                      {p.thumbUrl && <img src={p.thumbUrl} alt={p.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80" />}
+                      <Play className="relative h-6 w-6 fill-white text-white drop-shadow" />
+                    </span>
                   ) : (
                     <span className="flex h-14 w-14 items-center justify-center bg-slate-100">
                       <FileText className="h-6 w-6 text-slate-400" />
@@ -671,6 +679,20 @@ export default function CrmPhotoGallery() {
                       loading="lazy"
                       className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
                     />
+                  ) : isVideoFile(p) ? (
+                    <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-900">
+                      {p.thumbUrl && (
+                        <img
+                          src={p.thumbUrl}
+                          alt={p.name}
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full object-cover opacity-80 transition-transform duration-200 group-hover:scale-105"
+                        />
+                      )}
+                      <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-black/50">
+                        <Play className="h-6 w-6 fill-white text-white" />
+                      </span>
+                    </div>
                   ) : (
                     <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-slate-50">
                       <FileText className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
@@ -804,7 +826,20 @@ export default function CrmPhotoGallery() {
           onPointerCancel={onLightboxPointerUp}
           data-testid="gallery-lightbox"
         >
-          {isPdfFile(lightbox) ? (
+          {isVideoFile(lightbox) ? (
+            <div className="max-h-[80vh] w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+              <video
+                key={lightbox.id}
+                src={lightbox.url}
+                poster={lightbox.thumbUrl || undefined}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[80vh] w-full rounded-lg bg-black"
+                data-testid="lightbox-video"
+              />
+            </div>
+          ) : isPdfFile(lightbox) ? (
             <div className="h-[80vh] w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
               <iframe
                 src={lightbox.url}

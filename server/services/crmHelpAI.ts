@@ -379,6 +379,10 @@ export interface CrmHelpResponse {
   /** ALL proposed actions — one spoken request can carry several ("create a
    *  work order for X and a task to Y"). Max 5. */
   proposedActions?: ProposedAction[];
+  /** True when this reply's actions REPLACE earlier still-pending proposals
+   *  in the conversation (an adjustment/expansion re-proposed in full) — the
+   *  route marks those stale cards superseded so only one live set exists. */
+  replacesPrevious?: boolean;
 }
 
 // ── Live CRM lookup tools ────────────────────────────────────────────────
@@ -408,6 +412,11 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
           },
           required: ["type", "summary", "params"],
         },
+      },
+      replacesPrevious: {
+        type: "boolean",
+        description:
+          "true ONLY when this set REPLACES proposal(s) from earlier in this conversation that the user has NOT approved yet (an adjustment or expansion of the same request). The stale un-approved cards collapse so only this new set can be approved — never set it when the earlier proposal was already approved, or when this is an unrelated additional request.",
       },
     },
     required: ["actions"],
@@ -865,7 +874,12 @@ HOW TO PROPOSE: call the propose_actions tool with the full list of actions (one
 You can PREPARE a few kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include proposedActions when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Many users dictate by voice, so transcripts can be loosely worded, run-on, or missing punctuation — treat any imperative that names the thing to create ("put a work order on Brian's schedule for...", "set up a job for...", "schedule a service call at...") as an explicit creation request, even mid-conversation in a thread that was previously about something else. Never propose an action for informational questions.
 MULTIPLE REQUESTS IN ONE MESSAGE: voice users often ask for several things in one breath ("create a work order for the Smiths tomorrow at 10, add a task to order filters, and who hasn't paid?"). Handle ALL of them: answer every question asked, and include one proposedActions entry PER thing to create — never silently drop or merge requests. Say in your answer what each prepared action is.
 DEPENDENT ACTIONS — ORDER MATTERS: when one requested thing needs another to exist first ("create customer John Doe, set up a work order for him, and text him"), propose ALL of them in ONE reply but in strict dependency order: create_customer FIRST (with the phone/email the later steps need), then the work order, then the text/email — every dependent action using the exact same customerName as the new customer. The approval cards enforce that order: each later step unlocks only after the one before it completes, and the server resolves the customer by name at approval time, so the later steps find the newly created record. Make sure the details flow through — a text needs the phone number captured on the create_customer step, an email needs the email address. In your answer, spell the sequence out plainly: first approve the customer, then the work order, then the text.
-ADJUSTMENTS TO A PENDING PROPOSAL: if the user refines or corrects something you proposed before they approved it ("assign it to Rio", "make it 10:30 instead", "change it to maintenance"), respond with a NEW complete proposedActions entry carrying ALL the params — the original details PLUS their change (e.g. add "assignTo": "Rio" to the same work order). The new card is what they approve, right there. NEVER say the change will be applied later, at approval time, or "the system will match it" — put it in the card now so they can approve immediately. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
+ADJUSTMENTS AND ADD-ONS TO A PENDING PROPOSAL — one live set of cards, never two:
+The conversation history marks every proposal you made earlier with its outcome: "STILL AWAITING the user's approval", "the user APPROVED it and it ran", "the user dismissed it", or "replaced by a later proposal". Trust those markers and pick the right move:
+1. REFINE OR EXPAND something still awaiting approval ("assign it to Rio", "make it 10:30 instead", "let's also text the customer"): respond with a NEW COMPLETE set of proposedActions — the original action carrying ALL its params plus the change, and any newly requested actions with it — and set replacesPrevious true. The stale un-approved card(s) collapse automatically so the user sees exactly one live set; without replacesPrevious they'd see two cards for the same work order and approving both would create duplicates. NEVER say the change will be applied later, at approval time, or "the system will match it" — put it in the card now so they can approve immediately.
+2. ADD-ON AFTER APPROVAL: if the earlier proposal shows as already approved, it already ran — propose ONLY the new thing ("also text them" → just the send_sms) and do NOT set replacesPrevious.
+3. UNRELATED NEW REQUEST while something else is still pending ("also add a task to order filters"): propose just the new action WITHOUT replacesPrevious — the pending card is still valid and stays.
+In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
 RESOLVE THE TARGET FIRST — settle every ambiguity BEFORE proposing anything:
 Any action that touches an existing customer (work order, text, email, quote, invoice, update, delete) must be grounded in a customer_profile lookup from THIS conversation. The lookup fuzzy-matches, so run it even when the spoken name looks misheard or misspelled ("Rio Martin" will find "Ryo Martin") — never assume a customer doesn't exist because the spelling looks off, and never refuse an action because the name looks off.
 If the lookup comes back AMBIGUOUS (multiple candidates), propose NO actions that turn — not even the steps that don't depend on the customer. Ask which one they mean in one short question, listing each candidate with the detail that tells them apart (phone, address), and put each candidate's name in relatedTopics so they can tap to answer. Once the user picks, propose the ENTIRE chain of actions in one reply. Settling who it is first and then dropping all the cards at once is the flow users expect — discovering mid-approval that the customer was ambiguous is exactly what must never happen.
@@ -897,7 +911,8 @@ Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]${modeSection}`;
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
+- replacesPrevious: true ONLY when proposedActions replaces earlier still-un-approved proposal(s) per the ADJUSTMENTS rules — omit otherwise${modeSection}`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -914,8 +929,10 @@ Return JSON with:
     // Actions the model registers via the propose_actions tool — collected
     // here so they survive even when the final JSON answer fails to parse.
     const toolProposed: ProposedAction[] = [];
+    let toolReplacesPrevious = false;
     const collectProposedActions = (input: Record<string, unknown>): string => {
       const arr = Array.isArray((input as any)?.actions) ? (input as any).actions : [];
+      if ((input as any)?.replacesPrevious === true && arr.length > 0) toolReplacesPrevious = true;
       for (const pa of arr.slice(0, 5)) {
         if (
           pa &&
@@ -1067,6 +1084,7 @@ Return JSON with:
         confidence: partial || prose ? "medium" : "low",
         proposedAction: toolProposed[0] ?? null,
         proposedActions: toolProposed.slice(0, 5),
+        replacesPrevious: toolProposed.length > 0 && toolReplacesPrevious,
       };
     }
     
@@ -1108,6 +1126,7 @@ Return JSON with:
       hasLiveData: needsLiveData,
       proposedAction: mergedActions[0] ?? null,
       proposedActions: mergedActions,
+      replacesPrevious: mergedActions.length > 0 && (toolReplacesPrevious || parsed.replacesPrevious === true),
     };
 
     // Never cache responses that carry proposed actions or answered a photo —

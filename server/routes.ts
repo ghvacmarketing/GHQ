@@ -2266,17 +2266,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (found) {
           convoId = found.id;
           const stored = await db
-            .select({ role: aiMessages.role, content: aiMessages.content })
+            .select({ role: aiMessages.role, content: aiMessages.content, proposedAction: aiMessages.proposedAction, actionStatus: aiMessages.actionStatus })
             .from(aiMessages)
             .where(eq(aiMessages.conversationId, found.id))
             .orderBy(desc(aiMessages.createdAt))
             .limit(10);
           history = stored
             .reverse()
-            // Action-only rows have empty content; empty text blocks are
-            // rejected by the model APIs, so keep them out of the replay.
-            .filter((m) => m.content && m.content.trim() !== "")
-            .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+            // Assistant turns that carried a proposal get their OUTCOME
+            // stamped into the replay — the model must know whether its
+            // earlier card was approved (propose only the new thing),
+            // is still pending (re-propose in full with replacesPrevious),
+            // or was dismissed. Action-only rows have empty content; empty
+            // text blocks are rejected by the model APIs, so rows with
+            // neither text nor a proposal stay out of the replay.
+            .map((m) => {
+              let content = (m.content || "").trim();
+              if (m.role === "assistant" && m.proposedAction && typeof m.proposedAction === "object") {
+                const pa = m.proposedAction as { type?: string; summary?: string };
+                const outcome =
+                  m.actionStatus === "approved"
+                    ? "the user APPROVED it and it ran"
+                    : m.actionStatus === "dismissed"
+                      ? "the user dismissed it"
+                      : m.actionStatus === "superseded"
+                        ? "replaced by a later proposal"
+                        : "STILL AWAITING the user's approval";
+                content = `${content}${content ? "\n" : ""}[You proposed ${pa.type || "an action"}: ${(pa.summary || "").slice(0, 200)} — ${outcome}]`;
+              }
+              return { role: m.role as "user" | "assistant", content };
+            })
+            .filter((m) => m.content.trim() !== "");
           // The 10-message window can cut mid-pair; Anthropic requires the
           // first message to be a user turn, so trim a leading assistant one.
           while (history.length > 0 && history[0].role === "assistant") history.shift();
@@ -2302,6 +2322,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
       const extraActions: Array<{ messageId: string; proposedAction: unknown }> = [];
+      // Cards this reply retired (adjustment/expansion re-proposals) — the
+      // client greys them out so only ONE live set of approvals exists.
+      let supersededMessageIds: string[] = [];
       try {
         if (!convoId) {
           // New conversations can be filed into a space (owned by this user).
@@ -2332,6 +2355,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : result.proposedAction
             ? [result.proposedAction]
             : [];
+        // The model re-proposed an adjusted/expanded set — retire every still-
+        // pending card in this conversation BEFORE inserting the new ones, so
+        // approving the stale duplicate (two work orders!) becomes impossible.
+        // Approved/dismissed rows are never touched.
+        if (result.replacesPrevious && actions.length > 0) {
+          const stale = await db
+            .update(aiMessages)
+            .set({ actionStatus: "superseded" })
+            .where(and(
+              eq(aiMessages.conversationId, convoId),
+              eq(aiMessages.role, "assistant"),
+              isNotNull(aiMessages.proposedAction),
+              isNull(aiMessages.actionStatus),
+            ))
+            .returning({ id: aiMessages.id });
+          supersededMessageIds = stale.map((r) => r.id);
+        }
         const [assistantMsg] = await db
           .insert(aiMessages)
           .values({
@@ -2357,7 +2397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("AI conversation persist error (non-fatal):", persistErr);
       }
 
-      res.json({ ...result, conversationId: convoId, messageId, extraActions });
+      res.json({ ...result, conversationId: convoId, messageId, extraActions, supersededMessageIds });
     } catch (error: any) {
       console.error("Error in CRM help:", error);
       const detail = error?.message || error?.error?.message || "";
@@ -13903,8 +13943,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/customers/:id/files - Save file metadata after upload
-  // GET /api/crm/photos/feed - live company-wide photo feed (admin monitoring)
-  app.get("/api/crm/photos/feed", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+  // GET /api/crm/photos/feed - live company-wide photo feed. Open to EVERY
+  // CRM role — techs and sales need job media too (it was admin-only, which
+  // showed non-admins an empty Media page).
+  app.get("/api/crm/photos/feed", requireCrmAuth, async (req, res) => {
     try {
       // Paged: the CompanyCam import brought thousands of references and
       // loading them all at once made the Media page crawl. The client pulls
@@ -13945,6 +13987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: customerFiles.name,
         url: customerFiles.url,
         thumbUrl: customerFiles.thumbUrl,
+        contentType: customerFiles.contentType,
         createdAt: customerFiles.createdAt,
         customerId: customerFiles.customerId,
         customerName: crmCustomers.name,
@@ -13953,7 +13996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(customerFiles)
         .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
-        .where(sql`${customerFiles.contentType} LIKE 'image/%'`)
+        .where(sql`(${customerFiles.contentType} LIKE 'image/%' OR ${customerFiles.contentType} LIKE 'video/%')`)
         .orderBy(desc(customerFiles.createdAt))
         .limit(30);
       res.json(rows);
@@ -14164,6 +14207,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ ok: true }); // ack fast — CompanyCam retries slow endpoints
     try {
       const body = req.body || {};
+      const eventType = String(body.type || body.event_type || "");
+      // video.created events carry a video resource; everything else is
+      // treated as a photo event (the id is re-fetched with our own token
+      // either way, so a mislabeled event can't import anything bogus).
+      const video = body.video || body.data?.video || body.payload?.video || (eventType.startsWith("video") ? body.data : null);
+      if (video?.id || body.video_id) {
+        const videoId = String(video?.id || body.video_id);
+        const vProjectId = video?.project_id ? String(video.project_id) : null;
+        const { handleWebhookVideo } = await import("./services/companycam");
+        handleWebhookVideo(videoId, vProjectId).catch((e) => console.error("[CompanyCam] video webhook handling failed:", e?.message || e));
+        return;
+      }
       const photo = body.photo || body.data?.photo || body.payload?.photo || (body.type ? body.data : null) || body;
       const photoId = String(photo?.id || body.photo_id || "");
       const projectId = photo?.project_id ? String(photo.project_id) : null;
