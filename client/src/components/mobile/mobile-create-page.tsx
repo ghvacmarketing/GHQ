@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,26 +14,33 @@ import {
 
 /**
  * Full-screen shell for the mobile "create" flows (job, task, customer, quote,
- * invoice). Replaces the old bottom-sheet dialogs with real pages: a floating
- * liquid-glass X in the top-left that confirms before discarding an in-progress
- * draft, a title/subtitle header, and a scrolling body for the form. The page
- * itself does the create + navigate-to-the-new-record; this shell only owns the
- * chrome and the discard guard.
+ * invoice). A sticky three-slot nav bar — close on the left, title centred,
+ * save on the right — sits above a scrolling form body. The bar is in normal
+ * flow (not floating over the content), so nothing it covers is ever
+ * unreachable. The page itself does the create + navigate-to-the-new-record;
+ * this shell owns the chrome and the discard guard.
  */
 export function MobileCreatePage({
   title,
-  subtitle,
   dirty,
   exitTo,
+  onSave,
+  saveLabel = "Save",
+  saveDisabled,
+  saving,
   children,
   testid,
 }: {
   title: string;
-  subtitle?: string;
   /** Whether the form holds unsaved input — gates the discard confirmation. */
   dirty: boolean;
   /** Where the X (and a confirmed discard) lands. Defaults to browser back. */
   exitTo?: string;
+  /** Submit handler for the nav's save action; omit to leave the slot empty. */
+  onSave?: () => void;
+  saveLabel?: string;
+  saveDisabled?: boolean;
+  saving?: boolean;
   children: ReactNode;
   testid?: string;
 }) {
@@ -51,33 +58,42 @@ export function MobileCreatePage({
   };
 
   return (
-    <div
-      className="relative min-h-screen bg-slate-50"
-      style={{ paddingTop: "env(safe-area-inset-top)" }}
-      data-testid={testid}
-    >
-      {/* Floating liquid-glass X, top-left */}
-      <button
-        onClick={handleClose}
-        className="liquid-glass liquid-glass--interactive fixed left-4 z-50 flex h-11 w-11 items-center justify-center text-slate-800"
-        style={{
-          top: "calc(env(safe-area-inset-top) + 12px)",
-          // Round the glass shape (base + inner-edge pseudo both read this var)
-          ["--glass-radius" as string]: "9999px",
-        }}
-        aria-label="Discard and close"
-        data-testid="create-page-close"
+    <div className="min-h-screen bg-slate-50" data-testid={testid}>
+      {/* Sticky nav — equal side columns keep the title optically centred no
+          matter how wide the save label runs. */}
+      <div
+        className="sticky top-0 z-40 border-b border-slate-200 bg-white"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
-        <X className="h-5 w-5" strokeWidth={2.25} />
-      </button>
+        <div className="grid h-14 grid-cols-[4.5rem_1fr_4.5rem] items-center px-2">
+          <button
+            onClick={handleClose}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-slate-700 transition-colors active:bg-slate-100"
+            aria-label="Close"
+            data-testid="create-page-close"
+          >
+            <X className="h-5 w-5" strokeWidth={2.25} />
+          </button>
 
-      <div className="px-4 pb-16 pt-16">
-        <div className="mb-4">
-          <h1 className="text-xl font-bold text-slate-900">{title}</h1>
-          {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+          <h1 className="truncate text-center text-[15px] font-semibold text-slate-900">{title}</h1>
+
+          <div className="flex justify-end">
+            {onSave && (
+              <button
+                onClick={onSave}
+                disabled={saveDisabled || saving}
+                className="flex h-11 items-center gap-1.5 rounded-full px-3 text-[15px] font-semibold text-[#711419] transition-colors active:bg-[#711419]/10 disabled:text-slate-300"
+                data-testid="create-page-save"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {saveLabel}
+              </button>
+            )}
+          </div>
         </div>
-        {children}
       </div>
+
+      <div className="px-4 pb-16 pt-4">{children}</div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-[8px]">

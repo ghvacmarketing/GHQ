@@ -54,9 +54,11 @@ export default function MobileTaskNew() {
   return (
     <MobileCreatePage
       title="New task"
-      subtitle="For you — it lands on your CRM task list too."
       dirty={dirty}
       exitTo="/mobile/tasks"
+      onSave={() => createMutation.mutate()}
+      saveDisabled={title.trim().length === 0 || !currentUser}
+      saving={createMutation.isPending}
       testid="mobile-task-new-page"
     >
       <div className="space-y-3.5">

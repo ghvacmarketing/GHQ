@@ -66,27 +66,12 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
 import type { CrmUser, AccountType, AccountStatus, LeadSource, CrmAccount, CrmCustomer } from "@shared/schema";
+import { LEAD_SOURCES } from "@/lib/lead-sources";
 
 const ACCOUNT_TYPES: { value: AccountType; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "RESIDENTIAL", label: "Residential", description: "Individual homeowners and renters", icon: Home },
   { value: "PROPERTY_MANAGER", label: "Property Manager", description: "Property management companies with multiple sites", icon: Users },
   { value: "COMMERCIAL", label: "Commercial", description: "Business and commercial properties", icon: Building2 },
-];
-
-const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
-  { value: "WEBSITE", label: "Website" },
-  { value: "REFERRAL", label: "Referral" },
-  { value: "GOOGLE", label: "Google" },
-  { value: "FACEBOOK", label: "Facebook" },
-  { value: "YELP", label: "Yelp" },
-  { value: "HOME_ADVISOR", label: "HomeAdvisor" },
-  { value: "ANGI", label: "Angi" },
-  { value: "THUMBTACK", label: "Thumbtack" },
-  { value: "WALK_IN", label: "Walk-In" },
-  { value: "PHONE", label: "Phone" },
-  { value: "REPEAT_CUSTOMER", label: "Repeat Customer" },
-  { value: "FIELDEDGE", label: "FieldEdge" },
-  { value: "OTHER", label: "Other" },
 ];
 
 const BILLING_METHODS = ["Invoice", "Credit Card on File", "Check", "ACH"];

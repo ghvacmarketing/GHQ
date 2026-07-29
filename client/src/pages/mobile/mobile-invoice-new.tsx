@@ -189,8 +189,10 @@ export default function MobileInvoiceNew() {
   return (
     <MobileCreatePage
       title="New invoice"
-      subtitle="Pick the job, add line items, done."
       dirty={dirty}
+      onSave={handleCreateInvoice}
+      saveDisabled={!canSubmit}
+      saving={createInvoiceMutation.isPending}
       testid="mobile-invoice-new-page"
     >
       <div className="space-y-4">

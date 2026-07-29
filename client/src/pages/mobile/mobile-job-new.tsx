@@ -231,12 +231,14 @@ export default function MobileJobNew() {
   return (
     <MobileCreatePage
       title="New job"
-      subtitle="Schedule a work order for a customer."
       dirty={dirty}
       exitTo="/mobile/job"
+      onSave={() => createWorkOrderMutation.mutate()}
+      saveDisabled={!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
+      saving={createWorkOrderMutation.isPending}
       testid="mobile-job-new-page"
     >
-      <div className="space-y-4 py-4">
+      <div className="space-y-4">
         {/* Customer Search */}
         <div className="space-y-2">
           <Label>Customer *</Label>

@@ -8508,6 +8508,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         billToParent: customerData.billToParent || false,
       }).returning();
       autoSyncCustomer(newCustomer.id);
+      // Same side effect as POST /api/crm/customers — a customer created
+      // through this path must trigger customer.created automations too.
+      fireAutomationForCustomer("customer.created", newCustomer.id, { type: "customer", id: newCustomer.id });
 
       // Create property if provided
       let newProperty = null;

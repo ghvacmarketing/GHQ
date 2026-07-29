@@ -206,8 +206,10 @@ export default function MobileQuoteNew() {
   return (
     <MobileCreatePage
       title="New quote"
-      subtitle="Pick the job, add line items, done."
       dirty={dirty}
+      onSave={handleCreateQuote}
+      saveDisabled={!canSubmit}
+      saving={createQuoteMutation.isPending}
       testid="mobile-quote-new-page"
     >
       <div className="space-y-4">
