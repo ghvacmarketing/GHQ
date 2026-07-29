@@ -2574,37 +2574,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fuzzy customer-name scoring for AI actions — voice transcription mangles
-  // names ("Blue Water Kafe"), so exact/ILIKE matching isn't enough. Combines
-  // token overlap with an edit-distance ratio; both are case-insensitive.
-  const aiNameSimilarity = (a: string, b: string): number => {
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-    const na = norm(a);
-    const nb = norm(b);
-    if (!na || !nb) return 0;
-    if (na === nb) return 1;
-    if (na.includes(nb) || nb.includes(na)) return 0.92;
-    const ta = na.split(" ");
-    const tb = new Set(nb.split(" "));
-    let overlap = 0;
-    for (const t of ta) if (tb.has(t)) overlap++;
-    const tokenScore = (2 * overlap) / (ta.length + tb.size);
-    const sa = na.replace(/ /g, "");
-    const sb = nb.replace(/ /g, "");
-    const m = sa.length;
-    const n = sb.length;
-    const dp: number[] = Array.from({ length: n + 1 }, (_, j) => j);
-    for (let i = 1; i <= m; i++) {
-      let prev = dp[0];
-      dp[0] = i;
-      for (let j = 1; j <= n; j++) {
-        const cur = dp[j];
-        dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (sa[i - 1] === sb[j - 1] ? 0 : 1));
-        prev = cur;
-      }
-    }
-    const levScore = 1 - dp[n] / Math.max(m, n);
-    return Math.max(tokenScore, levScore) * 0.98;
-  };
+  // names ("Blue Water Kafe"), so exact/ILIKE matching isn't enough. Shared
+  // with Gibbs' customer_profile lookup tool so proposal-time and approval-time
+  // matching agree.
+  const { nameSimilarity: aiNameSimilarity, sameNormalizedName: aiSameName } = await import("./services/customer-match");
 
   // Shared customer resolution for AI actions: an explicit customerId (the
   // user picked from the candidate list) wins; otherwise fuzzy-match the
@@ -2749,6 +2722,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerType: z.enum(["residential", "commercial"]).optional(),
             leadSource: z.string().trim().max(100).optional(),
             notes: z.string().trim().max(2000).optional(),
+            // Set by Gibbs ONLY after the user explicitly confirmed that a
+            // similar-sounding existing customer is a different person —
+            // skips the near-duplicate refusal below (exact dupes still refuse).
+            confirmedNew: z.boolean().optional(),
           }).strict(),
         }),
         z.object({
@@ -3002,15 +2979,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // create_customer — adds the customer to the CRM after approval. Exact
-      // name matches are refused so a voice slip can't create a duplicate.
+      // name matches are always refused; NEAR matches (misheard spellings like
+      // "Rio Martin" for existing "Ryo Martin") are refused too unless the
+      // user explicitly confirmed a new person (confirmedNew via Gibbs).
       if (action.type === "create_customer") {
-        const [existing] = await db
-          .select({ id: crmCustomers.id, name: crmCustomers.name })
-          .from(crmCustomers)
-          .where(sql`LOWER(${crmCustomers.name}) = ${action.params.name.toLowerCase()}`)
-          .limit(1);
-        if (existing) {
-          return res.status(409).json({ message: `${existing.name} is already in the CRM — open their customer page instead of creating a duplicate.` });
+        const everyone = await db
+          .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, fullAddress: crmCustomers.fullAddress })
+          .from(crmCustomers);
+        const exact = everyone.find((c) => aiSameName(c.name || "", action.params.name));
+        if (exact) {
+          return res.status(409).json({ message: `${exact.name} is already in the CRM — open their customer page instead of creating a duplicate.` });
+        }
+        if (!action.params.confirmedNew) {
+          const near = everyone
+            .map((c) => ({ ...c, score: aiNameSimilarity(c.name || "", action.params.name) }))
+            .filter((c) => c.score >= 0.72)
+            .sort((x, y) => y.score - x.score);
+          if (near.length > 0) {
+            const who = near
+              .slice(0, 3)
+              .map((c) => `${c.name}${c.phone ? ` (${c.phone})` : c.fullAddress ? ` (${c.fullAddress})` : ""}`)
+              .join(", ");
+            return res.status(409).json({
+              message: `Not created — "${action.params.name}" looks a lot like existing customer${near.length > 1 ? "s" : ""} ${who}. If that's who you meant, use the existing record; if this is really a different person, tell Gibbs and it will re-propose with your confirmation.`,
+            });
+          }
         }
         const [newCustomer] = await db
           .insert(crmCustomers)

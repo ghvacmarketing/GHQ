@@ -27,6 +27,7 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  ChevronDown,
   Folder,
   FolderInput,
   ImagePlus,
@@ -40,6 +41,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import {
@@ -75,6 +77,33 @@ const STARTERS = [
   "Which invoices are unpaid?",
   "Create a work order",
   "Add a task for tomorrow",
+];
+
+/** Behavior modes for Gibbs — same three as the mobile app, and the same
+ *  localStorage key, so the pick follows the user between surfaces. The mode
+ *  rides every /api/crm/help call; conversation-only is also hard-enforced
+ *  server-side (no proposal tool, proposals stripped). */
+type GibbsMode = "general" | "conversation" | "implementation";
+
+const GIBBS_MODES: Array<{ value: GibbsMode; label: string; description: string; icon: typeof Sparkles }> = [
+  {
+    value: "general",
+    label: "General",
+    description: "The full Gibbs — talk through anything and set things up, all in one chat.",
+    icon: Sparkles,
+  },
+  {
+    value: "conversation",
+    label: "Conversation only",
+    description: "Just talk — questions, advice, shop talk. Gibbs won't prepare any actions.",
+    icon: MessagesSquare,
+  },
+  {
+    value: "implementation",
+    label: "Implementation only",
+    description: "All business — short answers focused on preparing actions for your approval.",
+    icon: Wrench,
+  },
 ];
 
 /** Strip any markdown that slips through so the chat never shows raw
@@ -124,6 +153,19 @@ export default function AiAssistantModal() {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
+  // Gibbs behavior mode — persists across sessions, shared with mobile.
+  const [mode, setMode] = useState<GibbsMode>(() => {
+    const saved = typeof localStorage !== "undefined" ? localStorage.getItem("gibbs-mode") : null;
+    return saved === "conversation" || saved === "implementation" ? saved : "general";
+  });
+  const pickMode = (m: GibbsMode) => {
+    setMode(m);
+    try {
+      localStorage.setItem("gibbs-mode", m);
+    } catch {
+      // private-mode storage failure — the mode still applies this session
+    }
+  };
   // Index of the just-arrived answer — the only message that types itself in.
   const [freshIndex, setFreshIndex] = useState<number | null>(null);
   // Approval cards and topic chips wait until the fresh answer finishes
@@ -268,6 +310,7 @@ export default function AiAssistantModal() {
       conversationHistory: historyForApi,
       conversationId,
       images: photos.length > 0 ? photos : undefined,
+      mode,
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
     })
@@ -738,6 +781,56 @@ export default function AiAssistantModal() {
             <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
               {activeTitle || (messages.length > 0 ? "Conversation" : "New chat")}
             </p>
+            {/* Mode picker — same three modes as the mobile Gibbs button. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition-colors hover:border-[#711419]/40 hover:text-[#711419]"
+                  aria-label="Gibbs mode"
+                  data-testid="ai-mode-open"
+                >
+                  {(() => {
+                    const m = GIBBS_MODES.find((x) => x.value === mode) ?? GIBBS_MODES[0];
+                    const Icon = m.icon;
+                    return (
+                      <>
+                        <Icon className="h-3.5 w-3.5" />
+                        {m.label}
+                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                      </>
+                    );
+                  })()}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                {GIBBS_MODES.map((m) => {
+                  const Icon = m.icon;
+                  return (
+                    <DropdownMenuItem
+                      key={m.value}
+                      onClick={() => pickMode(m.value)}
+                      className="items-start gap-2.5 py-2.5"
+                      data-testid={`ai-mode-${m.value}`}
+                    >
+                      <span
+                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                          mode === m.value ? "bg-[#711419]/10 text-[#711419]" : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                          {m.label}
+                          {mode === m.value && <Check className="h-3.5 w-3.5 text-[#711419]" />}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-snug text-slate-500">{m.description}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               onClick={() => setOpen(false)}
               className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"

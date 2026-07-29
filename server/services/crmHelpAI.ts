@@ -5,6 +5,7 @@ import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, c
 import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+import { nameSimilarity } from "./customer-match";
 
 // All business scheduling happens in the shop's local timezone.
 const BUSINESS_TIMEZONE = "America/New_York";
@@ -416,8 +417,9 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
 const CRM_TOOLS: ClaudeTool[] = [
   {
     name: "customer_profile",
-    description: "Full live profile for one customer by (partial) name: contact info, agreements, recent invoices with balances, recent work orders, recent quotes. Use for ANY question about a specific customer.",
-    input_schema: { type: "object", properties: { name: { type: "string", description: "Customer name or part of it" } }, required: ["name"] },
+    description:
+      "Full live profile for one customer by name: contact info, agreements, recent invoices with balances, recent work orders, recent quotes. Matching is FUZZY — misheard or misspelled names ('Rio Martin') still find the real record ('Ryo Martin'), so use it even when a name looks off. Use for ANY question about a specific customer, and ALWAYS before proposing any action that involves a customer. If several customers plausibly match, it returns the candidate list instead of picking one — you must then ask the user which one before proposing anything.",
+    input_schema: { type: "object", properties: { name: { type: "string", description: "Customer name or part of it, exactly as the user said it" } }, required: ["name"] },
   },
   {
     name: "price_items",
@@ -529,13 +531,37 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
   if (name === "customer_profile") {
     const q = String(input?.name || "").trim();
     if (!q) return "No customer name given.";
-    const matches = await db
+    // Fuzzy-score every customer (voice transcripts mangle names — "Rio"
+    // must find "Ryo") instead of trusting ILIKE substring hits alone.
+    const everyone = await db
       .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, email: crmCustomers.email, fullAddress: crmCustomers.fullAddress, customerStatus: crmCustomers.customerStatus })
-      .from(crmCustomers)
-      .where(ilike(crmCustomers.name, `%${q}%`))
-      .limit(5);
-    if (matches.length === 0) return `No customer matching "${q}".`;
-    const c = matches[0];
+      .from(crmCustomers);
+    const scored = everyone
+      .map((c) => ({ ...c, score: nameSimilarity(c.name || "", q) }))
+      .filter((c) => c.score >= 0.55)
+      .sort((x, y) => y.score - x.score);
+    if (scored.length === 0) {
+      return JSON.stringify({
+        found: false,
+        message: `No customer matching "${q}" and no close-sounding names either — if the user wants them added, it's safe to treat this as a NEW customer.`,
+      });
+    }
+    const best = scored[0];
+    const second = scored[1];
+    // Confident single match: clear best score with daylight to #2.
+    const confident = best.score >= 0.85 && (!second || best.score - second.score >= 0.15);
+    if (!confident) {
+      return JSON.stringify({
+        ambiguous: true,
+        instruction: `MULTIPLE customers plausibly match "${q}". Do NOT pick one yourself and do NOT propose any actions this turn — ask the user which one they mean, listing each candidate with a detail that tells them apart (phone or address), and offer the names as tappable relatedTopics.`,
+        candidates: scored.slice(0, 5).map(({ score, ...c }) => ({ ...c, similarity: Math.round(score * 100) / 100 })),
+      });
+    }
+    const c = best;
+    const matchNote = c.name && c.name.trim().toLowerCase() !== q.toLowerCase()
+      ? `User said "${q}" — this matched existing customer "${c.name}". Use the CRM spelling "${c.name}" (and this customerId) in any action params, and mention in your answer that you found them under that name.`
+      : undefined;
+    const nearMisses = scored.slice(1).filter((x) => x.score >= 0.7);
     const [agreements, invoices, workOrders, quotes] = await Promise.all([
       db.select({ plan: crmAgreements.agreementPlan, status: crmAgreements.status, price: crmAgreements.price, frequency: crmAgreements.frequency, nextServiceDate: crmAgreements.nextServiceDate })
         .from(crmAgreements).where(eq(crmAgreements.customerId, c.id)),
@@ -546,9 +572,13 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
       db.select({ quoteNumber: crmQuotes.quoteNumber, title: crmQuotes.title, status: crmQuotes.status, total: crmQuotes.total })
         .from(crmQuotes).where(eq(crmQuotes.customerId, c.id)).orderBy(desc(crmQuotes.createdAt)).limit(10),
     ]);
+    const { score: _score, ...customer } = c;
     return JSON.stringify({
-      customer: c,
-      otherNameMatches: matches.slice(1).map((m) => m.name),
+      customer,
+      ...(matchNote ? { matchNote } : {}),
+      // Other customers with similar names — relevant when the user asks to
+      // CREATE someone: a near-miss here means ask before proposing create.
+      similarExistingCustomers: nearMisses.map((m) => ({ name: m.name, phone: m.phone })),
       agreements,
       recentInvoices: invoices,
       recentWorkOrders: workOrders,
@@ -836,13 +866,17 @@ You can PREPARE a few kinds of actions for the user to approve, but you can NEVE
 MULTIPLE REQUESTS IN ONE MESSAGE: voice users often ask for several things in one breath ("create a work order for the Smiths tomorrow at 10, add a task to order filters, and who hasn't paid?"). Handle ALL of them: answer every question asked, and include one proposedActions entry PER thing to create — never silently drop or merge requests. Say in your answer what each prepared action is.
 DEPENDENT ACTIONS — ORDER MATTERS: when one requested thing needs another to exist first ("create customer John Doe, set up a work order for him, and text him"), propose ALL of them in ONE reply but in strict dependency order: create_customer FIRST (with the phone/email the later steps need), then the work order, then the text/email — every dependent action using the exact same customerName as the new customer. The approval cards enforce that order: each later step unlocks only after the one before it completes, and the server resolves the customer by name at approval time, so the later steps find the newly created record. Make sure the details flow through — a text needs the phone number captured on the create_customer step, an email needs the email address. In your answer, spell the sequence out plainly: first approve the customer, then the work order, then the text.
 ADJUSTMENTS TO A PENDING PROPOSAL: if the user refines or corrects something you proposed before they approved it ("assign it to Rio", "make it 10:30 instead", "change it to maintenance"), respond with a NEW complete proposedActions entry carrying ALL the params — the original details PLUS their change (e.g. add "assignTo": "Rio" to the same work order). The new card is what they approve, right there. NEVER say the change will be applied later, at approval time, or "the system will match it" — put it in the card now so they can approve immediately. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
-Pass customerName exactly as the user said or typed it, even if it looks misspelled — the server fuzzy-matches it against the CRM and will ask the user to pick when it isn't sure. Never refuse an action just because the name looks off.
+RESOLVE THE TARGET FIRST — settle every ambiguity BEFORE proposing anything:
+Any action that touches an existing customer (work order, text, email, quote, invoice, update, delete) must be grounded in a customer_profile lookup from THIS conversation. The lookup fuzzy-matches, so run it even when the spoken name looks misheard or misspelled ("Rio Martin" will find "Ryo Martin") — never assume a customer doesn't exist because the spelling looks off, and never refuse an action because the name looks off.
+If the lookup comes back AMBIGUOUS (multiple candidates), propose NO actions that turn — not even the steps that don't depend on the customer. Ask which one they mean in one short question, listing each candidate with the detail that tells them apart (phone, address), and put each candidate's name in relatedTopics so they can tap to answer. Once the user picks, propose the ENTIRE chain of actions in one reply. Settling who it is first and then dropping all the cards at once is the flow users expect — discovering mid-approval that the customer was ambiguous is exactly what must never happen.
+When the lookup confidently matched one customer, put that record's exact name in customerName (the CRM's spelling, not the misheard one) and copy the record's id into customerId in the params — the id pins execution to exactly the customer shown on the card. If the matched spelling differs from what the user said, say so plainly in your answer ("Found them — Ryo Martin on Fairview Rd").
+Steps that target a customer being CREATED earlier in the same chain are the one exception — no id exists yet, so they carry the exact same customerName as the create_customer step (per DEPENDENT ACTIONS below). Only pass an existing customer's name WITHOUT a lookup when the lookup itself failed twice; in that case pass the name as the user said it — the server fuzzy-matches at approval time as a safety net.
 Action types and their params:
 1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
 2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — a technician's name if the user asked to assign it to someone), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00") }
 3. send_sms — texts a customer through the CRM's messaging line. params: { "customerName": string (required), "customerPhone": string (optional but strongly preferred — the customer's phone from your customer_profile lookup, so the approval card shows exactly which number the text goes to), "message": string (required — write the COMPLETE, ready-to-send text exactly as it should go out: friendly, professional, concise, signed "— Giesbrecht HVAC"; no placeholders like [time] unless the user left the detail out) }
 4. send_email — emails someone from the approving user's connected Gmail. Recipient — set EXACTLY ONE: pass "customerName" when the user names a customer (the CRM looks up the email on their file; it errors if none is on file), OR pass "toEmail" when the user gives a literal email address (use it verbatim, never invent one). params: { "customerName": string (optional — the customer whose on-file email to use), "customerEmail": string (optional but strongly preferred with customerName — the customer's email from your customer_profile lookup, so the approval card shows exactly where the email goes), "toEmail": string (optional — an actual email address the user provided), "subject": string (required), "body": string (required — the COMPLETE plain-text email body, ready to send: professional and warm, proper greeting and sign-off as Giesbrecht HVAC, no markdown, no placeholders unless a detail is genuinely unknown) }
-5. create_customer — adds a new customer to the CRM. Before proposing, check for the same name in LIVE DATA (customer_profile) — if they already exist, say so instead of proposing a duplicate. Include every detail the user gave. params: { "name": string (required — the customer's full name), "phone": string (optional), "email": string (optional), "fullAddress": string (optional — street, city, state ZIP on one line), "customerType": "residential" | "commercial" (optional, default residential), "leadSource": string (optional — where they came from if mentioned, e.g. Google, referral, door hanger), "notes": string (optional — anything else worth keeping, e.g. "has an old gas furnace, interested in a heat pump") }
+5. create_customer — adds a new customer to the CRM. Before proposing you MUST run customer_profile on the name — it fuzzy-matches, so a misheard "Rio Martin" surfaces the real "Ryo Martin". If the lookup finds that person or anyone similar (a match, an ambiguous candidate list, or similarExistingCustomers): do NOT propose create — ask whether they mean that existing customer or truly a new person, naming the match(es), with the existing name(s) in relatedTopics. Propose create_customer only when the lookup found no close match, or the user has explicitly confirmed this is a different person from the similar customer you named — in that confirmed case include "confirmedNew": true in params (NEVER include it otherwise; the server refuses near-duplicate creates without it). Include every detail the user gave. params: { "name": string (required — the customer's full name), "phone": string (optional), "email": string (optional), "fullAddress": string (optional — street, city, state ZIP on one line), "customerType": "residential" | "commercial" (optional, default residential), "leadSource": string (optional — where they came from if mentioned, e.g. Google, referral, door hanger), "notes": string (optional — anything else worth keeping, e.g. "has an old gas furnace, interested in a heat pump"), "confirmedNew": true (ONLY after the user explicitly confirmed the similar existing customer is someone else) }
 6. update_customer — edits an existing customer's details. ALWAYS look the customer up with customer_profile FIRST, then build the proposal so the approval card shows the full before-and-after. params: { "customerName": string (required), "changes": object with ONLY the fields to change — any of { "name", "phone", "email", "fullAddress", "customerType" ("residential"|"commercial"), "leadSource", "notes" } — and "current": object with the customer's CURRENT values for those same detail fields from your lookup (name, phone, email, fullAddress, customerType, leadSource — include them all so the card shows the complete record being edited). Never put a field in changes unless the user asked for it to change. }
 7. delete_customer — PERMANENTLY deletes a customer. Only propose when the user explicitly says to delete/remove them — never infer it. The server refuses if the customer has any work orders, quotes, or invoices (say so if your lookup shows they do). params: { "customerName": string (required) }
 8. delete_work_order — deletes one work order (the server refuses if an invoice or quote is linked to it, and asks the user to pick when the customer has several). Only propose on an explicit delete/cancel-and-remove request. params: { "customerName": string (required), "workOrderTitle": string (optional — the job's title if the user gave it or your lookup shows it), "workOrderId": string (optional — ONLY if a lookup returned the exact id) }
