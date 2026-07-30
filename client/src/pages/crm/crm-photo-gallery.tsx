@@ -247,10 +247,9 @@ function MatchCustomerDialog({ project, onClose }: { project: UnmatchedProject; 
 }
 
 function UnmatchedProjectCard({
-  project, kindFilter, isAdmin, onOpenMedia, onCreate, onMatch,
+  project, isAdmin, onOpenMedia, onCreate, onMatch,
 }: {
   project: UnmatchedProject;
-  kindFilter: "all" | "photos" | "videos";
   isAdmin: boolean;
   onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
   onCreate: (p: UnmatchedProject) => void;
@@ -280,10 +279,7 @@ function UnmatchedProjectCard({
     () => Array.from(new Set(media.map((m) => m.creatorName).filter(Boolean))) as string[],
     [media],
   );
-  const shownMedia = useMemo(
-    () => media.filter((m) => kindFilter === "all" || (kindFilter === "photos" ? m.kind === "photo" : m.kind === "video")),
-    [media, kindFilter],
-  );
+  const shownMedia = media;
   const photoN = media.filter((m) => m.kind === "photo").length;
   const videoN = media.filter((m) => m.kind === "video").length;
   const title = unmatchedProjectTitle(project);
@@ -337,7 +333,7 @@ function UnmatchedProjectCard({
               {[...Array(6)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
             </div>
           ) : shownMedia.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400">{media.length === 0 ? "No media found on this project." : `No ${kindFilter} on this project.`}</p>
+            <p className="py-4 text-center text-sm text-slate-400">No media found on this project.</p>
           ) : (
             <div className={GRID_CLASSES[2]}>
               {shownMedia.map((m) => (
@@ -376,23 +372,18 @@ function UnmatchedProjectCard({
 type UnmatchedGalleryItem = UnmatchedMediaItem & { ccProjectId: string; projectTitle: string };
 
 /** Photos/Videos sub-tabs: flat gallery of every unmatched project's media,
- *  captioned with the project each shot belongs to. */
+ *  captioned with the project each shot belongs to. Same grid + zoom sizing
+ *  as the matched gallery (size comes from the shared toolbar control). */
 function UnmatchedGallery({
-  kind, searchQ, onOpen,
+  kind, searchQ, size, items, isLoading, onOpen,
 }: {
   kind: "photos" | "videos";
   searchQ: string;
+  size: number;
+  items: UnmatchedGalleryItem[];
+  isLoading: boolean;
   onOpen: (m: UnmatchedGalleryItem) => void;
 }) {
-  const { data: items = [], isLoading } = useQuery<UnmatchedGalleryItem[]>({
-    queryKey: ["/api/crm/companycam/unmatched-media"],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/companycam/unmatched-media", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load unmatched media");
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
   const shown = useMemo(() => {
     let l = items.filter((m) => (kind === "photos" ? m.kind === "photo" : m.kind === "video"));
     const q = searchQ.trim().toLowerCase();
@@ -401,7 +392,7 @@ function UnmatchedGallery({
   }, [items, kind, searchQ]);
   if (isLoading) {
     return (
-      <div className={GRID_CLASSES[1]}>
+      <div className={GRID_CLASSES[size]}>
         {[...Array(12)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
       </div>
     );
@@ -416,7 +407,7 @@ function UnmatchedGallery({
     );
   }
   return (
-    <div className={GRID_CLASSES[1]} data-testid="unmatched-gallery">
+    <div className={GRID_CLASSES[size]} data-testid="unmatched-gallery">
       {shown.map((m) => (
         <div
           key={m.id}
@@ -458,15 +449,19 @@ function UnmatchedGallery({
 }
 
 function UnmatchedSection({
-  projects, isLoading, searchQ, kindFilter, sort, isAdmin, onOpenMedia,
+  projects, isLoading, searchQ, kindFilter, sort, size, galleryItems, galleryLoading, isAdmin, onOpenMedia, onOpenGalleryItem,
 }: {
   projects: UnmatchedProject[];
   isLoading: boolean;
   searchQ: string;
-  kindFilter: "all" | "photos" | "videos";
+  kindFilter: "projects" | "photos" | "videos";
   sort: "media" | "name";
+  size: number;
+  galleryItems: UnmatchedGalleryItem[];
+  galleryLoading: boolean;
   isAdmin: boolean;
   onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
+  onOpenGalleryItem: (m: UnmatchedGalleryItem) => void;
 }) {
   const [createFor, setCreateFor] = useState<UnmatchedProject | null>(null);
   const [matchFor, setMatchFor] = useState<UnmatchedProject | null>(null);
@@ -492,11 +487,14 @@ function UnmatchedSection({
           </p>
         </div>
       </div>
-      {kindFilter !== "all" ? (
+      {kindFilter !== "projects" ? (
         <UnmatchedGallery
           kind={kindFilter}
           searchQ={searchQ}
-          onOpen={(m) => onOpenMedia(m, { ccProjectId: m.ccProjectId, ccProjectName: m.projectTitle, ccAddress: null, matchScore: null, photoCount: null, archived: null, lastSyncedAt: null })}
+          size={size}
+          items={galleryItems}
+          isLoading={galleryLoading}
+          onOpen={onOpenGalleryItem}
         />
       ) : isLoading ? (
         <div className="space-y-3">
@@ -518,7 +516,6 @@ function UnmatchedSection({
             <UnmatchedProjectCard
               key={p.ccProjectId}
               project={p}
-              kindFilter={kindFilter}
               isAdmin={isAdmin}
               onOpenMedia={onOpenMedia}
               onCreate={setCreateFor}
@@ -563,7 +560,7 @@ export default function CrmPhotoGallery() {
   const [dateTo, setDateTo] = useState("");
   const [primaryTab, setPrimaryTab] = useState<"gallery" | "unmatched">("gallery");
   const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent">("all");
-  const [unmatchedKind, setUnmatchedKind] = useState<"all" | "photos" | "videos">("all");
+  const [unmatchedKind, setUnmatchedKind] = useState<"projects" | "photos" | "videos">("projects");
   const [unmatchedSort, setUnmatchedSort] = useState<"media" | "name">("media");
   const [searchQ, setSearchQ] = useState("");
 
@@ -629,6 +626,35 @@ export default function CrmPhotoGallery() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
   const isAdmin = ["owner", "admin", "supervisor"].includes(currentUser?.role || "");
+
+  // Unmatched media gallery data — needed for the Unmatched Photos/Videos
+  // sub-tabs and for the "Unmatched CompanyCam videos" section on the main
+  // Videos tab.
+  const wantUnmatchedMedia =
+    (primaryTab === "unmatched" && unmatchedKind !== "projects") ||
+    (primaryTab === "gallery" && typeTab === "videos");
+  const { data: unmatchedMedia = [], isLoading: unmatchedMediaLoading } = useQuery<UnmatchedGalleryItem[]>({
+    queryKey: ["/api/crm/companycam/unmatched-media"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/companycam/unmatched-media", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load unmatched media");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!currentUser && wantUnmatchedMedia,
+  });
+  const openUnmatchedGalleryItem = (m: UnmatchedGalleryItem) =>
+    setLightbox({
+      id: m.id,
+      name: m.name,
+      url: m.url,
+      thumbUrl: m.thumbUrl,
+      contentType: m.contentType,
+      createdAt: m.createdAt,
+      customerId: null,
+      customerName: m.projectTitle,
+      uploadedByName: m.creatorName,
+    });
 
   // Unmatched CompanyCam projects — fetched here so the tab shows its count
   const { data: unmatchedProjects = [], isLoading: unmatchedLoading } = useQuery<UnmatchedProject[]>({
@@ -1093,12 +1119,39 @@ export default function CrmPhotoGallery() {
                 activeKey={unmatchedKind}
                 onSelect={(k) => setUnmatchedKind(k as typeof unmatchedKind)}
                 tabs={[
-                  { key: "all", label: "All" },
+                  { key: "projects", label: "Projects", count: unmatchedProjects.length || null },
                   { key: "photos", label: "Photos" },
                   { key: "videos", label: "Videos" },
                 ]}
               />
               <div className="ml-auto flex items-center gap-2">
+                {unmatchedKind !== "projects" && (
+                  <>
+                    <span className="text-xs text-muted-foreground" data-testid="unmatched-media-count">
+                      {unmatchedMedia.filter((m) => (unmatchedKind === "photos" ? m.kind === "photo" : m.kind === "video")).length} items
+                    </span>
+                    <div className="flex items-center rounded-md border border-input bg-white">
+                      <button
+                        onClick={() => setSize((s) => Math.min(SMALLEST, s + 1))}
+                        disabled={size === SMALLEST}
+                        className="flex h-9 w-9 items-center justify-center text-slate-600 hover:text-foreground disabled:opacity-35"
+                        title="Smaller thumbnails"
+                        data-testid="unmatched-size-smaller"
+                      >
+                        <ZoomOut className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setSize((s) => Math.max(LARGEST, s - 1))}
+                        disabled={size === LARGEST}
+                        className="flex h-9 w-9 items-center justify-center border-l border-input text-slate-600 hover:text-foreground disabled:opacity-35"
+                        title="Larger thumbnails"
+                        data-testid="unmatched-size-larger"
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </>
+                )}
                 {searchBox}
                 {filtersPopover}
               </div>
@@ -1132,6 +1185,10 @@ export default function CrmPhotoGallery() {
             searchQ={searchQ}
             kindFilter={unmatchedKind}
             sort={unmatchedSort}
+            size={size}
+            galleryItems={unmatchedMedia}
+            galleryLoading={unmatchedMediaLoading}
+            onOpenGalleryItem={openUnmatchedGalleryItem}
             isAdmin={isAdmin}
             onOpenMedia={(m, project) =>
               setLightbox({
@@ -1313,6 +1370,34 @@ export default function CrmPhotoGallery() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Videos tab: every CompanyCam video reaches the CRM — matched ones
+            above (imported to customers), unmatched ones here, clearly split */}
+        {primaryTab === "gallery" && typeTab === "videos" && (unmatchedMediaLoading || unmatchedMedia.some((m) => m.kind === "video")) && (
+          <div className="space-y-3 pt-4" data-testid="gallery-unmatched-videos">
+            <div className="flex items-center gap-2 border-t border-border pt-4">
+              <h2 className="text-sm font-semibold text-foreground">Unmatched CompanyCam videos</h2>
+              <span className="rounded-[3px] bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                Not linked to a customer yet
+              </span>
+              <button
+                onClick={() => { setPrimaryTab("unmatched"); setUnmatchedKind("projects"); }}
+                className="ml-auto text-xs font-medium text-[#711419] hover:underline"
+                data-testid="goto-unmatched"
+              >
+                Match these projects →
+              </button>
+            </div>
+            <UnmatchedGallery
+              kind="videos"
+              searchQ={searchQ}
+              size={size}
+              items={unmatchedMedia}
+              isLoading={unmatchedMediaLoading}
+              onOpen={openUnmatchedGalleryItem}
+            />
           </div>
         )}
 
