@@ -2,6 +2,16 @@ import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { recordAiUsage } from "./ai-usage";
+
+/** Meter a Whisper call for the cost tracker. verbose_json responses carry
+ *  the real audio duration; fall back to a bitrate estimate from file size. */
+function meterWhisper(transcription: any, audioBuffer: Buffer, source: string) {
+  const seconds = typeof transcription?.duration === "number" && transcription.duration > 0
+    ? transcription.duration
+    : audioBuffer.length / 16000; // ~16 kB/s opus estimate
+  recordAiUsage({ provider: "openai", kind: "transcription", model: "whisper-1", audioSeconds: seconds, source });
+}
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 // Same key fallback chain as the other AI services (crmHelpAI/ghqSearchAI) —
@@ -39,7 +49,9 @@ export class VoiceService {
       const transcription = await openai.audio.transcriptions.create({
         file: audioReadStream,
         model: "whisper-1",
+        response_format: "verbose_json",
       });
+      meterWhisper(transcription, audioBuffer, "voice-dictation");
 
       const transcribedText = transcription.text.trim();
 
@@ -109,7 +121,9 @@ export class VoiceService {
       const transcription = await openai.audio.transcriptions.create({
         file: audioReadStream,
         model: "whisper-1",
+        response_format: "verbose_json",
       });
+      meterWhisper(transcription, audioBuffer, "voice-notes");
 
       const transcribedText = transcription.text.trim();
 

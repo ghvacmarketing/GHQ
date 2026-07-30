@@ -285,6 +285,44 @@ async function runInstallPlannerMigrations() {
     // Govee per-sensor calibration offsets (match the Govee app's calibrated values).
     await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS temp_offset_f numeric(5,2) NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS humidity_offset numeric(5,2) NOT NULL DEFAULT 0`);
+    // ── Cost tracker (Settings → Usage & Costs) ──
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_usage_events (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider text NOT NULL,
+        kind text NOT NULL,
+        model text NOT NULL,
+        input_tokens integer NOT NULL DEFAULT 0,
+        output_tokens integer NOT NULL DEFAULT 0,
+        audio_seconds real NOT NULL DEFAULT 0,
+        cost_micro bigint NOT NULL DEFAULT 0,
+        source text,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_usage_events_created_idx ON ai_usage_events (created_at)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS provider_usage_snapshots (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider text NOT NULL,
+        snapshot_date date NOT NULL,
+        metric text NOT NULL,
+        value numeric,
+        cost_micro bigint NOT NULL DEFAULT 0,
+        raw jsonb,
+        created_at timestamp DEFAULT now(),
+        UNIQUE (provider, snapshot_date, metric)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS manual_provider_costs (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        label text NOT NULL,
+        monthly_cost_cents integer NOT NULL,
+        notes text,
+        created_at timestamp DEFAULT now()
+      )
+    `);
     // Per-line customer visibility on quotes. One-time backfill INSIDE the
     // column-added guard: existing worksheet (custom_install) quotes stored
     // raw internal costs as line items — hide them all from customer-facing
@@ -1091,6 +1129,11 @@ async function runWaterHeaterSeeds() {
     import("./services/companycam")
       .then(({ scheduleCompanycamSync }) => scheduleCompanycamSync())
       .catch((err) => console.error("CompanyCam scheduler import failed:", err));
+
+    // Daily provider cost snapshots (Settings → Usage & Costs)
+    import("./services/cost-tracker")
+      .then(({ scheduleCostSnapshots }) => scheduleCostSnapshots())
+      .catch((err) => console.error("Cost tracker scheduler import failed:", err));
 
     // Gmail (Workspace) two-way inbox sync for connected CRM users
     import("./services/gmailService")

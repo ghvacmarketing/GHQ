@@ -682,6 +682,7 @@ The Settings page at /crm/settings contains these sub-sections:
 
 **Financial**
 - **Payment Settings** — configure Stripe, financing link (GreenSky URL), and payment options
+- **Usage & Costs** (/crm/settings/costs, owner/admin only) — internal cost tracker: month-to-date estimated spend across AI (Gibbs tokens + Whisper voice minutes, self-metered per call), Render hosting plan, Neon database storage, plus manual flat monthly costs for services without APIs (e.g. Textline); 30-day AI spend chart and a Refresh Providers button
 - **Materials Catalog** — manage materials and parts pricing
 - **QuickBooks Integration** — QuickBooks Online sync settings and class mapping
 

@@ -66,6 +66,7 @@ const sections: SettingsSection[] = [
     title: "Financial",
     items: [
       { name: "Payment Settings", href: "/crm/settings/payments", icon: CreditCard },
+      { name: "Usage & Costs", href: "/crm/settings/costs", icon: CreditCard },
       { name: "Materials Catalog", href: "/crm/settings/materials-catalog", icon: Boxes },
       { name: "QuickBooks Integration", href: "/crm/settings/quickbooks", icon: BookOpen },
     ],

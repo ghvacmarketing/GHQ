@@ -5,8 +5,24 @@
  * features (Ask AI help, smart search) run on Claude instead of OpenAI.
  */
 
+import { recordAiUsage } from "./ai-usage";
+
 const API_URL = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+
+/** Meter a successful Anthropic response (fire-and-forget). */
+function meter(data: any, source: string) {
+  const u = data?.usage;
+  if (!u) return;
+  recordAiUsage({
+    provider: "anthropic",
+    kind: "chat",
+    model: String(data?.model || DEFAULT_MODEL),
+    inputTokens: (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0),
+    outputTokens: u.output_tokens || 0,
+    source,
+  });
+}
 
 export function claudeConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
@@ -39,6 +55,7 @@ export async function claudeChat(opts: {
     err.status = res.status;
     throw err;
   }
+  meter(data, "claude-chat");
   return (data?.content || [])
     .filter((b: any) => b?.type === "text")
     .map((b: any) => b.text)
@@ -92,6 +109,7 @@ export async function claudeChatWithTools(opts: {
       err.status = res.status;
       throw err;
     }
+    meter(data, "gibbs");
 
     if (!finalTurn && data.stop_reason === "tool_use") {
       messages.push({ role: "assistant", content: data.content });

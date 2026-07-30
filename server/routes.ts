@@ -13943,6 +13943,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/customers/:id/files - Save file metadata after upload
+  // ── Cost tracker (Settings → Usage & Costs) — owner/admin only ──
+  app.get("/api/crm/costs/summary", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    try {
+      const ai = await db.execute(sql`
+        SELECT provider, source, date_trunc('day', created_at)::date::text AS day,
+               SUM(cost_micro)::bigint AS cost_micro,
+               SUM(input_tokens)::bigint AS input_tokens, SUM(output_tokens)::bigint AS output_tokens,
+               SUM(audio_seconds)::float AS audio_seconds, COUNT(*)::int AS calls
+        FROM ai_usage_events
+        WHERE created_at > now() - interval '31 days'
+        GROUP BY provider, source, day ORDER BY day
+      `);
+      const snapshots = await db.execute(sql`
+        SELECT provider, snapshot_date::text AS day, metric, value::float AS value, cost_micro::bigint AS cost_micro
+        FROM provider_usage_snapshots
+        WHERE snapshot_date > now() - interval '31 days'
+        ORDER BY snapshot_date
+      `);
+      const manual = await db.execute(sql`SELECT id, label, monthly_cost_cents, notes FROM manual_provider_costs ORDER BY label`);
+      res.json({ ai: ai.rows, snapshots: snapshots.rows, manual: manual.rows });
+    } catch (error) {
+      console.error("Error building cost summary:", error);
+      res.status(500).json({ message: "Failed to load cost summary" });
+    }
+  });
+
+  app.post("/api/crm/costs/manual", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    const label = String(req.body?.label || "").trim();
+    const cents = Math.round(Number(req.body?.monthlyCostCents));
+    if (!label || !Number.isFinite(cents) || cents < 0) {
+      return res.status(400).json({ message: "label and monthlyCostCents are required" });
+    }
+    const r = await db.execute(sql`
+      INSERT INTO manual_provider_costs (label, monthly_cost_cents, notes)
+      VALUES (${label}, ${cents}, ${String(req.body?.notes || "") || null}) RETURNING id
+    `);
+    res.status(201).json({ id: (r.rows[0] as any)?.id });
+  });
+
+  app.delete("/api/crm/costs/manual/:id", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    await db.execute(sql`DELETE FROM manual_provider_costs WHERE id = ${req.params.id}`);
+    res.json({ ok: true });
+  });
+
+  // Manual refresh of the nightly snapshots (also runs 60s after every boot)
+  app.post("/api/crm/costs/refresh", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    const { runCostSnapshots } = await import("./services/cost-tracker");
+    await runCostSnapshots();
+    res.json({ ok: true });
+  });
+
   // GET /api/crm/photos/feed - live company-wide photo feed. Open to EVERY
   // CRM role — techs and sales need job media too (it was admin-only, which
   // showed non-admins an empty Media page).
