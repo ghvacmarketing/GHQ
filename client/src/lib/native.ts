@@ -14,9 +14,14 @@ import { apiRequest } from "@/lib/queryClient";
 export const isNativeApp = () => Capacitor.isNativePlatform();
 
 // Tag the document so CSS can adapt to the shell (kill rubber-band bounce,
-// safe-area tweaks). Module side effect — runs wherever native.ts is used.
+// safe-area tweaks) and hide iOS's keyboard accessory bar (the up/down/Done
+// strip) — a native app types without browser chrome. Module side effect —
+// runs wherever native.ts is used.
 if (typeof document !== "undefined" && Capacitor.isNativePlatform()) {
   document.documentElement.classList.add("native-app");
+  import("@capacitor/keyboard")
+    .then(({ Keyboard }) => Keyboard.setAccessoryBarVisible({ isVisible: false }))
+    .catch(() => {});
 }
 
 // ---- Push notifications -------------------------------------------------
