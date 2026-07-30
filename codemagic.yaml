@@ -32,20 +32,31 @@ workflows:
         script: npm run build
       - name: Capacitor sync
         script: npx cap sync ios
-      # Explicit signing: the Apple Distribution certificate + "GHQ App Store"
-      # profile already exist (created 2026-07-30 via the ASC API); the CLI
-      # matches the certificate by CERTIFICATE_PRIVATE_KEY and --create
-      # regenerates anything that expires.
+      # Deterministic signing — no fetching/matching magic. The public cert +
+      # provisioning profile are committed in ios/certs/ (not secrets); only
+      # CERTIFICATE_PRIVATE_KEY (Codemagic secure env var) completes the pair.
+      # Both expire 2027-07-30 — re-download via the ASC API then.
       - name: Set up code signing
         script: |
+          set -e
+          echo "$CERTIFICATE_PRIVATE_KEY" > /tmp/cert_key.pem
+          openssl x509 -inform DER -in ios/certs/distribution.cer -out /tmp/cert.pem
+          CERT_MOD=$(openssl x509 -noout -modulus -in /tmp/cert.pem)
+          KEY_MOD=$(openssl rsa -noout -modulus -in /tmp/cert_key.pem)
+          if [ "$CERT_MOD" != "$KEY_MOD" ]; then
+            echo "ERROR: CERTIFICATE_PRIVATE_KEY env var does not match ios/certs/distribution.cer"
+            echo "Paste the full contents of apple-distribution-cert-private-key.pem into the Codemagic env var (group appstore_credentials)."
+            exit 1
+          fi
+          openssl pkcs12 -export -inkey /tmp/cert_key.pem -in /tmp/cert.pem -out /tmp/cert.p12 -password pass:buildpass
           keychain initialize
-          app-store-connect fetch-signing-files "app.ghvac.tools" --type IOS_APP_STORE --create
-          keychain add-certificates
-          xcode-project use-profiles
+          keychain add-certificates --certificate /tmp/cert.p12 --certificate-password buildpass
+          mkdir -p ~/Library/MobileDevice/"Provisioning Profiles"
+          cp ios/certs/GHQ_App_Store.mobileprovision ~/Library/MobileDevice/"Provisioning Profiles"/
           echo "===== signing identities in keychain ====="
-          security find-identity -v -p codesigning || true
+          security find-identity -v -p codesigning
           echo "===== provisioning profiles installed ====="
-          ls -la ~/Library/"MobileDevice"/"Provisioning Profiles"/ || true
+          ls -la ~/Library/MobileDevice/"Provisioning Profiles"/
       - name: Stamp build number
         script: |
           cd ios/App
