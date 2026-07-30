@@ -591,6 +591,71 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
   return imported;
 }
 
+/** Media -> Unmatched tab: list a not-yet-matched project's photos + videos
+ *  straight from the CompanyCam API. Nothing lands in customer_files until a
+ *  customer is linked; a short cache keeps browsing snappy without hammering
+ *  the API. */
+export type UnmatchedMedia = {
+  id: string;
+  kind: "photo" | "video";
+  name: string;
+  url: string;
+  thumbUrl: string | null;
+  contentType: string;
+  createdAt: string | null;
+  creatorName: string | null;
+};
+
+const unmatchedMediaCache = new Map<string, { at: number; media: UnmatchedMedia[] }>();
+
+export async function fetchUnmatchedProjectMedia(ccProjectId: string, projectName: string): Promise<UnmatchedMedia[]> {
+  const hit = unmatchedMediaCache.get(ccProjectId);
+  if (hit && Date.now() - hit.at < 5 * 60 * 1000) return hit.media;
+
+  const [photos, videos] = await Promise.all([
+    fetchProjectPhotos(ccProjectId),
+    fetchProjectVideos(ccProjectId).catch(() => [] as CcVideo[]),
+  ]);
+  const media: UnmatchedMedia[] = [];
+  for (const p of photos) {
+    if (p.status && p.status !== "active") continue;
+    const original = p.uris.find((u) => u.type === "original") || p.uris[0];
+    if (!original?.uri) continue;
+    const ts = p.captured_at || p.created_at || null;
+    media.push({
+      id: `ccphoto-${p.id}`,
+      kind: "photo",
+      name: `${projectName}${ts ? ` ${new Date(ts * 1000).toISOString().slice(0, 10)}` : ""}.jpg`,
+      url: original.uri,
+      thumbUrl: p.uris.find((u) => u.type === "web")?.uri || null,
+      contentType: "image/jpeg",
+      createdAt: ts ? new Date(ts * 1000).toISOString() : null,
+      creatorName: p.creator_name || null,
+    });
+  }
+  for (const v of videos) {
+    const vStatus = (v.status || "").toLowerCase();
+    if (vStatus && vStatus !== "processed" && vStatus !== "active") continue;
+    const uris = Array.isArray(v.uris) ? v.uris : [];
+    const source = v.playback_url || uris.find((u) => u.type === "original")?.uri || uris[0]?.uri || null;
+    if (!source) continue;
+    const ts = v.captured_at || v.created_at || null;
+    media.push({
+      id: `ccvideo-${v.id}`,
+      kind: "video",
+      name: `${projectName} video${ts ? ` ${new Date(ts * 1000).toISOString().slice(0, 10)}` : ""}.mp4`,
+      url: source,
+      thumbUrl: v.thumbnail_urls?.medium || v.thumbnail_urls?.large || v.thumbnail_urls?.small || null,
+      contentType: videoContentType(source),
+      createdAt: ts ? new Date(ts * 1000).toISOString() : null,
+      creatorName: v.creator_name || null,
+    });
+  }
+  media.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  unmatchedMediaCache.set(ccProjectId, { at: Date.now(), media });
+  return media;
+}
+
 /** Push a freshly uploaded CRM photo up to the customer's linked CompanyCam
  *  project (fire-and-forget from the upload route). Records the returned
  *  photo id so the next pull skips it. */

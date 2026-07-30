@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
-import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, ChevronLeft, ChevronRight, Loader2, Filter, Upload, Search, FileText, Play } from "lucide-react";
+import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, ChevronLeft, ChevronRight, ChevronDown, Loader2, Filter, Upload, Search, FileText, Play, MapPin, UserPlus, Link2, EyeOff } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -71,6 +71,365 @@ async function downloadPhoto(p: FeedPhoto) {
   }
 }
 
+// ── Unmatched CompanyCam projects (Media -> Unmatched tab) ──
+// Projects the sync couldn't tie to a customer. Their media never lands in
+// customer_files, so this tab lists them straight from the CompanyCam API,
+// grouped by project, carrying the project's name/address/creators so an
+// admin can create the customer (pre-filled) or link an existing one.
+
+type UnmatchedProject = {
+  ccProjectId: string;
+  ccProjectName: string | null;
+  ccAddress: string | null;
+  matchScore: number | null;
+  photoCount: number | null;
+  lastSyncedAt: string | null;
+};
+
+type UnmatchedMediaItem = {
+  id: string;
+  kind: "photo" | "video";
+  name: string;
+  url: string;
+  thumbUrl: string | null;
+  contentType: string;
+  createdAt: string | null;
+  creatorName: string | null;
+};
+
+const unmatchedProjectTitle = (p: UnmatchedProject) =>
+  (p.ccProjectName || "").trim() || (p.ccAddress || "").trim() || "Unnamed project";
+
+function CreateCustomerDialog({ project, onClose }: { project: UnmatchedProject; onClose: () => void }) {
+  const { toast } = useToast();
+  const [name, setName] = useState(unmatchedProjectTitle(project));
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState(project.ccAddress || "");
+  const [type, setType] = useState("residential");
+  const create = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/companycam/links/${project.ccProjectId}/create-customer`, {
+        name, phone, email, fullAddress: address, customerType: type,
+      });
+      return res.json();
+    },
+    onSuccess: (d: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/companycam/unmatched"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/photos/feed"] });
+      toast({ title: `Customer created — ${d.imported ?? 0} item${d.imported === 1 ? "" : "s"} imported` });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't create the customer", variant: "destructive" }),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && !create.isPending && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Create customer from CompanyCam project</DialogTitle></DialogHeader>
+        <div className="space-y-2.5">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">Name</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} data-testid="cc-create-name" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">Address</label>
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, city, state" data-testid="cc-create-address" />
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Phone (optional)</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} data-testid="cc-create-phone" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Email (optional)</label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} data-testid="cc-create-email" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">Type</label>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="cc-create-type"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="residential">Residential</SelectItem>
+                <SelectItem value="commercial">Commercial</SelectItem>
+                <SelectItem value="property_manager">Property manager</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            All {project.photoCount ?? 0} item{(project.photoCount ?? 0) === 1 ? "" : "s"} from “{unmatchedProjectTitle(project)}” will import to this customer right away.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={create.isPending}>Cancel</Button>
+          <Button
+            className="bg-[#711419] hover:bg-[#8a1a1f]"
+            disabled={!name.trim() || create.isPending}
+            onClick={() => create.mutate()}
+            data-testid="cc-create-submit"
+          >
+            {create.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <UserPlus className="mr-1.5 h-4 w-4" />}
+            Create & import
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MatchCustomerDialog({ project, onClose }: { project: UnmatchedProject; onClose: () => void }) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const { data: results = [], isFetching } = useQuery<Array<{ id: string; name: string; phone?: string | null }>>({
+    queryKey: ["/api/mobile/customers", "unmatched-link", search],
+    queryFn: async () => {
+      const res = await fetch(`/api/mobile/customers?search=${encodeURIComponent(search.trim())}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: search.trim().length >= 2,
+  });
+  const link = useMutation({
+    mutationFn: async (customerId: string) => {
+      const res = await apiRequest("PATCH", `/api/crm/companycam/links/${project.ccProjectId}`, { customerId });
+      return res.json();
+    },
+    onSuccess: (d: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/companycam/unmatched"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/photos/feed"] });
+      toast({ title: `Linked to ${d.customerName || "customer"} — ${d.imported ?? 0} item${d.imported === 1 ? "" : "s"} imported` });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't link the project", variant: "destructive" }),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && !link.isPending && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Match “{unmatchedProjectTitle(project)}”</DialogTitle></DialogHeader>
+        <div className="space-y-2">
+          <Input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search existing customers…"
+            data-testid="cc-match-search"
+          />
+          {search.trim().length >= 2 && (
+            <div className="max-h-56 overflow-y-auto rounded-[4px] border border-slate-200">
+              {isFetching && results.length === 0 ? (
+                <p className="px-3 py-4 text-center text-sm text-slate-400">Searching…</p>
+              ) : results.length === 0 ? (
+                <p className="px-3 py-4 text-center text-sm text-slate-400">No customers found.</p>
+              ) : (
+                results.map((c) => (
+                  <button
+                    key={c.id}
+                    disabled={link.isPending}
+                    onClick={() => link.mutate(c.id)}
+                    className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 hover:bg-slate-50 disabled:opacity-50"
+                    data-testid={`cc-match-customer-${c.id}`}
+                  >
+                    <span className="font-medium text-slate-800">{c.name}</span>
+                    {c.phone && <span className="ml-1.5 text-xs text-slate-400">{c.phone}</span>}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={link.isPending}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UnmatchedProjectCard({
+  project, isAdmin, onOpenMedia, onCreate, onMatch,
+}: {
+  project: UnmatchedProject;
+  isAdmin: boolean;
+  onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
+  onCreate: (p: UnmatchedProject) => void;
+  onMatch: (p: UnmatchedProject) => void;
+}) {
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const { data: media = [], isLoading } = useQuery<UnmatchedMediaItem[]>({
+    queryKey: ["/api/crm/companycam/unmatched", project.ccProjectId, "media"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/companycam/unmatched/${project.ccProjectId}/media`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load this project's media");
+      return res.json();
+    },
+    enabled: expanded,
+    staleTime: 5 * 60 * 1000,
+  });
+  const ignore = useMutation({
+    mutationFn: async () => apiRequest("PATCH", `/api/crm/companycam/links/${project.ccProjectId}`, { ignore: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/companycam/unmatched"] });
+      toast({ title: "Project ignored — undo anytime in Settings → CompanyCam" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't ignore the project", variant: "destructive" }),
+  });
+  const creators = useMemo(
+    () => Array.from(new Set(media.map((m) => m.creatorName).filter(Boolean))) as string[],
+    [media],
+  );
+  const title = unmatchedProjectTitle(project);
+  const count = project.photoCount ?? 0;
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm" data-testid={`unmatched-project-${project.ccProjectId}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground" title={title}>{title}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+            {(project.ccProjectName || "").trim() && project.ccAddress && (
+              <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{project.ccAddress}</span>
+            )}
+            <span>{count} item{count === 1 ? "" : "s"} on CompanyCam</span>
+            {creators.length > 0 && <span>· by {creators.join(", ")}</span>}
+          </p>
+        </div>
+        {isAdmin && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button size="sm" className="h-8 bg-[#711419] hover:bg-[#8a1a1f]" onClick={() => onCreate(project)} data-testid={`cc-create-${project.ccProjectId}`}>
+              <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Create customer
+            </Button>
+            <Button size="sm" variant="outline" className="h-8" onClick={() => onMatch(project)} data-testid={`cc-link-${project.ccProjectId}`}>
+              <Link2 className="mr-1.5 h-3.5 w-3.5" /> Match existing
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 text-slate-500" disabled={ignore.isPending} onClick={() => ignore.mutate()} title="Hide this project — it isn't a customer job" data-testid={`cc-ignore-${project.ccProjectId}`}>
+              <EyeOff className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-center gap-1 border-t border-border bg-slate-50/60 py-1.5 text-xs font-medium text-slate-500 hover:text-foreground"
+        data-testid={`cc-expand-${project.ccProjectId}`}
+      >
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+        {expanded ? "Hide media" : `View media (${count})`}
+      </button>
+      {expanded && (
+        <div className="border-t border-border p-3">
+          {isLoading ? (
+            <div className={GRID_CLASSES[2]}>
+              {[...Array(6)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
+            </div>
+          ) : media.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">No media found on this project.</p>
+          ) : (
+            <div className={GRID_CLASSES[2]}>
+              {media.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => onOpenMedia(m, project)}
+                  className="group relative overflow-hidden rounded-lg border border-border"
+                  title={`${m.creatorName || "Unknown"}${m.createdAt ? ` · ${format(new Date(m.createdAt), "MMM d, h:mm a")}` : ""}`}
+                  data-testid={`cc-media-${m.id}`}
+                >
+                  {m.kind === "video" ? (
+                    <span className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-900">
+                      {m.thumbUrl && <img src={m.thumbUrl} alt={m.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80" />}
+                      <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-black/50">
+                        <Play className="h-4 w-4 fill-white text-white" />
+                      </span>
+                    </span>
+                  ) : (
+                    <img
+                      src={m.thumbUrl || m.url}
+                      alt={m.name}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UnmatchedSection({
+  projects, isLoading, searchQ, isAdmin, onOpenMedia,
+}: {
+  projects: UnmatchedProject[];
+  isLoading: boolean;
+  searchQ: string;
+  isAdmin: boolean;
+  onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
+}) {
+  const [sort, setSort] = useState<"media" | "name">("media");
+  const [createFor, setCreateFor] = useState<UnmatchedProject | null>(null);
+  const [matchFor, setMatchFor] = useState<UnmatchedProject | null>(null);
+  const list = useMemo(() => {
+    let l = projects;
+    const q = searchQ.trim().toLowerCase();
+    if (q) l = l.filter((p) => unmatchedProjectTitle(p).toLowerCase().includes(q) || (p.ccAddress || "").toLowerCase().includes(q));
+    return [...l].sort((a, b) =>
+      sort === "name"
+        ? unmatchedProjectTitle(a).localeCompare(unmatchedProjectTitle(b))
+        : (b.photoCount ?? 0) - (a.photoCount ?? 0),
+    );
+  }, [projects, searchQ, sort]);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm text-muted-foreground">
+          CompanyCam jobs that aren't linked to a customer yet — their media stays here until someone {isAdmin ? "creates or matches the customer" : "with admin access links them"}.
+        </p>
+        <div className="ml-auto">
+          <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+            <SelectTrigger className="h-8 w-40 bg-white text-xs" data-testid="unmatched-sort"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="media">Most media first</SelectItem>
+              <SelectItem value="name">Project name A–Z</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
+        </div>
+      ) : list.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-20 text-center">
+          <Check className="mb-3 h-12 w-12 text-green-500/60" />
+          <p className="text-sm font-medium text-slate-600">
+            {searchQ.trim() ? "No unmatched projects match your search" : "Nothing unmatched"}
+          </p>
+          <p className="text-xs text-slate-400">
+            {searchQ.trim() ? "Try a different search." : "Every CompanyCam project is linked to a customer."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3" data-testid="unmatched-list">
+          {list.map((p) => (
+            <UnmatchedProjectCard
+              key={p.ccProjectId}
+              project={p}
+              isAdmin={isAdmin}
+              onOpenMedia={onOpenMedia}
+              onCreate={setCreateFor}
+              onMatch={setMatchFor}
+            />
+          ))}
+        </div>
+      )}
+      {createFor && <CreateCustomerDialog key={createFor.ccProjectId} project={createFor} onClose={() => setCreateFor(null)} />}
+      {matchFor && <MatchCustomerDialog key={matchFor.ccProjectId} project={matchFor} onClose={() => setMatchFor(null)} />}
+    </div>
+  );
+}
+
 const isImageFile = (p: FeedPhoto) => (p.contentType || "").startsWith("image/");
 const isVideoFile = (p: FeedPhoto) => (p.contentType || "").startsWith("video/");
 const isPdfFile = (p: FeedPhoto) =>
@@ -99,7 +458,7 @@ export default function CrmPhotoGallery() {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent">("all");
+  const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent" | "unmatched">("all");
   const [searchQ, setSearchQ] = useState("");
 
   // Upload — pick a customer, then attach files to them
@@ -162,6 +521,19 @@ export default function CrmPhotoGallery() {
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+  const isAdmin = ["owner", "admin", "supervisor"].includes(currentUser?.role || "");
+
+  // Unmatched CompanyCam projects — fetched here so the tab shows its count
+  const { data: unmatchedProjects = [], isLoading: unmatchedLoading } = useQuery<UnmatchedProject[]>({
+    queryKey: ["/api/crm/companycam/unmatched"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/companycam/unmatched", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+    enabled: !!currentUser,
   });
 
   // Paged feed — thousands of CompanyCam references made the all-at-once load
@@ -443,8 +815,10 @@ export default function CrmPhotoGallery() {
               { key: "documents", label: "Documents" },
               { key: "checklist", label: "Checklist Photos" },
               { key: "recent", label: "Recent" },
+              { key: "unmatched", label: "Unmatched", count: unmatchedProjects.length || null },
             ]}
           />
+          {typeTab !== "unmatched" && (
           <IndustrialTabs
             testidPrefix="media-view"
             activeKey={view}
@@ -454,7 +828,9 @@ export default function CrmPhotoGallery() {
               { key: "list", label: "List" },
             ]}
           />
+          )}
 
+          {typeTab !== "unmatched" && (
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground" data-testid="photo-count">
               {filtersActive && photos ? `${filtered.length} of ${photos.length}` : `${filtered.length}`} items
@@ -550,6 +926,7 @@ export default function CrmPhotoGallery() {
               </PopoverContent>
             </Popover>
           </div>
+          )}
         </div>
 
         {selectionActive && (
@@ -571,7 +948,27 @@ export default function CrmPhotoGallery() {
           </div>
         )}
 
-        {isLoading ? (
+        {typeTab === "unmatched" ? (
+          <UnmatchedSection
+            projects={unmatchedProjects}
+            isLoading={unmatchedLoading}
+            searchQ={searchQ}
+            isAdmin={isAdmin}
+            onOpenMedia={(m, project) =>
+              setLightbox({
+                id: m.id,
+                name: m.name,
+                url: m.url,
+                thumbUrl: m.thumbUrl,
+                contentType: m.contentType,
+                createdAt: m.createdAt,
+                customerId: null,
+                customerName: unmatchedProjectTitle(project),
+                uploadedByName: m.creatorName,
+              })
+            }
+          />
+        ) : isLoading ? (
           <div className={GRID_CLASSES[1]}>
             {[...Array(10)].map((_, i) => (
               <Skeleton key={i} className="aspect-square rounded-lg" />
@@ -741,7 +1138,7 @@ export default function CrmPhotoGallery() {
         )}
 
         {/* Load more — the feed comes down in pages so the page stays smooth */}
-        {hasNextPage && !isLoading && (
+        {typeTab !== "unmatched" && hasNextPage && !isLoading && (
           <div className="flex justify-center pt-1">
             <Button
               variant="outline"
@@ -890,9 +1287,11 @@ export default function CrmPhotoGallery() {
             <Button variant="secondary" size="sm" onClick={() => downloadPhoto(lightbox)} data-testid="lightbox-download">
               <Download className="mr-1.5 h-4 w-4" /> Download
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(lightbox)} data-testid="lightbox-delete">
-              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-            </Button>
+            {lightbox.customerId && (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(lightbox)} data-testid="lightbox-delete">
+                <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+              </Button>
+            )}
           </div>
         </div>
       )}

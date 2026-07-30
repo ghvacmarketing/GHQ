@@ -412,7 +412,7 @@ CompanyCam projects sync into the CRM as photo AND video references (Settings > 
 
 ### How it works
 - Instant: CompanyCam webhooks (photo.created, video.created) push new media into the CRM within seconds; a 15-minute background reconciliation sync (plus a "Sync now" button) catches anything missed, auto-matches projects to customers, and imports photo/video references
-- Projects the auto-matcher isn't sure about show as "unmatched" on the settings page — an admin picks the right customer manually ("Match" button), or marks the project "Ignore"
+- Projects the auto-matcher isn't sure about show as "unmatched" in TWO places: the settings page, and the Media page's "Unmatched" tab (Media > Unmatched) which lists each unmatched CompanyCam project as a card with its name, address, item count and creators, previews its photos/videos live from CompanyCam, and (for owner/admin/supervisor) offers "Create customer" (pre-filled from the project's name/address — creates the CRM customer, links the project, and imports everything in one click), "Match existing" (search + link), or Ignore
 - Two-way: new photos uploaded in the CRM/mobile app for a linked customer are pushed up to the matching CompanyCam project automatically
 - Deletes never propagate in either direction
 - Requires the COMPANYCAM_API_TOKEN environment variable on the server

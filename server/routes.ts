@@ -14357,6 +14357,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---- Media -> Unmatched tab: CompanyCam projects nobody is linked to ----
+
+  // Every CRM role can SEE what's sitting unmatched (same visibility rule as
+  // the media feed); linking/creating stays admin-gated below.
+  app.get("/api/crm/companycam/unmatched", requireCrmAuth, async (_req, res) => {
+    try {
+      const links = await db
+        .select({
+          ccProjectId: companycamProjectLinks.ccProjectId,
+          ccProjectName: companycamProjectLinks.ccProjectName,
+          ccAddress: companycamProjectLinks.ccAddress,
+          matchScore: companycamProjectLinks.matchScore,
+          photoCount: companycamProjectLinks.photoCount,
+          lastSyncedAt: companycamProjectLinks.lastSyncedAt,
+        })
+        .from(companycamProjectLinks)
+        .where(and(eq(companycamProjectLinks.matchType, "unmatched"), eq(companycamProjectLinks.archived, false)))
+        .orderBy(desc(companycamProjectLinks.photoCount));
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching unmatched CompanyCam projects:", error);
+      res.status(500).json({ message: "Failed to load unmatched projects" });
+    }
+  });
+
+  // Live media for one unmatched project, proxied from the CompanyCam API —
+  // nothing is imported until the project gets a customer.
+  app.get("/api/crm/companycam/unmatched/:ccProjectId/media", requireCrmAuth, async (req, res) => {
+    try {
+      const { companycamConfigured, fetchUnmatchedProjectMedia } = await import("./services/companycam");
+      if (!companycamConfigured()) return res.json([]);
+      const [link] = await db
+        .select({ ccProjectName: companycamProjectLinks.ccProjectName })
+        .from(companycamProjectLinks)
+        .where(eq(companycamProjectLinks.ccProjectId, req.params.ccProjectId));
+      if (!link) return res.status(404).json({ message: "Unknown CompanyCam project" });
+      res.json(await fetchUnmatchedProjectMedia(req.params.ccProjectId, link.ccProjectName || "CompanyCam"));
+    } catch (error) {
+      console.error("Error fetching unmatched project media:", error);
+      res.status(500).json({ message: "Failed to load project media" });
+    }
+  });
+
+  // One click from "orphaned photos" to a real customer: create the CRM
+  // customer from the project's own name/address (caller can override any
+  // field), link the project to it, and import everything immediately.
+  app.post("/api/crm/companycam/links/:ccProjectId/create-customer", requireCrmAdmin, async (req, res) => {
+    try {
+      const ccProjectId = req.params.ccProjectId;
+      const [link] = await db.select().from(companycamProjectLinks).where(eq(companycamProjectLinks.ccProjectId, ccProjectId));
+      if (!link) return res.status(404).json({ message: "Unknown CompanyCam project" });
+      if (link.customerId) return res.status(400).json({ message: "This project is already linked to a customer" });
+
+      const name = String(req.body?.name || link.ccProjectName || link.ccAddress || "").trim();
+      if (!name) return res.status(400).json({ message: "A customer name is required" });
+      const [created] = await db
+        .insert(crmCustomers)
+        .values({
+          name,
+          phone: String(req.body?.phone || "").trim() || null,
+          email: String(req.body?.email || "").trim() || null,
+          fullAddress: String(req.body?.fullAddress ?? link.ccAddress ?? "").trim() || null,
+          leadSource: "CompanyCam",
+          customerType: ["residential", "commercial", "property_manager"].includes(req.body?.customerType)
+            ? req.body.customerType
+            : "residential",
+          customerStatus: "customer",
+          sourceSystem: "companycam",
+          sourceId: ccProjectId,
+        })
+        .returning({ id: crmCustomers.id });
+
+      await db
+        .update(companycamProjectLinks)
+        .set({ matchType: "manual", customerId: created.id, matchScore: null })
+        .where(eq(companycamProjectLinks.ccProjectId, ccProjectId));
+      const { importProjectPhotos } = await import("./services/companycam");
+      const imported = await importProjectPhotos(ccProjectId, created.id, link.ccProjectName || "CompanyCam").catch(() => 0);
+      res.json({ customerId: created.id, imported });
+    } catch (error) {
+      console.error("Error creating customer from CompanyCam project:", error);
+      res.status(500).json({ message: "Failed to create the customer" });
+    }
+  });
+
   // DELETE /api/crm/customers/:id/files/:fileId - Delete a customer file
   app.delete("/api/crm/customers/:id/files/:fileId", requireCrmAuth, async (req, res) => {
     try {
