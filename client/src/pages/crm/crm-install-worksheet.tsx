@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -26,7 +31,10 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft,
+  BookOpen,
   CheckCircle,
+  Eye,
+  EyeOff,
   Plus,
   Trash2,
   Loader2,
@@ -76,6 +84,8 @@ interface LocalLine {
   category: LineCategory;
   description: string;
   cost: number;
+  /** Shown on the customer's copy of the quote? Costs default to internal. */
+  customerVisible: boolean;
 }
 
 const defaultInputs: WorksheetInputs = {
@@ -94,9 +104,10 @@ const defaultInputs: WorksheetInputs = {
 type PricingMode = "install" | "service";
 
 export default function CrmInstallWorksheet() {
-  usePageTitle("Install Worksheet");
+  usePageTitle("Custom Pricing");
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const searchString = useSearch();
 
   const [pricingMode, setPricingMode] = useState<PricingMode>("install");
   const [inputs, setInputs] = useState<WorksheetInputs>(defaultInputs);
@@ -116,6 +127,43 @@ export default function CrmInstallWorksheet() {
   const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
   const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
+
+  // ── Prefill from the New Quote setup flow: customer + salesperson are
+  // chosen BEFORE this page opens, so finalizing must never re-ask. ──
+  const urlParams = useMemo(() => new URLSearchParams(searchString), [searchString]);
+  const presetCustomerId = urlParams.get("customerId");
+  useEffect(() => {
+    const a = urlParams.get("assignedToId");
+    if (a) setAssignedToId(a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const { data: presetCustomer } = useQuery<CrmCustomer | null>({
+    queryKey: ["/api/crm/customers", presetCustomerId, "worksheet-prefill"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${presetCustomerId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!presetCustomerId,
+  });
+  useEffect(() => {
+    if (presetCustomer && !selectedCustomer) setSelectedCustomer(presetCustomer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetCustomer]);
+
+  // ── Catalog pull: search the CRM items/price catalog into a line ──
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const { data: catalogItems = [], isFetching: catalogLoading } = useQuery<Array<{ id: string; name: string; description: string | null; rate: string | null; category: string | null }>>({
+    queryKey: ["/api/crm/items", "worksheet-catalog", catalogSearch],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/items?search=${encodeURIComponent(catalogSearch.trim())}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data.slice(0, 12) : [];
+    },
+    enabled: catalogOpen && catalogSearch.trim().length >= 2,
+  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -166,7 +214,7 @@ export default function CrmInstallWorksheet() {
       customerId: string;
       installSubtype: string;
       inputs: WorksheetInputs;
-      lines: Array<{ category: string; description: string; cost: number }>;
+      lines: Array<{ category: string; description: string; cost: number; customerVisible: boolean }>;
       assignedToId?: string | null;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-worksheet", data);
@@ -472,6 +520,12 @@ export default function CrmInstallWorksheet() {
       toast({ title: "No line items", description: "Add at least one line item before creating a quote", variant: "destructive" });
       return;
     }
+    // Customer + salesperson were picked in the New Quote setup — create
+    // straight away. The modal only appears when this page was opened cold.
+    if (selectedCustomer && assignedToId) {
+      handleCreateQuote();
+      return;
+    }
     setShowCustomerModal(true);
   };
 
@@ -489,6 +543,7 @@ export default function CrmInstallWorksheet() {
         category: l.category,
         description: l.description,
         cost: l.cost,
+        customerVisible: l.customerVisible,
       })),
       assignedToId: assignedToId || undefined,
     });
@@ -506,8 +561,24 @@ export default function CrmInstallWorksheet() {
         category: "equipment",
         description: "",
         cost: 0,
+        customerVisible: false,
       },
     ]);
+  };
+
+  const addLineFromCatalog = (item: { name: string; description: string | null; rate: string | null }) => {
+    setLines((prev) => [
+      ...prev,
+      {
+        id: `line-${Date.now()}`,
+        category: "equipment",
+        description: item.description ? `${item.name} — ${item.description}` : item.name,
+        cost: parseFloat(item.rate || "0") || 0,
+        customerVisible: false,
+      },
+    ]);
+    setCatalogOpen(false);
+    setCatalogSearch("");
   };
 
   const updateLine = (id: string, field: keyof LocalLine, value: string | number | boolean) => {
@@ -556,46 +627,50 @@ export default function CrmInstallWorksheet() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/crm/quotes")} data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
+        {/* Header: title left, centered mode tabs (same style as Inbox), action right */}
+        <div className="grid items-center gap-3 xl:grid-cols-[1fr_auto_1fr]">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={() => navigate("/crm/quotes")}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+              data-testid="button-back"
+              aria-label="Back to quotes"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="text-page-title">
                 Custom Pricing
               </h1>
-              <p className="text-slate-500 text-sm mt-1">
-                {pricingMode === "install" 
-                  ? "Calculate install pricing with labor, materials, and margins"
-                  : "Calculate service pricing with parts, labor, and warranty"}
-              </p>
+              {selectedCustomer ? (
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                  For <span className="font-semibold text-[#711419]">{selectedCustomer.name}</span>
+                  {assignedToId ? " · salesperson set" : ""}
+                </p>
+              ) : (
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {pricingMode === "install"
+                    ? "Install pricing with labor, materials, and margins"
+                    : "Service pricing with parts, labor, and warranty"}
+                </p>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Tabs value={pricingMode} onValueChange={(v) => setPricingMode(v as PricingMode)} className="w-auto">
-              <TabsList className="grid w-full grid-cols-2 h-10">
-                <TabsTrigger 
-                  value="install" 
-                  className="px-4 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
-                  data-testid="toggle-install-mode"
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  Install
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="service" 
-                  className="px-4 data-[state=active]:bg-[#711419] data-[state=active]:text-white"
-                  data-testid="toggle-service-mode"
-                >
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Service
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            {pricingMode === "install" && (
+          <div className="justify-self-center">
+            <IndustrialTabs
+              testidPrefix="pricing-mode"
+              activeKey={pricingMode}
+              onSelect={(k) => setPricingMode(k as PricingMode)}
+              tabs={[
+                { key: "install", label: "Install" },
+                { key: "service", label: "Service" },
+              ]}
+            />
+          </div>
+          <div className="justify-self-end">
+            {pricingMode === "install" ? (
               <Button
-                className="bg-[#d3b07d] hover:bg-[#c4a06e] text-white"
+                className="bg-[#711419] hover:bg-[#8a1a1f] text-white"
                 onClick={handleFinalizeClick}
                 disabled={isFinalizing || lines.length === 0}
                 data-testid="button-finalize"
@@ -603,10 +678,9 @@ export default function CrmInstallWorksheet() {
                 {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                 Finalize → Create Quote
               </Button>
-            )}
-            {pricingMode === "service" && (
+            ) : (
               <Button
-                className="bg-[#711419] hover:bg-[#8a1a20] text-white"
+                className="bg-[#711419] hover:bg-[#8a1a1f] text-white"
                 onClick={handleServiceFinalizeClick}
                 disabled={saveServiceQuoteMutation.isPending || serviceParts.length === 0}
                 data-testid="button-finalize-service"
@@ -755,12 +829,61 @@ export default function CrmInstallWorksheet() {
 
           <Card className="lg:col-span-2">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">Line Items</CardTitle>
-                <Button variant="outline" size="sm" onClick={addLine} data-testid="button-add-line">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Line
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Popover open={catalogOpen} onOpenChange={setCatalogOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-add-from-catalog">
+                        <BookOpen className="h-4 w-4 mr-1" />
+                        From catalog
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-80 p-2">
+                      <div className="relative mb-2">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          autoFocus
+                          value={catalogSearch}
+                          onChange={(e) => setCatalogSearch(e.target.value)}
+                          placeholder="Search the items catalog…"
+                          className="h-8 pl-8 text-sm"
+                          data-testid="catalog-search-input"
+                        />
+                      </div>
+                      {catalogSearch.trim().length < 2 ? (
+                        <p className="py-4 text-center text-xs text-slate-400">Type at least 2 characters.</p>
+                      ) : catalogLoading ? (
+                        <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
+                      ) : catalogItems.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-slate-400">No catalog items match.</p>
+                      ) : (
+                        <div className="max-h-64 overflow-y-auto">
+                          {catalogItems.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => addLineFromCatalog(item)}
+                              className="flex w-full items-center justify-between gap-2 rounded-[3px] px-2 py-2 text-left hover:bg-slate-50"
+                              data-testid={`catalog-item-${item.id}`}
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium text-slate-800">{item.name}</span>
+                                {item.description && <span className="block truncate text-xs text-slate-500">{item.description}</span>}
+                              </span>
+                              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">
+                                ${parseFloat(item.rate || "0").toFixed(2)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="outline" size="sm" onClick={addLine} data-testid="button-add-line">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Line
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -779,14 +902,14 @@ export default function CrmInstallWorksheet() {
                         {group.items.map((line) => (
                           <div
                             key={line.id}
-                            className="flex items-center gap-2 p-2 bg-slate-50 rounded-md"
+                            className="flex items-start gap-2 rounded-[4px] border border-slate-300/70 bg-white p-2"
                             data-testid={`line-item-${line.id}`}
                           >
                             <Select
                               value={line.category}
                               onValueChange={(v) => updateLine(line.id, "category", v)}
                             >
-                              <SelectTrigger className="w-32" data-testid={`select-category-${line.id}`}>
+                              <SelectTrigger className="w-32 shrink-0" data-testid={`select-category-${line.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -797,11 +920,13 @@ export default function CrmInstallWorksheet() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Input
+                            {/* Grows as you type — long descriptions are welcome */}
+                            <Textarea
                               placeholder="Description"
                               value={line.description}
                               onChange={(e) => updateLine(line.id, "description", e.target.value)}
-                              className="flex-1"
+                              rows={1}
+                              className="min-h-[40px] flex-1 resize-y text-sm"
                               data-testid={`input-description-${line.id}`}
                             />
                             <Input
@@ -811,73 +936,38 @@ export default function CrmInstallWorksheet() {
                               placeholder="Cost"
                               value={line.cost || ""}
                               onChange={(e) => updateLine(line.id, "cost", parseFloat(e.target.value) || 0)}
-                              className="w-28"
+                              className="w-28 shrink-0"
                               data-testid={`input-cost-${line.id}`}
                             />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeLine(line.id)}
-                              data-testid={`button-delete-${line.id}`}
+                            <button
+                              onClick={() => updateLine(line.id, "customerVisible", !line.customerVisible)}
+                              className={`mt-1.5 shrink-0 rounded p-1.5 transition-colors ${
+                                line.customerVisible
+                                  ? "bg-[#711419]/10 text-[#711419]"
+                                  : "text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                              }`}
+                              title={line.customerVisible ? "Customer SEES this line on the quote" : "Internal only — hidden from the customer"}
+                              data-testid={`toggle-visible-${line.id}`}
                             >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
+                              {line.customerVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                            </button>
+                            <button
+                              onClick={() => removeLine(line.id)}
+                              className="mt-1.5 shrink-0 rounded p-1.5 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                              data-testid={`button-delete-${line.id}`}
+                              title="Remove line"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         ))}
                       </div>
                     </div>
                   ))}
-
-                  {lines.length > 0 && linesByCategory.length === 0 && (
-                    lines.map((line) => (
-                      <div
-                        key={line.id}
-                        className="flex items-center gap-2 p-2 bg-slate-50 rounded-md"
-                        data-testid={`line-item-${line.id}`}
-                      >
-                        <Select
-                          value={line.category}
-                          onValueChange={(v) => updateLine(line.id, "category", v)}
-                        >
-                          <SelectTrigger className="w-32" data-testid={`select-category-${line.id}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {LINE_CATEGORIES.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          placeholder="Description"
-                          value={line.description}
-                          onChange={(e) => updateLine(line.id, "description", e.target.value)}
-                          className="flex-1"
-                          data-testid={`input-description-${line.id}`}
-                        />
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Cost"
-                          value={line.cost || ""}
-                          onChange={(e) => updateLine(line.id, "cost", parseFloat(e.target.value) || 0)}
-                          className="w-28"
-                          data-testid={`input-cost-${line.id}`}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeLine(line.id)}
-                          data-testid={`button-delete-${line.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <EyeOff className="h-3.5 w-3.5" />
+                    Lines are internal costs by default — toggle the eye on any line the customer should see on their quote.
+                  </p>
                 </div>
               )}
             </CardContent>

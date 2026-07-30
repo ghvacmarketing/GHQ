@@ -20919,9 +20919,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const line of lines) {
         const cost = line.cost || 0;
         if (cost === 0) continue; // Skip zero-cost items
-        
+
         equipmentSubtotal += cost;
-        
+
         await db.insert(crmQuoteLineItems).values({
           quoteId: newQuote.id,
           lineType: "part",
@@ -20930,6 +20930,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: "1",
           lineTotal: cost.toString(),
           sortOrder: sortOrder++,
+          // Worksheet lines are internal costs — hidden from the customer
+          // unless the user explicitly toggled "customer sees this".
+          customerVisible: line.customerVisible === true,
         });
       }
 
@@ -20945,6 +20948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: "1",
           lineTotal: laborTotal.toString(),
           sortOrder: sortOrder++,
+          customerVisible: false,
         });
       }
 
@@ -20958,6 +20962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: "1",
           lineTotal: inputs.warrantyReserveDollar.toString(),
           sortOrder: sortOrder++,
+          customerVisible: false,
         });
       }
 
@@ -21232,6 +21237,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/quotes/quick - Create standalone quick quote
+  // PATCH /api/crm/quotes/:quoteId/line-items/:lineItemId — toggle whether a
+  // line shows on customer-facing surfaces (public view, emails). Lets the
+  // office flip visibility after the quote exists.
+  app.patch("/api/crm/quotes/:quoteId/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { quoteId, lineItemId } = req.params;
+      if (typeof req.body?.customerVisible !== "boolean") {
+        return res.status(400).json({ message: "customerVisible (boolean) is required" });
+      }
+      const [row] = await db
+        .update(crmQuoteLineItems)
+        .set({ customerVisible: req.body.customerVisible })
+        .where(and(eq(crmQuoteLineItems.id, lineItemId), eq(crmQuoteLineItems.quoteId, quoteId)))
+        .returning({ id: crmQuoteLineItems.id, customerVisible: crmQuoteLineItems.customerVisible });
+      if (!row) return res.status(404).json({ message: "Line item not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Error updating line item visibility:", error);
+      res.status(500).json({ message: "Error updating line item" });
+    }
+  });
+
   app.post("/api/crm/quotes/quick", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -25867,9 +25894,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       
       console.log(`[QuoteView] Quote ${quote.quoteNumber} viewed (view #${currentViewCount + 1})`);
 
-      const lineItems = await db.select().from(crmQuoteLineItems)
+      const allLineItems = await db.select().from(crmQuoteLineItems)
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
         .orderBy(crmQuoteLineItems.sortOrder);
+      // Customer-facing view: only lines flagged visible. Internal cost lines
+      // (worksheet labor/materials at cost) never reach the customer.
+      const lineItems = allLineItems.filter((li) => li.customerVisible !== false);
 
       // Fetch deposit percentage from settings
       let depositPercentage = 50; // default

@@ -115,9 +115,10 @@ export async function buildQuoteEmailContent(
   sentBy?: string,
   options?: { quoteViewUrl?: string }
 ): Promise<{ subject: string; html: string; text: string }> {
-  // Filter out labor/internal line items from client-facing email
+  // Filter out labor/internal line items from client-facing email — and
+  // anything explicitly flagged not customer-visible (worksheet cost lines).
   const clientVisibleItems = lineItems.filter(item =>
-    item.lineType !== "labor" && item.lineType !== "other"
+    item.lineType !== "labor" && item.lineType !== "other" && item.customerVisible !== false
   );
 
   // Calculate quote total for placeholder replacement

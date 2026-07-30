@@ -69,6 +69,7 @@ import {
   Pencil,
   FolderKanban,
   Eye,
+  EyeOff,
   Package,
   Search,
   Tag,
@@ -797,6 +798,18 @@ export default function CrmQuoteDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to add line item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Toggle whether a line shows on the customer's copy (public view + emails).
+  const toggleLineVisibilityMutation = useMutation({
+    mutationFn: async ({ lineItemId, customerVisible }: { lineItemId: string; customerVisible: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/crm/quotes/${quoteId}/line-items/${lineItemId}`, { customerVisible });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] }),
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update visibility", variant: "destructive" });
     },
   });
 
@@ -3170,6 +3183,19 @@ export default function CrmQuoteDetail() {
                           {canEditLineItems && (
                             <TableCell>
                               <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => toggleLineVisibilityMutation.mutate({ lineItemId: item.id, customerVisible: (item as any).customerVisible === false })}
+                                  disabled={toggleLineVisibilityMutation.isPending}
+                                  title={(item as any).customerVisible === false ? "Hidden from the customer — click to show" : "Customer sees this line — click to hide"}
+                                  data-testid={`button-toggle-visible-${item.id}`}
+                                >
+                                  {(item as any).customerVisible === false
+                                    ? <EyeOff className="h-4 w-4 text-slate-400 hover:text-[#711419]" />
+                                    : <Eye className="h-4 w-4 text-[#711419]" />}
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"

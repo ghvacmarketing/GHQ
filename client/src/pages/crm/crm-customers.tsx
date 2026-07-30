@@ -32,10 +32,15 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  Filter,
   Plus,
   FolderOpen,
   CornerDownRight,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { EmptyState } from "@/components/crm/ui-kit";
 import { QuickAddCustomerDialog } from "@/components/crm/quick-add-customer-dialog";
@@ -423,32 +428,18 @@ export default function CrmCustomers() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Title + subheading · centered search · action — all on one row */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-          <div className="min-w-0 shrink-0">
+        {/* Title left · action right — search moved down beside the filter */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground truncate" data-testid="text-customers-title">
               Customers
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Manage customer accounts, contacts, and history</p>
           </div>
-
-          <div className="relative w-full lg:flex-1 lg:max-w-md lg:mx-auto">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search customers…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-              data-testid="input-search"
-            />
-          </div>
-
-          <div className="shrink-0">
-            <Button size="sm" onClick={() => setQuickAddOpen(true)} data-testid="button-create-customer">
-              <Plus className="h-4 w-4 mr-1" />
-              New Customer
-            </Button>
-          </div>
+          <Button size="sm" onClick={() => setQuickAddOpen(true)} data-testid="button-create-customer">
+            <Plus className="h-4 w-4 mr-1" />
+            New Customer
+          </Button>
         </div>
 
         <QuickAddCustomerDialog
@@ -459,27 +450,15 @@ export default function CrmCustomers() {
 
         {/* Industrial segmented tabs — the experimental house tab structure */}
         {(() => {
+          // Status tabs and the popover filters are independent now — picking
+          // a tab no longer wipes type/role/agreement filters.
           const activeTabKey =
-            sourceFilter !== "all" ? "" :
-            accountRole === "parent" ? "parent" :
-            accountRole === "sub" ? "sub" :
-            hasAgreement ? "agreements" :
-            customerType === "Residential" ? "residential" :
-            customerType === "Commercial" ? "commercial" :
-            customerType === "Property Manager" ? "pm" :
             statusTab === "prospects" ? "prospects" :
             statusTab === "customers" ? "customers" : "all";
           const selectTab = (key: string) => {
-            setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all");
-            if (key === "prospects") setStatusTab("prospects");
-            else if (key === "customers") setStatusTab("customers");
-            else if (key === "residential") setCustomerType("Residential");
-            else if (key === "commercial") setCustomerType("Commercial");
-            else if (key === "pm") setCustomerType("Property Manager");
-            else if (key === "agreements") setHasAgreement(true);
-            else if (key === "parent") setAccountRole("parent");
-            else if (key === "sub") setAccountRole("sub");
+            setStatusTab(key === "prospects" ? "prospects" : key === "customers" ? "customers" : "all");
           };
+          const filtersActive = customerType !== "all" || hasAgreement || accountRole !== "all";
           return (
             <div className="flex flex-wrap items-center gap-2">
               <IndustrialTabs
@@ -492,26 +471,82 @@ export default function CrmCustomers() {
                   { key: "customers", label: "Customers", count: statsData?.customers?.toLocaleString() || 0 },
                 ]}
               />
-              <IndustrialTabs
-                testidPrefix="tab-type"
-                activeKey={activeTabKey}
-                onSelect={selectTab}
-                tabs={[
-                  { key: "residential", label: "Residential" },
-                  { key: "commercial", label: "Commercial" },
-                  { key: "pm", label: "Property Manager" },
-                ]}
-              />
-              <IndustrialTabs
-                testidPrefix="tab-extra"
-                activeKey={activeTabKey}
-                onSelect={selectTab}
-                tabs={[
-                  { key: "agreements", label: "Agreements", count: statsData?.withAgreements?.toLocaleString() || 0 },
-                  { key: "parent", label: "Parent Accounts" },
-                  { key: "sub", label: "Sub Accounts" },
-                ]}
-              />
+              {/* Search + condensed filter, right-aligned — same pattern as the rest of the CRM */}
+              <div className="ml-auto flex items-center gap-2">
+                <div className="relative w-56 sm:w-64">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search customers…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                    data-testid="input-search"
+                  />
+                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={`relative flex h-9 w-9 items-center justify-center rounded-[4px] border transition-colors ${
+                        filtersActive
+                          ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
+                          : "border-slate-300/70 bg-white text-slate-500 hover:border-[#711419] hover:text-[#711419]"
+                      }`}
+                      title="Filters"
+                      data-testid="customers-filter-open"
+                    >
+                      <Filter className="h-4 w-4" />
+                      {filtersActive && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-64 space-y-3">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer type</p>
+                      <Select value={customerType} onValueChange={setCustomerType}>
+                        <SelectTrigger className="h-9" data-testid="customers-filter-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All types</SelectItem>
+                          <SelectItem value="Residential">Residential</SelectItem>
+                          <SelectItem value="Commercial">Commercial</SelectItem>
+                          <SelectItem value="Property Manager">Property Manager</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Account role</p>
+                      <Select value={accountRole} onValueChange={(v) => setAccountRole(v as typeof accountRole)}>
+                        <SelectTrigger className="h-9" data-testid="customers-filter-role"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All accounts</SelectItem>
+                          <SelectItem value="parent">Parent accounts</SelectItem>
+                          <SelectItem value="sub">Sub accounts</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={hasAgreement}
+                        onChange={(e) => setHasAgreement(e.target.checked)}
+                        className="h-4 w-4 accent-[#711419]"
+                        data-testid="customers-filter-agreements"
+                      />
+                      Has an active agreement
+                      {statsData?.withAgreements != null && (
+                        <span className="ml-auto text-xs text-slate-400">{statsData.withAgreements.toLocaleString()}</span>
+                      )}
+                    </label>
+                    {filtersActive && (
+                      <button
+                        onClick={() => { setCustomerType("all"); setHasAgreement(false); setAccountRole("all"); }}
+                        className="text-xs font-semibold text-[#711419] hover:underline"
+                        data-testid="customers-filter-clear"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           );
         })()}

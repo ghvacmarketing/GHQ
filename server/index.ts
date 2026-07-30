@@ -285,6 +285,22 @@ async function runInstallPlannerMigrations() {
     // Govee per-sensor calibration offsets (match the Govee app's calibrated values).
     await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS temp_offset_f numeric(5,2) NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS humidity_offset numeric(5,2) NOT NULL DEFAULT 0`);
+    // Per-line customer visibility on quotes. One-time backfill INSIDE the
+    // column-added guard: existing worksheet (custom_install) quotes stored
+    // raw internal costs as line items — hide them all from customer-facing
+    // surfaces. Guarded so later boots never overwrite user toggles.
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'crm_quote_line_items' AND column_name = 'customer_visible'
+        ) THEN
+          ALTER TABLE crm_quote_line_items ADD COLUMN customer_visible boolean DEFAULT true;
+          UPDATE crm_quote_line_items SET customer_visible = false
+            WHERE quote_id IN (SELECT id FROM crm_quotes WHERE quote_type = 'custom_install');
+        END IF;
+      END $$;
+    `);
   } catch (err) {
     console.error("Install planner migration error (non-fatal):", err);
   }

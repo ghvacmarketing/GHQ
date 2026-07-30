@@ -168,6 +168,7 @@ export default function CrmTasksSimple() {
       setNewTitle("");
       setNewDue("");
       invalidate();
+      toast({ title: "Task added" });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't add the task", variant: "destructive" }),
   });
@@ -177,26 +178,67 @@ export default function CrmTasksSimple() {
       apiRequest("PUT", `/api/tasks/${t.id}`, {
         status: t.status === "completed" ? "pending" : "completed",
       }),
-    onSuccess: invalidate,
+    onSuccess: (_data, t) => {
+      invalidate();
+      toast({ title: t.status === "completed" ? "Task reopened" : "Task completed" });
+    },
     onError: (e: any) => toast({ title: e?.message || "Couldn't update the task", variant: "destructive" }),
   });
 
   const deleteTask = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/tasks/${id}`),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Task deleted" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't delete the task", variant: "destructive" }),
   });
 
   const updateTask = useMutation({
     mutationFn: async ({ id, ...body }: { id: string } & Record<string, unknown>) =>
       apiRequest("PUT", `/api/tasks/${id}`, body),
-    onSuccess: invalidate,
+    onSuccess: (_data, vars) => {
+      invalidate();
+      const field = Object.keys(vars).find((k) => k !== "id");
+      const label =
+        field === "title" ? "Title saved"
+        : field === "description" ? "Notes saved"
+        : field === "dueAt" ? "Due date updated"
+        : field === "assignedToUserId" ? "Assignee updated"
+        : field === "priority" ? "Priority updated"
+        : "Task updated";
+      toast({ title: label });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't update the task", variant: "destructive" }),
   });
 
   // ── Detail panel (Asana-style): every field editable + subtasks ──
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Two-phase visibility so the slide-over eases in AND out (a bare unmount
+  // would snap shut with no exit animation).
+  const [panelVisible, setPanelVisible] = useState(false);
+  useEffect(() => {
+    if (detailId) {
+      const raf = requestAnimationFrame(() => requestAnimationFrame(() => setPanelVisible(true)));
+      return () => cancelAnimationFrame(raf);
+    }
+    setPanelVisible(false);
+  }, [detailId]);
+  const closePanel = () => {
+    setPanelVisible(false);
+    window.setTimeout(() => setDetailId(null), 300);
+  };
   const detailTask = tasks.find((t) => t.id === detailId) || null;
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
+  // Tasks expanded in the LIST to show their subtasks indented underneath.
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpandedTasks((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
   useEffect(() => {
     const t = detailId ? tasks.find((x) => x.id === detailId) : null;
     setDraftTitle(t?.title ?? "");
@@ -208,10 +250,11 @@ export default function CrmTasksSimple() {
   useEffect(() => {
     if (!detailId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDetailId(null);
+      if (e.key === "Escape") closePanel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailId]);
 
   // Subtask progress for the list rows ("2/3" chips) — one grouped query.
@@ -243,17 +286,33 @@ export default function CrmTasksSimple() {
     onSuccess: () => {
       setNewSubtask("");
       invalidate();
+      toast({ title: "Subtask added" });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't add the subtask", variant: "destructive" }),
   });
+  // taskId rides along so BOTH the panel and the expanded list rows can
+  // check off / rename subtasks.
   const patchSubtask = useMutation({
-    mutationFn: async ({ id, ...body }: { id: string } & Record<string, unknown>) =>
-      apiRequest("PUT", `/api/tasks/${detailId}/subtasks/${id}`, body),
-    onSuccess: invalidate,
+    mutationFn: async ({ taskId, id, ...body }: { taskId: string; id: string } & Record<string, unknown>) =>
+      apiRequest("PUT", `/api/tasks/${taskId}/subtasks/${id}`, body),
+    onSuccess: (_data, vars) => {
+      invalidate();
+      toast({
+        title:
+          typeof vars.isCompleted === "boolean"
+            ? vars.isCompleted ? "Subtask completed" : "Subtask reopened"
+            : "Subtask renamed",
+      });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't update the subtask", variant: "destructive" }),
   });
   const removeSubtask = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/tasks/${detailId}/subtasks/${id}`),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Subtask deleted" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't delete the subtask", variant: "destructive" }),
   });
 
   if (!currentUser) return null;
@@ -266,7 +325,20 @@ export default function CrmTasksSimple() {
     const assignee = userName(t.assignedToUserId);
     const counts = subCounts.get(t.id);
     const priority = (t.priority || "normal") as string;
+    const isExpanded = expandedTasks.has(t.id);
+    // Same cache key as the detail panel, so expanding is instant after
+    // either has loaded once.
+    const { data: rowSubtasks = [] } = useQuery<Array<{ id: string; title: string; isCompleted: boolean }>>({
+      queryKey: ["/api/tasks", t.id, "subtasks"],
+      queryFn: async () => {
+        const res = await fetch(`/api/tasks/${t.id}/subtasks`, { credentials: "include" });
+        if (!res.ok) return [];
+        return res.json();
+      },
+      enabled: isExpanded,
+    });
     return (
+      <>
       <div className="group flex items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-0 hover:bg-slate-50" data-testid={`task-${t.id}`}>
         <button
           onClick={() => toggleTask.mutate(t)}
@@ -293,12 +365,6 @@ export default function CrmTasksSimple() {
                 {format(new Date(t.dueAt), "EEE, MMM d")}
               </span>
             )}
-            {counts && counts.total > 0 && (
-              <span className={`flex items-center gap-1 text-[11px] ${counts.done === counts.total ? "text-emerald-600" : "text-slate-400"}`} data-testid={`task-subtask-chip-${t.id}`}>
-                <ListChecks className="h-3 w-3" />
-                {counts.done}/{counts.total}
-              </span>
-            )}
             {priority !== "normal" && !completed && (
               <span className={`flex items-center gap-1 text-[11px] font-semibold ${priority === "high" ? "text-red-600" : "text-slate-400"}`}>
                 <Flag className="h-3 w-3" />
@@ -310,6 +376,20 @@ export default function CrmTasksSimple() {
             )}
           </div>
         </button>
+        {counts && counts.total > 0 && (
+          <button
+            onClick={() => toggleExpanded(t.id)}
+            className={`mt-0.5 flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${
+              counts.done === counts.total ? "text-emerald-600 hover:bg-emerald-50" : "text-slate-500 hover:bg-slate-100"
+            }`}
+            title={isExpanded ? "Hide subtasks" : "Show subtasks"}
+            data-testid={`task-subtask-chip-${t.id}`}
+          >
+            <ListChecks className="h-3.5 w-3.5" />
+            {counts.done}/{counts.total}
+            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </button>
+        )}
         <button
           onClick={() => deleteTask.mutate(t.id)}
           className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
@@ -319,6 +399,29 @@ export default function CrmTasksSimple() {
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
+      {/* Subtasks, indented under their parent — check off right from the list */}
+      {isExpanded && rowSubtasks.length > 0 && (
+        <div className="border-b border-slate-100 bg-slate-50/60 py-1 last:border-0" data-testid={`task-subtasks-${t.id}`}>
+          {rowSubtasks.map((s) => (
+            <div key={s.id} className="flex items-center gap-2.5 py-1.5 pl-12 pr-4">
+              <button
+                onClick={() => patchSubtask.mutate({ taskId: t.id, id: s.id, isCompleted: !s.isCompleted })}
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                  s.isCompleted ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419]"
+                }`}
+                aria-label={s.isCompleted ? "Mark incomplete" : "Mark complete"}
+                data-testid={`row-subtask-toggle-${s.id}`}
+              >
+                <Check className="h-2.5 w-2.5" strokeWidth={3} />
+              </button>
+              <span className={`min-w-0 flex-1 truncate text-[13px] ${s.isCompleted ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                {s.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      </>
     );
   };
 
@@ -334,7 +437,11 @@ export default function CrmTasksSimple() {
           <div className="min-w-0">
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Activity</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {scope === "notifications" ? "Everything that needs your attention" : scope === "comments" ? "Open pin comments across the CRM" : `${open.length} open${done.length ? ` · ${done.length} done` : ""}`}
+              {scope === "notifications"
+                ? `${notifCount?.count ?? 0} unread`
+                : scope === "comments"
+                  ? `${allPins.length} open`
+                  : `${open.length} open${done.length ? ` · ${done.length} done` : ""}`}
             </p>
           </div>
           <div className="justify-self-center">
@@ -411,7 +518,7 @@ export default function CrmTasksSimple() {
 
         {/* Quick add */}
         {(scope === "mine" || scope === "everyone") && (
-        <div className="flex items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-3 py-2" data-testid="task-add-bar">
+        <div className="flex items-center gap-2.5 rounded-[4px] border border-slate-300/70 bg-white py-2 pl-4 pr-3" data-testid="task-add-bar">
           <Plus className="h-4 w-4 shrink-0 text-[#711419]" />
           <Input
             value={newTitle}
@@ -476,9 +583,15 @@ export default function CrmTasksSimple() {
           place — title, notes, due, assignee, priority — plus subtasks. ── */}
       {detailTask && (
         <>
-          <div className="fixed inset-0 z-[60] bg-black/20" onClick={() => setDetailId(null)} data-testid="task-detail-backdrop" />
+          <div
+            className={`fixed inset-0 z-[60] bg-black/20 transition-opacity duration-300 ${panelVisible ? "opacity-100" : "opacity-0"}`}
+            onClick={closePanel}
+            data-testid="task-detail-backdrop"
+          />
           <aside
-            className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-md flex-col border-l border-slate-300/70 bg-white shadow-2xl animate-in slide-in-from-right duration-200"
+            className={`fixed inset-y-0 right-0 z-[61] flex w-full max-w-md transform flex-col border-l border-slate-300/70 bg-white shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+              panelVisible ? "translate-x-0" : "translate-x-full"
+            }`}
             data-testid="task-detail-panel"
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3">
@@ -498,7 +611,7 @@ export default function CrmTasksSimple() {
                 <button
                   onClick={() => {
                     deleteTask.mutate(detailTask.id);
-                    setDetailId(null);
+                    closePanel();
                   }}
                   className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                   title="Delete task"
@@ -507,7 +620,7 @@ export default function CrmTasksSimple() {
                   <Trash2 className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setDetailId(null)}
+                  onClick={closePanel}
                   className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                   aria-label="Close"
                   data-testid="task-detail-close"
@@ -611,7 +724,7 @@ export default function CrmTasksSimple() {
                     {subtasks.map((s) => (
                       <div key={s.id} className="group flex items-center gap-2.5 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50" data-testid={`subtask-${s.id}`}>
                         <button
-                          onClick={() => patchSubtask.mutate({ id: s.id, isCompleted: !s.isCompleted })}
+                          onClick={() => patchSubtask.mutate({ taskId: detailTask.id, id: s.id, isCompleted: !s.isCompleted })}
                           className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                             s.isCompleted ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419]"
                           }`}
@@ -626,7 +739,7 @@ export default function CrmTasksSimple() {
                           defaultValue={s.title}
                           onBlur={(e) => {
                             const v = e.target.value.trim();
-                            if (v && v !== s.title) patchSubtask.mutate({ id: s.id, title: v });
+                            if (v && v !== s.title) patchSubtask.mutate({ taskId: detailTask.id, id: s.id, title: v });
                           }}
                           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                           className={`min-w-0 flex-1 border-0 bg-transparent p-0 text-sm focus:outline-none ${

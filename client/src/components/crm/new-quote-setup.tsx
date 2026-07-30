@@ -1,6 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +31,9 @@ import {
   Check,
   FileText,
   Loader2,
+  Plus,
   Search,
+  Trash2,
   Zap,
 } from "lucide-react";
 
@@ -62,15 +67,24 @@ export type NewQuoteSetupInitial = {
   lead?: boolean;
 };
 
+type QuickLine = { id: string; description: string; quantity: number; unitPrice: number };
+
 export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; onOpenChange: (o: boolean) => void; initial?: NewQuoteSetupInitial }) {
   const [, navigate] = useLocation();
-  const [step, setStep] = useState<"type" | "details">("type");
+  const { toast } = useToast();
+  const [step, setStep] = useState<"type" | "details" | "build">("type");
   const [kind, setKind] = useState<QuoteKind | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customer, setCustomer] = useState<CustomerLite | null>(null);
   const [propertyId, setPropertyId] = useState<string>("none");
   const [linkValue, setLinkValue] = useState<string>("none"); // none | lead | wo:<id> | pr:<id>
   const [assigneeId, setAssigneeId] = useState<string>("");
+  // Quick-quote build step (replaces the old wizard page): title, description,
+  // and line items right here in the dialog.
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickDescription, setQuickDescription] = useState("");
+  const [quickLines, setQuickLines] = useState<QuickLine[]>([]);
+  const [creating, setCreating] = useState(false);
 
   // Fresh dialog every open, seeded with whatever context the launcher had
   useEffect(() => {
@@ -87,6 +101,10 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
           : "none",
       );
       setAssigneeId("");
+      setQuickTitle("");
+      setQuickDescription("");
+      setQuickLines([{ id: `ql-${Date.now()}`, description: "", quantity: 1, unitPrice: 0 }]);
+      setCreating(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -156,6 +174,11 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
 
   const launch = () => {
     if (!kind || !customer || !assigneeId) return;
+    // Quick quotes build right here in the dialog — no wizard page.
+    if (kind === "quick") {
+      setStep("build");
+      return;
+    }
     const params = new URLSearchParams({ setup: "1", assignedToId: assigneeId });
     if (propertyId && propertyId !== "none") params.set("propertyId", propertyId);
     if (linkValue.startsWith("wo:")) params.set("workOrderId", linkValue.slice(3));
@@ -165,13 +188,44 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
     onOpenChange(false);
     if (kind === "proposal") {
       navigate(`/crm/quotes/proposal/${customer.id}?${params.toString()}`);
-    } else if (kind === "worksheet") {
-      params.set("customerId", customer.id);
-      navigate(`/crm/quotes/install-worksheet/new?${params.toString()}`);
     } else {
       params.set("customerId", customer.id);
-      params.set("quoteType", "quick");
-      navigate(`/crm/quotes/new?${params.toString()}`);
+      navigate(`/crm/quotes/install-worksheet/new?${params.toString()}`);
+    }
+  };
+
+  const quickTotal = quickLines.reduce((s, l) => s + (l.quantity || 0) * (l.unitPrice || 0), 0);
+  const validQuickLines = quickLines.filter((l) => l.description.trim() && l.unitPrice > 0);
+
+  const createQuickQuote = async () => {
+    if (!customer || !assigneeId || validQuickLines.length === 0 || creating) return;
+    setCreating(true);
+    try {
+      const res = await apiRequest("POST", "/api/crm/quotes/quick", {
+        customerId: customer.id,
+        title: quickTitle.trim() || "Quick Quote",
+        description: quickDescription.trim() || undefined,
+        propertyId: propertyId !== "none" ? propertyId : undefined,
+        workOrderId: linkValue.startsWith("wo:") ? linkValue.slice(3) : undefined,
+        projectId: linkValue.startsWith("pr:") ? linkValue.slice(3) : undefined,
+        sourceType: linkValue === "lead" ? "lead" : undefined,
+        assignedToId: assigneeId,
+        lineItems: validQuickLines.map((l) => ({
+          description: l.description.trim(),
+          quantity: l.quantity || 1,
+          unitPrice: l.unitPrice,
+          taxable: true,
+          lineType: "part",
+        })),
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      onOpenChange(false);
+      navigate(`/crm/quotes/${data.quoteId || data.quote?.id}`);
+    } catch (e: any) {
+      toast({ title: e?.message || "Couldn't create the quote", variant: "destructive" });
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -209,7 +263,7 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
               })}
             </div>
           </>
-        ) : (
+        ) : step === "details" ? (
           <>
             <DialogHeader>
               <DialogTitle>{kindLabel}</DialogTitle>
@@ -373,7 +427,107 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
                 onClick={launch}
                 data-testid="quote-setup-launch"
               >
-                <Check className="mr-1.5 h-4 w-4" /> Open {kindLabel}
+                {kind === "quick" ? <ArrowRight className="mr-1.5 h-4 w-4" /> : <Check className="mr-1.5 h-4 w-4" />}
+                {kind === "quick" ? "Next — line items" : `Open ${kindLabel}`}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Quick Quote{customer ? ` — ${customer.name}` : ""}</DialogTitle>
+              <DialogDescription>Title, description, and the line items the customer will see.</DialogDescription>
+            </DialogHeader>
+
+            <div className="-mx-1 max-h-[60vh] space-y-4 overflow-y-auto px-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Title</Label>
+                <Input
+                  autoFocus
+                  value={quickTitle}
+                  onChange={(e) => setQuickTitle(e.target.value)}
+                  placeholder="e.g. Capacitor replacement"
+                  data-testid="quick-quote-title"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Description (optional)</Label>
+                <Textarea
+                  value={quickDescription}
+                  onChange={(e) => setQuickDescription(e.target.value)}
+                  placeholder="What this quote covers…"
+                  rows={2}
+                  className="resize-y"
+                  data-testid="quick-quote-description"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Line items</Label>
+                <div className="space-y-2">
+                  {quickLines.map((l) => (
+                    <div key={l.id} className="flex items-start gap-2" data-testid={`quick-line-${l.id}`}>
+                      <Textarea
+                        value={l.description}
+                        onChange={(e) => setQuickLines((prev) => prev.map((x) => (x.id === l.id ? { ...x, description: e.target.value } : x)))}
+                        placeholder="Description"
+                        rows={1}
+                        className="min-h-[38px] flex-1 resize-y text-sm"
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={l.quantity}
+                        onChange={(e) => setQuickLines((prev) => prev.map((x) => (x.id === l.id ? { ...x, quantity: parseFloat(e.target.value) || 1 } : x)))}
+                        className="w-16 shrink-0"
+                        title="Quantity"
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={l.unitPrice || ""}
+                        onChange={(e) => setQuickLines((prev) => prev.map((x) => (x.id === l.id ? { ...x, unitPrice: parseFloat(e.target.value) || 0 } : x)))}
+                        placeholder="Price"
+                        className="w-24 shrink-0"
+                        title="Unit price"
+                      />
+                      <button
+                        onClick={() => setQuickLines((prev) => prev.filter((x) => x.id !== l.id))}
+                        className="mt-2 shrink-0 rounded p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                        title="Remove line"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setQuickLines((prev) => [...prev, { id: `ql-${Date.now()}`, description: "", quantity: 1, unitPrice: 0 }])}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-[#711419] hover:underline"
+                  data-testid="quick-quote-add-line"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add line
+                </button>
+              </div>
+              <p className="text-right text-sm font-semibold text-slate-800">
+                Total <span className="tabular-nums text-[#711419]">${quickTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-200/80 pt-3">
+              <Button variant="outline" size="sm" onClick={() => setStep("details")} data-testid="quick-quote-back">
+                <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[#711419] hover:bg-[#8a1a1f]"
+                disabled={validQuickLines.length === 0 || creating}
+                onClick={createQuickQuote}
+                data-testid="quick-quote-create"
+              >
+                {creating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
+                Create Quote
               </Button>
             </div>
           </>

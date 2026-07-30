@@ -1629,6 +1629,10 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   discountKind: text("discount_kind").$type<DiscountKind>(),
   optionTag: text("option_tag"),
   imageUrl: text("image_url"),
+  // Shown on customer-facing surfaces (public quote view, quote emails)?
+  // Worksheet cost lines (labor, materials at cost) default to hidden —
+  // they're backend pricing, not what the customer is quoted.
+  customerVisible: boolean("customer_visible").default(true),
   // QuickBooks sub-account override - if null, calculated from item category + property type
   quickbooksSubAccountId: varchar("quickbooks_sub_account_id"),
   createdAt: timestamp("created_at").defaultNow(),
