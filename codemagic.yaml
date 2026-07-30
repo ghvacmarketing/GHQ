@@ -1,0 +1,50 @@
+# Codemagic CI — builds the iOS shell on a cloud Mac and ships it to TestFlight.
+#
+# One-time setup in the Codemagic UI (no secrets live in this file):
+#   1. Add this repo as an application (GitHub integration).
+#   2. Team settings -> Integrations -> Developer Portal -> add the App Store
+#      Connect API key: name it exactly "Codemagic" (matches integrations
+#      below), Issuer ID a6c12d1a-f526-41d8-9480-0d76904a6db7, Key ID
+#      5VG22AT57Q, upload AuthKey_5VG22AT57Q.p8.
+#   3. Start the "ios-testflight" workflow. Signing certs + profiles are
+#      created/managed automatically from that API key (Team 47JHV3522G).
+workflows:
+  ios-testflight:
+    name: iOS — TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.ghvac.tools
+      node: 22.16.0
+      xcode: latest
+      vars:
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+    triggering:
+      events: []   # manual builds only for now — start from the Codemagic UI
+    scripts:
+      - name: Install npm dependencies
+        script: npm ci
+      - name: Build web assets
+        script: npm run build
+      - name: Capacitor sync
+        script: npx cap sync ios
+      - name: Use signing profiles
+        script: xcode-project use-profiles
+      - name: Stamp build number
+        script: |
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Build IPA
+        script: xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

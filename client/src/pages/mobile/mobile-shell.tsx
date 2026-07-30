@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { useNativePush } from "@/lib/native";
 
 // The AI assistant popup — loaded on first open, then kept mounted so the
 // conversation survives closing and reopening the sheet.
@@ -90,6 +91,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
   });
 
   // Check if user can access mobile app
+  useNativePush(!!currentUser); // iOS shell: register for push once logged in
   const canAccessMobile = currentUser && MOBILE_ALLOWED_ROLES.includes(currentUser.role);
   const isSupervisor = !!currentUser && SUPERVISOR_ROLES.includes(currentUser.role);
 

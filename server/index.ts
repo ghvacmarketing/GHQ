@@ -551,6 +551,15 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS push_device_tokens (
+        token text PRIMARY KEY,
+        user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+        platform text NOT NULL DEFAULT 'ios',
+        created_at timestamp DEFAULT now(),
+        last_seen_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS mkt_templates (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,
@@ -1129,6 +1138,11 @@ async function runWaterHeaterSeeds() {
     import("./services/companycam")
       .then(({ scheduleCompanycamSync }) => scheduleCompanycamSync())
       .catch((err) => console.error("CompanyCam scheduler import failed:", err));
+
+    // Native app push: fan crm_notifications out to registered iOS devices
+    import("./services/push")
+      .then(({ startPushNotificationBridge }) => startPushNotificationBridge())
+      .catch((err) => console.error("Push bridge import failed:", err));
 
     // Daily provider cost snapshots (Settings → Usage & Costs)
     import("./services/cost-tracker")

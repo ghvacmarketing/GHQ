@@ -24,6 +24,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>GHVAC Tools uses the camera to capture job-site photos that attach to the customer's record.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GHVAC Tools lets you pick existing photos to attach to a customer's job record.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>GHVAC Tools can save job photos you download to your photo library.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

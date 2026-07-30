@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { isNativeApp, takeNativePhoto } from "@/lib/native";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -278,6 +279,12 @@ export default function MobilePhotos() {
   const [videoViewer, setVideoViewer] = useState<{ src: string; name: string; poster?: string | null } | null>(null);
 
   const openCamera = async () => {
+    // iOS shell: use the real native camera instead of the in-page one
+    if (isNativeApp()) {
+      const shot = await takeNativePhoto();
+      if (shot) await handleUpload([shot]);
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1440 } },

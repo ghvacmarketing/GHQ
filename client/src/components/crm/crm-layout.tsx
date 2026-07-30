@@ -64,6 +64,7 @@ import GhqSearch, { openGlobalAI } from "./ghq-search";
 import { TopNavSearch } from "./topnav-search";
 import NotificationsDrawerContent from "./notifications-drawer";
 import { PinCommentsLayer, enterPinMode } from "./pin-comments";
+import { useNativePush } from "@/lib/native";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -432,6 +433,7 @@ function SidebarContent({
 
 export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false, flush = false }: CrmLayoutProps) {
   const [location, navigate] = useLocation();
+  useNativePush(!!currentUser); // iOS shell: register for push once logged in
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(

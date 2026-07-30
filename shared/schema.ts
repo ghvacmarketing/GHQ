@@ -3774,6 +3774,16 @@ export const crmNotifications = pgTable("crm_notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Native app (iOS shell) push tokens — one row per device; a user can have
+// several devices, a re-registered token just refreshes last_seen_at.
+export const pushDeviceTokens = pgTable("push_device_tokens", {
+  token: text("token").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  platform: text("platform").notNull().default("ios"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+});
+
 export const insertCrmNotificationSchema = createInsertSchema(crmNotifications).omit({
   id: true,
   createdAt: true,
