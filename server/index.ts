@@ -551,6 +551,13 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS companycam_deleted_media (
+        object_path varchar PRIMARY KEY,
+        deleted_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS push_device_tokens (
         token text PRIMARY KEY,
         user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,

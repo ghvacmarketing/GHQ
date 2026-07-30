@@ -4062,6 +4062,15 @@ export const companycamProjectLinks = pgTable("companycam_project_links", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Media a CRM user DELETED — tombstones so the sync never re-imports it
+// (deleting the customer_files row alone removed the dedupe marker and the
+// photo/video boomeranged back on the next reconciliation pass).
+export const companycamDeletedMedia = pgTable("companycam_deleted_media", {
+  objectPath: varchar("object_path").primaryKey(), // companycam:<id> | companycam-video:<id>
+  deletedBy: varchar("deleted_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Photos WE pushed up to CompanyCam — skipped on import so a push never
 // boomerangs back as a duplicate customer_files row.
 export const companycamPushedPhotos = pgTable("companycam_pushed_photos", {

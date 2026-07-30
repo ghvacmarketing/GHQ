@@ -1,5 +1,6 @@
 import { db } from "../db";
 import {
+  companycamDeletedMedia,
   companycamProjectLinks,
   companycamPushedPhotos,
   crmCustomers,
@@ -77,6 +78,36 @@ async function ccPut(path: string, body: any): Promise<any> {
     throw new Error(`CompanyCam PUT ${path} -> ${res.status} ${text.slice(0, 200)}`);
   }
   return res.json();
+}
+
+async function ccDelete(path: string): Promise<boolean> {
+  const res = await fetch(`${CC_BASE}${path}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${process.env.COMPANYCAM_API_TOKEN}`,
+      Accept: "application/json",
+    },
+  });
+  return res.ok;
+}
+
+/** A CRM user deleted a CompanyCam-sourced reference. Tombstone it so the
+ *  reconciliation sync never re-imports it, and best-effort delete the source
+ *  media on CompanyCam so both systems agree. The tombstone is written FIRST —
+ *  even if the CompanyCam API call fails, the CRM delete sticks. */
+export async function propagateCrmDeleteToCompanycam(objectPath: string, deletedBy: string | null): Promise<void> {
+  if (!objectPath.startsWith("companycam")) return;
+  await db.insert(companycamDeletedMedia).values({ objectPath, deletedBy }).onConflictDoNothing();
+  if (!companycamConfigured()) return;
+  try {
+    const isVideo = objectPath.startsWith("companycam-video:");
+    const ccId = objectPath.split(":")[1];
+    if (!ccId) return;
+    const ok = await ccDelete(isVideo ? `/videos/${ccId}` : `/photos/${ccId}`);
+    console.log(`[CompanyCam] deleted ${isVideo ? "video" : "photo"} ${ccId} on CompanyCam: ${ok ? "ok" : "API refused (tombstone kept, won't re-import)"}`);
+  } catch (e: any) {
+    console.error("[CompanyCam] delete propagation failed (tombstone kept):", e?.message || e);
+  }
 }
 
 type CcProject = {
@@ -504,6 +535,10 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
     .where(like(customerFiles.objectPath, "companycam%"));
   const have = new Map(existing.map((r) => [r.objectPath, r]));
 
+  // Tombstones: media a CRM user deleted must never boomerang back in
+  const deleted = await db.select({ objectPath: companycamDeletedMedia.objectPath }).from(companycamDeletedMedia);
+  const tombstoned = new Set(deleted.map((r) => r.objectPath));
+
   const pushed = await db.select({ ccPhotoId: companycamPushedPhotos.ccPhotoId }).from(companycamPushedPhotos);
   const pushedIds = new Set(pushed.map((r) => r.ccPhotoId));
 
@@ -511,6 +546,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
   for (const photo of photos) {
     if (photo.status && photo.status !== "active") continue;
     const key = `companycam:${photo.id}`;
+    if (tombstoned.has(key)) continue;
     if (pushedIds.has(photo.id)) continue;
     const webUri = photo.uris.find((u) => u.type === "web")?.uri || null;
     const existingRow = have.get(key);
@@ -551,7 +587,7 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
     const vStatus = (video.status || "").toLowerCase();
     if (vStatus && vStatus !== "processed" && vStatus !== "active") continue;
     const key = `companycam-video:${video.id}`;
-    if (have.has(key)) continue;
+    if (tombstoned.has(key) || have.has(key)) continue;
     const uris = Array.isArray(video.uris) ? video.uris : [];
     const source =
       video.playback_url ||

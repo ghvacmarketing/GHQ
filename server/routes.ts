@@ -14469,7 +14469,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/customers/:id/files/:fileId - Delete a customer file
   app.delete("/api/crm/customers/:id/files/:fileId", requireCrmAuth, async (req, res) => {
     try {
+      // Capture the objectPath BEFORE deleting — CompanyCam-sourced media
+      // needs a tombstone (else the sync re-imports it) + upstream delete.
+      const [fileRow] = await db
+        .select({ objectPath: customerFiles.objectPath })
+        .from(customerFiles)
+        .where(eq(customerFiles.id, req.params.fileId));
       const deleted = await storage.deleteCustomerFile(req.params.fileId, req.params.id);
+      if (deleted && fileRow?.objectPath?.startsWith("companycam")) {
+        const deletedBy = (req as any).crmUser?.id || null;
+        import("./services/companycam")
+          .then(({ propagateCrmDeleteToCompanycam }) => propagateCrmDeleteToCompanycam(fileRow.objectPath!, deletedBy))
+          .catch((e) => console.error("[CompanyCam] delete propagation import failed:", e));
+      }
       if (!deleted) {
         return res.status(404).json({ message: "File not found" });
       }
