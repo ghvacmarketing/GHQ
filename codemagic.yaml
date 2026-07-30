@@ -42,12 +42,25 @@ workflows:
           app-store-connect fetch-signing-files "app.ghvac.tools" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles
+          echo "===== signing identities in keychain ====="
+          security find-identity -v -p codesigning || true
+          echo "===== provisioning profiles installed ====="
+          ls -la ~/Library/"MobileDevice"/"Provisioning Profiles"/ || true
       - name: Stamp build number
         script: |
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
+      # On failure, surface the actual xcodebuild error lines right in the
+      # step output instead of burying them in the artifacts zip.
       - name: Build IPA
-        script: xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+        script: |
+          xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME" || {
+            echo "===== xcodebuild error lines ====="
+            grep -h "error: " /tmp/xcodebuild_logs/*.log | tail -n 60 || true
+            echo "===== last 120 log lines ====="
+            tail -n 120 /tmp/xcodebuild_logs/*.log || true
+            exit 1
+          }
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
