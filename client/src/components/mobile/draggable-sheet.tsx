@@ -11,7 +11,7 @@ export function DraggableSheet({
   title,
   children,
   testid,
-  tall = false,
+  tall = false, glass = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -20,6 +20,7 @@ export function DraggableSheet({
   testid?: string;
   /** Big form sheets: cap at 90vh and scroll the content inside. */
   tall?: boolean;
+  glass?: boolean;
 }) {
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragStartY = useRef<number | null>(null);
@@ -63,7 +64,7 @@ export function DraggableSheet({
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        className={`rounded-t-3xl border-t-0 bg-white/85 px-5 pt-0 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/75 [&>button]:hidden ${tall ? "flex max-h-[90vh] flex-col" : ""}`}
+        className={`rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/85 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/75" : ""} ${tall ? "flex max-h-[90vh] flex-col" : ""}`}
         style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
         data-testid={testid}
       >
