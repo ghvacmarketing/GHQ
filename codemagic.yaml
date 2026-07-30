@@ -40,6 +40,13 @@ workflows:
         script: |
           set -e
           echo "$CERTIFICATE_PRIVATE_KEY" > /tmp/cert_key.pem
+          echo "Key header in env var: $(head -1 /tmp/cert_key.pem)"
+          if ! head -1 /tmp/cert_key.pem | grep -q "BEGIN \(RSA \)\?PRIVATE KEY"; then
+            echo "ERROR: CERTIFICATE_PRIVATE_KEY does not contain the expected key."
+            echo "Expected first line: -----BEGIN PRIVATE KEY-----"
+            echo "Re-paste the FULL contents of Downloads/apple-distribution-cert-private-key.pem (28 lines)."
+            exit 1
+          fi
           openssl x509 -inform DER -in ios/certs/distribution.cer -out /tmp/cert.pem
           CERT_MOD=$(openssl x509 -noout -modulus -in /tmp/cert.pem)
           KEY_MOD=$(openssl rsa -noout -modulus -in /tmp/cert_key.pem)
