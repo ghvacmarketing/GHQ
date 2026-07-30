@@ -374,16 +374,16 @@ function UnmatchedProjectCard({
 }
 
 function UnmatchedSection({
-  projects, isLoading, searchQ, kindFilter, isAdmin, onOpenMedia,
+  projects, isLoading, searchQ, kindFilter, sort, isAdmin, onOpenMedia,
 }: {
   projects: UnmatchedProject[];
   isLoading: boolean;
   searchQ: string;
   kindFilter: "all" | "photos" | "videos";
+  sort: "media" | "name";
   isAdmin: boolean;
   onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
 }) {
-  const [sort, setSort] = useState<"media" | "name">("media");
   const [createFor, setCreateFor] = useState<UnmatchedProject | null>(null);
   const [matchFor, setMatchFor] = useState<UnmatchedProject | null>(null);
   const list = useMemo(() => {
@@ -406,15 +406,6 @@ function UnmatchedSection({
           <p className="text-sm text-muted-foreground">
             Jobs that aren't linked to a customer yet — their media stays here until someone {isAdmin ? "creates or matches the customer" : "with admin access links them"}.
           </p>
-        </div>
-        <div className="ml-auto">
-          <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
-            <SelectTrigger className="h-8 w-40 bg-white text-xs" data-testid="unmatched-sort"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="media">Most media first</SelectItem>
-              <SelectItem value="name">Project name A–Z</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
       {isLoading ? (
@@ -483,6 +474,7 @@ export default function CrmPhotoGallery() {
   const [primaryTab, setPrimaryTab] = useState<"gallery" | "unmatched">("gallery");
   const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent">("all");
   const [unmatchedKind, setUnmatchedKind] = useState<"all" | "photos" | "videos">("all");
+  const [unmatchedSort, setUnmatchedSort] = useState<"media" | "name">("media");
   const [searchQ, setSearchQ] = useState("");
 
   // Upload — pick a customer, then attach files to them
@@ -771,6 +763,111 @@ export default function CrmPhotoGallery() {
 
   if (authLoading || !currentUser) return null;
 
+  // Search + filter live on the toolbar row's right side (below Upload).
+  // The filter popover is mode-aware: gallery filters vs unmatched sort.
+  const searchBox = (
+    <div className="relative w-56">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Input
+        value={searchQ}
+        onChange={(e) => setSearchQ(e.target.value)}
+        placeholder={primaryTab === "unmatched" ? "Search unmatched…" : "Search media…"}
+        className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+        data-testid="media-search"
+      />
+    </div>
+  );
+  const unmatchedFiltersActive = unmatchedSort !== "media";
+  const filtersPopover = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${
+            (primaryTab === "gallery" ? filtersActive : unmatchedFiltersActive)
+              ? "border-[#711419] text-[#711419]"
+              : "border-input bg-white text-slate-600 hover:text-foreground"
+          }`}
+          title="Filters"
+          data-testid="media-filters"
+        >
+          <Filter className="h-4 w-4" />
+          {(primaryTab === "gallery" ? filtersActive : unmatchedFiltersActive) && (
+            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-3">
+        {primaryTab === "unmatched" ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Sort</p>
+            <Select value={unmatchedSort} onValueChange={(v) => setUnmatchedSort(v as typeof unmatchedSort)}>
+              <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="unmatched-sort">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="media">Most media first</SelectItem>
+                <SelectItem value="name">Project name A–Z</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
+            <Select value={customerFilter} onValueChange={setCustomerFilter}>
+              <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-customer">
+                <SelectValue placeholder="Customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All customers</SelectItem>
+                {customerOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={userFilter} onValueChange={setUserFilter}>
+              <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-user">
+                <SelectValue placeholder="Taken by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All users</SelectItem>
+                {userOptions.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
+              <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-date">
+                <SelectValue placeholder="Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any date</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="custom">Custom range…</SelectItem>
+              </SelectContent>
+            </Select>
+            {datePreset === "custom" && (
+              <div className="space-y-1.5" data-testid="filter-date-range">
+                <DatePickerField value={dateFrom} onChange={setDateFrom} placeholder="From" />
+                <DatePickerField value={dateTo} onChange={setDateTo} placeholder="To" />
+              </div>
+            )}
+            {filtersActive && (
+              <button
+                onClick={clearFilters}
+                className="flex h-8 w-full items-center justify-center gap-1 rounded-md border border-slate-200 text-xs font-medium text-muted-foreground hover:text-foreground"
+                data-testid="clear-filters"
+              >
+                <X className="h-3.5 w-3.5" /> Clear all filters
+              </button>
+            )}
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+
   const photoActions = (p: FeedPhoto) => (
     <>
       <button
@@ -795,7 +892,7 @@ export default function CrmPhotoGallery() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex flex-wrap items-center gap-3">
           <div className="min-w-0 shrink-0">
             <div className="flex items-center gap-2.5">
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Media</h1>
@@ -807,82 +904,6 @@ export default function CrmPhotoGallery() {
             <p className="mt-0.5 text-sm text-muted-foreground">Photos and files from the field — refreshes automatically.</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder={primaryTab === "unmatched" ? "Search unmatched projects…" : "Search media…"}
-                className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-                data-testid="media-search"
-              />
-            </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${
-                    filtersActive ? "border-[#711419] text-[#711419]" : "border-input bg-white text-slate-600 hover:text-foreground"
-                  }`}
-                  title="Filters"
-                  data-testid="media-filters"
-                >
-                  <Filter className="h-4 w-4" />
-                  {filtersActive && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
-                <Select value={customerFilter} onValueChange={setCustomerFilter}>
-                  <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-customer">
-                    <SelectValue placeholder="Customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All customers</SelectItem>
-                    {customerOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={userFilter} onValueChange={setUserFilter}>
-                  <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-user">
-                    <SelectValue placeholder="Taken by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All users</SelectItem>
-                    {userOptions.map((name) => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
-                  <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-date">
-                    <SelectValue placeholder="Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Any date</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="7d">Last 7 days</SelectItem>
-                    <SelectItem value="30d">Last 30 days</SelectItem>
-                    <SelectItem value="custom">Custom range…</SelectItem>
-                  </SelectContent>
-                </Select>
-                {datePreset === "custom" && (
-                  <div className="space-y-1.5" data-testid="filter-date-range">
-                    <DatePickerField value={dateFrom} onChange={setDateFrom} placeholder="From" />
-                    <DatePickerField value={dateTo} onChange={setDateTo} placeholder="To" />
-                  </div>
-                )}
-                {filtersActive && (
-                  <button
-                    onClick={clearFilters}
-                    className="flex h-8 w-full items-center justify-center gap-1 rounded-md border border-slate-200 text-xs font-medium text-muted-foreground hover:text-foreground"
-                    data-testid="clear-filters"
-                  >
-                    <X className="h-3.5 w-3.5" /> Clear all filters
-                  </button>
-                )}
-              </PopoverContent>
-            </Popover>
             <Button
               size="sm"
               className="h-9 shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
@@ -892,12 +913,24 @@ export default function CrmPhotoGallery() {
               <Upload className="mr-1.5 h-4 w-4" /> Upload
             </Button>
           </div>
+          {/* Centered switcher, level with the Media title (Comms-style) */}
+          <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 lg:block">
+            <IndustrialTabs
+              testidPrefix="media-primary"
+              activeKey={primaryTab}
+              onSelect={(k) => setPrimaryTab(k as typeof primaryTab)}
+              tabs={[
+                { key: "gallery", label: "Photo Gallery" },
+                { key: "unmatched", label: "Unmatched", count: unmatchedProjects.length || null },
+              ]}
+            />
+          </div>
         </div>
 
-        {/* Centered primary switcher — Gallery | Unmatched (Comms-style) */}
-        <div className="flex justify-center">
+        {/* Small screens: switcher on its own row (header is too tight) */}
+        <div className="flex justify-center lg:hidden">
           <IndustrialTabs
-            testidPrefix="media-primary"
+            testidPrefix="media-primary-sm"
             activeKey={primaryTab}
             onSelect={(k) => setPrimaryTab(k as typeof primaryTab)}
             tabs={[
@@ -959,19 +992,27 @@ export default function CrmPhotoGallery() {
                     </button>
                   </div>
                 )}
+                {searchBox}
+                {filtersPopover}
               </div>
             </>
           ) : (
-            <IndustrialTabs
-              testidPrefix="unmatched-kind"
-              activeKey={unmatchedKind}
-              onSelect={(k) => setUnmatchedKind(k as typeof unmatchedKind)}
-              tabs={[
-                { key: "all", label: "All" },
-                { key: "photos", label: "Photos" },
-                { key: "videos", label: "Videos" },
-              ]}
-            />
+            <>
+              <IndustrialTabs
+                testidPrefix="unmatched-kind"
+                activeKey={unmatchedKind}
+                onSelect={(k) => setUnmatchedKind(k as typeof unmatchedKind)}
+                tabs={[
+                  { key: "all", label: "All" },
+                  { key: "photos", label: "Photos" },
+                  { key: "videos", label: "Videos" },
+                ]}
+              />
+              <div className="ml-auto flex items-center gap-2">
+                {searchBox}
+                {filtersPopover}
+              </div>
+            </>
           )}
         </div>
 
@@ -1000,6 +1041,7 @@ export default function CrmPhotoGallery() {
             isLoading={unmatchedLoading}
             searchQ={searchQ}
             kindFilter={unmatchedKind}
+            sort={unmatchedSort}
             isAdmin={isAdmin}
             onOpenMedia={(m, project) =>
               setLightbox({

@@ -38,7 +38,7 @@ export function computeQuoteTotals(
   // lines are ALL internal keeps its stored sell price (return null = don't
   // touch the stored totals).
   const items = allItems.filter(
-    (i) => i.customerVisible !== false && i.lineType !== "labor" && i.lineType !== "other",
+    (i) => i.customerVisible === true || (i.customerVisible !== false && i.lineType !== "labor" && i.lineType !== "other"),
   );
   if (items.length === 0) return null;
   let basis = items;
@@ -80,10 +80,14 @@ export function computeQuoteTotals(
 /** Recompute and persist a quote's stored subtotal/total from its line items. */
 export async function recomputeQuoteStoredTotals(quoteId: string): Promise<void> {
   const [quote] = await db
-    .select({ quoteMode: crmQuotes.quoteMode, selectedOption: crmQuotes.selectedOption, status: crmQuotes.status })
+    .select({ quoteMode: crmQuotes.quoteMode, selectedOption: crmQuotes.selectedOption, status: crmQuotes.status, quoteType: crmQuotes.quoteType })
     .from(crmQuotes)
     .where(eq(crmQuotes.id, quoteId));
   if (!quote) return;
+  // Custom (worksheet) quotes: the stored total IS the sell price set by the
+  // worksheet — line items are cost build-up and must never overwrite it,
+  // even when some lines are promoted to the customer view.
+  if (quote.quoteType === "custom_install" || quote.quoteType === "custom_service") return;
   const items = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quoteId));
   const computed = computeQuoteTotals(quote, items);
   if (!computed) return; // all-internal quote — the stored sell price stands

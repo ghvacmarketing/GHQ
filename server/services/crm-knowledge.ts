@@ -185,7 +185,7 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - A quote's line items are split: CUSTOMER line items (what the customer sees) and INTERNAL COSTS (labor, warranty reserve, worksheet cost build-up) shown in a separate amber "Internal costs" card on the quote detail page with a gross-margin readout
 - Internal costs NEVER appear on customer-facing surfaces: the public quote link, quote emails, the PDF, or presentation mode. A custom (worksheet) quote shows the customer one line — the package at its sell price
 - In presentation mode the presenter can deliberately reveal the Internal costs panel with the "Internal costs" toggle button (top-right, next to Exit); it always resets to hidden
-- There is NO per-line show/hide toggle anymore (the old eye toggle was removed)
+- Lines can be MOVED between sections after creation: in the Internal costs card each row has a "Show to customer" (eye) action that promotes it into the customer-facing list; customer rows have a "Move to internal costs" (eye-off) action. On custom quotes the sell price never changes when lines move — it stays the worksheet's price
 
 ### Multi-option quote totals (goals/analytics)
 - An options-mode quote counts toward quoted pipeline at its HIGHEST-priced option (plus shared items); once accepted/sold it counts at the option the customer actually chose plus shared items — never the sum of all options

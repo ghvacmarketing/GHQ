@@ -21620,7 +21620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const { description, partNumber, quantity, unitPrice, lineTotal, sortOrder, lineType, isDiscountLine, discountKind } = req.body;
+      const { description, partNumber, quantity, unitPrice, lineTotal, sortOrder, lineType, isDiscountLine, discountKind, customerVisible } = req.body;
       
       // Merge existing line item data with updates to validate the final state
       const mergedLineItem = {
@@ -21656,6 +21656,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (lineType !== undefined) updates.lineType = lineType;
       if (isDiscountLine !== undefined) updates.isDiscountLine = isDiscountLine;
       if (discountKind !== undefined) updates.discountKind = discountKind;
+      // Move a line between the customer-facing list and Internal costs.
+      // customerVisible=true overrides the labor/other lineType default.
+      if (typeof customerVisible === "boolean") updates.customerVisible = customerVisible;
       
       const [updatedLineItem] = await db.update(crmQuoteLineItems)
         .set(updates)
@@ -22478,7 +22481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate total for the SMS — customer-facing lines only; a custom
         // quote (all internal cost lines) falls back to the sell price.
         const visibleSmsTotal = lineItems
-          .filter(item => item.lineType !== "labor" && item.lineType !== "other" && (item as any).customerVisible !== false)
+          .filter(item => (item as any).customerVisible === true || ((item as any).customerVisible !== false && item.lineType !== "labor" && item.lineType !== "other"))
           .reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
         const quoteTotal = visibleSmsTotal > 0 ? visibleSmsTotal : parseFloat(quote.total || "0");
         
@@ -25985,7 +25988,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       // Customer-facing view: internal cost lines (worksheet costs, labor,
       // warranty reserve) never reach the customer.
       let lineItems = allLineItems.filter(
-        (li) => li.customerVisible !== false && li.lineType !== "labor" && li.lineType !== "other",
+        (li) => li.customerVisible === true || (li.customerVisible !== false && li.lineType !== "labor" && li.lineType !== "other"),
       );
       // Custom quotes are ALL internal build-up — the customer sees one line:
       // the package at its sell price.

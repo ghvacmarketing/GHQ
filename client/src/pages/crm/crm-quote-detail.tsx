@@ -802,6 +802,21 @@ export default function CrmQuoteDetail() {
     },
   });
 
+  // Move a line between Internal costs and the customer-facing list
+  const setLineVisibilityMutation = useMutation({
+    mutationFn: async ({ lineItemId, customerVisible }: { lineItemId: string; customerVisible: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/crm/quotes/${quoteId}/line-items/${lineItemId}`, { customerVisible });
+      return res.json();
+    },
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      toast({ title: vars.customerVisible ? "Moved to customer view" : "Moved to internal costs" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to move the line", variant: "destructive" });
+    },
+  });
+
   const deleteLineItemMutation = useMutation({
     mutationFn: async (lineItemId: string) => {
       const res = await apiRequest("DELETE", `/api/crm/quotes/${quoteId}/line-items/${lineItemId}`);
@@ -1100,7 +1115,8 @@ export default function CrmQuoteDetail() {
   // their own staff-only "Internal costs" section — never in the customer's
   // line items, the PDF, emails, or presentation mode.
   const isInternalLine = (item: { customerVisible?: boolean | null; lineType?: string | null }) =>
-    (item as any).customerVisible === false || item.lineType === "labor" || item.lineType === "other";
+    (item as any).customerVisible === false ||
+    ((item as any).customerVisible !== true && (item.lineType === "labor" || item.lineType === "other"));
   const visibleLineItems = (quote?.lineItems || []).filter((i) => !isInternalLine(i));
   const internalLineItems = (quote?.lineItems || []).filter((i) => isInternalLine(i));
   const internalCostsTotal = internalLineItems.reduce((sum, i) => sum + (parseFloat(String(i.lineTotal || 0)) || 0), 0);
@@ -3227,6 +3243,17 @@ export default function CrmQuoteDetail() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-8 w-8 p-0"
+                                  onClick={() => setLineVisibilityMutation.mutate({ lineItemId: item.id, customerVisible: false })}
+                                  disabled={editingLineItemId !== null || setLineVisibilityMutation.isPending}
+                                  title="Move to internal costs — the customer stops seeing this line"
+                                  data-testid={`button-internalize-${item.id}`}
+                                >
+                                  <EyeOff className="h-4 w-4 text-slate-500 hover:text-amber-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => deleteLineItemMutation.mutate(item.id)}
                                   disabled={editingLineItemId !== null || deleteLineItemMutation.isPending}
                                   data-testid={`button-delete-line-item-${item.id}`}
@@ -3435,16 +3462,29 @@ export default function CrmQuoteDetail() {
                       <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
                       {canEditLineItems && (
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                            onClick={() => deleteLineItemMutation.mutate(item.id)}
-                            disabled={deleteLineItemMutation.isPending}
-                            data-testid={`button-delete-internal-${item.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setLineVisibilityMutation.mutate({ lineItemId: item.id, customerVisible: true })}
+                              disabled={setLineVisibilityMutation.isPending}
+                              title="Show to customer — moves this line into the customer-facing list"
+                              data-testid={`button-promote-${item.id}`}
+                            >
+                              <Eye className="h-4 w-4 text-slate-500 hover:text-emerald-600" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => deleteLineItemMutation.mutate(item.id)}
+                              disabled={deleteLineItemMutation.isPending}
+                              data-testid={`button-delete-internal-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>

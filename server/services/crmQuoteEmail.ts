@@ -118,7 +118,7 @@ export async function buildQuoteEmailContent(
   // Filter out labor/internal line items from client-facing email — and
   // anything explicitly flagged not customer-visible (worksheet cost lines).
   let clientVisibleItems = lineItems.filter(item =>
-    item.lineType !== "labor" && item.lineType !== "other" && item.customerVisible !== false
+    item.customerVisible === true || (item.customerVisible !== false && item.lineType !== "labor" && item.lineType !== "other")
   );
   // Custom quotes are all internal cost build-up — the customer's email shows
   // one line: the package at its sell price.

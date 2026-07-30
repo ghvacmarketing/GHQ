@@ -43,7 +43,8 @@ type PdfQuote = {
 };
 
 export const isInternalQuoteLine = (item: PdfLineItem): boolean =>
-  item.customerVisible === false || item.lineType === "labor" || item.lineType === "other";
+  item.customerVisible === false ||
+  (item.customerVisible !== true && (item.lineType === "labor" || item.lineType === "other"));
 
 const money = (v: string | number | null | undefined) => {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? "0")) || 0;

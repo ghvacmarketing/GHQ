@@ -75,7 +75,8 @@ export default function MobileQuotePresent() {
   // Internal cost lines (worksheet build-up, labor, warranty reserve) never
   // show to the customer; the presenter can deliberately reveal them.
   const isInternalLine = (item: { customerVisible?: boolean | null; lineType?: string | null }) =>
-    (item as any)?.customerVisible === false || item?.lineType === "labor" || item?.lineType === "other";
+    (item as any)?.customerVisible === false ||
+    ((item as any)?.customerVisible !== true && (item?.lineType === "labor" || item?.lineType === "other"));
   const customerLineItems = (quote?.lineItems || []).filter((i: any) => !isInternalLine(i));
   const internalLineItems = (quote?.lineItems || []).filter((i: any) => isInternalLine(i));
   const internalCostsTotal = internalLineItems.reduce((sum: number, i: any) => sum + (parseFloat(String(i.lineTotal || 0)) || 0), 0);
