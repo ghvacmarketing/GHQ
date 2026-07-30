@@ -13,8 +13,11 @@ const config: CapacitorConfig = {
     allowNavigation: ["www.ghvac.app", "ghvac.app", "ghvac-tools.onrender.com"],
   },
   ios: {
-    contentInset: "automatic",
-    backgroundColor: "#711419",
+    // The web app handles safe areas itself (env(safe-area-inset-*)) —
+    // "automatic" double-applied insets: maroon band above, offset container
+    // cutting content, nav pushed below the screen.
+    contentInset: "never",
+    backgroundColor: "#ffffff",
   },
 };
 

@@ -13,6 +13,12 @@ import { apiRequest } from "@/lib/queryClient";
 
 export const isNativeApp = () => Capacitor.isNativePlatform();
 
+// Tag the document so CSS can adapt to the shell (kill rubber-band bounce,
+// safe-area tweaks). Module side effect — runs wherever native.ts is used.
+if (typeof document !== "undefined" && Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add("native-app");
+}
+
 // ---- Push notifications -------------------------------------------------
 
 let pushInitStarted = false;

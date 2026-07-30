@@ -885,3 +885,9 @@ body.ios-preview-open .ios-preview-actions {
 
   transition-delay: 70ms, 70ms, 0s;
 }
+
+/* iOS shell (Capacitor): no rubber-band overscroll above/below pages */
+.native-app,
+.native-app body {
+  overscroll-behavior: none;
+}

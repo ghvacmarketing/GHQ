@@ -817,19 +817,19 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <div className="pointer-events-none absolute inset-x-0 top-5 z-10 flex items-center justify-between px-3">
           <button
             onClick={() => setPanelOpen(true)}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
             aria-label="History and spaces"
             data-testid="assistant-panel-open"
           >
-            <History className="h-5 w-5" />
+            <History className="h-6 w-6" />
           </button>
           <button
             onClick={() => setModeSheetOpen(true)}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
             aria-label="Gibbs mode"
             data-testid="assistant-mode-open"
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-[18px] w-[18px] rotate-45 text-[#711419]">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-[22px] w-[22px] rotate-45 text-[#711419]">
               <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
               <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
               <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
@@ -838,11 +838,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </button>
           <button
             onClick={startNewChat}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
             aria-label="New conversation"
             data-testid="assistant-new-conversation"
           >
-            <SquarePen className="h-5 w-5" />
+            <SquarePen className="h-6 w-6" />
           </button>
         </div>
 

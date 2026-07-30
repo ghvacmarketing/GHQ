@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>GHVAC Tools</string>
+        <string>GHQ</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,7 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>GHVAC Tools uses the camera to capture job-site photos that attach to the customer's record.</string>
+	<string>GHQ uses the camera to capture job-site photos that attach to the customer's record.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>GHQ uses the microphone for voice dictation when talking to Gibbs, the assistant.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>GHVAC Tools lets you pick existing photos to attach to a customer's job record.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
