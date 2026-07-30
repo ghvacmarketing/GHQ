@@ -10,11 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { CatalogPicker } from "@/components/crm/catalog-picker";
 import {
   Select,
   SelectContent,
@@ -151,19 +147,6 @@ export default function CrmInstallWorksheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetCustomer]);
 
-  // ── Catalog pull: search the CRM items/price catalog into a line ──
-  const [catalogOpen, setCatalogOpen] = useState(false);
-  const [catalogSearch, setCatalogSearch] = useState("");
-  const { data: catalogItems = [], isFetching: catalogLoading } = useQuery<Array<{ id: string; name: string; description: string | null; rate: string | null; category: string | null }>>({
-    queryKey: ["/api/crm/items", "worksheet-catalog", catalogSearch],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/items?search=${encodeURIComponent(catalogSearch.trim())}`, { credentials: "include" });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data.slice(0, 12) : [];
-    },
-    enabled: catalogOpen && catalogSearch.trim().length >= 2,
-  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -577,8 +560,6 @@ export default function CrmInstallWorksheet() {
         customerVisible: false,
       },
     ]);
-    setCatalogOpen(false);
-    setCatalogSearch("");
   };
 
   const updateLine = (id: string, field: keyof LocalLine, value: string | number | boolean) => {
@@ -832,53 +813,7 @@ export default function CrmInstallWorksheet() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">Line Items</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Popover open={catalogOpen} onOpenChange={setCatalogOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" data-testid="button-add-from-catalog">
-                        <BookOpen className="h-4 w-4 mr-1" />
-                        From catalog
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-80 p-2">
-                      <div className="relative mb-2">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                        <Input
-                          autoFocus
-                          value={catalogSearch}
-                          onChange={(e) => setCatalogSearch(e.target.value)}
-                          placeholder="Search the items catalog…"
-                          className="h-8 pl-8 text-sm"
-                          data-testid="catalog-search-input"
-                        />
-                      </div>
-                      {catalogSearch.trim().length < 2 ? (
-                        <p className="py-4 text-center text-xs text-slate-400">Type at least 2 characters.</p>
-                      ) : catalogLoading ? (
-                        <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
-                      ) : catalogItems.length === 0 ? (
-                        <p className="py-4 text-center text-xs text-slate-400">No catalog items match.</p>
-                      ) : (
-                        <div className="max-h-64 overflow-y-auto">
-                          {catalogItems.map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => addLineFromCatalog(item)}
-                              className="flex w-full items-center justify-between gap-2 rounded-[3px] px-2 py-2 text-left hover:bg-slate-50"
-                              data-testid={`catalog-item-${item.id}`}
-                            >
-                              <span className="min-w-0">
-                                <span className="block truncate text-sm font-medium text-slate-800">{item.name}</span>
-                                {item.description && <span className="block truncate text-xs text-slate-500">{item.description}</span>}
-                              </span>
-                              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">
-                                ${parseFloat(item.rate || "0").toFixed(2)}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                  <CatalogPicker onPick={addLineFromCatalog} testidPrefix="worksheet-catalog" />
                   <Button variant="outline" size="sm" onClick={addLine} data-testid="button-add-line">
                     <Plus className="h-4 w-4 mr-1" />
                     Add Line

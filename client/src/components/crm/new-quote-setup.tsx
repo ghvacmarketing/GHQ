@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { CatalogPicker } from "@/components/crm/catalog-picker";
 import {
   ArrowLeft,
   ArrowRight,
@@ -85,6 +86,18 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
   const [quickDescription, setQuickDescription] = useState("");
   const [quickLines, setQuickLines] = useState<QuickLine[]>([]);
   const [creating, setCreating] = useState(false);
+  const addFromCatalog = (item: { name: string; description: string | null; rate: string | null }) => {
+    setQuickLines((prev) => {
+      // Replace a single still-empty starter row instead of stacking under it
+      const base = prev.length === 1 && !prev[0].description.trim() && !prev[0].unitPrice ? [] : prev;
+      return [...base, {
+        id: `ql-${Date.now()}`,
+        description: item.description ? `${item.name} — ${item.description}` : item.name,
+        quantity: 1,
+        unitPrice: parseFloat(item.rate || "0") || 0,
+      }];
+    });
+  };
 
   // Fresh dialog every open, seeded with whatever context the launcher had
   useEffect(() => {
@@ -233,7 +246,7 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={step === "build" ? "sm:max-w-3xl" : "sm:max-w-lg"}>
         {step === "type" ? (
           <>
             <DialogHeader>
@@ -462,14 +475,35 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Line items</Label>
-                <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Line items</Label>
+                  <div className="flex items-center gap-2">
+                    <CatalogPicker onPick={addFromCatalog} testidPrefix="quick-catalog" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setQuickLines((prev) => [...prev, { id: `ql-${Date.now()}`, description: "", quantity: 1, unitPrice: 0 }])}
+                      data-testid="quick-quote-add-line"
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" /> Add line
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-[4px] border border-slate-300/70">
+                  <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="flex-1">Description</span>
+                    <span className="w-16 text-right">Qty</span>
+                    <span className="w-24 text-right">Unit price</span>
+                    <span className="w-24 text-right">Total</span>
+                    <span className="w-6" />
+                  </div>
                   {quickLines.map((l) => (
-                    <div key={l.id} className="flex items-start gap-2" data-testid={`quick-line-${l.id}`}>
+                    <div key={l.id} className="flex items-start gap-2 border-b border-slate-100 px-3 py-2 last:border-0" data-testid={`quick-line-${l.id}`}>
                       <Textarea
                         value={l.description}
                         onChange={(e) => setQuickLines((prev) => prev.map((x) => (x.id === l.id ? { ...x, description: e.target.value } : x)))}
-                        placeholder="Description"
+                        placeholder="Description — expands as you type"
                         rows={1}
                         className="min-h-[38px] flex-1 resize-y text-sm"
                       />
@@ -479,7 +513,7 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
                         step="1"
                         value={l.quantity}
                         onChange={(e) => setQuickLines((prev) => prev.map((x) => (x.id === l.id ? { ...x, quantity: parseFloat(e.target.value) || 1 } : x)))}
-                        className="w-16 shrink-0"
+                        className="w-16 shrink-0 text-right"
                         title="Quantity"
                       />
                       <Input
@@ -488,13 +522,16 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
                         step="0.01"
                         value={l.unitPrice || ""}
                         onChange={(e) => setQuickLines((prev) => prev.map((x) => (x.id === l.id ? { ...x, unitPrice: parseFloat(e.target.value) || 0 } : x)))}
-                        placeholder="Price"
-                        className="w-24 shrink-0"
+                        placeholder="0.00"
+                        className="w-24 shrink-0 text-right"
                         title="Unit price"
                       />
+                      <span className="w-24 shrink-0 pt-2 text-right text-sm font-medium tabular-nums text-slate-700">
+                        ${((l.quantity || 0) * (l.unitPrice || 0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                       <button
                         onClick={() => setQuickLines((prev) => prev.filter((x) => x.id !== l.id))}
-                        className="mt-2 shrink-0 rounded p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                        className="mt-2 w-6 shrink-0 rounded p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
                         title="Remove line"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -502,13 +539,6 @@ export function NewQuoteSetup({ open, onOpenChange, initial }: { open: boolean; 
                     </div>
                   ))}
                 </div>
-                <button
-                  onClick={() => setQuickLines((prev) => [...prev, { id: `ql-${Date.now()}`, description: "", quantity: 1, unitPrice: 0 }])}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-[#711419] hover:underline"
-                  data-testid="quick-quote-add-line"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add line
-                </button>
               </div>
               <p className="text-right text-sm font-semibold text-slate-800">
                 Total <span className="tabular-nums text-[#711419]">${quickTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
