@@ -60,24 +60,10 @@ workflows:
           keychain add-certificates --certificate /tmp/cert.p12 --certificate-password buildpass
           mkdir -p ~/Library/MobileDevice/"Provisioning Profiles"
           cp ios/certs/GHQ_App_Store.mobileprovision ~/Library/MobileDevice/"Provisioning Profiles"/
-          # Export options for the IPA step (use-profiles used to generate this)
-          cat > ~/export_options.plist <<'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>teamID</key><string>47JHV3522G</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>signingCertificate</key><string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>app.ghvac.tools</key><string>GHQ App Store</string>
-            </dict>
-            <key>uploadSymbols</key><true/>
-          </dict>
-          </plist>
-          PLIST
+          # Export options for the IPA step — a committed file, copied verbatim
+          # (a heredoc here got mangled on the build machine once; never again)
+          cp ios/certs/export_options.plist ~/export_options.plist
+          plutil -lint ~/export_options.plist
           echo "===== signing identities in keychain ====="
           security find-identity -v -p codesigning
           echo "===== provisioning profiles installed ====="
