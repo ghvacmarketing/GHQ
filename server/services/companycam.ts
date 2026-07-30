@@ -140,11 +140,17 @@ type CcVideo = {
 async function fetchProjectVideos(projectId: string): Promise<CcVideo[]> {
   const all: CcVideo[] = [];
   for (let page = 1; page <= 50; page++) {
-    const rows: CcVideo[] = await ccFetch(`/projects/${projectId}/videos?per_page=100&page=${page}`);
-    if (!Array.isArray(rows)) break;
+    const raw: any = await ccFetch(`/projects/${projectId}/videos?per_page=100&page=${page}`);
+    // Accept every plausible payload shape — a bare array like the photos
+    // endpoint, or wrapped ({videos: []} / {data: []}).
+    const rows: CcVideo[] = Array.isArray(raw) ? raw : Array.isArray(raw?.videos) ? raw.videos : Array.isArray(raw?.data) ? raw.data : [];
+    if (rows.length === 0 && page === 1 && raw && !Array.isArray(raw)) {
+      console.log(`[CompanyCam] videos payload for project ${projectId} had unexpected shape:`, JSON.stringify(raw).slice(0, 300));
+    }
     all.push(...rows);
     if (rows.length < 100) break;
   }
+  if (all.length > 0) console.log(`[CompanyCam] project ${projectId}: ${all.length} video(s) found`);
   return all;
 }
 
