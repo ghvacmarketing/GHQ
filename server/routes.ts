@@ -14282,7 +14282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/crm/notification-templates", requireCrmAdmin, async (req, res) => {
     try {
-      const sender = getCurrentCrmUser(req);
+      const sender = await getCurrentCrmUser(req);
       const name = String(req.body?.name || "").trim();
       const title = String(req.body?.title || "").trim();
       const message = String(req.body?.message || "").trim();
@@ -14333,7 +14333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // and they appear in every in-app notifications drawer.
   app.post("/api/crm/notifications/broadcast", requireCrmAdmin, async (req, res) => {
     try {
-      const sender = getCurrentCrmUser(req);
+      const sender = await getCurrentCrmUser(req);
       const title = String(req.body?.title || "").trim();
       const message = String(req.body?.message || "").trim();
       const userIds: string[] | "all" = req.body?.userIds === "all" ? "all" : Array.isArray(req.body?.userIds) ? req.body.userIds : [];
