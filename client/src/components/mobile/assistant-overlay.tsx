@@ -943,11 +943,21 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         <span className="shrink-0 font-semibold">Replaced below</span>
                       </p>
                     )}
+                    {/* Dismissed proposals stay visible as a collapsed stub —
+                        history should show what was declined, not hide it. */}
+                    {revealed && msg.proposedAction && msg.actionState === "dismissed" && (
+                      <p className="flex max-w-[92%] items-center gap-1.5 rounded-[4px] border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-400" data-testid={`assistant-action-dismissed-${i}`}>
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                        <span className="min-w-0 truncate line-through">{AI_ACTION_LABELS[msg.proposedAction.type] || "Action"}: {msg.proposedAction.summary}</span>
+                        <span className="shrink-0 font-semibold">Dismissed</span>
+                      </p>
+                    )}
                     {revealed && msg.proposedAction && msg.actionState !== "dismissed" && msg.actionState !== "superseded" && (
                       <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 break-words rounded-[4px] border border-[#711419]/30 bg-[#711419]/[0.05] p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#711419]">
                           <ShieldCheck className="h-3.5 w-3.5" />
-                          {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
+                          {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} —{" "}
+                          {msg.actionState === "done" ? "approved & ran" : msg.actionState === "executing" ? "running" : "needs your approval"}
                           {msg.actionBatch && (
                             <span className="ml-auto rounded-[3px] bg-[#711419]/10 px-1.5 py-0.5 tracking-normal text-[#711419]">
                               Step {msg.actionBatch.step} of {msg.actionBatch.total}

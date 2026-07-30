@@ -79,6 +79,9 @@ export type AiChatMessage = {
    *  customer → work order → text): later steps can only be approved after
    *  the earlier ones complete. */
   actionBatch?: { id: string; step: number; total: number } | null;
+  /** When the message was stored — shown in team-chat review so an owner can
+   *  see when a teammate asked for something. */
+  createdAt?: string | null;
 };
 
 /** Editable fields of a proposed action's params — lets the user fix a typo
@@ -183,6 +186,7 @@ type AiServerMessage = {
   proposedAction?: AiProposedAction | null;
   actionStatus?: string | null;
   actionResult?: { entity: string; id: string; label: string; url: string } | null;
+  createdAt?: string | null;
 };
 
 export function mapServerAiMessage(m: AiServerMessage): AiChatMessage {
@@ -204,6 +208,7 @@ export function mapServerAiMessage(m: AiServerMessage): AiChatMessage {
       : undefined,
     actionResult: m.actionResult ? { label: m.actionResult.label, url: m.actionResult.url } : null,
     messageId: m.id,
+    createdAt: m.createdAt ?? null,
   };
 }
 

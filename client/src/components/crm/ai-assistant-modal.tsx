@@ -853,7 +853,18 @@ export default function AiAssistantModal() {
 
           {/* Thread */}
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {messages.length === 0 && !pending ? (
+            {messages.length === 0 && !pending && viewUser ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                  <MessagesSquare className="h-7 w-7" />
+                </span>
+                <h2 className="text-xl font-semibold text-slate-800">Reviewing {viewUser.name}'s Gibbs chats</h2>
+                <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-500">
+                  Pick a conversation from the sidebar. You'll see everything they saw — questions, answers,
+                  and every proposed action with its outcome (approved, dismissed, replaced, or still waiting).
+                </p>
+              </div>
+            ) : messages.length === 0 && !pending ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10 text-[#711419]">
                   <Sparkles className="h-7 w-7" />
@@ -901,6 +912,9 @@ export default function AiAssistantModal() {
                               {msg.content}
                             </div>
                           )}
+                          {viewUser && msg.createdAt && (
+                            <p className="text-right text-[10px] text-slate-400">{formatConversationWhen(msg.createdAt)}</p>
+                          )}
                         </div>
                       </div>
                     );
@@ -938,11 +952,28 @@ export default function AiAssistantModal() {
                             <span className="ml-1 shrink-0 font-semibold no-underline">Replaced by a newer proposal below</span>
                           </p>
                         )}
+                        {/* Dismissed proposals stay VISIBLE as a collapsed stub —
+                            hiding them made reviewed chats look like approvals
+                            had vanished. */}
+                        {revealed && msg.proposedAction && msg.actionState === "dismissed" && (
+                          <p className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-400" data-testid={`ai-action-dismissed-${i}`}>
+                            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                            <span className="line-through">{AI_ACTION_LABELS[msg.proposedAction.type] || "Action"}: {msg.proposedAction.summary}</span>
+                            <span className="ml-1 shrink-0 font-semibold no-underline">Dismissed{viewUser ? ` by ${viewUser.name}` : ""} — never ran</span>
+                          </p>
+                        )}
                         {revealed && msg.proposedAction && msg.actionState !== "dismissed" && msg.actionState !== "superseded" && (
                           <div className="animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3 duration-300" data-testid={`ai-action-card-${i}`}>
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
-                              {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} — needs your approval
+                              {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} —{" "}
+                              {msg.actionState === "done"
+                                ? "approved & ran"
+                                : msg.actionState === "executing"
+                                  ? "running"
+                                  : viewUser
+                                    ? `awaiting ${viewUser.name}'s approval`
+                                    : "needs your approval"}
                               {msg.actionBatch && (
                                 <span className="ml-auto rounded bg-[#711419]/10 px-1.5 py-0.5 tracking-normal text-[#711419]">
                                   Step {msg.actionBatch.step} of {msg.actionBatch.total}
@@ -1028,7 +1059,15 @@ export default function AiAssistantModal() {
                                 </div>
                               </div>
                             )}
-                            {(msg.actionState === "pending" || msg.actionState === "error") && editing?.index !== i && (() => {
+                            {/* Reviewing a teammate: status only, never live
+                                controls — approving someone else's pending
+                                card would execute it under the reviewer. */}
+                            {viewUser && (msg.actionState === "pending" || msg.actionState === "error" || msg.actionState === "choose") && (
+                              <p className="mt-2 text-xs font-medium text-amber-700">
+                                Still waiting on {viewUser.name} to approve or dismiss this — read-only view.
+                              </p>
+                            )}
+                            {!viewUser && (msg.actionState === "pending" || msg.actionState === "error") && editing?.index !== i && (() => {
                               // A later step of a batch stays locked until every
                               // earlier step is done or dismissed.
                               const waitingOn = msg.actionBatch
@@ -1071,7 +1110,7 @@ export default function AiAssistantModal() {
                                 </>
                               );
                             })()}
-                            {msg.actionState === "choose" && msg.actionCandidates && (
+                            {!viewUser && msg.actionState === "choose" && msg.actionCandidates && (
                               <div className="mt-2.5 space-y-1.5">
                                 <p className="text-xs font-medium text-slate-700">{msg.actionError}</p>
                                 {msg.actionCandidates.map((cand) => {
@@ -1131,7 +1170,7 @@ export default function AiAssistantModal() {
                             )}
                           </div>
                         )}
-                        {revealed && msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && (
+                        {revealed && msg.relatedTopics && msg.relatedTopics.length > 0 && i === messages.length - 1 && !pending && !viewUser && (
                           <div className="flex flex-wrap gap-2 pl-1">
                             {msg.relatedTopics.map((topic, j) => (
                               <button
@@ -1143,6 +1182,9 @@ export default function AiAssistantModal() {
                               </button>
                             ))}
                           </div>
+                        )}
+                        {viewUser && msg.createdAt && (
+                          <p className="pl-1 text-[10px] text-slate-400">{formatConversationWhen(msg.createdAt)}</p>
                         )}
                       </div>
                     </div>
