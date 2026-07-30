@@ -817,7 +817,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <div className="pointer-events-none absolute inset-x-0 top-5 z-10 flex items-center justify-between px-3">
           <button
             onClick={() => setPanelOpen(true)}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
             aria-label="History and spaces"
             data-testid="assistant-panel-open"
           >
@@ -825,7 +825,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </button>
           <button
             onClick={() => setModeSheetOpen(true)}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full transition-colors active:bg-white/80"
             aria-label="Gibbs mode"
             data-testid="assistant-mode-open"
           >
@@ -838,7 +838,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </button>
           <button
             onClick={startNewChat}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/60 bg-white/55 text-slate-600 shadow-sm backdrop-blur-md transition-colors active:bg-white/80"
+            className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
             aria-label="New conversation"
             data-testid="assistant-new-conversation"
           >

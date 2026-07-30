@@ -891,3 +891,14 @@ body.ios-preview-open .ios-preview-actions {
 .native-app body {
   overscroll-behavior: none;
 }
+
+/* iOS liquid glass — translucent, heavy blur + saturation, light rim and
+   inner top highlight. Used on the agenda bell/avatar bubble and Gibbs'
+   round header buttons. */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 4px 18px rgba(17, 24, 39, 0.1);
+}

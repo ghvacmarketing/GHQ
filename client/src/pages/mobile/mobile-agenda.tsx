@@ -356,7 +356,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
       </div>
 
       {/* Bell + avatar share one frosted bubble */}
-      <div className="flex items-center rounded-full border border-slate-900/10 bg-white/85 shadow-sm backdrop-blur-xl dark:bg-slate-800">
+      <div className="liquid-glass flex items-center rounded-full dark:bg-slate-800">
         <button
           onClick={() => setNotifOpen(true)}
           className="relative flex h-11 w-12 items-center justify-center rounded-l-full text-slate-600 outline-none transition-transform focus:outline-none active:scale-95"
