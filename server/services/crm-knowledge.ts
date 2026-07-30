@@ -408,10 +408,10 @@ Integration with Bouncie GPS devices for real-time vehicle tracking of company t
 ## COMPANYCAM INTEGRATION
 
 ### What is the CompanyCam integration?
-CompanyCam projects sync into the CRM as photo references (Settings > CompanyCam, URL: /crm/settings/companycam). Projects are matched to CRM customers BY ADDRESS (the street number must match); each matched project's photos appear in that customer's Files/Photos everywhere in the CRM and mobile app. The images stay hosted on CompanyCam's CDN — nothing bulky is copied into the database.
+CompanyCam projects sync into the CRM as photo AND video references (Settings > CompanyCam, URL: /crm/settings/companycam). Projects are matched to CRM customers by ADDRESS (street number must match) or by CUSTOMER NAME (the project name matches exactly one customer — ties between same-named customers only resolve if the street number also agrees); each matched project's photos/videos appear in that customer's Files/Photos everywhere in the CRM and mobile app. The media stays hosted on CompanyCam's CDN — nothing bulky is copied into the database.
 
 ### How it works
-- An hourly background sync (plus a "Sync now" button) pulls all CompanyCam projects, auto-matches them to customers by address, and imports photo references
+- Instant: CompanyCam webhooks (photo.created, video.created) push new media into the CRM within seconds; a 15-minute background reconciliation sync (plus a "Sync now" button) catches anything missed, auto-matches projects to customers, and imports photo/video references
 - Projects the auto-matcher isn't sure about show as "unmatched" on the settings page — an admin picks the right customer manually ("Match" button), or marks the project "Ignore"
 - Two-way: new photos uploaded in the CRM/mobile app for a linked customer are pushed up to the matching CompanyCam project automatically
 - Deletes never propagate in either direction

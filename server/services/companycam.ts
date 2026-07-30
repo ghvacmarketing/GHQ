@@ -124,8 +124,10 @@ async function fetchProjectPhotos(projectId: string): Promise<CcPhoto[]> {
   return all;
 }
 
-/** Same shape as photos: id, creator, captured_at, uris[]. Videos stay on
- *  CompanyCam's CDN — we only import reference rows, never the bytes. */
+/** Real API shape (verified live 2026-07-30): videos do NOT use the photos'
+ *  uris[] array — they carry playback_url + thumbnail_urls, and their status
+ *  lifecycle is "processing" -> "processed" (photos use "active"). Videos stay
+ *  on CompanyCam's CDN — we only import reference rows, never the bytes. */
 type CcVideo = {
   id: string;
   project_id: string;
@@ -133,8 +135,10 @@ type CcVideo = {
   creator_name: string | null;
   captured_at: number | null;
   created_at?: number | null;
-  status?: string;
-  uris: Array<{ type: string; uri: string; url?: string }>;
+  status?: string; // "processing" | "processed" | "deleted"
+  playback_url?: string | null;
+  thumbnail_urls?: { large?: string | null; medium?: string | null; small?: string | null } | null;
+  uris?: Array<{ type: string; uri: string; url?: string }>; // legacy fallback, absent in current API
 };
 
 async function fetchProjectVideos(projectId: string): Promise<CcVideo[]> {
@@ -173,6 +177,10 @@ const STREET_ABBREV: Record<string, string> = {
 function normalizeAddress(raw: string): { number: string | null; tokens: string[] } {
   const cleaned = raw
     .toLowerCase()
+    // "GA-80", "SR 24", "US-221", "Hwy. 171", "Route 4" all name the same kind
+    // of road — fold designation + route number into one token ("hwy80") so
+    // differing prefixes still overlap. \d{1,4} can never swallow a 5-digit zip.
+    .replace(/\b(?:ga|sr|us|rte|route|hwy|highway)[-. ]*(\d{1,4})\b/g, "hwy$1")
     .replace(/[^a-z0-9 ]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -197,6 +205,92 @@ export function addressMatchScore(ccAddress: string, crmAddress: string): number
   if (!a.number || !b.number) return Math.round(tokenScore * 40);
   if (a.number !== b.number) return Math.round(tokenScore * 25);
   return Math.round(40 + tokenScore * 60); // number matches: 40 base + token quality
+}
+
+// ---- Name matching ------------------------------------------------------
+
+/** Words that carry no identity in a project/customer name. "amd" is the
+ *  recurring field typo for "and"; "lead" strips CompanyCam's "LEAD |"
+ *  project-name prefixes. */
+const NAME_STOPWORDS = new Set([
+  "and", "amd", "or", "the", "mr", "mrs", "ms", "dr", "jr", "sr", "ii", "iii",
+  "family", "home", "house", "new", "job", "project", "install", "repair",
+  "lead", "leads", "llc", "inc", "co",
+]);
+
+function nameTokens(raw: string): Set<string> {
+  return new Set(
+    raw
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, " ")
+      .split(/\s+/)
+      .filter((t) => t.length >= 2 && !NAME_STOPWORDS.has(t) && !/^\d+$/.test(t)),
+  );
+}
+
+const tokensEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && Array.from(a).every((t) => b.has(t));
+const tokensSubset = (a: Set<string>, b: Set<string>) => {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  return small.size >= 2 && Array.from(small).every((t) => large.has(t));
+};
+
+/** Decide which customer (if any) a CompanyCam project belongs to.
+ *
+ *  Evidence, strongest first:
+ *  1. ADDRESS (score >= 70) — street-number anchored, as always. The project
+ *     NAME also counts as an address source when it contains digits, because
+ *     techs name lead projects by street address ("4441 Mennonite Church Rd").
+ *  2. NAME — the project name matches exactly one customer name (token-set
+ *     equality first, then subset so "Southern Rentals | 4541" finds
+ *     "Southern Rentals"). A tie between same-named customers only resolves
+ *     when exactly one of them also matches the street number (addr >= 40);
+ *     otherwise the project stays unmatched for the manual UI — never guess.
+ */
+function matchProject(
+  projectName: string | null,
+  projectAddress: string | null,
+  candidateAddresses: Array<{ customerId: string; address: string }>,
+  customerNames: Array<{ customerId: string; toks: Set<string> }>,
+): { customerId: string | null; score: number | null } {
+  const addrSources: string[] = [];
+  if (projectAddress) addrSources.push(projectAddress);
+  if (projectName && /\d/.test(projectName)) addrSources.push(projectName);
+
+  let bestAddr: { customerId: string; score: number } | null = null;
+  const addrByCustomer = new Map<string, number>();
+  for (const src of addrSources) {
+    for (const cand of candidateAddresses) {
+      const score = addressMatchScore(src, cand.address);
+      if (!bestAddr || score > bestAddr.score) bestAddr = { customerId: cand.customerId, score };
+      if (score > (addrByCustomer.get(cand.customerId) ?? -1)) addrByCustomer.set(cand.customerId, score);
+    }
+  }
+  if (bestAddr && bestAddr.score >= 70) return { customerId: bestAddr.customerId, score: bestAddr.score };
+
+  const pt = projectName ? nameTokens(projectName) : new Set<string>();
+  if (pt.size >= 2) {
+    const decide = (ids: string[], base: number): { customerId: string; score: number } | null => {
+      const uniq = Array.from(new Set(ids));
+      if (uniq.length === 1) return { customerId: uniq[0], score: base };
+      const scored = uniq
+        .map((id) => ({ id, s: addrByCustomer.get(id) ?? 0 }))
+        .sort((x, y) => y.s - x.s);
+      if (scored[0].s >= 40 && scored[0].s > (scored[1]?.s ?? -1)) return { customerId: scored[0].id, score: base - 5 };
+      return null;
+    };
+    const exact = customerNames.filter((c) => tokensEqual(pt, c.toks)).map((c) => c.customerId);
+    if (exact.length > 0) {
+      const d = decide(exact, 90);
+      if (d) return d;
+    } else {
+      const subs = customerNames.filter((c) => tokensSubset(pt, c.toks)).map((c) => c.customerId);
+      if (subs.length > 0) {
+        const d = decide(subs, 80);
+        if (d) return d;
+      }
+    }
+  }
+  return { customerId: null, score: bestAddr?.score ?? null };
 }
 
 // ---- Sync ---------------------------------------------------------------
@@ -236,6 +330,9 @@ export async function syncCompanycam(): Promise<CompanycamSyncResult> {
         candidateAddresses.push({ customerId: p.customerId, address: `${p.address1} ${p.city || ""}` });
       }
     }
+    const customerNames = customers
+      .filter((c) => c.name)
+      .map((c) => ({ customerId: c.id, toks: nameTokens(c.name!) }));
 
     for (const proj of projects) {
       const addrParts = [proj.address?.street_address_1, proj.address?.city, proj.address?.state].filter(Boolean);
@@ -248,22 +345,21 @@ export async function syncCompanycam(): Promise<CompanycamSyncResult> {
 
       // Only auto-(re)match links the user hasn't touched (manual/ignored stick)
       if (matchType === "unmatched" || matchType === "auto") {
-        let best: { customerId: string; score: number } | null = null;
-        if (ccAddress) {
-          for (const cand of candidateAddresses) {
-            const score = addressMatchScore(proj.address?.street_address_1 || ccAddress, cand.address);
-            if (!best || score > best.score) best = { customerId: cand.customerId, score };
-          }
-        }
-        if (best && best.score >= 70) {
-          customerId = best.customerId;
+        const m = matchProject(
+          proj.name || null,
+          proj.address?.street_address_1 || ccAddress || null,
+          candidateAddresses,
+          customerNames,
+        );
+        if (m.customerId) {
+          customerId = m.customerId;
           matchType = "auto";
-          matchScore = best.score;
+          matchScore = m.score;
           result.autoMatched++;
         } else {
           customerId = null;
           matchType = "unmatched";
-          matchScore = best?.score ?? null;
+          matchScore = m.score;
           result.unmatched++;
         }
       }
@@ -450,22 +546,35 @@ export async function importProjectPhotos(ccProjectId: string, customerId: strin
   }
 
   for (const video of videos) {
-    if (video.status && video.status !== "active") continue;
+    // Videos use a "processing" -> "processed" lifecycle (photos use
+    // "active"); a still-processing clip is picked up on the next pass.
+    const vStatus = (video.status || "").toLowerCase();
+    if (vStatus && vStatus !== "processed" && vStatus !== "active") continue;
     const key = `companycam-video:${video.id}`;
     if (have.has(key)) continue;
     const uris = Array.isArray(video.uris) ? video.uris : [];
-    const source = uris.find((u) => u.type === "original") || uris.find((u) => u.type === "web") || uris[0];
-    if (!source?.uri) continue;
-    // Poster frame for grids — any image-ish uri CompanyCam provides.
-    const thumb = uris.find((u) => u.type === "thumbnail")?.uri || uris.find((u) => u.type === "poster")?.uri || null;
+    const source =
+      video.playback_url ||
+      uris.find((u) => u.type === "original")?.uri ||
+      uris.find((u) => u.type === "web")?.uri ||
+      uris[0]?.uri ||
+      null;
+    if (!source) continue;
+    // Poster frame for grids — thumbnail_urls in the live API.
+    const thumb =
+      video.thumbnail_urls?.medium ||
+      video.thumbnail_urls?.large ||
+      video.thumbnail_urls?.small ||
+      uris.find((u) => u.type === "thumbnail")?.uri ||
+      null;
     const capturedAt = video.captured_at || video.created_at || null;
     await db.insert(customerFiles).values({
       customerId,
       name: `CompanyCam ${projectName} video${capturedAt ? ` ${new Date(capturedAt * 1000).toISOString().slice(0, 10)}` : ""}.mp4`,
-      url: source.uri,
+      url: source,
       thumbUrl: thumb,
       objectPath: key,
-      contentType: videoContentType(source.uri),
+      contentType: videoContentType(source),
       size: null,
       uploadedBy: await matchCreatorToUser(video.creator_id, video.creator_name),
       createdAt: capturedAt ? new Date(capturedAt * 1000) : new Date(),
@@ -545,9 +654,21 @@ export async function handleWebhookPhoto(photoId: string, projectId: string | nu
   await handleWebhookMedia(projId);
 }
 
-export async function handleWebhookVideo(videoId: string, projectId: string | null): Promise<void> {
+export async function handleWebhookVideo(videoId: string, projectId: string | null, attempt = 0): Promise<void> {
   if (!companycamConfigured()) return;
   const video: any = await ccFetch(`/videos/${videoId}`).catch(() => null);
+  // video.created fires while the clip is still transcoding — poll a few
+  // times so the reference lands the moment it turns "processed" instead of
+  // waiting for the next reconciliation tick.
+  const status = String(video?.status || "").toLowerCase();
+  if (status === "processing" && attempt < 5) {
+    setTimeout(() => {
+      handleWebhookVideo(videoId, projectId, attempt + 1).catch((e) =>
+        console.error("[CompanyCam] video webhook retry failed:", e?.message || e),
+      );
+    }, 60_000);
+    return;
+  }
   // Some plans 404 the videos API — fall back to the payload's project id so
   // a video event still triggers a project import attempt.
   const projId = String(video?.project_id || projectId || "");
