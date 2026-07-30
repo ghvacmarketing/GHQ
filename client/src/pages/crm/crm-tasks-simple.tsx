@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isBefore, startOfDay } from "date-fns";
-import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink } from "lucide-react";
+import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink, ListChecks, X, Flag } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
@@ -16,9 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
 import type { CrmUser, Task } from "@shared/schema";
 
 // Human-readable location for a pin path: "/crm/customers/8f2a…?tab=tasks"
@@ -69,8 +66,9 @@ function describePinPath(path: string): string {
 
 /**
  * Tasks, Google-Tasks style: one list, a quick-add bar, round check-off
- * circles, and a collapsible Completed section. No boards, no columns,
- * no types, no subtasks — just tasks.
+ * circles, and a collapsible Completed section. Clicking a task opens an
+ * Asana-style detail panel — every field editable, plus a subtask checklist
+ * (task_subtasks table; the routes predate this page).
  */
 export default function CrmTasksSimple() {
   usePageTitle("Activity");
@@ -116,6 +114,8 @@ export default function CrmTasksSimple() {
   type PinRow = {
     id: string; path: string; body: string; createdByName: string | null; created_at: string; mentions: string[];
   };
+  // Always loaded (not just on the Comments tab) so the tab's count chip is
+  // stable — a chip that pops in only when active made the tab bar jump.
   const { data: allPins = [] } = useQuery<PinRow[]>({
     queryKey: ["/api/crm/pins", "all-open"],
     queryFn: async () => {
@@ -123,7 +123,7 @@ export default function CrmTasksSimple() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!currentUser && scope === "comments",
+    enabled: !!currentUser,
   });
   const resolvePin = useMutation({
     mutationFn: async (id: string) => apiRequest("PATCH", `/api/crm/pins/${id}`, { resolved: true }),
@@ -192,6 +192,70 @@ export default function CrmTasksSimple() {
     onSuccess: invalidate,
   });
 
+  // ── Detail panel (Asana-style): every field editable + subtasks ──
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detailTask = tasks.find((t) => t.id === detailId) || null;
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDesc, setDraftDesc] = useState("");
+  useEffect(() => {
+    const t = detailId ? tasks.find((x) => x.id === detailId) : null;
+    setDraftTitle(t?.title ?? "");
+    setDraftDesc(t?.description ?? "");
+    // Re-seed only when a different task opens — not on every refetch, or
+    // typing would be clobbered mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailId]);
+  useEffect(() => {
+    if (!detailId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetailId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [detailId]);
+
+  // Subtask progress for the list rows ("2/3" chips) — one grouped query.
+  const { data: subCountRows = [] } = useQuery<Array<{ taskId: string; total: number; done: number }>>({
+    queryKey: ["/api/tasks", "subtask-counts"],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks/subtask-counts", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+  const subCounts = useMemo(() => new Map(subCountRows.map((r) => [r.taskId, r])), [subCountRows]);
+
+  type Subtask = { id: string; taskId: string; title: string; isCompleted: boolean; dueAt: string | null; sortOrder: number };
+  const { data: subtasks = [] } = useQuery<Subtask[]>({
+    queryKey: ["/api/tasks", detailId, "subtasks"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${detailId}/subtasks`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!detailId,
+  });
+  const [newSubtask, setNewSubtask] = useState("");
+  const addSubtask = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", `/api/tasks/${detailId}/subtasks`, { title: newSubtask.trim(), sortOrder: subtasks.length }),
+    onSuccess: () => {
+      setNewSubtask("");
+      invalidate();
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't add the subtask", variant: "destructive" }),
+  });
+  const patchSubtask = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string } & Record<string, unknown>) =>
+      apiRequest("PUT", `/api/tasks/${detailId}/subtasks/${id}`, body),
+    onSuccess: invalidate,
+  });
+  const removeSubtask = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/tasks/${detailId}/subtasks/${id}`),
+    onSuccess: invalidate,
+  });
+
   if (!currentUser) return null;
   const userName = (id: string | null | undefined) => users.find((u) => u.id === id)?.name || null;
   const today = startOfDay(new Date());
@@ -200,6 +264,8 @@ export default function CrmTasksSimple() {
     const completed = t.status === "completed";
     const overdue = !completed && t.dueAt && isBefore(new Date(t.dueAt), today);
     const assignee = userName(t.assignedToUserId);
+    const counts = subCounts.get(t.id);
+    const priority = (t.priority || "normal") as string;
     return (
       <div className="group flex items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-0 hover:bg-slate-50" data-testid={`task-${t.id}`}>
         <button
@@ -212,9 +278,14 @@ export default function CrmTasksSimple() {
         >
           <Check className="h-3 w-3" strokeWidth={3} />
         </button>
-        <div className="min-w-0 flex-1">
+        {/* Whole row body opens the detail panel — that's where all editing lives */}
+        <button
+          onClick={() => setDetailId(t.id)}
+          className="min-w-0 flex-1 text-left"
+          data-testid={`task-open-${t.id}`}
+        >
           <p className={`text-sm ${completed ? "text-slate-400 line-through" : "font-medium text-slate-900"}`}>{t.title}</p>
-          {t.description && <p className={`mt-0.5 text-xs ${completed ? "text-slate-300" : "text-slate-500"}`}>{t.description}</p>}
+          {t.description && <p className={`mt-0.5 line-clamp-2 text-xs ${completed ? "text-slate-300" : "text-slate-500"}`}>{t.description}</p>}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {t.dueAt && (
               <span className={`flex items-center gap-1 text-[11px] ${overdue ? "font-semibold text-red-600" : "text-slate-400"}`}>
@@ -222,39 +293,23 @@ export default function CrmTasksSimple() {
                 {format(new Date(t.dueAt), "EEE, MMM d")}
               </span>
             )}
+            {counts && counts.total > 0 && (
+              <span className={`flex items-center gap-1 text-[11px] ${counts.done === counts.total ? "text-emerald-600" : "text-slate-400"}`} data-testid={`task-subtask-chip-${t.id}`}>
+                <ListChecks className="h-3 w-3" />
+                {counts.done}/{counts.total}
+              </span>
+            )}
+            {priority !== "normal" && !completed && (
+              <span className={`flex items-center gap-1 text-[11px] font-semibold ${priority === "high" ? "text-red-600" : "text-slate-400"}`}>
+                <Flag className="h-3 w-3" />
+                {priority === "high" ? "High" : "Low"}
+              </span>
+            )}
             {assignee && scope === "everyone" && (
               <span className="text-[11px] text-slate-400">{assignee}</span>
             )}
           </div>
-        </div>
-        {!completed && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100" title="Edit" data-testid={`task-edit-${t.id}`}>
-                <CalendarDays className="h-4 w-4" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Edit task</p>
-              <DatePickerField
-                value={t.dueAt ? format(new Date(t.dueAt), "yyyy-MM-dd") : ""}
-                onChange={(v) =>
-                  updateTask.mutate({ id: t.id, dueAt: v ? new Date(`${v}T09:00:00`).toISOString() : null })
-                }
-                placeholder="Due date"
-              />
-              <Select
-                value={t.assignedToUserId || ""}
-                onValueChange={(v) => updateTask.mutate({ id: t.id, assignedToUserId: v })}
-              >
-                <SelectTrigger className="h-9"><SelectValue placeholder="Assign to…" /></SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </PopoverContent>
-          </Popover>
-        )}
+        </button>
         <button
           onClick={() => deleteTask.mutate(t.id)}
           className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
@@ -270,15 +325,19 @@ export default function CrmTasksSimple() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="mx-auto w-full max-w-2xl space-y-4">
-        {/* Title + scope tabs on one row */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-0 shrink-0">
+        {/* Title + scope tabs. 1fr | auto | 1fr grid keeps the tabs pinned to
+            the true center — with mx-auto they re-centered against the
+            subtitle, whose width changes per tab, so switching tabs made the
+            whole bar jump sideways. Counts render on every tab for the same
+            reason (a chip that mounts only when active changes the tab's width). */}
+        <div className="grid items-center gap-3 lg:grid-cols-[1fr_auto_1fr]">
+          <div className="min-w-0">
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Activity</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {scope === "notifications" ? "Everything that needs your attention" : scope === "comments" ? "Open pin comments across the CRM" : `${open.length} open${done.length ? ` · ${done.length} done` : ""}`}
             </p>
           </div>
-          <div className="mx-auto">
+          <div className="justify-self-center">
             <IndustrialTabs
               testidPrefix="tasks-scope"
               activeKey={scope}
@@ -287,10 +346,11 @@ export default function CrmTasksSimple() {
                 { key: "mine", label: "My Tasks" },
                 { key: "everyone", label: "Everyone" },
                 { key: "notifications", label: "Notifications", count: notifCount?.count ? notifCount.count : null },
-                { key: "comments", label: "Comments", count: scope === "comments" && allPins.length ? allPins.length : null },
+                { key: "comments", label: "Comments", count: allPins.length ? allPins.length : null },
               ]}
             />
           </div>
+          <div className="hidden lg:block" />
         </div>
 
         {/* Comments across the CRM — open pin comments, click through to the spot */}
@@ -411,6 +471,203 @@ export default function CrmTasksSimple() {
           </div>
         )}
       </div>
+
+      {/* ── Task detail panel: Asana-style slide-over. Everything edits in
+          place — title, notes, due, assignee, priority — plus subtasks. ── */}
+      {detailTask && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/20" onClick={() => setDetailId(null)} data-testid="task-detail-backdrop" />
+          <aside
+            className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-md flex-col border-l border-slate-300/70 bg-white shadow-2xl animate-in slide-in-from-right duration-200"
+            data-testid="task-detail-panel"
+          >
+            <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3">
+              <button
+                onClick={() => toggleTask.mutate(detailTask)}
+                className={`flex h-8 items-center gap-1.5 rounded-[4px] border px-2.5 text-xs font-semibold transition-colors ${
+                  detailTask.status === "completed"
+                    ? "border-[#711419] bg-[#711419] text-white"
+                    : "border-slate-300 text-slate-600 hover:border-[#711419] hover:text-[#711419]"
+                }`}
+                data-testid="task-detail-toggle"
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                {detailTask.status === "completed" ? "Completed" : "Mark complete"}
+              </button>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    deleteTask.mutate(detailTask.id);
+                    setDetailId(null);
+                  }}
+                  className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  title="Delete task"
+                  data-testid="task-detail-delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setDetailId(null)}
+                  className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close"
+                  data-testid="task-detail-close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+              {/* Title — borderless input, saves on blur/Enter */}
+              <textarea
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                onBlur={() => {
+                  const v = draftTitle.trim();
+                  if (v && v !== detailTask.title) updateTask.mutate({ id: detailTask.id, title: v });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.target as HTMLTextAreaElement).blur();
+                  }
+                }}
+                rows={2}
+                className={`w-full resize-none border-0 p-0 text-lg font-semibold leading-snug focus:outline-none focus:ring-0 ${
+                  detailTask.status === "completed" ? "text-slate-400 line-through" : "text-slate-900"
+                }`}
+                data-testid="task-detail-title"
+              />
+
+              {/* Fields */}
+              <div className="space-y-2.5">
+                <label className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">Assignee</span>
+                  <Select
+                    value={detailTask.assignedToUserId || ""}
+                    onValueChange={(v) => updateTask.mutate({ id: detailTask.id, assignedToUserId: v })}
+                  >
+                    <SelectTrigger className="h-9 flex-1" data-testid="task-detail-assignee"><SelectValue placeholder="Assign to…" /></SelectTrigger>
+                    <SelectContent>
+                      {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </label>
+                <label className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">Due</span>
+                  <DatePickerField
+                    value={detailTask.dueAt ? format(new Date(detailTask.dueAt), "yyyy-MM-dd") : ""}
+                    onChange={(v) => updateTask.mutate({ id: detailTask.id, dueAt: v ? new Date(`${v}T09:00:00`).toISOString() : null })}
+                    placeholder="No due date"
+                    className="flex-1"
+                    testid="task-detail-due"
+                  />
+                </label>
+                <label className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">Priority</span>
+                  <Select
+                    value={(detailTask.priority as string) || "normal"}
+                    onValueChange={(v) => updateTask.mutate({ id: detailTask.id, priority: v })}
+                  >
+                    <SelectTrigger className="h-9 flex-1" data-testid="task-detail-priority"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+              </div>
+
+              {/* Description */}
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Notes</p>
+                <textarea
+                  value={draftDesc}
+                  onChange={(e) => setDraftDesc(e.target.value)}
+                  onBlur={() => {
+                    if (draftDesc !== (detailTask.description || "")) {
+                      updateTask.mutate({ id: detailTask.id, description: draftDesc || null });
+                    }
+                  }}
+                  rows={4}
+                  placeholder="Add details…"
+                  className="w-full resize-none rounded-[4px] border border-slate-300/70 bg-white px-3 py-2 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-[#711419] focus:outline-none"
+                  data-testid="task-detail-notes"
+                />
+              </div>
+
+              {/* Subtasks */}
+              <div>
+                <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <ListChecks className="h-3.5 w-3.5" />
+                  Subtasks
+                  {subtasks.length > 0 && (
+                    <span className="text-slate-500">{subtasks.filter((s) => s.isCompleted).length}/{subtasks.length}</span>
+                  )}
+                </p>
+                {subtasks.length > 0 && (
+                  <div className="overflow-hidden rounded-[4px] border border-slate-200" data-testid="task-subtask-list">
+                    {subtasks.map((s) => (
+                      <div key={s.id} className="group flex items-center gap-2.5 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50" data-testid={`subtask-${s.id}`}>
+                        <button
+                          onClick={() => patchSubtask.mutate({ id: s.id, isCompleted: !s.isCompleted })}
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                            s.isCompleted ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419]"
+                          }`}
+                          data-testid={`subtask-toggle-${s.id}`}
+                          aria-label={s.isCompleted ? "Mark incomplete" : "Mark complete"}
+                        >
+                          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                        </button>
+                        {/* Inline rename — plain input styled as text, saves on blur */}
+                        <input
+                          key={`${s.id}-${s.title}`}
+                          defaultValue={s.title}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v && v !== s.title) patchSubtask.mutate({ id: s.id, title: v });
+                          }}
+                          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                          className={`min-w-0 flex-1 border-0 bg-transparent p-0 text-sm focus:outline-none ${
+                            s.isCompleted ? "text-slate-400 line-through" : "text-slate-800"
+                          }`}
+                          data-testid={`subtask-title-${s.id}`}
+                        />
+                        <button
+                          onClick={() => removeSubtask.mutate(s.id)}
+                          className="rounded p-0.5 text-slate-300 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                          title="Delete subtask"
+                          data-testid={`subtask-delete-${s.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-1.5 flex items-center gap-2 rounded-[4px] border border-dashed border-slate-300 px-3 py-1.5">
+                  <Plus className="h-3.5 w-3.5 shrink-0 text-[#711419]" />
+                  <input
+                    value={newSubtask}
+                    onChange={(e) => setNewSubtask(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && newSubtask.trim() && addSubtask.mutate()}
+                    placeholder="Add a subtask — press Enter"
+                    className="h-7 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                    data-testid="subtask-add-input"
+                  />
+                </div>
+              </div>
+
+              {/* Meta */}
+              <p className="text-[11px] text-slate-400">
+                Created {detailTask.createdAt ? format(new Date(detailTask.createdAt), "MMM d, yyyy") : ""}
+                {userName(detailTask.createdByUserId) ? ` by ${userName(detailTask.createdByUserId)}` : ""}
+              </p>
+            </div>
+          </aside>
+        </>
+      )}
     </CrmLayout>
   );
 }
