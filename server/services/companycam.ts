@@ -692,6 +692,36 @@ export async function fetchUnmatchedProjectMedia(ccProjectId: string, projectNam
   return media;
 }
 
+/** Media -> Unmatched Photos/Videos sub-tabs: one flat gallery of EVERY
+ *  unmatched project's media, each item carrying its project so tiles can be
+ *  captioned and actions deep-linked. Fans out over the per-project cache
+ *  with modest concurrency so a cold load doesn't hammer CompanyCam. */
+export async function fetchAllUnmatchedMedia(): Promise<
+  Array<UnmatchedMedia & { ccProjectId: string; projectTitle: string }>
+> {
+  const links = await db
+    .select({
+      ccProjectId: companycamProjectLinks.ccProjectId,
+      ccProjectName: companycamProjectLinks.ccProjectName,
+      ccAddress: companycamProjectLinks.ccAddress,
+    })
+    .from(companycamProjectLinks)
+    .where(eq(companycamProjectLinks.matchType, "unmatched"));
+
+  const out: Array<UnmatchedMedia & { ccProjectId: string; projectTitle: string }> = [];
+  const queue = [...links];
+  const worker = async () => {
+    for (let link = queue.shift(); link; link = queue.shift()) {
+      const title = (link.ccProjectName || "").trim() || (link.ccAddress || "").trim() || "Unnamed project";
+      const media = await fetchUnmatchedProjectMedia(link.ccProjectId, title).catch(() => [] as UnmatchedMedia[]);
+      for (const m of media) out.push({ ...m, ccProjectId: link.ccProjectId, projectTitle: title });
+    }
+  };
+  await Promise.all(Array.from({ length: 5 }, worker));
+  out.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  return out;
+}
+
 /** Push a freshly uploaded CRM photo up to the customer's linked CompanyCam
  *  project (fire-and-forget from the upload route). Records the returned
  *  photo id so the next pull skips it. */

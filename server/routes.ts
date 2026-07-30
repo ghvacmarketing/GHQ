@@ -14323,6 +14323,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Flat gallery of every unmatched project's media (Photos/Videos sub-tabs)
+  app.get("/api/crm/companycam/unmatched-media", requireCrmAuth, async (_req, res) => {
+    try {
+      const { companycamConfigured, fetchAllUnmatchedMedia } = await import("./services/companycam");
+      if (!companycamConfigured()) return res.json([]);
+      res.json(await fetchAllUnmatchedMedia());
+    } catch (error) {
+      console.error("Error fetching unmatched media gallery:", error);
+      res.status(500).json({ message: "Failed to load unmatched media" });
+    }
+  });
+
   // Live media for one unmatched project, proxied from the CompanyCam API —
   // nothing is imported until the project gets a customer.
   app.get("/api/crm/companycam/unmatched/:ccProjectId/media", requireCrmAuth, async (req, res) => {

@@ -373,6 +373,90 @@ function UnmatchedProjectCard({
   );
 }
 
+type UnmatchedGalleryItem = UnmatchedMediaItem & { ccProjectId: string; projectTitle: string };
+
+/** Photos/Videos sub-tabs: flat gallery of every unmatched project's media,
+ *  captioned with the project each shot belongs to. */
+function UnmatchedGallery({
+  kind, searchQ, onOpen,
+}: {
+  kind: "photos" | "videos";
+  searchQ: string;
+  onOpen: (m: UnmatchedGalleryItem) => void;
+}) {
+  const { data: items = [], isLoading } = useQuery<UnmatchedGalleryItem[]>({
+    queryKey: ["/api/crm/companycam/unmatched-media"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/companycam/unmatched-media", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load unmatched media");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const shown = useMemo(() => {
+    let l = items.filter((m) => (kind === "photos" ? m.kind === "photo" : m.kind === "video"));
+    const q = searchQ.trim().toLowerCase();
+    if (q) l = l.filter((m) => m.projectTitle.toLowerCase().includes(q) || (m.creatorName || "").toLowerCase().includes(q));
+    return l;
+  }, [items, kind, searchQ]);
+  if (isLoading) {
+    return (
+      <div className={GRID_CLASSES[1]}>
+        {[...Array(12)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
+      </div>
+    );
+  }
+  if (shown.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-20 text-center">
+        <ImageIcon className="mb-3 h-12 w-12 text-slate-300" />
+        <p className="text-sm font-medium text-slate-600">No unmatched {kind}</p>
+        <p className="text-xs text-slate-400">Everything on CompanyCam of this type is linked to a customer.</p>
+      </div>
+    );
+  }
+  return (
+    <div className={GRID_CLASSES[1]} data-testid="unmatched-gallery">
+      {shown.map((m) => (
+        <div
+          key={m.id}
+          className="group relative overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+          style={{ contentVisibility: "auto", containIntrinsicSize: "280px" } as React.CSSProperties}
+          data-testid={`unmatched-tile-${m.id}`}
+        >
+          <button onClick={() => onOpen(m)} className="block w-full overflow-hidden">
+            {m.kind === "video" ? (
+              <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-900">
+                {m.thumbUrl && (
+                  <img src={m.thumbUrl} alt={m.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80 transition-transform duration-200 group-hover:scale-105" />
+                )}
+                <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-black/50">
+                  <Play className="h-6 w-6 fill-white text-white" />
+                </span>
+              </div>
+            ) : (
+              <img
+                src={m.thumbUrl || m.url}
+                alt={m.name}
+                loading="lazy"
+                className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
+              />
+            )}
+          </button>
+          <div className="space-y-0.5 p-2.5">
+            <p className="truncate text-xs font-semibold text-foreground" title={m.projectTitle}>{m.projectTitle}</p>
+            <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+              <User className="h-3 w-3 shrink-0" />
+              {m.creatorName || "Unknown"}
+              {m.createdAt && <> · {format(new Date(m.createdAt), "MMM d, h:mm a")}</>}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function UnmatchedSection({
   projects, isLoading, searchQ, kindFilter, sort, isAdmin, onOpenMedia,
 }: {
@@ -408,7 +492,13 @@ function UnmatchedSection({
           </p>
         </div>
       </div>
-      {isLoading ? (
+      {kindFilter !== "all" ? (
+        <UnmatchedGallery
+          kind={kindFilter}
+          searchQ={searchQ}
+          onOpen={(m) => onOpenMedia(m, { ccProjectId: m.ccProjectId, ccProjectName: m.projectTitle, ccAddress: null, matchScore: null, photoCount: null, archived: null, lastSyncedAt: null })}
+        />
+      ) : isLoading ? (
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
         </div>
