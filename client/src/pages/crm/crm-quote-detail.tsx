@@ -3865,11 +3865,13 @@ export default function CrmQuoteDetail() {
             <CardContent>
               {isEditingDescription ? (
                 <div className="space-y-3">
+                  {/* Tall editor — contracts and pasted scopes should be fully
+                      visible while editing, not squeezed into a strip */}
                   <RichTextEditor
                     content={editedDescription}
                     onChange={(content) => setEditedDescription(content)}
                     placeholder="Add a description for this custom install quote..."
-                    minHeight="min-h-[150px]"
+                    minHeight="min-h-[450px]"
                   />
                   <div className="flex gap-2">
                     <Button

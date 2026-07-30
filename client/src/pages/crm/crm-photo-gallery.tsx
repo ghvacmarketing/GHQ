@@ -83,6 +83,7 @@ type UnmatchedProject = {
   ccAddress: string | null;
   matchScore: number | null;
   photoCount: number | null;
+  archived: boolean | null;
   lastSyncedAt: string | null;
 };
 
@@ -246,9 +247,10 @@ function MatchCustomerDialog({ project, onClose }: { project: UnmatchedProject; 
 }
 
 function UnmatchedProjectCard({
-  project, isAdmin, onOpenMedia, onCreate, onMatch,
+  project, kindFilter, isAdmin, onOpenMedia, onCreate, onMatch,
 }: {
   project: UnmatchedProject;
+  kindFilter: "all" | "photos" | "videos";
   isAdmin: boolean;
   onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
   onCreate: (p: UnmatchedProject) => void;
@@ -278,6 +280,12 @@ function UnmatchedProjectCard({
     () => Array.from(new Set(media.map((m) => m.creatorName).filter(Boolean))) as string[],
     [media],
   );
+  const shownMedia = useMemo(
+    () => media.filter((m) => kindFilter === "all" || (kindFilter === "photos" ? m.kind === "photo" : m.kind === "video")),
+    [media, kindFilter],
+  );
+  const photoN = media.filter((m) => m.kind === "photo").length;
+  const videoN = media.filter((m) => m.kind === "video").length;
   const title = unmatchedProjectTitle(project);
   const count = project.photoCount ?? 0;
   return (
@@ -289,7 +297,14 @@ function UnmatchedProjectCard({
             {(project.ccProjectName || "").trim() && project.ccAddress && (
               <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{project.ccAddress}</span>
             )}
-            <span>{count} item{count === 1 ? "" : "s"} on CompanyCam</span>
+            <span>
+              {media.length > 0
+                ? `${photoN} photo${photoN === 1 ? "" : "s"}${videoN > 0 ? ` · ${videoN} video${videoN === 1 ? "" : "s"}` : ""}`
+                : `${count} item${count === 1 ? "" : "s"} on CompanyCam`}
+            </span>
+            {project.archived && (
+              <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">Archived on CompanyCam</span>
+            )}
             {creators.length > 0 && <span>· by {creators.join(", ")}</span>}
           </p>
         </div>
@@ -321,11 +336,11 @@ function UnmatchedProjectCard({
             <div className={GRID_CLASSES[2]}>
               {[...Array(6)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
             </div>
-          ) : media.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400">No media found on this project.</p>
+          ) : shownMedia.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">{media.length === 0 ? "No media found on this project." : `No ${kindFilter} on this project.`}</p>
           ) : (
             <div className={GRID_CLASSES[2]}>
-              {media.map((m) => (
+              {shownMedia.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => onOpenMedia(m, project)}
@@ -359,11 +374,12 @@ function UnmatchedProjectCard({
 }
 
 function UnmatchedSection({
-  projects, isLoading, searchQ, isAdmin, onOpenMedia,
+  projects, isLoading, searchQ, kindFilter, isAdmin, onOpenMedia,
 }: {
   projects: UnmatchedProject[];
   isLoading: boolean;
   searchQ: string;
+  kindFilter: "all" | "photos" | "videos";
   isAdmin: boolean;
   onOpenMedia: (m: UnmatchedMediaItem, project: UnmatchedProject) => void;
 }) {
@@ -383,9 +399,14 @@ function UnmatchedSection({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm text-muted-foreground">
-          CompanyCam jobs that aren't linked to a customer yet — their media stays here until someone {isAdmin ? "creates or matches the customer" : "with admin access links them"}.
-        </p>
+        <div>
+          <p className="text-sm font-semibold text-foreground" data-testid="unmatched-summary">
+            {projects.length} unmatched project{projects.length === 1 ? "" : "s"} · {projects.reduce((n, p) => n + (p.photoCount ?? 0), 0).toLocaleString()} items on CompanyCam
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Jobs that aren't linked to a customer yet — their media stays here until someone {isAdmin ? "creates or matches the customer" : "with admin access links them"}.
+          </p>
+        </div>
         <div className="ml-auto">
           <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
             <SelectTrigger className="h-8 w-40 bg-white text-xs" data-testid="unmatched-sort"><SelectValue /></SelectTrigger>
@@ -416,6 +437,7 @@ function UnmatchedSection({
             <UnmatchedProjectCard
               key={p.ccProjectId}
               project={p}
+              kindFilter={kindFilter}
               isAdmin={isAdmin}
               onOpenMedia={onOpenMedia}
               onCreate={setCreateFor}
@@ -458,7 +480,9 @@ export default function CrmPhotoGallery() {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent" | "unmatched">("all");
+  const [primaryTab, setPrimaryTab] = useState<"gallery" | "unmatched">("gallery");
+  const [typeTab, setTypeTab] = useState<"all" | "photos" | "videos" | "documents" | "checklist" | "recent">("all");
+  const [unmatchedKind, setUnmatchedKind] = useState<"all" | "photos" | "videos">("all");
   const [searchQ, setSearchQ] = useState("");
 
   // Upload — pick a customer, then attach files to them
@@ -782,87 +806,21 @@ export default function CrmPhotoGallery() {
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">Photos and files from the field — refreshes automatically.</p>
           </div>
-          <div className="relative mx-auto w-full max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder="Search media…"
-              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-              data-testid="media-search"
-            />
-          </div>
-          <Button
-            size="sm"
-            className="ml-auto h-9 shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
-            onClick={() => { setUpCustomer(null); setUpSearch(""); setUploadOpen(true); }}
-            data-testid="media-upload"
-          >
-            <Upload className="mr-1.5 h-4 w-4" /> Upload
-          </Button>
-        </div>
-
-        {/* Row 2: type + view tabs on the left, filters condensed into one icon on the right */}
-        <div className="flex flex-wrap items-center gap-2" data-testid="gallery-toolbar">
-          <IndustrialTabs
-            testidPrefix="media-type"
-            activeKey={typeTab}
-            onSelect={(k) => setTypeTab(k as typeof typeTab)}
-            tabs={[
-              { key: "all", label: "All" },
-              { key: "photos", label: "Photos" },
-              { key: "videos", label: "Videos" },
-              { key: "documents", label: "Documents" },
-              { key: "checklist", label: "Checklist Photos" },
-              { key: "recent", label: "Recent" },
-              { key: "unmatched", label: "Unmatched", count: unmatchedProjects.length || null },
-            ]}
-          />
-          {typeTab !== "unmatched" && (
-          <IndustrialTabs
-            testidPrefix="media-view"
-            activeKey={view}
-            onSelect={(k) => setView(k as typeof view)}
-            tabs={[
-              { key: "grid", label: "Grid" },
-              { key: "list", label: "List" },
-            ]}
-          />
-          )}
-
-          {typeTab !== "unmatched" && (
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground" data-testid="photo-count">
-              {filtersActive && photos ? `${filtered.length} of ${photos.length}` : `${filtered.length}`} items
-            </span>
-
-            {view === "grid" && (
-              <div className="flex items-center rounded-md border border-input bg-white">
-                <button
-                  onClick={() => setSize((s) => Math.min(SMALLEST, s + 1))}
-                  disabled={size === SMALLEST}
-                  className="flex h-9 w-9 items-center justify-center text-slate-600 hover:text-foreground disabled:opacity-35"
-                  title="Smaller thumbnails"
-                  data-testid="size-smaller"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setSize((s) => Math.max(LARGEST, s - 1))}
-                  disabled={size === LARGEST}
-                  className="flex h-9 w-9 items-center justify-center border-l border-input text-slate-600 hover:text-foreground disabled:opacity-35"
-                  title="Larger thumbnails"
-                  data-testid="size-larger"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
+            <div className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder={primaryTab === "unmatched" ? "Search unmatched projects…" : "Search media…"}
+                className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                data-testid="media-search"
+              />
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <button
-                  className={`relative flex h-9 w-9 items-center justify-center rounded-md border ${
+                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${
                     filtersActive ? "border-[#711419] text-[#711419]" : "border-input bg-white text-slate-600 hover:text-foreground"
                   }`}
                   title="Filters"
@@ -925,7 +883,95 @@ export default function CrmPhotoGallery() {
                 )}
               </PopoverContent>
             </Popover>
+            <Button
+              size="sm"
+              className="h-9 shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
+              onClick={() => { setUpCustomer(null); setUpSearch(""); setUploadOpen(true); }}
+              data-testid="media-upload"
+            >
+              <Upload className="mr-1.5 h-4 w-4" /> Upload
+            </Button>
           </div>
+        </div>
+
+        {/* Centered primary switcher — Gallery | Unmatched (Comms-style) */}
+        <div className="flex justify-center">
+          <IndustrialTabs
+            testidPrefix="media-primary"
+            activeKey={primaryTab}
+            onSelect={(k) => setPrimaryTab(k as typeof primaryTab)}
+            tabs={[
+              { key: "gallery", label: "Photo Gallery" },
+              { key: "unmatched", label: "Unmatched", count: unmatchedProjects.length || null },
+            ]}
+          />
+        </div>
+
+        {/* Sub-tabs per mode (view controls right) */}
+        <div className="flex flex-wrap items-center gap-2" data-testid="gallery-toolbar">
+          {primaryTab === "gallery" ? (
+            <>
+              <IndustrialTabs
+                testidPrefix="media-type"
+                activeKey={typeTab}
+                onSelect={(k) => setTypeTab(k as typeof typeTab)}
+                tabs={[
+                  { key: "all", label: "All" },
+                  { key: "photos", label: "Photos" },
+                  { key: "videos", label: "Videos" },
+                  { key: "documents", label: "Documents" },
+                  { key: "checklist", label: "Checklist Photos" },
+                  { key: "recent", label: "Recent" },
+                ]}
+              />
+              <IndustrialTabs
+                testidPrefix="media-view"
+                activeKey={view}
+                onSelect={(k) => setView(k as typeof view)}
+                tabs={[
+                  { key: "grid", label: "Grid" },
+                  { key: "list", label: "List" },
+                ]}
+              />
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-muted-foreground" data-testid="photo-count">
+                  {filtersActive && photos ? `${filtered.length} of ${photos.length}` : `${filtered.length}`} items
+                </span>
+                {view === "grid" && (
+                  <div className="flex items-center rounded-md border border-input bg-white">
+                    <button
+                      onClick={() => setSize((s) => Math.min(SMALLEST, s + 1))}
+                      disabled={size === SMALLEST}
+                      className="flex h-9 w-9 items-center justify-center text-slate-600 hover:text-foreground disabled:opacity-35"
+                      title="Smaller thumbnails"
+                      data-testid="size-smaller"
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setSize((s) => Math.max(LARGEST, s - 1))}
+                      disabled={size === LARGEST}
+                      className="flex h-9 w-9 items-center justify-center border-l border-input text-slate-600 hover:text-foreground disabled:opacity-35"
+                      title="Larger thumbnails"
+                      data-testid="size-larger"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <IndustrialTabs
+              testidPrefix="unmatched-kind"
+              activeKey={unmatchedKind}
+              onSelect={(k) => setUnmatchedKind(k as typeof unmatchedKind)}
+              tabs={[
+                { key: "all", label: "All" },
+                { key: "photos", label: "Photos" },
+                { key: "videos", label: "Videos" },
+              ]}
+            />
           )}
         </div>
 
@@ -948,11 +994,12 @@ export default function CrmPhotoGallery() {
           </div>
         )}
 
-        {typeTab === "unmatched" ? (
+        {primaryTab === "unmatched" ? (
           <UnmatchedSection
             projects={unmatchedProjects}
             isLoading={unmatchedLoading}
             searchQ={searchQ}
+            kindFilter={unmatchedKind}
             isAdmin={isAdmin}
             onOpenMedia={(m, project) =>
               setLightbox({
@@ -1138,7 +1185,7 @@ export default function CrmPhotoGallery() {
         )}
 
         {/* Load more — the feed comes down in pages so the page stays smooth */}
-        {typeTab !== "unmatched" && hasNextPage && !isLoading && (
+        {primaryTab === "gallery" && hasNextPage && !isLoading && (
           <div className="flex justify-center pt-1">
             <Button
               variant="outline"

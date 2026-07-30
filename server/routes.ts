@@ -14301,6 +14301,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // the media feed); linking/creating stays admin-gated below.
   app.get("/api/crm/companycam/unmatched", requireCrmAuth, async (_req, res) => {
     try {
+      // EVERY unmatched project — archived CompanyCam jobs included (their
+      // media still matters); the UI badges archived ones.
       const links = await db
         .select({
           ccProjectId: companycamProjectLinks.ccProjectId,
@@ -14308,10 +14310,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ccAddress: companycamProjectLinks.ccAddress,
           matchScore: companycamProjectLinks.matchScore,
           photoCount: companycamProjectLinks.photoCount,
+          archived: companycamProjectLinks.archived,
           lastSyncedAt: companycamProjectLinks.lastSyncedAt,
         })
         .from(companycamProjectLinks)
-        .where(and(eq(companycamProjectLinks.matchType, "unmatched"), eq(companycamProjectLinks.archived, false)))
+        .where(eq(companycamProjectLinks.matchType, "unmatched"))
         .orderBy(desc(companycamProjectLinks.photoCount));
       res.json(links);
     } catch (error) {
