@@ -558,6 +558,16 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS notification_templates (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        title text NOT NULL,
+        message text,
+        created_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS push_device_tokens (
         token text PRIMARY KEY,
         user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,

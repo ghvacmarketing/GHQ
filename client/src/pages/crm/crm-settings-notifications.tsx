@@ -44,6 +44,16 @@ type PushDevice = {
   userName: string | null;
 };
 
+const TYPE_DESCRIPTIONS: Record<string, string> = {
+  task_assigned: "A task gets assigned to someone",
+  task_due: "A task reaches its due date",
+  mention: "Someone is @-mentioned in a comment",
+  tagged_comment: "Someone is tagged in a pin comment",
+  comment: "A new comment lands on their work",
+  status_change: "A record they're on changes status (quote accepted, job done…)",
+  system: "Announcements sent from this page",
+};
+
 const TYPE_LABELS: Record<string, string> = {
   mention: "Mention",
   task_assigned: "Task assigned",
@@ -104,6 +114,43 @@ export default function CrmSettingsNotifications() {
     },
   });
 
+  type NotificationTemplate = { id: string; name: string; title: string; message: string | null };
+  const { data: templates = [] } = useQuery<NotificationTemplate[]>({
+    queryKey: ["/api/crm/notification-templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/notification-templates", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const { data: typeSummary = [] } = useQuery<Array<{ type: string; count: number }>>({
+    queryKey: ["/api/crm/notifications/type-summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/notifications/type-summary", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const typeCount = (t: string) => typeSummary.find((r) => r.type === t)?.count ?? 0;
+
+  const saveTemplate = useMutation({
+    mutationFn: async () => {
+      const name = window.prompt("Template name (e.g. Shop meeting reminder):", title.slice(0, 40));
+      if (!name?.trim()) throw new Error("cancelled");
+      const res = await apiRequest("POST", "/api/crm/notification-templates", { name: name.trim(), title, message });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notification-templates"] });
+      toast({ title: "Template saved" });
+    },
+    onError: (e: any) => { if (e?.message !== "cancelled") toast({ title: e?.message || "Couldn't save the template", variant: "destructive" }); },
+  });
+  const deleteTemplate = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/notification-templates/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/notification-templates"] }),
+  });
+
   const send = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/crm/notifications/broadcast", {
@@ -156,6 +203,30 @@ export default function CrmSettingsNotifications() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5">
+            {templates.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5" data-testid="template-chips">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Templates:</span>
+                {templates.map((t) => (
+                  <span key={t.id} className="group inline-flex items-center overflow-hidden rounded-[4px] border border-slate-200 bg-white text-xs">
+                    <button
+                      onClick={() => { setTitle(t.title); setMessage(t.message || ""); }}
+                      className="px-2.5 py-1 font-medium text-slate-700 hover:bg-[#711419]/5 hover:text-[#711419]"
+                      data-testid={`template-${t.id}`}
+                    >
+                      {t.name}
+                    </button>
+                    <button
+                      onClick={() => deleteTemplate.mutate(t.id)}
+                      className="hidden border-l border-slate-200 px-1.5 py-1 text-slate-400 hover:text-red-600 group-hover:block"
+                      title="Delete template"
+                      data-testid={`template-delete-${t.id}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2.5">
               <Select value={recipients} onValueChange={setRecipients}>
                 <SelectTrigger className="h-9 w-56 bg-white text-sm" data-testid="broadcast-recipients">
@@ -186,7 +257,15 @@ export default function CrmSettingsNotifications() {
               className="bg-white text-sm"
               data-testid="broadcast-message"
             />
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={!title.trim() || saveTemplate.isPending}
+                onClick={() => saveTemplate.mutate()}
+                data-testid="broadcast-save-template"
+              >
+                Save as template
+              </Button>
               <Button
                 className="bg-[#711419] hover:bg-[#8a1a1f]"
                 disabled={!title.trim() || send.isPending}
@@ -196,6 +275,32 @@ export default function CrmSettingsNotifications() {
                 {send.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
                 Send
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* What the system notifies about, automatically */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Notification types</CardTitle>
+            <CardDescription>What the CRM sends automatically — every one also pushes to registered phones.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="type-catalog">
+              {Object.entries(TYPE_DESCRIPTIONS).map(([t, desc]) => (
+                <button
+                  key={t}
+                  onClick={() => setTypeFilter(typeFilter === t ? "all" : t)}
+                  className={`rounded-md border p-2.5 text-left transition-colors ${typeFilter === t ? "border-[#711419] bg-[#711419]/[0.04]" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                  data-testid={`type-card-${t}`}
+                >
+                  <p className="flex items-center justify-between text-sm font-semibold text-slate-800">
+                    {TYPE_LABELS[t]}
+                    <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-slate-500">{typeCount(t)}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -3784,6 +3784,16 @@ export const pushDeviceTokens = pgTable("push_device_tokens", {
   lastSeenAt: timestamp("last_seen_at").defaultNow(),
 });
 
+// Reusable messages for the Notification Center composer
+export const notificationTemplates = pgTable("notification_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  title: text("title").notNull(),
+  message: text("message"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertCrmNotificationSchema = createInsertSchema(crmNotifications).omit({
   id: true,
   createdAt: true,
