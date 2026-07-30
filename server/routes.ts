@@ -14219,6 +14219,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---- Notification center (Settings → Notifications) ----
+  // Org-wide view of everything the system notifies people about — the
+  // oversight surface for mobile push (work orders assigned, payments, …).
+  app.get("/api/crm/notifications/admin", requireCrmAdmin, async (req, res) => {
+    try {
+      const { userId, type, q } = req.query as Record<string, string | undefined>;
+      const conds: any[] = [];
+      if (userId && userId !== "all") conds.push(eq(crmNotifications.userId, userId));
+      if (type && type !== "all") conds.push(eq(crmNotifications.type, type as any));
+      if (q?.trim()) {
+        const like = `%${q.trim()}%`;
+        conds.push(sql`(${crmNotifications.title} ILIKE ${like} OR ${crmNotifications.preview} ILIKE ${like})`);
+      }
+      const rows = await db
+        .select({
+          id: crmNotifications.id,
+          type: crmNotifications.type,
+          title: crmNotifications.title,
+          preview: crmNotifications.preview,
+          entityType: crmNotifications.entityType,
+          entityId: crmNotifications.entityId,
+          isRead: crmNotifications.isRead,
+          createdAt: crmNotifications.createdAt,
+          recipientId: crmNotifications.userId,
+          recipientName: crmUsers.name,
+        })
+        .from(crmNotifications)
+        .leftJoin(crmUsers, eq(crmNotifications.userId, crmUsers.id))
+        .where(conds.length > 0 ? and(...conds) : undefined)
+        .orderBy(desc(crmNotifications.createdAt))
+        .limit(300);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching admin notifications:", error);
+      res.status(500).json({ message: "Failed to load notifications" });
+    }
+  });
+
+  // Which users can actually receive mobile pushes (registered devices)
+  app.get("/api/crm/push/devices", requireCrmAdmin, async (_req, res) => {
+    try {
+      const rows = await db
+        .select({
+          token: pushDeviceTokens.token,
+          platform: pushDeviceTokens.platform,
+          lastSeenAt: pushDeviceTokens.lastSeenAt,
+          userId: pushDeviceTokens.userId,
+          userName: crmUsers.name,
+        })
+        .from(pushDeviceTokens)
+        .leftJoin(crmUsers, eq(pushDeviceTokens.userId, crmUsers.id))
+        .orderBy(desc(pushDeviceTokens.lastSeenAt));
+      res.json(rows.map((r) => ({ ...r, token: r.token.slice(0, 8) + "…" })));
+    } catch (error) {
+      console.error("Error fetching push devices:", error);
+      res.status(500).json({ message: "Failed to load devices" });
+    }
+  });
+
+  // Send a notification to chosen users (or everyone active). Rows land in
+  // crm_notifications, so the APNs bridge pushes them to phones within ~20s
+  // and they appear in every in-app notifications drawer.
+  app.post("/api/crm/notifications/broadcast", requireCrmAdmin, async (req, res) => {
+    try {
+      const sender = getCurrentCrmUser(req);
+      const title = String(req.body?.title || "").trim();
+      const message = String(req.body?.message || "").trim();
+      const userIds: string[] | "all" = req.body?.userIds === "all" ? "all" : Array.isArray(req.body?.userIds) ? req.body.userIds : [];
+      if (!title) return res.status(400).json({ message: "A title is required" });
+      if (userIds !== "all" && userIds.length === 0) return res.status(400).json({ message: "Pick at least one recipient" });
+
+      let targets: string[];
+      if (userIds === "all") {
+        const users = await db.select({ id: crmUsers.id }).from(crmUsers).where(eq(crmUsers.isActive, true));
+        targets = users.map((u) => u.id);
+      } else {
+        targets = userIds;
+      }
+      for (const userId of targets) {
+        await db.insert(crmNotifications).values({
+          userId,
+          type: "system",
+          title,
+          preview: message || null,
+          actorId: sender?.id || null,
+        });
+      }
+      res.json({ sent: targets.length });
+    } catch (error) {
+      console.error("Error broadcasting notification:", error);
+      res.status(500).json({ message: "Failed to send the notification" });
+    }
+  });
+
   // ---- CompanyCam admin: status, manual sync, manual matching ----
   app.get("/api/crm/companycam/status", requireCrmAdmin, async (_req, res) => {
     try {

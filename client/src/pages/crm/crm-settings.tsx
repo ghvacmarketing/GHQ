@@ -4,7 +4,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
+import { Bell,
   Shield,
   Users,
   ClipboardList,
@@ -47,6 +47,7 @@ const sections: SettingsSection[] = [
     items: [
       { name: "Users & Roles", href: "/crm/settings/users", icon: Users },
       { name: "Time Logs", href: "/crm/settings/time-logs", icon: Clock, ownerOnly: true },
+      { name: "Notifications", href: "/crm/settings/notifications", icon: Bell },
     ],
   },
   {

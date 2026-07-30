@@ -515,7 +515,9 @@ button:hover .ghq-more,
 .ghq-more:hover {
   transform: rotate(45deg) scale(1.05);
 }
-svg.ghq-more.ghq-more-open {
+svg.ghq-more.ghq-more-open,
+button[data-state="open"] svg.ghq-more,
+[data-state="open"] > svg.ghq-more {
   transform: rotate(45deg) scale(1.1);
 }
 

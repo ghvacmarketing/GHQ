@@ -418,6 +418,13 @@ Integration with Bouncie GPS devices for real-time vehicle tracking of company t
 
 ---
 
+## NOTIFICATION CENTER
+
+### Settings > Notifications (URL: /crm/settings/notifications)
+Admin-only org-wide notification oversight: a feed of EVERY notification the system has sent anyone (work orders assigned, payments, mentions, task assignments...) with filters by person, type, and search; a registered-devices counter showing whose phones can receive mobile push; and a "Send a notification" composer — pick everyone or one person, write a title + optional message, and it lands in their in-app notification drawer AND as a push notification on any phone with the GHQ app (delivered by the APNs bridge within ~20 seconds).
+
+---
+
 ## COMPANYCAM INTEGRATION
 
 ### What is the CompanyCam integration?
