@@ -88,7 +88,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
     // If a selectedOption is provided, calculate deposit from that option's total only
     if (selectedOption) {
       const lineItems = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quoteId));
-      const optionItems = lineItems.filter(item => item.optionTag === selectedOption);
+      const optionItems = lineItems.filter(item => item.optionTag === selectedOption || !item.optionTag);
       
       if (optionItems.length > 0) {
         // Sum the line totals for the selected option

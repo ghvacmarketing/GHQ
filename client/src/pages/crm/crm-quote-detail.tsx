@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreIcon } from "@/components/crm/more-icon";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
@@ -94,6 +94,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
+import { generateQuotePdf } from "@/lib/quote-pdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -801,18 +802,6 @@ export default function CrmQuoteDetail() {
     },
   });
 
-  // Toggle whether a line shows on the customer's copy (public view + emails).
-  const toggleLineVisibilityMutation = useMutation({
-    mutationFn: async ({ lineItemId, customerVisible }: { lineItemId: string; customerVisible: boolean }) => {
-      const res = await apiRequest("PATCH", `/api/crm/quotes/${quoteId}/line-items/${lineItemId}`, { customerVisible });
-      return res.json();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] }),
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to update visibility", variant: "destructive" });
-    },
-  });
-
   const deleteLineItemMutation = useMutation({
     mutationFn: async (lineItemId: string) => {
       const res = await apiRequest("DELETE", `/api/crm/quotes/${quoteId}/line-items/${lineItemId}`);
@@ -1107,6 +1096,33 @@ export default function CrmQuoteDetail() {
     setNewItemOptionTagCreating(false);
   };
 
+  // Internal cost lines (worksheet build-up, labor, warranty reserve) live in
+  // their own staff-only "Internal costs" section — never in the customer's
+  // line items, the PDF, emails, or presentation mode.
+  const isInternalLine = (item: { customerVisible?: boolean | null; lineType?: string | null }) =>
+    (item as any).customerVisible === false || item.lineType === "labor" || item.lineType === "other";
+  const visibleLineItems = (quote?.lineItems || []).filter((i) => !isInternalLine(i));
+  const internalLineItems = (quote?.lineItems || []).filter((i) => isInternalLine(i));
+  const internalCostsTotal = internalLineItems.reduce((sum, i) => sum + (parseFloat(String(i.lineTotal || 0)) || 0), 0);
+
+  // Presentation mode never shows internal pricing by default; the presenter
+  // can flip it on deliberately (stays inside the Internal costs panel).
+  const [showInternalInPresentation, setShowInternalInPresentation] = useState(false);
+  const presentationLineItems = useMemo(() => {
+    if (visibleLineItems.length > 0) return visibleLineItems;
+    const total = parseFloat(String(quote?.total || 0)) || 0;
+    if (total <= 0) return [];
+    // Custom quotes: every stored line is internal cost build-up — the
+    // customer sees the package at its sell price.
+    return [{
+      id: "sell-price",
+      description: quote?.title || "Complete installation as specified",
+      quantity: "1",
+      unitPrice: String(total),
+      lineTotal: String(total),
+    } as any];
+  }, [visibleLineItems, quote?.total, quote?.title]);
+
   const calculateLineItemsSubtotal = () => {
     if (!quote?.lineItems) return 0;
     return quote.lineItems
@@ -1271,6 +1287,7 @@ export default function CrmQuoteDetail() {
   };
 
   const resetPresentationState = () => {
+    setShowInternalInPresentation(false);
     setPresentationSignature("");
     setPresentationName("");
     setPresentationAgreed(false);
@@ -1844,6 +1861,19 @@ export default function CrmQuoteDetail() {
 
   const handleDownloadPDF = async () => {
     if (!quote) return;
+
+    // Standard (custom + quick) quotes print with the shared professional
+    // template that mirrors the invoice PDF. Internal cost lines never print.
+    if (!quote.aiGeneratedQuote) {
+      try {
+        const fileName = generateQuotePdf(quote as any, (quote.lineItems || []) as any);
+        toast({ title: "PDF Downloaded", description: `Quote saved as ${fileName}` });
+      } catch (e) {
+        console.error("Error generating PDF:", e);
+        toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+      }
+      return;
+    }
 
     // Load logo, recolor every opaque pixel to white (so it sits directly on the
     // dark-red bar without any background box), and capture the aspect ratio.
@@ -3081,8 +3111,8 @@ export default function CrmQuoteDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quote.lineItems && quote.lineItems.length > 0 ? (
-                  quote.lineItems.map((item) => (
+                {visibleLineItems.length > 0 ? (
+                  visibleLineItems.map((item) => (
                     <TableRow key={item.id}>
                       {editingLineItemId === item.id ? (
                         <>
@@ -3183,19 +3213,6 @@ export default function CrmQuoteDetail() {
                           {canEditLineItems && (
                             <TableCell>
                               <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => toggleLineVisibilityMutation.mutate({ lineItemId: item.id, customerVisible: (item as any).customerVisible === false })}
-                                  disabled={toggleLineVisibilityMutation.isPending}
-                                  title={(item as any).customerVisible === false ? "Hidden from the customer — click to show" : "Customer sees this line — click to hide"}
-                                  data-testid={`button-toggle-visible-${item.id}`}
-                                >
-                                  {(item as any).customerVisible === false
-                                    ? <EyeOff className="h-4 w-4 text-slate-400 hover:text-[#711419]" />
-                                    : <Eye className="h-4 w-4 text-[#711419]" />}
-                                </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -3360,26 +3377,97 @@ export default function CrmQuoteDetail() {
             {/* Hide subtotal/total for options mode since each package is a separate choice */}
             {quote.quoteMode !== "options" && (
               <div className="mt-6 border-t pt-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">
-                    {quote.quoteType === "custom_install" ? "Internal Costs" : "Equipment & Labor"}
-                  </span>
-                  <span>{formatCurrency(calculateLineItemsSubtotal())}</span>
-                </div>
-                <Separator />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Sell Price</span>
-                  <span className="text-[#d3b07d]">
-                    {/* For worksheet/custom_install quotes, line items are internal costs - use quote.total as the selling price */}
-                    {quote.quoteType === "custom_install" 
-                      ? formatCurrency(quote.total)
-                      : formatCurrency(calculateLineItemsTotal())}
-                  </span>
+                  <span className="text-[#d3b07d]">{formatCurrency(quote.total)}</span>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Internal costs — staff-only cost build-up (worksheet lines, labor,
+            warranty reserve). Never shown to the customer: excluded from the
+            public view, emails, the PDF, and presentation mode. */}
+        {internalLineItems.length > 0 && (
+          <Card className="border-amber-200/70" data-testid="internal-costs-card">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <EyeOff className="h-4 w-4 text-amber-600" />
+                    Internal costs
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Cost build-up for this job — internal only, never on customer-facing copies.
+                  </p>
+                </div>
+                <span className="rounded-[3px] bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-800">
+                  Internal only
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right w-24">Qty</TableHead>
+                    <TableHead className="text-right w-32">Unit Cost</TableHead>
+                    <TableHead className="text-right w-32">Total</TableHead>
+                    {canEditLineItems && <TableHead className="w-20">Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {internalLineItems.map((item) => (
+                    <TableRow key={item.id} data-testid={`internal-line-${item.id}`}>
+                      <TableCell>
+                        <span className="text-slate-700">{item.description}</span>
+                        {item.lineType === "labor" && (
+                          <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">Labor</span>
+                        )}
+                        {item.description === "Warranty Reserve" && (
+                          <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">Warranty</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{item.quantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                      {canEditLineItems && (
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => deleteLineItemMutation.mutate(item.id)}
+                            disabled={deleteLineItemMutation.isPending}
+                            data-testid={`button-delete-internal-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="mt-4 border-t pt-3 space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Total internal costs</span>
+                  <span className="font-medium">{formatCurrency(internalCostsTotal)}</span>
+                </div>
+                {parseFloat(quote.total || "0") > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Gross margin (sell − costs)</span>
+                    <span className={`font-semibold ${parseFloat(quote.total || "0") - internalCostsTotal >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                      {formatCurrency(parseFloat(quote.total || "0") - internalCostsTotal)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Items Catalog Dialog */}
         <Dialog open={showItemsCatalogDialog} onOpenChange={(open) => {
@@ -4791,8 +4879,21 @@ export default function CrmQuoteDetail() {
       >
         <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto !bg-gray-100">
           <div className="min-h-screen bg-gray-100">
-            {/* Exit button */}
-            <div className="fixed top-4 right-4 z-50">
+            {/* Presenter controls: internal-costs reveal + exit */}
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+              {internalLineItems.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowInternalInPresentation((v) => !v)}
+                  className={`shadow-lg ${showInternalInPresentation ? "border-amber-400 bg-amber-50 text-amber-800" : "bg-white"}`}
+                  title={showInternalInPresentation ? "Internal costs are visible on screen" : "Reveal internal costs (labor, warranty) on screen"}
+                  data-testid="button-toggle-internal-presentation"
+                >
+                  {showInternalInPresentation ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+                  Internal costs
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -4908,7 +5009,7 @@ export default function CrmQuoteDetail() {
                       </div>
 
                       <div className="space-y-3 sm:space-y-4">
-                        {groupLineItemsByOption(quote.lineItems).map((option) => {
+                        {groupLineItemsByOption(visibleLineItems).map((option) => {
                           const isSelected = presentationSelectedOption === option.tag;
                           const whatsIncluded = getWhatsIncludedForOption(
                             option.tag, 
@@ -5029,8 +5130,8 @@ export default function CrmQuoteDetail() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {quote.lineItems && quote.lineItems.length > 0 ? (
-                              quote.lineItems.map((item) => (
+                            {presentationLineItems.length > 0 ? (
+                              presentationLineItems.map((item) => (
                                 <TableRow key={item.id}>
                                   <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} /></TableCell>
                                   <TableCell className="text-right">{item.quantity}</TableCell>
@@ -5059,6 +5160,37 @@ export default function CrmQuoteDetail() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Internal costs — presenter-revealed only, clearly marked */}
+              {showInternalInPresentation && internalLineItems.length > 0 && (
+                <Card className="shadow-lg mb-6 border-2 border-amber-300 bg-amber-50/60" data-testid="presentation-internal-costs">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base text-amber-900">Internal costs</CardTitle>
+                      <span className="rounded-[3px] bg-amber-200 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                        Internal only
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableBody>
+                        {internalLineItems.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="text-slate-700">{item.description}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">{formatPresentationCurrency(item.lineTotal)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow>
+                          <TableCell className="font-semibold text-amber-900" colSpan={2}>Total internal costs</TableCell>
+                          <TableCell className="text-right font-semibold text-amber-900">{formatPresentationCurrency(internalCostsTotal)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Signature Section or Already Approved Message */}
               {quote.status === "accepted" ? (

@@ -190,6 +190,8 @@ export class WebhookHandlers {
               .where(eq(crmQuotes.id, quoteId));
 
             if (shouldAutoAccept) {
+              const { recomputeQuoteStoredTotals } = await import("./services/quoteTotals");
+              await recomputeQuoteStoredTotals(quoteId).catch(() => {});
               console.log(`[Webhook] Quote ${quote.quoteNumber} auto-accepted after deposit payment - amount: $${depositAmount}, option: ${selectedOption}`);
             } else {
               console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}, option: ${selectedOption}`);

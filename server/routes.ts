@@ -398,32 +398,9 @@ function validateDiscountLineItems(
   return { valid: true };
 }
 
-// Recompute and persist a quote's stored subtotal/total from its line items.
-// Mirrors the quote detail page: subtotal = sum of non-discount line totals (gross),
-// total = sum of ALL line totals (discount lines have negative totals, so they net out).
-// Keeps crmQuotes.subtotal/total in sync so lists, pipeline value, and invoice
-// conversion reflect the same totals as the detail page.
-async function recomputeQuoteStoredTotals(quoteId: string): Promise<void> {
-  const items = await db.select().from(crmQuoteLineItems)
-    .where(eq(crmQuoteLineItems.quoteId, quoteId));
-
-  let subtotal = 0;
-  let total = 0;
-  for (const item of items) {
-    const lineTotal = parseFloat(String(item.lineTotal ?? "0")) || 0;
-    total += lineTotal;
-    const isDiscount = item.isDiscountLine === true
-      || item.lineType === "discount"
-      || (item.description ?? "").startsWith("Discount:");
-    if (!isDiscount) {
-      subtotal += lineTotal;
-    }
-  }
-
-  await db.update(crmQuotes)
-    .set({ subtotal: subtotal.toFixed(2), total: total.toFixed(2), updatedAt: new Date() })
-    .where(eq(crmQuotes.id, quoteId));
-}
+// Option-aware totals moved to services/quoteTotals.ts — options-mode quotes
+// store best-option totals while unsold and selected-option totals once sold.
+import { recomputeQuoteStoredTotals } from "./services/quoteTotals";
 
 // Helper function to check for scheduling conflicts
 async function checkSchedulingConflict(
@@ -7351,74 +7328,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 1. Company Overview KPIs
-      // For multi-option quotes, only count the "Best" option total (highest price option)
-      // Single-mode quotes use their total as-is
+      // crmQuotes.total is option-aware (services/quoteTotals.ts): options
+      // quotes store best-option totals while unsold and the SELECTED option
+      // once sold, so the stored total is the correct pipeline value here.
       const allQuotesInRange = await db
         .select({
           id: crmQuotes.id,
           total: crmQuotes.total,
-          quoteMode: crmQuotes.quoteMode,
           status: crmQuotes.status,
         })
         .from(crmQuotes)
         .where(sql`${crmQuotes.createdAt} >= ${rangeStart}`);
 
-      // Get IDs of multi-option quotes
-      const optionQuoteIds = allQuotesInRange
-        .filter(q => q.quoteMode === "options")
-        .map(q => q.id);
-
-      // Fetch all line items for multi-option quotes in a single query
-      const optionLineItems = optionQuoteIds.length > 0
-        ? await db
-            .select({
-              quoteId: crmQuoteLineItems.quoteId,
-              optionTag: crmQuoteLineItems.optionTag,
-              lineTotal: crmQuoteLineItems.lineTotal,
-            })
-            .from(crmQuoteLineItems)
-            .where(inArray(crmQuoteLineItems.quoteId, optionQuoteIds))
-        : [];
-
-      // Build a nested map: quoteId -> optionTag -> cost (lineTotal stores costs)
-      const optionQuoteCosts = new Map<string, Map<string, number>>();
-      const quoteAllOptionsCost = new Map<string, number>(); // Total cost of all options per quote
-      
-      for (const item of optionLineItems) {
-        const quoteId = item.quoteId;
-        const tag = item.optionTag || "default";
-        const lineTotal = parseFloat(item.lineTotal || "0");
-
-        if (!optionQuoteCosts.has(quoteId)) {
-          optionQuoteCosts.set(quoteId, new Map<string, number>());
-        }
-        const optionMap = optionQuoteCosts.get(quoteId)!;
-        optionMap.set(tag, (optionMap.get(tag) || 0) + lineTotal);
-        quoteAllOptionsCost.set(quoteId, (quoteAllOptionsCost.get(quoteId) || 0) + lineTotal);
-      }
-
-      // For multi-option quotes, calculate the highest option's sell price
-      // Using proportional approach: (highestOptionCost / allOptionsCost) * quote.total
-      // This preserves the markup ratio from the original quote
-      const highestOptionSellPrices = new Map<string, number>();
-      for (const quote of allQuotesInRange.filter(q => q.quoteMode === "options")) {
-        const optionMap = optionQuoteCosts.get(quote.id);
-        const allCost = quoteAllOptionsCost.get(quote.id) || 0;
-        const quoteSellPrice = parseFloat(quote.total || "0");
-        
-        if (optionMap && allCost > 0) {
-          // Find the highest cost option
-          let highestCost = 0;
-          for (const cost of optionMap.values()) {
-            if (cost > highestCost) highestCost = cost;
-          }
-          // Calculate proportional sell price for the highest option
-          const highestOptionSellPrice = (highestCost / allCost) * quoteSellPrice;
-          highestOptionSellPrices.set(quote.id, highestOptionSellPrice);
-        }
-      }
-
-      // Calculate totals using precomputed highest option sell prices
       let totalQuotedCalc = 0;
       let totalQuotesCount = 0;
       let totalSoldCalc = 0;
@@ -7426,16 +7347,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const quote of allQuotesInRange) {
         totalQuotesCount++;
-        let effectiveTotal = parseFloat(quote.total || "0");
-
-        // For multi-option quotes, use precomputed highest option sell price
-        if (quote.quoteMode === "options" && highestOptionSellPrices.has(quote.id)) {
-          effectiveTotal = highestOptionSellPrices.get(quote.id) || effectiveTotal;
-        }
-
+        const effectiveTotal = parseFloat(quote.total || "0");
         totalQuotedCalc += effectiveTotal;
-
-        if (quote.status === "accepted") {
+        if (quote.status === "accepted" || quote.status === "converted") {
           acceptedQuotesCount++;
           totalSoldCalc += effectiveTotal;
         }
@@ -19068,7 +18982,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (optionToUse) {
-          quoteLineItems = quoteLineItems.filter(item => item.optionTag === optionToUse);
+          // The sold package = the chosen option PLUS shared (untagged) lines
+          quoteLineItems = quoteLineItems.filter(item => item.optionTag === optionToUse || !item.optionTag);
           
           // Verify we have line items after filtering
           if (quoteLineItems.length === 0) {
@@ -19168,6 +19083,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.update(crmQuotes)
         .set({ status: "converted" as const, updatedAt: new Date() })
         .where(eq(crmQuotes.id, quoteId));
+      // Sold: option-aware stored total now reflects the chosen option
+      await recomputeQuoteStoredTotals(quoteId).catch(() => {});
 
       // Update work order billing disposition
       if (workOrderIdToUse) {
@@ -20820,7 +20737,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           line_total as "lineTotal", sort_order as "sortOrder",
           item_id as "itemId", is_discount_line as "isDiscountLine",
           discount_kind as "discountKind", option_tag as "optionTag",
-          image_url as "imageUrl", created_at as "createdAt"
+          image_url as "imageUrl", customer_visible as "customerVisible",
+          created_at as "createdAt"
         FROM crm_quote_line_items
         WHERE quote_id = ${req.params.id}
         ORDER BY sort_order ASC
@@ -21102,9 +21020,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: "1",
           lineTotal: cost.toString(),
           sortOrder: sortOrder++,
-          // Worksheet lines are internal costs — hidden from the customer
-          // unless the user explicitly toggled "customer sees this".
-          customerVisible: line.customerVisible === true,
+          // Worksheet lines are internal costs — never customer-facing. The
+          // customer sees the package sell price, not the cost build-up.
+          customerVisible: false,
         });
       }
 
@@ -21401,6 +21319,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
 
+      // Options quotes: stored total = best option + shared lines (not the
+      // sum of every option) — this is the pipeline's quoted value.
+      await recomputeQuoteStoredTotals(newQuote.id).catch(() => {});
+
       return res.status(201).json({ quoteId: newQuote.id, quote: newQuote, lineItems: createdLineItems });
     } catch (error) {
       console.error("Error creating quote from proposal:", error);
@@ -21408,29 +21330,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/quotes/quick - Create standalone quick quote
-  // PATCH /api/crm/quotes/:quoteId/line-items/:lineItemId — toggle whether a
-  // line shows on customer-facing surfaces (public view, emails). Lets the
-  // office flip visibility after the quote exists.
-  app.patch("/api/crm/quotes/:quoteId/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
-    try {
-      const { quoteId, lineItemId } = req.params;
-      if (typeof req.body?.customerVisible !== "boolean") {
-        return res.status(400).json({ message: "customerVisible (boolean) is required" });
-      }
-      const [row] = await db
-        .update(crmQuoteLineItems)
-        .set({ customerVisible: req.body.customerVisible })
-        .where(and(eq(crmQuoteLineItems.id, lineItemId), eq(crmQuoteLineItems.quoteId, quoteId)))
-        .returning({ id: crmQuoteLineItems.id, customerVisible: crmQuoteLineItems.customerVisible });
-      if (!row) return res.status(404).json({ message: "Line item not found" });
-      res.json(row);
-    } catch (error) {
-      console.error("Error updating line item visibility:", error);
-      res.status(500).json({ message: "Error updating line item" });
-    }
-  });
+  // (The per-line customer-visibility toggle route was removed 2026-07-30 —
+  // the feature was buggy and it shadowed the general line-item PATCH below.
+  // Internal vs customer-facing is now decided at creation: worksheet cost
+  // lines, labor, and warranty reserve are always internal.)
 
+  // POST /api/crm/quotes/quick - Create standalone quick quote
   app.post("/api/crm/quotes/quick", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
@@ -22027,6 +21932,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
+      // Sold: stored total flips from best-option to the chosen option
+      await recomputeQuoteStoredTotals(req.params.id).catch(() => {});
 
       fireAutomationForCustomer("quote.accepted", updated.customerId, { type: "quote", id: updated.id });
 
@@ -22171,6 +22078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
+      await recomputeQuoteStoredTotals(req.params.id).catch(() => {});
 
       await logCrmAudit(
         user.id,
@@ -22564,10 +22472,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (sendSms && phoneNumber) {
         console.log("[Quote SMS] Sending to:", phoneNumber);
         
-        // Calculate total for the SMS
-        const quoteTotal = lineItems
-          .filter(item => item.lineType !== "labor" && item.lineType !== "other")
+        // Calculate total for the SMS — customer-facing lines only; a custom
+        // quote (all internal cost lines) falls back to the sell price.
+        const visibleSmsTotal = lineItems
+          .filter(item => item.lineType !== "labor" && item.lineType !== "other" && (item as any).customerVisible !== false)
           .reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
+        const quoteTotal = visibleSmsTotal > 0 ? visibleSmsTotal : parseFloat(quote.total || "0");
         
         smsResult = await sendQuoteSms({
           customerId: quote.customerId || "",
@@ -26069,9 +25979,34 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const allLineItems = await db.select().from(crmQuoteLineItems)
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
         .orderBy(crmQuoteLineItems.sortOrder);
-      // Customer-facing view: only lines flagged visible. Internal cost lines
-      // (worksheet labor/materials at cost) never reach the customer.
-      const lineItems = allLineItems.filter((li) => li.customerVisible !== false);
+      // Customer-facing view: internal cost lines (worksheet costs, labor,
+      // warranty reserve) never reach the customer.
+      let lineItems = allLineItems.filter(
+        (li) => li.customerVisible !== false && li.lineType !== "labor" && li.lineType !== "other",
+      );
+      // Custom quotes are ALL internal build-up — the customer sees one line:
+      // the package at its sell price.
+      if (lineItems.length === 0 && parseFloat(quote.total || "0") > 0) {
+        lineItems = [{
+          id: `sell-${quote.id}`,
+          quoteId: quote.id,
+          lineType: "install",
+          description: quote.title || "Complete installation as specified",
+          partNumber: null,
+          quantity: "1",
+          unitPrice: quote.total,
+          lineTotal: quote.total,
+          sortOrder: 0,
+          itemId: null,
+          isDiscountLine: false,
+          discountKind: null,
+          optionTag: null,
+          imageUrl: null,
+          customerVisible: true,
+          quickbooksSubAccountId: null,
+          createdAt: quote.createdAt,
+        } as any];
+      }
 
       // Fetch deposit percentage from settings
       let depositPercentage = 50; // default
@@ -26188,6 +26123,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         })
         .where(eq(crmQuotes.id, quote.id))
         .returning();
+      await recomputeQuoteStoredTotals(quote.id).catch(() => {});
 
       // Log activity to projectActivities if quote has a projectId
       if (quote.projectId) {

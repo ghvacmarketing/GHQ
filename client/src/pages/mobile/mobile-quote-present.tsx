@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink } from "lucide-react";
+import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,6 +71,22 @@ export default function MobileQuotePresent() {
 
   // Get deposit percentage from quote data (already fetched with CRM quote API)
   const depositPercentage = (quote as any)?.depositPercentage ?? 50;
+
+  // Internal cost lines (worksheet build-up, labor, warranty reserve) never
+  // show to the customer; the presenter can deliberately reveal them.
+  const isInternalLine = (item: { customerVisible?: boolean | null; lineType?: string | null }) =>
+    (item as any)?.customerVisible === false || item?.lineType === "labor" || item?.lineType === "other";
+  const customerLineItems = (quote?.lineItems || []).filter((i: any) => !isInternalLine(i));
+  const internalLineItems = (quote?.lineItems || []).filter((i: any) => isInternalLine(i));
+  const internalCostsTotal = internalLineItems.reduce((sum: number, i: any) => sum + (parseFloat(String(i.lineTotal || 0)) || 0), 0);
+  const [showInternal, setShowInternal] = useState(false);
+  const displayLineItems = customerLineItems.length > 0 ? customerLineItems : (parseFloat(String(quote?.total || 0)) > 0 ? [{
+    id: "sell-price",
+    description: quote?.title || "Complete installation as specified",
+    quantity: "1",
+    unitPrice: String(quote?.total),
+    lineTotal: String(quote?.total),
+  } as any] : []);
 
   // Fetch financing link for deposit quotes
   const { data: financingData } = useQuery<{ financingLink: string; isDefault: boolean }>({
@@ -333,16 +349,30 @@ export default function MobileQuotePresent() {
             <ArrowLeft className="h-5 w-5 mr-1" />
             Back
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExit}
-            className="min-h-[44px]"
-            data-testid="button-exit"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Exit
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {internalLineItems.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowInternal((v) => !v)}
+                className={`min-h-[44px] ${showInternal ? "border-amber-400 bg-amber-50 text-amber-800" : ""}`}
+                data-testid="button-toggle-internal"
+              >
+                {showInternal ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+                Internal
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExit}
+              className="min-h-[44px]"
+              data-testid="button-exit"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Exit
+            </Button>
+          </div>
         </div>
 
         <div className="px-4 py-6 space-y-6">
@@ -384,7 +414,7 @@ export default function MobileQuotePresent() {
                   </div>
 
                   <div className="space-y-4">
-                    {groupLineItemsByOption(quote.lineItems).map((option) => {
+                    {groupLineItemsByOption(customerLineItems).map((option) => {
                       const isSelected = selectedOption === option.tag;
                       const whatsIncluded = getWhatsIncludedForOption(
                         option.tag, 
@@ -498,9 +528,9 @@ export default function MobileQuotePresent() {
                 <>
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Quote Details</h3>
-                    {quote.lineItems && quote.lineItems.length > 0 ? (
+                    {displayLineItems.length > 0 ? (
                       <div className="space-y-3">
-                        {quote.lineItems.map((item) => (
+                        {displayLineItems.map((item) => (
                           <div
                             key={item.id}
                             className="border rounded-lg p-3 bg-slate-50"
@@ -538,6 +568,29 @@ export default function MobileQuotePresent() {
               )}
             </CardContent>
           </Card>
+
+          {showInternal && internalLineItems.length > 0 && (
+            <Card className="shadow-md border-2 border-amber-300 bg-amber-50/60" data-testid="present-internal-costs">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-amber-900">Internal costs</h3>
+                  <span className="rounded-[3px] bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">Internal only</span>
+                </div>
+                <div className="space-y-2">
+                  {internalLineItems.map((item: any) => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-slate-700 mr-3 break-words">{item.description}</span>
+                      <span className="font-medium text-slate-900 whitespace-nowrap">{formatPresentationCurrency(item.lineTotal || "0")}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t border-amber-200 pt-2 text-sm font-semibold text-amber-900">
+                    <span>Total internal costs</span>
+                    <span>{formatPresentationCurrency(internalCostsTotal)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {isAlreadyAccepted ? (
             <Card className="shadow-md border-0">

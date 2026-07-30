@@ -117,9 +117,22 @@ export async function buildQuoteEmailContent(
 ): Promise<{ subject: string; html: string; text: string }> {
   // Filter out labor/internal line items from client-facing email — and
   // anything explicitly flagged not customer-visible (worksheet cost lines).
-  const clientVisibleItems = lineItems.filter(item =>
+  let clientVisibleItems = lineItems.filter(item =>
     item.lineType !== "labor" && item.lineType !== "other" && item.customerVisible !== false
   );
+  // Custom quotes are all internal cost build-up — the customer's email shows
+  // one line: the package at its sell price.
+  if (clientVisibleItems.length === 0 && parseFloat(quote.total || "0") > 0) {
+    clientVisibleItems = [{
+      id: `sell-${quote.id}`,
+      quoteId: quote.id,
+      lineType: "install",
+      description: quote.title || "Complete installation as specified",
+      quantity: "1",
+      unitPrice: quote.total,
+      lineTotal: quote.total,
+    } as CrmQuoteLineItem];
+  }
 
   // Calculate quote total for placeholder replacement
   const quoteTotal = clientVisibleItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);

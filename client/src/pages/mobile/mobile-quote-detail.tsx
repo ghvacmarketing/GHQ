@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
-import { jsPDF } from "jspdf";
+import { generateQuotePdf } from "@/lib/quote-pdf";
 import { 
   ArrowLeft, 
   FileText, 
@@ -196,163 +196,10 @@ export default function MobileQuoteDetail() {
 
   const handleDownloadPDF = () => {
     if (!quote) return;
-
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      const contentWidth = pageWidth - (margin * 2);
-      let y = margin;
-
-      const brandColor: [number, number, number] = [113, 20, 25];
-      const textColor: [number, number, number] = [30, 41, 59];
-      const mutedColor: [number, number, number] = [100, 116, 139];
-      const lightBg: [number, number, number] = [248, 250, 252];
-      const tableRowAlt: [number, number, number] = [248, 250, 252];
-
-      doc.setFillColor(...brandColor);
-      doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
-      
-      doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
-      doc.text(COMPANY_INFO.name, margin + 8, y + 12);
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(220, 220, 220);
-      doc.text(COMPANY_INFO.address, margin + 8, y + 20);
-
-      doc.setFontSize(9);
-      doc.text(COMPANY_INFO.phone, pageWidth - margin - 8, y + 10, { align: 'right' });
-      doc.text(COMPANY_INFO.email, pageWidth - margin - 8, y + 15, { align: 'right' });
-      doc.text(COMPANY_INFO.website, pageWidth - margin - 8, y + 20, { align: 'right' });
-      
-      y += 38;
-
-      doc.setFontSize(24);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...brandColor);
-      doc.text("QUOTE", margin, y);
-      y += 12;
-
-      const boxHeight = 32;
-      doc.setFillColor(...lightBg);
-      doc.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, 'F');
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Bill To", margin + 5, y + 8);
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text(quote.customerName || "Customer", margin + 5, y + 15);
-      
-      doc.setTextColor(...mutedColor);
-      let custY = y + 15;
-      if (quote.customerEmail) {
-        custY += 4;
-        doc.text(quote.customerEmail, margin + 5, custY);
-      }
-      if (quote.customerPhone) {
-        custY += 4;
-        doc.text(quote.customerPhone, margin + 5, custY);
-      }
-      if (quote.serviceAddress) {
-        custY += 4;
-        doc.text(quote.serviceAddress.substring(0, 60), margin + 5, custY);
-      }
-
-      const detailsX = pageWidth - margin - 60;
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Quote #:", detailsX, y + 8);
-      doc.text("Date:", detailsX, y + 14);
-      doc.text("Valid Until:", detailsX, y + 20);
-      
-      doc.setFont("helvetica", "normal");
-      doc.text(quote.quoteNumber || "", detailsX + 30, y + 8);
-      doc.text(quote.createdAt ? format(new Date(quote.createdAt), "MM/dd/yyyy") : "", detailsX + 30, y + 14);
-      doc.text(quote.validUntil ? format(new Date(quote.validUntil), "MM/dd/yyyy") : "N/A", detailsX + 30, y + 20);
-
-      y += boxHeight + 10;
-
-      doc.setFillColor(...brandColor);
-      doc.rect(margin, y, contentWidth, 10, 'F');
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
-      doc.text("Line Items", margin + 5, y + 7);
-      y += 10;
-
-      const col1Width = contentWidth * 0.50;
-      const col2Width = contentWidth * 0.12;
-      const col3Width = contentWidth * 0.18;
-      const col4Width = contentWidth * 0.20;
-      
-      doc.setFillColor(...lightBg);
-      doc.rect(margin, y, contentWidth, 8, 'F');
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Description", margin + 3, y + 5.5);
-      doc.text("Qty", margin + col1Width + col2Width/2, y + 5.5, { align: 'center' });
-      doc.text("Unit Price", margin + col1Width + col2Width + col3Width - 3, y + 5.5, { align: 'right' });
-      doc.text("Amount", margin + contentWidth - 3, y + 5.5, { align: 'right' });
-      y += 8;
-
-      const lineItems = quote.lineItems || [];
-      lineItems.forEach((item, index) => {
-        const descLines = doc.splitTextToSize(item.description || "", col1Width - 6);
-        const rowHeight = Math.max(10, descLines.length * 4 + 4);
-        
-        if (index % 2 === 0) {
-          doc.setFillColor(...tableRowAlt);
-          doc.rect(margin, y, contentWidth, rowHeight, 'F');
-        }
-        
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...textColor);
-        
-        let textY = y + 5;
-        descLines.forEach((line: string) => {
-          doc.text(line, margin + 3, textY);
-          textY += 4;
-        });
-        
-        doc.text(String(item.quantity || 1), margin + col1Width + col2Width/2, y + 5, { align: 'center' });
-        doc.text(formatCurrency(item.unitPrice), margin + col1Width + col2Width + col3Width - 3, y + 5, { align: 'right' });
-        doc.text(formatCurrency(item.lineTotal), margin + contentWidth - 3, y + 5, { align: 'right' });
-        
-        y += rowHeight;
-      });
-
-      y += 8;
-      
-      const totalBoxWidth = 80;
-      const totalBoxX = pageWidth - margin - totalBoxWidth;
-      
-      doc.setFontSize(10);
-      doc.setTextColor(...textColor);
-      doc.text("Subtotal:", totalBoxX, y);
-      doc.text(formatCurrency(quote.subtotal), pageWidth - margin, y, { align: 'right' });
-      y += 6;
-      
-      doc.setDrawColor(...brandColor);
-      doc.setLineWidth(0.5);
-      doc.line(totalBoxX, y, pageWidth - margin, y);
-      y += 6;
-      
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...brandColor);
-      doc.text("Total:", totalBoxX, y);
-      doc.text(formatCurrency(quote.total), pageWidth - margin, y, { align: 'right' });
-
-      doc.save(`Quote-${quote.quoteNumber || id}.pdf`);
+      // Shared professional template (mirrors the invoice PDF); internal cost
+      // lines never print.
+      generateQuotePdf(quote as any, ((quote as any).lineItems || []) as any);
       toast({ title: "PDF Downloaded", description: "Quote PDF has been downloaded successfully." });
     } catch (error) {
       console.error("PDF generation error:", error);

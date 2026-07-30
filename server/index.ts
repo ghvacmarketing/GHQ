@@ -1151,6 +1151,12 @@ async function runWaterHeaterSeeds() {
       .then(({ startPushNotificationBridge }) => startPushNotificationBridge())
       .catch((err) => console.error("Push bridge import failed:", err));
 
+    // Multi-option quotes: self-heal stored totals (best option while unsold,
+    // selected option once sold) — legacy rows stored the sum of all options.
+    import("./services/quoteTotals")
+      .then(({ recomputeAllOptionsQuoteTotals }) => recomputeAllOptionsQuoteTotals())
+      .catch((err) => console.error("Quote totals backfill import failed:", err));
+
     // Daily provider cost snapshots (Settings → Usage & Costs)
     import("./services/cost-tracker")
       .then(({ scheduleCostSnapshots }) => scheduleCostSnapshots())

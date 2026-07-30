@@ -875,18 +875,6 @@ export default function CrmInstallWorksheet() {
                               data-testid={`input-cost-${line.id}`}
                             />
                             <button
-                              onClick={() => updateLine(line.id, "customerVisible", !line.customerVisible)}
-                              className={`mt-1.5 shrink-0 rounded p-1.5 transition-colors ${
-                                line.customerVisible
-                                  ? "bg-[#711419]/10 text-[#711419]"
-                                  : "text-slate-300 hover:bg-slate-100 hover:text-slate-500"
-                              }`}
-                              title={line.customerVisible ? "Customer SEES this line on the quote" : "Internal only — hidden from the customer"}
-                              data-testid={`toggle-visible-${line.id}`}
-                            >
-                              {line.customerVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                            </button>
-                            <button
                               onClick={() => removeLine(line.id)}
                               className="mt-1.5 shrink-0 rounded p-1.5 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
                               data-testid={`button-delete-${line.id}`}
@@ -901,7 +889,7 @@ export default function CrmInstallWorksheet() {
                   ))}
                   <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
                     <EyeOff className="h-3.5 w-3.5" />
-                    Lines are internal costs by default — toggle the eye on any line the customer should see on their quote.
+                    These lines are your internal cost build-up — the customer only ever sees the package sell price.
                   </p>
                 </div>
               )}
