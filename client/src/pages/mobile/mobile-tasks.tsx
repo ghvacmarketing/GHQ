@@ -51,6 +51,15 @@ export default function MobileTasks() {
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
   const dueInputRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Let the sheet finish sliding up BEFORE the keyboard rises — focusing
+  // during the animation makes both fight for the screen.
+  useEffect(() => {
+    if (!createOpen) return;
+    const t = setTimeout(() => titleInputRef.current?.focus(), 380);
+    return () => clearTimeout(t);
+  }, [createOpen]);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -252,7 +261,7 @@ export default function MobileTasks() {
         <div className="pb-3">
           <div className="flex items-start gap-2">
             <input
-              autoFocus
+              ref={titleInputRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What needs doing?"
@@ -275,6 +284,30 @@ export default function MobileTasks() {
 
           {/* Assignee left · due date right, Asana-style */}
           <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="relative">
+            {assigneePickerOpen && (
+              <div
+                className="absolute bottom-full left-0 z-20 mb-2 max-h-56 w-64 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150"
+                onTouchMove={(e) => e.stopPropagation()}
+                data-testid="task-assignee-list"
+              >
+                {users.filter((u) => u.isActive !== false).map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => { setAssigneeId(u.id === currentUser?.id ? null : u.id); setAssigneePickerOpen(false); }}
+                    className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2.5 text-left text-sm last:border-0 active:bg-slate-50 ${
+                      u.id === effectiveAssignee ? "font-semibold text-[#711419]" : "text-slate-700"
+                    }`}
+                    data-testid={`task-assignee-${u.id}`}
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#711419]/10 text-[11px] font-bold text-[#711419]">
+                      {(u.name || "?").charAt(0).toUpperCase()}
+                    </span>
+                    {u.name}{u.id === currentUser?.id ? " (me)" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               onClick={() => setAssigneePickerOpen((v) => !v)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -285,6 +318,7 @@ export default function MobileTasks() {
               <UserRound className="h-4 w-4" />
               {assigneeName.split(/\s+/)[0]}
             </button>
+            </div>
             <button
               onClick={() => dueInputRef.current?.showPicker?.() || dueInputRef.current?.click()}
               className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -306,25 +340,6 @@ export default function MobileTasks() {
             </button>
           </div>
 
-          {assigneePickerOpen && (
-            <div className="mt-2 max-h-48 overflow-y-auto rounded-[4px] border border-slate-200 bg-white" data-testid="task-assignee-list">
-              {users.filter((u) => u.isActive !== false).map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => { setAssigneeId(u.id === currentUser?.id ? null : u.id); setAssigneePickerOpen(false); }}
-                  className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2.5 text-left text-sm last:border-0 active:bg-slate-50 ${
-                    u.id === effectiveAssignee ? "font-semibold text-[#711419]" : "text-slate-700"
-                  }`}
-                  data-testid={`task-assignee-${u.id}`}
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#711419]/10 text-[11px] font-bold text-[#711419]">
-                    {(u.name || "?").charAt(0).toUpperCase()}
-                  </span>
-                  {u.name}{u.id === currentUser?.id ? " (me)" : ""}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </DraggableSheet>
 

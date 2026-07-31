@@ -728,15 +728,18 @@ export default function MobilePhotos() {
           className="fixed inset-0 z-50 flex flex-col bg-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
           data-testid="photos-search-overlay"
         >
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto px-4 ${customerSearch.trim().length < 2 || searching || searchResults.length === 0 ? "flex flex-col justify-end" : ""}`}
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+          >
             {customerSearch.trim().length < 2 ? (
-              <p className="py-10 text-center text-sm text-slate-400">Type to search photos and customers.</p>
+              <p className="pb-6 text-center text-sm text-slate-400">Type to search photos and customers.</p>
             ) : searching ? (
-              <div className="flex items-center justify-center py-10 text-slate-400">
+              <div className="flex items-center justify-center pb-6 text-slate-400">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : searchResults.length === 0 ? (
-              <p className="py-10 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
+              <p className="pb-6 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
             ) : (
               <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="customer-search-results">
                 {searchResults.map((c) => (
@@ -759,7 +762,7 @@ export default function MobilePhotos() {
             )}
           </div>
           <div
-            className="flex items-center gap-2 px-4 pt-2 transition-[padding-bottom] duration-150 ease-out"
+            className="flex items-center gap-2 px-4 pt-2"
             style={{
               paddingBottom: keyboardInset > 0
                 ? `${keyboardInset + 10}px`

@@ -5,6 +5,10 @@ import {
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
+import { MoreIcon } from "@/components/crm/more-icon";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -170,36 +174,42 @@ export default function MobileMessages() {
 
   return (
     <MobileShell>
-      {/* ── Conversation list ── */}
-      <div className="flex h-full flex-col" data-testid="mobile-messages">
-        <div className="space-y-3 border-b bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-              <MessageSquare className="h-5 w-5 text-[#711419]" />
-              Messages
-            </h1>
-            <div className="flex items-center gap-2">
-              <Button size="icon" variant="outline" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} data-testid="button-sync-messages">
-                <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-              </Button>
-              <Button size="icon" variant="outline" onClick={() => setShowNewConversation(true)} data-testid="button-new-conversation">
-                <Plus className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-conversations"
-            />
-          </div>
+      {/* ── Conversation list — minimal chrome: title, search, 4-dot menu ── */}
+      <div className="p-4 space-y-3" data-testid="mobile-messages">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Messages</h1>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
+                aria-label="Message actions"
+                data-testid="messages-actions"
+              >
+                <MoreIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowNewConversation(true)} data-testid="menu-new-conversation">
+                <Plus className="mr-2 h-4 w-4" /> New message
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} data-testid="menu-sync-messages">
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`} /> Sync from Textline
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-conversations"
+          />
         </div>
 
-        <ScrollArea className="flex-1">
+        <div className="-mx-4">
           {loadingConversations ? (
             <div className="flex justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
@@ -245,10 +255,10 @@ export default function MobileMessages() {
             <div className="py-12 text-center text-slate-500">
               <MessageSquare className="mx-auto mb-3 h-16 w-16 text-slate-300" />
               <p className="mb-1 text-lg font-medium">No conversations yet</p>
-              <p className="text-sm">Tap the + button to start a new message</p>
+              <p className="text-sm">Use the menu to start a new message</p>
             </div>
           )}
-        </ScrollArea>
+        </div>
       </div>
 
       {/* ── Open thread — fullscreen chat layer (WhatsApp style) ── */}

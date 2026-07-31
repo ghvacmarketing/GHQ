@@ -2,6 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
+import { MoreIcon } from "@/components/crm/more-icon";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { useToast } from "@/hooks/use-toast";
@@ -112,36 +116,42 @@ export default function MobileMail() {
 
   return (
     <MobileShell>
-      {/* ── Inbox ── */}
-      <div className="flex h-full flex-col" data-testid="mobile-mail-page">
-        <div className="space-y-3 border-b bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-              <Mail className="h-5 w-5 text-[#711419]" />
-              Email
-            </h1>
-            <div className="flex items-center gap-2">
-              <Button size="icon" variant="outline" onClick={() => refetch()} disabled={isRefetching} data-testid="button-mail-refresh">
-                <RefreshCw className={`h-5 w-5 ${isRefetching ? "animate-spin" : ""}`} />
-              </Button>
-              <Button size="icon" variant="outline" onClick={() => setComposeOpen(true)} data-testid="button-mail-compose">
-                <PenSquare className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="Search mail..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-              data-testid="input-mail-search"
-            />
-          </div>
+      {/* ── Inbox — minimal chrome: title, search, 4-dot menu ── */}
+      <div className="p-4 space-y-3" data-testid="mobile-mail-page">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Email</h1>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
+                aria-label="Mail actions"
+                data-testid="mail-actions"
+              >
+                <MoreIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setComposeOpen(true)} data-testid="menu-mail-compose">
+                <PenSquare className="mr-2 h-4 w-4" /> New email
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => refetch()} disabled={isRefetching} data-testid="menu-mail-refresh">
+                <RefreshCw className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} /> Refresh
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search mail..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+            data-testid="input-mail-search"
+          />
         </div>
 
-        <ScrollArea className="flex-1">
+        <div className="-mx-4">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
@@ -190,7 +200,7 @@ export default function MobileMail() {
               <p className="text-sm">Nothing in your inbox right now.</p>
             </div>
           )}
-        </ScrollArea>
+        </div>
       </div>
 
       {/* ── Thread reader ── */}

@@ -20,7 +20,11 @@ export const isNativeApp = () => Capacitor.isNativePlatform();
 if (typeof document !== "undefined" && Capacitor.isNativePlatform()) {
   document.documentElement.classList.add("native-app");
   import("@capacitor/keyboard")
-    .then(({ Keyboard }) => Keyboard.setAccessoryBarVisible({ isVisible: false }))
+    .then(({ Keyboard, KeyboardStyle }) => {
+      Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
+      // The app is light-themed — a dark/black keyboard looks foreign
+      Keyboard.setStyle({ style: KeyboardStyle.Light }).catch(() => {});
+    })
     .catch(() => {});
 }
 
