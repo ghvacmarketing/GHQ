@@ -128,6 +128,7 @@ const MobileQuoteDetail = lazy(() => import("@/pages/mobile/mobile-quote-detail"
 const MobileQuotePresent = lazy(() => import("@/pages/mobile/mobile-quote-present"));
 const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-detail"));
 const MobileMessages = lazy(() => import("@/pages/mobile/mobile-messages"));
+const MobileMail = lazy(() => import("@/pages/mobile/mobile-mail"));
 const MobileCustomers = lazy(() => import("@/pages/mobile/mobile-customers"));
 const MobileCustomerDetail = lazy(() => import("@/pages/mobile/mobile-customer-detail"));
 const MobileJobNew = lazy(() => import("@/pages/mobile/mobile-job-new"));
@@ -416,6 +417,7 @@ function Router() {
       <Route path="/mobile/tasks">{() => <MobileWrapper><MobileTasks /></MobileWrapper>}</Route>
       <Route path="/mobile/photos">{() => <MobileWrapper><MobilePhotos /></MobileWrapper>}</Route>
       <Route path="/mobile/messages">{() => <MobileWrapper><MobileMessages /></MobileWrapper>}</Route>
+      <Route path="/mobile/mail">{() => <MobileWrapper><MobileMail /></MobileWrapper>}</Route>
       <Route path="/mobile/customers/new">{() => <MobileWrapper><MobileCustomerNew /></MobileWrapper>}</Route>
       <Route path="/mobile/customers/:id">{() => <MobileWrapper><MobileCustomerDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/customers">{() => <MobileWrapper><MobileCustomers /></MobileWrapper>}</Route>

@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { 
-  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Phone, Plus, X, RefreshCw
+import {
+  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, RefreshCw, Phone,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
+
+/** Mobile Messages — WhatsApp-style. The conversation list lives in the
+ *  shell; an open thread is a FULLSCREEN layer (no tab bar, no floating
+ *  containers): warm chat canvas, tailed bubbles, day chips, composer pinned
+ *  to the true bottom above the keyboard/safe area. */
 
 interface ConversationWithCustomer extends CrmMessagingConversation {
   customerPhone?: string | null;
@@ -30,6 +34,19 @@ interface CustomerSearchResult {
   email: string;
 }
 
+const listTime = (d: string | Date) => {
+  const dt = new Date(d);
+  if (isToday(dt)) return format(dt, "h:mm a");
+  if (isYesterday(dt)) return "Yesterday";
+  return format(dt, "MMM d");
+};
+
+const dayChip = (d: Date) => {
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "EEEE, MMM d");
+};
+
 export default function MobileMessages() {
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -37,6 +54,7 @@ export default function MobileMessages() {
   const [messageText, setMessageText] = useState("");
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const { data: conversations, isLoading: loadingConversations } = useQuery<ConversationWithCustomer[]>({
     queryKey: ["/api/mobile/messaging/conversations", searchQuery],
@@ -55,7 +73,7 @@ export default function MobileMessages() {
     queryKey: ["/api/mobile/messaging/conversations", selectedConversationId],
     queryFn: async () => {
       const res = await fetch(`/api/mobile/messaging/conversations/${selectedConversationId}`, { credentials: "include" });
-      if (!res.ok) return null;
+      if (!res.ok) return null as any;
       return res.json();
     },
     enabled: !!selectedConversationId,
@@ -101,19 +119,8 @@ export default function MobileMessages() {
     },
   });
 
-  const handleSendMessage = () => {
-    if (!messageText.trim() || !selectedConversationId) return;
-    sendMessageMutation.mutate({ conversationId: selectedConversationId, body: messageText.trim() });
-  };
-
-  const handleStartConversation = (customerId: string) => {
-    startConversationMutation.mutate({ customerId });
-  };
-
   const syncMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/crm/messaging/sync-textline");
-    },
+    mutationFn: async () => apiRequest("POST", "/api/crm/messaging/sync-textline"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations"] });
       toast({ title: "Synced", description: "Conversations updated from Textline" });
@@ -123,25 +130,260 @@ export default function MobileMessages() {
     },
   });
 
-  if (showNewConversation) {
-    return (
-      <MobileShell>
-        <div className="flex flex-col h-full" data-testid="mobile-new-conversation">
-          <div className="flex items-center gap-3 p-4 border-b bg-white">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setShowNewConversation(false)}
-              data-testid="button-close-new-conversation"
+  const handleSendMessage = () => {
+    if (!messageText.trim() || !selectedConversationId) return;
+    sendMessageMutation.mutate({ conversationId: selectedConversationId, body: messageText.trim() });
+  };
+
+  // Stick to the newest message like a real chat app
+  const messages = conversationDetail?.messages || [];
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages.length, selectedConversationId]);
+
+  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+  const displayName =
+    conversationDetail?.customer?.name ||
+    conversationDetail?.conversation?.customerName ||
+    selectedConversation?.customerName ||
+    "Unknown Contact";
+  const displayPhone =
+    conversationDetail?.customer?.phone ||
+    conversationDetail?.conversation?.phoneNumber ||
+    selectedConversation?.phoneNumber ||
+    "";
+
+  // Messages grouped with day chips
+  const timeline = useMemo(() => {
+    const out: Array<{ kind: "chip"; label: string; key: string } | { kind: "msg"; m: CrmMessagingMessage }> = [];
+    let lastDay: Date | null = null;
+    for (const m of messages) {
+      const at = m.sentAt ? new Date(m.sentAt) : null;
+      if (at && (!lastDay || !isSameDay(at, lastDay))) {
+        out.push({ kind: "chip", label: dayChip(at), key: `chip-${at.toDateString()}` });
+        lastDay = at;
+      }
+      out.push({ kind: "msg", m });
+    }
+    return out;
+  }, [messages]);
+
+  return (
+    <MobileShell>
+      {/* ── Conversation list ── */}
+      <div className="flex h-full flex-col" data-testid="mobile-messages">
+        <div className="space-y-3 border-b bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+              <MessageSquare className="h-5 w-5 text-[#711419]" />
+              Messages
+            </h1>
+            <div className="flex items-center gap-2">
+              <Button size="icon" variant="outline" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} data-testid="button-sync-messages">
+                <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+              </Button>
+              <Button size="icon" variant="outline" onClick={() => setShowNewConversation(true)} data-testid="button-new-conversation">
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-conversations"
+            />
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          {loadingConversations ? (
+            <div className="flex justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+            </div>
+          ) : conversations && conversations.length > 0 ? (
+            <div className="divide-y divide-slate-100">
+              {conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => setSelectedConversationId(conversation.id)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+                  data-testid={`conversation-${conversation.id}`}
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
+                    {conversation.customerName?.charAt(0).toUpperCase() || "?"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-[15px] font-semibold text-slate-900">
+                        {conversation.customerName || "Unknown"}
+                      </p>
+                      {conversation.lastMessageAt && (
+                        <span className={`shrink-0 text-xs ${conversation.unreadInboundCount ? "font-semibold text-[#711419]" : "text-slate-400"}`}>
+                          {listTime(conversation.lastMessageAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className="truncate text-sm text-slate-500">
+                        {conversation.phoneNumber || conversation.customerPhone || "No phone"}
+                      </p>
+                      {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
+                        <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[#711419] px-1.5 text-[11px] font-bold text-white">
+                          {conversation.unreadInboundCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center text-slate-500">
+              <MessageSquare className="mx-auto mb-3 h-16 w-16 text-slate-300" />
+              <p className="mb-1 text-lg font-medium">No conversations yet</p>
+              <p className="text-sm">Tap the + button to start a new message</p>
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      {/* ── Open thread — fullscreen chat layer (WhatsApp style) ── */}
+      {selectedConversationId && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-[#efeae2] animate-in slide-in-from-right duration-200"
+          data-testid="mobile-conversation-detail"
+        >
+          <div
+            className="flex items-center gap-2 border-b border-black/5 bg-white px-2 py-2 shadow-sm"
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}
+          >
+            <button
+              onClick={() => setSelectedConversationId(null)}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
+              data-testid="button-back-to-list"
             >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold leading-tight text-slate-900">{displayName}</p>
+              {displayPhone && <p className="truncate text-xs text-slate-500">{displayPhone}</p>}
+            </div>
+            {displayPhone && (
+              <a
+                href={`tel:${displayPhone}`}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-[#711419] active:bg-slate-100"
+                aria-label="Call"
+                data-testid="button-call-contact"
+              >
+                <Phone className="h-5 w-5" />
+              </a>
+            )}
+          </div>
+
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            {loadingDetail && messages.length === 0 ? (
+              <div className="flex justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+              </div>
+            ) : timeline.length > 0 ? (
+              <div className="space-y-1.5">
+                {timeline.map((entry) =>
+                  entry.kind === "chip" ? (
+                    <div key={entry.key} className="flex justify-center py-2">
+                      <span className="rounded-md bg-white/85 px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm">
+                        {entry.label}
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      key={entry.m.id}
+                      className={`flex ${entry.m.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`relative max-w-[82%] rounded-2xl px-3 py-1.5 shadow-sm ${
+                          entry.m.direction === "outbound"
+                            ? "rounded-br-[4px] bg-[#711419] text-white"
+                            : "rounded-bl-[4px] bg-white text-slate-900"
+                        }`}
+                        data-testid={`message-${entry.m.id}`}
+                      >
+                        <p className="whitespace-pre-wrap break-words pb-1 pr-12 text-[15px] leading-snug">{entry.m.body}</p>
+                        <span
+                          className={`absolute bottom-1 right-2.5 text-[10px] ${
+                            entry.m.direction === "outbound" ? "text-white/60" : "text-slate-400"
+                          }`}
+                        >
+                          {entry.m.sentAt ? format(new Date(entry.m.sentAt), "h:mm a") : "…"}
+                        </span>
+                      </div>
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-500">
+                <MessageSquare className="mx-auto mb-2 h-12 w-12 text-slate-400/60" />
+                <p>No messages yet — say hello.</p>
+              </div>
+            )}
+          </div>
+
+          <div
+            className="flex items-end gap-2 px-3 pt-2"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
+          >
+            <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-3xl bg-white px-4 shadow-sm">
+              <textarea
+                placeholder="Message"
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                rows={1}
+                className="max-h-28 w-full resize-none bg-transparent py-3 text-[16px] leading-5 text-slate-900 outline-none placeholder:text-slate-400"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                data-testid="input-message"
+              />
+            </div>
+            <button
+              onClick={handleSendMessage}
+              disabled={!messageText.trim() || sendMessageMutation.isPending}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-md transition-transform active:scale-95 disabled:opacity-50"
+              data-testid="button-send-message"
+            >
+              {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── New conversation — fullscreen picker ── */}
+      {showNewConversation && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-white animate-in slide-in-from-bottom duration-200" data-testid="mobile-new-conversation">
+          <div
+            className="flex items-center gap-3 border-b bg-white p-4"
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+          >
+            <Button variant="ghost" size="icon" onClick={() => setShowNewConversation(false)} data-testid="button-close-new-conversation">
               <X className="h-5 w-5" />
             </Button>
-            <h2 className="font-semibold text-lg">New Message</h2>
+            <h2 className="text-lg font-semibold">New Message</h2>
           </div>
           <div className="p-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
+                autoFocus
                 placeholder="Search contacts..."
                 value={contactSearch}
                 onChange={(e) => setContactSearch(e.target.value)}
@@ -160,242 +402,35 @@ export default function MobileMessages() {
                 {contacts.map((contact) => (
                   <button
                     key={contact.id}
-                    onClick={() => handleStartConversation(contact.id)}
-                    className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 text-left"
+                    onClick={() => startConversationMutation.mutate({ customerId: contact.id })}
+                    className="flex w-full items-center gap-3 p-4 text-left active:bg-slate-50"
                     data-testid={`contact-${contact.id}`}
                     disabled={startConversationMutation.isPending}
                   >
-                    <div className="w-10 h-10 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
                       {contact.customerName?.charAt(0).toUpperCase() || "?"}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 truncate">{contact.customerName}</p>
-                      <p className="text-sm text-slate-500 truncate">{contact.phone}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-800">{contact.customerName}</p>
+                      <p className="truncate text-sm text-slate-500">{contact.phone}</p>
                     </div>
                   </button>
                 ))}
               </div>
             ) : contactSearch.length >= 2 ? (
-              <div className="text-center py-8 text-slate-500">
-                <User className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+              <div className="py-8 text-center text-slate-500">
+                <User className="mx-auto mb-2 h-12 w-12 text-slate-300" />
                 <p>No contacts found</p>
               </div>
             ) : (
-              <div className="text-center py-8 text-slate-500">
-                <Search className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+              <div className="py-8 text-center text-slate-500">
+                <Search className="mx-auto mb-2 h-12 w-12 text-slate-300" />
                 <p>Type at least 2 characters to search</p>
               </div>
             )}
           </ScrollArea>
         </div>
-      </MobileShell>
-    );
-  }
-
-  // Find selected conversation from list for header display
-  const selectedConversation = conversations?.find(c => c.id === selectedConversationId);
-  
-  // Get display name and phone from best available source
-  const getDisplayName = () => {
-    return conversationDetail?.customer?.name 
-      || conversationDetail?.conversation?.customerName 
-      || selectedConversation?.customerName 
-      || "Unknown Contact";
-  };
-  
-  const getDisplayPhone = () => {
-    return conversationDetail?.customer?.phone 
-      || conversationDetail?.conversation?.phoneNumber 
-      || selectedConversation?.phoneNumber 
-      || "";
-  };
-
-  if (selectedConversationId) {
-    return (
-      <MobileShell>
-        <div className="flex flex-col h-full" data-testid="mobile-conversation-detail">
-          <div className="flex items-center gap-3 p-4 border-b bg-white">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setSelectedConversationId(null)}
-              data-testid="button-back-to-list"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-slate-800 truncate">
-                {getDisplayName()}
-              </p>
-              <p className="text-sm text-slate-500 truncate">
-                {getDisplayPhone()}
-              </p>
-            </div>
-          </div>
-
-          <ScrollArea className="flex-1 p-4">
-            {loadingDetail ? (
-              <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
-              </div>
-            ) : conversationDetail?.messages && conversationDetail.messages.length > 0 ? (
-              <div className="space-y-3">
-                {conversationDetail.messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        message.direction === "outbound"
-                          ? "bg-[#711419] text-white"
-                          : "bg-slate-100 text-slate-800"
-                      }`}
-                      data-testid={`message-${message.id}`}
-                    >
-                      <p className="whitespace-pre-wrap break-words">{message.body}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.direction === "outbound" ? "text-white/70" : "text-slate-400"
-                      }`}>
-                        {message.sentAt ? format(new Date(message.sentAt), "h:mm a") : "Sending..."}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-500">
-                <MessageSquare className="h-12 w-12 mx-auto mb-2 text-slate-300" />
-                <p>No messages yet</p>
-              </div>
-            )}
-          </ScrollArea>
-
-          <div className="p-4 border-t bg-white">
-            <div className="flex gap-2">
-              <Textarea
-                placeholder="Type a message..."
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                className="min-h-[44px] max-h-32 resize-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                data-testid="input-message"
-              />
-              <Button
-                size="icon"
-                className="h-11 w-11 bg-[#711419] hover:bg-[#8a1a1f]"
-                onClick={handleSendMessage}
-                disabled={!messageText.trim() || sendMessageMutation.isPending}
-                data-testid="button-send-message"
-              >
-                {sendMessageMutation.isPending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Send className="h-5 w-5" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </MobileShell>
-    );
-  }
-
-  return (
-    <MobileShell>
-      <div className="flex flex-col h-full" data-testid="mobile-messages">
-        <div className="p-4 border-b bg-white space-y-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-[#711419]" />
-              Messages
-            </h1>
-            <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                data-testid="button-sync-messages"
-              >
-                <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              </Button>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => setShowNewConversation(true)}
-                data-testid="button-new-conversation"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-conversations"
-            />
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1">
-          {loadingConversations ? (
-            <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
-            </div>
-          ) : conversations && conversations.length > 0 ? (
-            <div className="divide-y">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  onClick={() => setSelectedConversationId(conversation.id)}
-                  className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 text-left"
-                  data-testid={`conversation-${conversation.id}`}
-                >
-                  <div className="w-12 h-12 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold">
-                    {conversation.customerName?.charAt(0).toUpperCase() || "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-slate-800 truncate">
-                        {conversation.customerName || "Unknown"}
-                      </p>
-                      {conversation.lastMessageAt && (
-                        <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
-                          {format(new Date(conversation.lastMessageAt), "MMM d")}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-500 truncate">
-                      {conversation.phoneNumber || conversation.customerPhone || "No phone"}
-                    </p>
-                  </div>
-                  {conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
-                    <div className="w-5 h-5 rounded-full bg-[#711419] text-white text-xs flex items-center justify-center">
-                      {conversation.unreadInboundCount}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-slate-500">
-              <MessageSquare className="h-16 w-16 mx-auto mb-3 text-slate-300" />
-              <p className="text-lg font-medium mb-1">No conversations yet</p>
-              <p className="text-sm">Tap the + button to start a new message</p>
-            </div>
-          )}
-        </ScrollArea>
-      </div>
+      )}
     </MobileShell>
   );
 }

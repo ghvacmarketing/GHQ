@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import MobileShell from "./mobile-shell";
 import {
   Camera, CheckSquare, ChevronRight, Clock, ClipboardList, MessageSquare, Monitor,
-  Sparkles, UserRound, Users, Wrench,
+  Sparkles, UserRound, Users, Wrench, Mail,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -51,6 +51,7 @@ export default function MobileMore() {
       items: [
         { label: "Customers", sub: "Search every customer and their history", icon: Users, onTap: (n) => n("/mobile/customers"), testid: "more-customers" },
         { label: "Messages", sub: "Text conversations with customers", icon: MessageSquare, onTap: (n) => n("/mobile/messages"), testid: "more-messages" },
+        { label: "Email", sub: "Your CRM Gmail inbox — read, reply, compose", icon: Mail, onTap: (n) => n("/mobile/mail"), testid: "more-mail" },
         {
           label: "Ask Gibbs", sub: "AI help — lookups, drafts, and actions", icon: Sparkles,
           onTap: () => window.dispatchEvent(new Event("ghq-mobile-open-assistant")), testid: "more-assistant",
