@@ -6,6 +6,7 @@ import {
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { MoreIcon } from "@/components/crm/more-icon";
+import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -123,6 +124,18 @@ export default function MobileMessages() {
     },
   });
 
+  const { data: mailInbox } = useQuery<{ connected: boolean; threads: Array<{ isUnread: boolean }> }>({
+    queryKey: ["/api/crm/mail/threads", "count"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/mail/threads?folder=inbox", { credentials: "include" });
+      if (!res.ok) return { connected: false, threads: [] };
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+  });
+  const mailUnread = mailInbox?.threads?.filter((t) => t.isUnread).length ?? 0;
+  const chatUnread = (conversations ?? []).reduce((n, c) => n + (c.unreadInboundCount || 0), 0);
+
   const syncMutation = useMutation({
     mutationFn: async () => apiRequest("POST", "/api/crm/messaging/sync-textline"),
     onSuccess: () => {
@@ -177,7 +190,7 @@ export default function MobileMessages() {
       {/* ── Conversation list — minimal chrome: title, search, 4-dot menu ── */}
       <div className="p-4 space-y-3" data-testid="mobile-messages">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Messages</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inbox</h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -198,6 +211,7 @@ export default function MobileMessages() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        <InboxSwitcher active="chat" mailCount={mailUnread} chatCount={chatUnread} />
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -242,8 +256,8 @@ export default function MobileMessages() {
                         {conversation.phoneNumber || conversation.customerPhone || "No phone"}
                       </p>
                       {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
-                        <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[#711419] px-1.5 text-[11px] font-bold text-white">
-                          {conversation.unreadInboundCount}
+                        <span className="shrink-0 rounded-[4px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white">
+                          Needs you{conversation.unreadInboundCount > 1 ? ` · ${conversation.unreadInboundCount}` : ""}
                         </span>
                       )}
                     </div>

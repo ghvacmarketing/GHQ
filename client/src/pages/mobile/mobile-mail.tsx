@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { MoreIcon } from "@/components/crm/more-icon";
+import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -84,6 +85,18 @@ export default function MobileMail() {
     enabled: !!openThreadId,
   });
 
+  const { data: chatConvos } = useQuery<Array<{ unreadInboundCount?: number | null }>>({
+    queryKey: ["/api/mobile/messaging/conversations", "count"],
+    queryFn: async () => {
+      const res = await fetch("/api/mobile/messaging/conversations", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+  });
+  const chatUnread = (chatConvos ?? []).reduce((n, c) => n + (c.unreadInboundCount || 0), 0);
+  const mailUnread = inbox?.threads?.filter((t) => t.isUnread).length ?? 0;
+
   const sendMutation = useMutation({
     mutationFn: async (payload: { to: string; subject: string; html: string; threadRowId?: string }) =>
       apiRequest("POST", "/api/crm/mail/send", payload),
@@ -119,7 +132,7 @@ export default function MobileMail() {
       {/* ── Inbox — minimal chrome: title, search, 4-dot menu ── */}
       <div className="p-4 space-y-3" data-testid="mobile-mail-page">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Email</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inbox</h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -140,6 +153,7 @@ export default function MobileMail() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        <InboxSwitcher active="mail" mailCount={mailUnread} chatCount={chatUnread} />
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -185,8 +199,15 @@ export default function MobileMail() {
                         {listTime(t.lastMessageAt)}
                       </span>
                     </span>
-                    <span className={`mt-0.5 block truncate text-sm ${t.isUnread ? "font-semibold text-slate-800" : "text-slate-600"}`}>
-                      {t.subject || "(no subject)"}
+                    <span className="mt-0.5 flex items-center gap-1.5">
+                      <span className={`min-w-0 truncate text-sm ${t.isUnread ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+                        {t.subject || "(no subject)"}
+                      </span>
+                      {t.isUnread && (
+                        <span className="shrink-0 rounded-[4px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white">
+                          Needs you
+                        </span>
+                      )}
                     </span>
                     {t.snippet && <span className="mt-0.5 block truncate text-xs text-slate-400">{t.snippet}</span>}
                   </span>
