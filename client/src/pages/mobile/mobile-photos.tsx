@@ -551,7 +551,7 @@ export default function MobilePhotos() {
                     <p className="mt-0.5 truncate text-[11px] text-slate-500">
                       {c.count} recent photo{c.count !== 1 ? "s" : ""}
                       {c.latest.uploadedByName ? ` · ${c.latest.uploadedByName}` : ""}
-                      {c.latest.createdAt ? ` · ${format(new Date(c.latest.createdAt), "MMM d")}` : ""}
+                      {c.latest.createdAt ? ` · ${format(new Date(c.latest.createdAt), "MMM d, h:mm a")}` : ""}
                     </p>
                   </div>
                 </button>
@@ -594,7 +594,7 @@ export default function MobilePhotos() {
                   <p className="mt-2 truncate text-[12px] font-semibold text-slate-800">{rp.customerName || "No customer"}</p>
                   <p className="mt-0.5 truncate text-[11px] text-slate-400">
                     {rp.uploadedByName || "Unknown"}
-                    {rp.createdAt ? ` · ${format(new Date(rp.createdAt), "MMM d")}` : ""}
+                    {rp.createdAt ? ` · ${format(new Date(rp.createdAt), "MMM d, h:mm a")}` : ""}
                   </p>
                 </button>
               ))}
