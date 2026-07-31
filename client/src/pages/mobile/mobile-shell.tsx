@@ -46,6 +46,27 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
   const [photoTargetOpen, setPhotoTargetOpen] = useState(false);
+  // The tab bar ducks while the keyboard is up — otherwise iOS shoves it
+  // above the keyboard, right over whatever you are typing into.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    let blurT: ReturnType<typeof setTimeout> | undefined;
+    const isTypable = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    const onFocusIn = (e: FocusEvent) => {
+      if (isTypable(e.target)) { clearTimeout(blurT); setKeyboardUp(true); }
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (isTypable(e.target)) { blurT = setTimeout(() => setKeyboardUp(false), 120); }
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      clearTimeout(blurT);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantLoaded, setAssistantLoaded] = useState(false);
   const go = (path: string) => { setCreateOpen(false); navigate(path); };
@@ -168,7 +189,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       {/* Flat full-width bottom tab bar (icon + label; active = maroon) */}
       {/* touch-action none: an upward swipe on the nav must not rubber-band
           the page and flash white below it */}
-      <div className="absolute inset-x-0 bottom-0 z-40" style={{ touchAction: "none" }} data-testid="mobile-nav">
+      <div className={`absolute inset-x-0 bottom-0 z-40 transition-all duration-150 ${keyboardUp ? "pointer-events-none translate-y-full opacity-0" : ""}`} style={{ touchAction: "none" }} data-testid="mobile-nav">
         <nav
           className="rounded-t-2xl border-t-2 border-slate-300/80 bg-[#e9ebee]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
