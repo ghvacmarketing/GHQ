@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { GibbsActionPreview } from "@/components/crm/gibbs-action-preview";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
@@ -965,6 +966,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                           )}
                         </p>
                         <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
+                        {editing?.index !== i && <GibbsActionPreview action={msg.proposedAction} />}
                         {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
                           {msg.proposedAction.type === "update_customer"
                             ? customerUpdateRows(msg.proposedAction.params).map((row) => (

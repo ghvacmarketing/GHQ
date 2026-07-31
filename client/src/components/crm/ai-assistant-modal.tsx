@@ -45,6 +45,7 @@ import {
   X,
 } from "lucide-react";
 import { GibbsMark } from "@/components/crm/gibbs-mark";
+import { GibbsActionPreview } from "@/components/crm/gibbs-action-preview";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -982,6 +983,7 @@ export default function AiAssistantModal() {
                               )}
                             </p>
                             <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
+                            {editing?.index !== i && <GibbsActionPreview action={msg.proposedAction} />}
                             {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
                               {msg.proposedAction.type === "update_customer"
                                 ? customerUpdateRows(msg.proposedAction.params).map((row) => (
