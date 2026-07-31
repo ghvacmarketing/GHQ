@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import {
   ArrowLeft,
@@ -135,6 +135,7 @@ function AgreementItem({ agreement }: { agreement: CrmAgreement }) {
 }
 
 export default function MobileCustomerDetail() {
+  const [, navigate] = useLocation();
   const { id } = useParams<{ id: string }>();
 
   const {
@@ -190,22 +191,33 @@ export default function MobileCustomerDetail() {
 
   return (
     <MobileShell>
-      <div className="min-h-full" data-testid="mobile-customer-detail-page">
-        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
-          <Link href="/mobile/customers">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 rounded-[4px] text-[#711419] hover:bg-slate-100"
-              data-testid="back-button"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <h1 className="text-base font-bold text-slate-900" data-testid="header-title">
-            Customer Details
-          </h1>
-        </div>
+      <div
+        className="min-h-full"
+        data-testid="mobile-customer-detail-page"
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          if (t.clientX < 28) (e.currentTarget as any)._swipe = { x: t.clientX, y: t.clientY };
+        }}
+        onTouchMove={(e) => {
+          const st = (e.currentTarget as any)._swipe;
+          if (!st) return;
+          const t = e.touches[0];
+          if (t.clientX - st.x > 70 && Math.abs(t.clientY - st.y) < 60) {
+            (e.currentTarget as any)._swipe = null;
+            navigate("/mobile/customers");
+          }
+        }}
+        onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
+      >
+        {/* Floating back — no header bar */}
+        <button
+          onClick={() => navigate("/mobile/customers")}
+          className="liquid-glass fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition-transform active:scale-95"
+          style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+          data-testid="back-button"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
 
         {customerLoading ? (
           <DetailSkeleton />
@@ -213,30 +225,44 @@ export default function MobileCustomerDetail() {
           <ErrorState onRetry={() => refetchCustomer()} />
         ) : customer ? (
           <div className="p-4 space-y-4">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5">
-                <User className="h-6 w-6 text-[#711419]" />
+            <div className="mb-4 pt-10">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="customer-name">
+                {customer.name}
+              </h2>
+              {(customer.leadSource || customer.createdAt) && (
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {[customer.leadSource ? `via ${customer.leadSource}` : null, customer.createdAt ? `customer since ${new Date(customer.createdAt).getFullYear()}` : null].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+
+            {/* At a glance — real numbers, not labels */}
+            <div className="grid grid-cols-3 gap-2" data-testid="customer-stats">
+              <div className="rounded-[4px] border border-slate-300/70 bg-white px-3 py-2.5">
+                <p className="text-lg font-bold tabular-nums text-slate-900">{workOrders?.length ?? 0}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Jobs</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-slate-900 truncate" data-testid="customer-name">
-                  {customer.name}
-                </h2>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  <span
-                    className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${customerTypeConfig[customer.customerType as keyof typeof customerTypeConfig]?.className || customerTypeConfig.residential.className}`}
-                    data-testid="customer-type-badge"
-                  >
-                    {customerTypeConfig[customer.customerType as keyof typeof customerTypeConfig]?.label || "Residential"}
-                  </span>
-                  <span
-                    className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.className || customerStatusConfig.customer.className}`}
-                    data-testid="customer-status-badge"
-                  >
-                    {customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.label || "Customer"}
-                  </span>
-                </div>
+              <div className="rounded-[4px] border border-slate-300/70 bg-white px-3 py-2.5">
+                <p className="text-lg font-bold tabular-nums text-slate-900">
+                  {workOrders?.filter((w) => w.status !== "completed" && w.status !== "cancelled").length ?? 0}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Open</p>
+              </div>
+              <div className="rounded-[4px] border border-slate-300/70 bg-white px-3 py-2.5">
+                <p className="text-lg font-bold tabular-nums text-slate-900">{agreements?.length ?? 0}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Agreements</p>
               </div>
             </div>
+
+            {workOrders && workOrders.length > 0 && (() => {
+              const last = [...workOrders].sort((a, b) => new Date(b.scheduledStart || 0).getTime() - new Date(a.scheduledStart || 0).getTime())[0];
+              return last?.scheduledStart ? (
+                <p className="text-xs text-slate-500" data-testid="last-visit-line">
+                  Last visit: {new Date(last.scheduledStart).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {last.title ? ` — ${last.title}` : ""}
+                </p>
+              ) : null;
+            })()}
 
             <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="contact-card">
               <div className="border-b border-slate-200 px-3.5 py-2.5">
