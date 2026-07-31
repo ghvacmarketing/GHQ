@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { MapEmbed, DistanceFromMe } from "@/components/mobile/address-autocomplete";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -333,13 +334,15 @@ export default function MobileJobNew() {
               </Select>
             )}
             {selectedProperty?.address1 && (
-              <iframe
-                title="Job location"
-                src={`https://www.google.com/maps?q=${encodeURIComponent([selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", "))}&output=embed`}
-                className="h-36 w-full rounded-lg border border-slate-200"
-                loading="lazy"
-                data-testid="job-location-map"
-              />
+              <div data-testid="job-location-map">
+                <MapEmbed
+                  query={[selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", ")}
+                  className="h-40"
+                />
+                <DistanceFromMe
+                  address={[selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", ")}
+                />
+              </div>
             )}
           </div>
         )}

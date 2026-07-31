@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Building2, Check, Home, Loader2, Plus, Users } from "lucide-react";
@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LEAD_SOURCES } from "@/lib/lead-sources";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
-import { AddressAutocomplete } from "@/components/mobile/address-autocomplete";
+import { AddressAutocomplete, validateAddress, type AddressValidationResult } from "@/components/mobile/address-autocomplete";
 import type { AccountType, LeadSource } from "@shared/schema";
 
 /** New Customer — the mobile twin of the CRM's account-create wizard. It
@@ -51,6 +51,8 @@ export default function MobileCustomerNew() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address1, setAddress1] = useState("");
+  const [addrCheck, setAddrCheck] = useState<AddressValidationResult | null>(null);
+  const [addrChecking, setAddrChecking] = useState(false);
   const [address2, setAddress2] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -144,6 +146,19 @@ export default function MobileCustomerNew() {
     }
     createCustomer.mutate();
   };
+
+  // USPS-grade address validation — badge updates as the address completes
+  useEffect(() => {
+    const full = address1.trim() && city.trim() && state.trim() ? `${address1}, ${city}, ${state} ${zip}`.trim() : "";
+    if (!full) { setAddrCheck(null); return; }
+    setAddrChecking(true);
+    const t = setTimeout(async () => {
+      const r = await validateAddress(full);
+      setAddrCheck(r);
+      setAddrChecking(false);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [address1, city, state, zip]);
 
   const sectionLabel = "mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400";
 
@@ -292,6 +307,35 @@ export default function MobileCustomerNew() {
               <Input id="nc-zip" value={zip} inputMode="numeric" onChange={(e) => setZip(e.target.value)} placeholder="30830" data-testid="nc-zip" />
             </div>
           </div>
+          {(addrChecking || addrCheck) && (
+            <div data-testid="nc-address-validation">
+              {addrChecking ? (
+                <p className="text-xs text-slate-400">Checking address…</p>
+              ) : addrCheck?.verdict === "verified" ? (
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                  <Check className="h-3.5 w-3.5" /> Address verified
+                </p>
+              ) : addrCheck?.verdict === "fixable" && addrCheck.standardized ? (
+                <button
+                  onClick={() => {
+                    const parts = addrCheck.standardized!.split(",").map((x) => x.trim());
+                    if (parts.length >= 3) {
+                      setAddress1(parts[0]);
+                      setCity(parts[1]);
+                      const st = parts[2].match(/^([A-Za-z]{2})\s+(\d{5})/);
+                      if (st) { setState(st[1].toUpperCase()); setZip(st[2]); }
+                    }
+                  }}
+                  className="rounded-[4px] border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-left text-xs text-amber-900"
+                  data-testid="nc-address-suggestion"
+                >
+                  Did you mean <span className="font-semibold">{addrCheck.standardized}</span>? Tap to use it.
+                </button>
+              ) : (
+                <p className="text-xs text-amber-700">Couldn't fully verify this address — double-check it.</p>
+              )}
+            </div>
+          )}
           {!isPM && (
             <>
               <div>

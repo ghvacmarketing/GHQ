@@ -44,11 +44,7 @@ export function AddressAutocomplete({
   testid?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<HTMLDivElement | null>(null);
-  const mapObj = useRef<any>(null);
-  const markerObj = useRef<any>(null);
   const [ready, setReady] = useState<boolean | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +69,6 @@ export function AddressAutocomplete({
             const address = place.formattedAddress || "";
             const loc = place.location;
             const c = loc ? { lat: typeof loc.lat === "function" ? loc.lat() : loc.lat, lng: typeof loc.lng === "function" ? loc.lng() : loc.lng } : undefined;
-            if (c) setCoords(c);
             onChange(address, c);
           } catch {
             /* selection failed — the typed text still stands */
@@ -87,35 +82,6 @@ export function AddressAutocomplete({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Live mini-map pin once we have coordinates
-  useEffect(() => {
-    if (!showMap || !coords || !mapRef.current) return;
-    (async () => {
-      try {
-        const g = (window as any).google;
-        const { Map } = await g.maps.importLibrary("maps");
-        const { AdvancedMarkerElement } = await g.maps.importLibrary("marker").catch(() => ({ AdvancedMarkerElement: null }));
-        if (!mapObj.current) {
-          mapObj.current = new Map(mapRef.current, {
-            center: coords,
-            zoom: 16,
-            disableDefaultUI: true,
-            gestureHandling: "none",
-            mapId: "GHQ_CREATE_MAP",
-          });
-        } else {
-          mapObj.current.setCenter(coords);
-        }
-        if (AdvancedMarkerElement) {
-          if (markerObj.current) markerObj.current.map = null;
-          markerObj.current = new AdvancedMarkerElement({ map: mapObj.current, position: coords });
-        }
-      } catch {
-        /* map preview is decoration — never block the form */
-      }
-    })();
-  }, [coords, showMap]);
 
   if (ready === false || !KEY) {
     return (
@@ -140,9 +106,121 @@ export function AddressAutocomplete({
           {value}
         </p>
       )}
-      {showMap && coords && (
-        <div ref={mapRef} className="mt-2 h-36 w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm" data-testid={testid ? `${testid}-map` : undefined} />
+      {showMap && value && (
+        <div className="mt-2" data-testid={testid ? `${testid}-map` : undefined}>
+          <MapEmbed query={value} className="h-36" />
+        </div>
       )}
     </div>
   );
+}
+
+/** Mobile-friendly embedded map for an address string. Uses the Maps Embed
+ *  API when a key exists (crisper, branded pin), else the keyless embed. */
+export function MapEmbed({ query, className = "h-40" }: { query: string; className?: string }) {
+  if (!query.trim()) return null;
+  const src = KEY
+    ? `https://www.google.com/maps/embed/v1/place?key=${KEY}&q=${encodeURIComponent(query)}&zoom=15`
+    : `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+  return (
+    <iframe
+      title="Location"
+      src={src}
+      className={`${className} w-full rounded-xl border border-slate-200 shadow-sm`}
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      allowFullScreen
+    />
+  );
+}
+
+/** "How far am I?" — device location → driving distance + time to the given
+ *  address via the Distance Matrix service. Renders nothing until both ends
+ *  are known; never blocks or errors the page. */
+export function DistanceFromMe({ address }: { address: string }) {
+  const [result, setResult] = useState<{ distance: string; duration: string } | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "done" | "unavailable">("idle");
+
+  useEffect(() => {
+    if (!address.trim() || !KEY) { setState("unavailable"); return; }
+    let cancelled = false;
+    setState("loading");
+    (async () => {
+      try {
+        const ok = await loadMaps();
+        if (!ok || cancelled) return setState("unavailable");
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 120000 });
+        });
+        if (cancelled) return;
+        const g = (window as any).google;
+        await g.maps.importLibrary("routes").catch(() => g.maps.importLibrary("core"));
+        const svc = new g.maps.DistanceMatrixService();
+        svc.getDistanceMatrix(
+          {
+            origins: [{ lat: pos.coords.latitude, lng: pos.coords.longitude }],
+            destinations: [address],
+            travelMode: "DRIVING",
+            unitSystem: g.maps.UnitSystem.IMPERIAL,
+          },
+          (resp: any, status: string) => {
+            if (cancelled) return;
+            const el = resp?.rows?.[0]?.elements?.[0];
+            if (status === "OK" && el?.status === "OK") {
+              setResult({ distance: el.distance?.text || "", duration: el.duration?.text || "" });
+              setState("done");
+            } else {
+              setState("unavailable");
+            }
+          },
+        );
+      } catch {
+        if (!cancelled) setState("unavailable");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [address]);
+
+  if (state === "loading") {
+    return <p className="mt-1.5 text-xs text-slate-400">Checking distance from you…</p>;
+  }
+  if (state !== "done" || !result) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-600" data-testid="distance-from-me">
+      <MapPin className="h-3.5 w-3.5 text-[#711419]" />
+      {result.distance} from you · about {result.duration} driving
+    </p>
+  );
+}
+
+export type AddressValidationResult = {
+  verdict: "verified" | "fixable" | "unverified";
+  standardized?: string;
+};
+
+/** USPS-grade check via the Address Validation API. Best-effort: any
+ *  API/network problem returns null so forms never block on it. */
+export async function validateAddress(address: string): Promise<AddressValidationResult | null> {
+  if (!KEY || !address.trim()) return null;
+  try {
+    const res = await fetch(`https://addressvalidation.googleapis.com/v1:validateAddress?key=${KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: { regionCode: "US", addressLines: [address] } }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const v = data?.result?.verdict;
+    const standardized = data?.result?.address?.formattedAddress as string | undefined;
+    if (!v) return null;
+    if (v.addressComplete && !v.hasUnconfirmedComponents) {
+      return { verdict: "verified", standardized };
+    }
+    if (standardized && standardized.toLowerCase() !== address.trim().toLowerCase()) {
+      return { verdict: "fixable", standardized };
+    }
+    return { verdict: "unverified", standardized };
+  } catch {
+    return null;
+  }
 }
