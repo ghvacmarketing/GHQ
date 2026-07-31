@@ -61,8 +61,14 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
     };
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
+    // Safety net: if the focused element unmounts (overlay closed), focusout
+    // never fires in WebKit — poll while hidden and restore the nav.
+    const guard = setInterval(() => {
+      setKeyboardUp((up) => (up && !isTypable(document.activeElement) ? false : up));
+    }, 600);
     return () => {
       clearTimeout(blurT);
+      clearInterval(guard);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
     };
@@ -257,7 +263,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
         <button
           onClick={() => setCreateOpen(true)}
           className="absolute right-4 z-40 flex items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90"
-          style={{ bottom: "calc(76px + env(safe-area-inset-bottom))", height: 60, width: 60 }}
+          style={{ bottom: "calc(76px + env(safe-area-inset-bottom))", height: 60, width: 60, ...(keyboardUp ? { opacity: 0, pointerEvents: "none" as const, transform: "translateY(20px)" } : {}) }}
           data-testid="fab-create"
           aria-label="Create"
         >

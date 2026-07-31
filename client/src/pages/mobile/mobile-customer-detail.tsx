@@ -195,16 +195,27 @@ export default function MobileCustomerDetail() {
         className="min-h-full"
         data-testid="mobile-customer-detail-page"
         onTouchStart={(e) => {
+          const el = e.currentTarget as any;
+          if (!el._mountedAt) el._mountedAt = Date.now();
           const t = e.touches[0];
-          if (t.clientX < 28) (e.currentTarget as any)._swipe = { x: t.clientX, y: t.clientY };
+          // Edge swipe only, and never within the first beat after opening —
+          // the tap that navigated here must not double as an exit gesture.
+          if (t.clientX < 40 && Date.now() - el._mountedAt > 500) {
+            el._swipe = { x: t.clientX, y: t.clientY };
+          }
         }}
         onTouchMove={(e) => {
-          const st = (e.currentTarget as any)._swipe;
+          const el = e.currentTarget as any;
+          const st = el._swipe;
           if (!st) return;
           const t = e.touches[0];
-          if (t.clientX - st.x > 70 && Math.abs(t.clientY - st.y) < 60) {
-            (e.currentTarget as any)._swipe = null;
+          const dx = t.clientX - st.x;
+          const dy = Math.abs(t.clientY - st.y);
+          if (dx > 80 && dy < 40 && dx > dy * 2) {
+            el._swipe = null;
             navigate("/mobile/customers");
+          } else if (dy > 50) {
+            el._swipe = null; // vertical scroll — not a back gesture
           }
         }}
         onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
@@ -213,7 +224,7 @@ export default function MobileCustomerDetail() {
         <button
           onClick={() => navigate("/mobile/customers")}
           className="liquid-glass fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition-transform active:scale-95"
-          style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+          style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
           data-testid="back-button"
         >
           <ArrowLeft className="h-5 w-5" />
