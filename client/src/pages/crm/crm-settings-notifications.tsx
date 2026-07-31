@@ -54,6 +54,30 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
   system: "Announcements sent from this page",
 };
 
+// The concrete events behind each category — sourced from every
+// crm_notifications insert in the codebase, so this list is truthful.
+const TYPE_SUBTYPES: Record<string, string[]> = {
+  task_assigned: [
+    "New job (work order) assigned to you",
+    "A teammate assigned you a task",
+  ],
+  task_due: ["A task reaches its due date"],
+  mention: ["@-mention in a comment"],
+  tagged_comment: [
+    "Someone left you a pin note",
+    "Your pin note was resolved",
+  ],
+  comment: ["Comment activity on your work"],
+  status_change: ["Your job was rescheduled"],
+  system: [
+    "Announcements sent from this page",
+    "Sensor alerts (humidity / temperature monitors)",
+    "Automation follow-ups & messages",
+    "Marketing campaign notices",
+    "Customer portal activity",
+  ],
+};
+
 const TYPE_LABELS: Record<string, string> = {
   mention: "Mention",
   task_assigned: "Task assigned",
@@ -194,6 +218,9 @@ export default function CrmSettingsNotifications() {
           </span>
         </div>
 
+        {/* ── Section 1: sending ── */}
+        <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Send</p>
+
         {/* Composer */}
         <Card>
           <CardHeader className="pb-3">
@@ -279,6 +306,9 @@ export default function CrmSettingsNotifications() {
           </CardContent>
         </Card>
 
+        {/* ── Section 2: activity ── */}
+        <p className="pt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Activity</p>
+
         {/* What the system notifies about, automatically */}
         <Card>
           <CardHeader className="pb-3">
@@ -299,6 +329,16 @@ export default function CrmSettingsNotifications() {
                     <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-slate-500">{typeCount(t)}</span>
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
+                  {(TYPE_SUBTYPES[t] || []).length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5 border-t border-slate-100 pt-1.5">
+                      {TYPE_SUBTYPES[t].map((sub) => (
+                        <li key={sub} className="flex items-start gap-1.5 text-[11px] leading-snug text-slate-600">
+                          <span className="mt-[5px] h-1 w-1 shrink-0 rounded-full bg-[#711419]/50" />
+                          {sub}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </button>
               ))}
             </div>

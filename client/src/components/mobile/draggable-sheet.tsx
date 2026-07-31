@@ -64,7 +64,7 @@ export function DraggableSheet({
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        className={`rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/85 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/75" : ""} ${tall ? "flex max-h-[90vh] flex-col" : ""}`}
+        className={`rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${tall ? "flex max-h-[90vh] flex-col" : ""}`}
         style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
         data-testid={testid}
       >
