@@ -84,14 +84,22 @@ export function AddressAutocomplete({
   }, []);
 
   if (ready === false || !KEY) {
+    // No key (or script failed): plain input — but the map still shows via
+    // the keyless embed, so the location is always visible.
     return (
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Street, city, state ZIP"
-        className="w-full rounded-xl border-0 bg-white/90 px-4 py-3 text-[16px] text-slate-900 shadow-sm outline-none placeholder:text-slate-400"
-        data-testid={testid}
-      />
+      <div data-testid={testid}>
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Street, city, state ZIP"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-[16px] text-slate-900 shadow-sm outline-none placeholder:text-slate-400"
+        />
+        {showMap && value.trim().length > 8 && (
+          <div className="mt-2">
+            <MapEmbed query={value} className="h-36" />
+          </div>
+        )}
+      </div>
     );
   }
 
