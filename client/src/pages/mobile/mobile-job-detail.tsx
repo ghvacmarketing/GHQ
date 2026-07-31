@@ -4518,7 +4518,17 @@ export default function MobileJobDetail() {
         });
       } else {
         setOptimisticStatus(null);
-        toast({ title: "Failed to update status", variant: "destructive" });
+        // Surface the server's reason (e.g. "Finish your current job first…")
+        // instead of a generic failure.
+        const raw = error instanceof Error ? error.message : "";
+        let serverMessage = "";
+        try {
+          serverMessage = JSON.parse(raw.slice(raw.indexOf("{"))).message || "";
+        } catch { /* not JSON — keep generic */ }
+        toast({
+          title: serverMessage || "Failed to update status",
+          variant: "destructive",
+        });
       }
     },
   });

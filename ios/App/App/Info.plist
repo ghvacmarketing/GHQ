@@ -30,6 +30,8 @@
 	<string>GHQ uses the camera to capture job-site photos that attach to the customer's record.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>GHQ uses the microphone for voice dictation when talking to Gibbs, the assistant.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>GHQ uses your location to confirm you're on site at a job.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>GHVAC Tools lets you pick existing photos to attach to a customer's job record.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

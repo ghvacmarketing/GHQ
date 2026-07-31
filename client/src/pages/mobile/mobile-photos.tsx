@@ -55,7 +55,41 @@ export default function MobilePhotos() {
     },
   });
 
-  const activeCustomer = pickedCustomer;
+  // Deep links from the "+" Add Photo picker: ?cid=&cname= preselects the
+  // target customer; ?pick=1 opens the search overlay immediately.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cid = params.get("cid");
+    const cname = params.get("cname");
+    if (cid) setPickedCustomer({ id: cid, name: cname || "Customer", phone: null });
+    if (params.get("pick") === "1") setSearchActive(true);
+    if (cid || params.get("pick")) window.history.replaceState({}, "", "/mobile/photos");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Techs can only attach photos while ON SITE at their job — the picker
+  // endpoint returns exactly that job (or nothing = blocked).
+  const isTechRole = currentUser?.role === "tech";
+  const { data: photoTargets } = useQuery<{ mode: string; jobs: Array<{ customerId: string; customerName: string | null }> }>({
+    queryKey: ["/api/mobile/photo-targets"],
+    queryFn: async () => {
+      const res = await fetch("/api/mobile/photo-targets", { credentials: "include" });
+      if (!res.ok) throw new Error("failed");
+      return res.json();
+    },
+    enabled: !!currentUser && isTechRole,
+    refetchInterval: 60 * 1000,
+  });
+  const techOnsiteJob = isTechRole ? photoTargets?.jobs?.[0] || null : null;
+  const techBlocked = isTechRole && photoTargets !== undefined && !techOnsiteJob;
+  useEffect(() => {
+    if (techOnsiteJob && !pickedCustomer) {
+      setPickedCustomer({ id: techOnsiteJob.customerId, name: techOnsiteJob.customerName || "Customer", phone: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techOnsiteJob?.customerId]);
+
+  const activeCustomer = techBlocked ? null : pickedCustomer;
   const customerId = activeCustomer?.id || null;
 
   // Search ANY customer to attach photos to (mobile-friendly, tech-accessible).
@@ -400,7 +434,10 @@ export default function MobilePhotos() {
           display: searchActive ? "none" : undefined,
         }}
       >
-        {/* Search icon top right — opens the full-screen search overlay */}
+        {/* Search icon top right — opens the full-screen search overlay.
+            Techs don't get free targeting: their photos go to the job
+            they're on site at. */}
+        {!isTechRole && (
         <div className="flex items-center justify-end gap-2">
           <button
             onClick={() => setSearchActive(true)}
@@ -411,6 +448,7 @@ export default function MobilePhotos() {
             <Search className="h-4 w-4" />
           </button>
         </div>
+        )}
 
         {/* Missing-photos nudge: finished jobs with zero shots on record */}
         {missingPhotoJobs.length > 0 && (
@@ -479,6 +517,7 @@ export default function MobilePhotos() {
               {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+              {!isTechRole && (
               <button
                 onClick={() => { setCustomerSearch(""); setSearchActive(true); }}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
@@ -486,6 +525,7 @@ export default function MobilePhotos() {
               >
                 Change
               </button>
+              )}
               <button
                 onClick={() => setPickedCustomer(null)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 active:scale-95"
@@ -497,6 +537,15 @@ export default function MobilePhotos() {
             </div>
           </div>
         ) : null}
+
+        {techBlocked && (
+          <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-4 py-4 text-center" data-testid="tech-offsite-banner">
+            <p className="text-sm font-semibold text-amber-900">You're not on site at a job</p>
+            <p className="mt-1 text-xs text-amber-800">
+              Photos attach to the job you're working. Open your job and tap On Site — this page unlocks automatically.
+            </p>
+          </div>
+        )}
 
         {/* Capture / library */}
         {activeCustomer && (
@@ -676,7 +725,7 @@ export default function MobilePhotos() {
           window.visualViewport height tracking. */}
       {searchActive && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-slate-50"
+          className="fixed inset-0 z-50 flex flex-col bg-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
           data-testid="photos-search-overlay"
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
@@ -710,7 +759,7 @@ export default function MobilePhotos() {
             )}
           </div>
           <div
-            className="flex items-center gap-2 px-4 pt-2"
+            className="flex items-center gap-2 px-4 pt-2 transition-[padding-bottom] duration-150 ease-out"
             style={{
               paddingBottom: keyboardInset > 0
                 ? `${keyboardInset + 10}px`

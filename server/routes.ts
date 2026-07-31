@@ -15339,6 +15339,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied - work order not assigned to you" });
       }
 
+      // One active job at a time: a tech can't start (en_route/on_site) the
+      // NEXT job while another of their jobs is still active — complete the
+      // current one first.
+      const startingStatuses = ["en_route", "on_site"];
+      if (
+        user.role === "tech" &&
+        typeof req.body?.status === "string" &&
+        startingStatuses.includes(req.body.status) &&
+        !startingStatuses.includes(existingWorkOrder.status)
+      ) {
+        const [activeJob] = await db
+          .select({ id: crmWorkOrders.id, status: crmWorkOrders.status, customerName: crmCustomers.name })
+          .from(crmWorkOrders)
+          .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+          .where(and(
+            eq(crmWorkOrders.assignedTechId, user.id),
+            inArray(crmWorkOrders.status, ["en_route", "on_site"]),
+            ne(crmWorkOrders.id, existingWorkOrder.id),
+          ))
+          .limit(1);
+        if (activeJob) {
+          return res.status(409).json({
+            message: `Finish your current job first — you're still ${activeJob.status === "on_site" ? "on site" : "en route"}${activeJob.customerName ? ` at ${activeJob.customerName}` : ""}. Complete it before starting the next one.`,
+          });
+        }
+      }
+
       // Prevent editing work orders that are "on_site" - only allow status, notes, and completion details
       if (existingWorkOrder.status === "on_site") {
         const lockedFields = ["assignedTechId", "scheduledStart", "scheduledEnd", "customerId", "propertyId", "title", "description", "priority", "visitType", "workSubtype", "projectId", "agreementId", "dispatchQueueStage"];
@@ -29068,16 +29095,86 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/mobile/photo-targets — who/what a photo can be attached to.
+  // Supervisors and office roles: every job scheduled TODAY plus free-form
+  // customer search. Techs: ONLY the job they are currently ON SITE at —
+  // no on-site job, no uploads (the system must know they're on site).
+  app.get("/api/mobile/photo-targets", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const isTech = user.role === "tech";
+      const dayKey = formatInTimeZone(new Date(), "America/New_York", "yyyy-MM-dd");
+      const dayStart = fromZonedTime(`${dayKey} 00:00:00`, "America/New_York");
+      const dayEnd = fromZonedTime(`${dayKey} 23:59:59`, "America/New_York");
+      const conds: any[] = [
+        gte(crmWorkOrders.scheduledStart, dayStart),
+        lte(crmWorkOrders.scheduledStart, dayEnd),
+        ne(crmWorkOrders.status, "cancelled"),
+      ];
+      if (isTech) {
+        conds.push(eq(crmWorkOrders.assignedTechId, user.id));
+        conds.push(eq(crmWorkOrders.status, "on_site"));
+      }
+      const jobs = await db
+        .select({
+          id: crmWorkOrders.id,
+          title: crmWorkOrders.title,
+          status: crmWorkOrders.status,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          customerId: crmWorkOrders.customerId,
+          customerName: crmCustomers.name,
+          techName: crmUsers.name,
+        })
+        .from(crmWorkOrders)
+        .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+        .leftJoin(crmUsers, eq(crmWorkOrders.assignedTechId, crmUsers.id))
+        .where(and(...conds))
+        .orderBy(asc(crmWorkOrders.scheduledStart));
+      res.json({
+        mode: isTech ? "tech" : "supervisor",
+        canPickCustomer: !isTech,
+        jobs: jobs.filter((j) => j.customerId),
+      });
+    } catch (error) {
+      console.error("Error fetching photo targets:", error);
+      res.status(500).json({ message: "Failed to load photo targets" });
+    }
+  });
+
   // GET /api/mobile/customers - Mobile customer lookup (for field technicians)
   app.get("/api/mobile/customers", requireCrmTechOrAbove, async (req, res) => {
     try {
       const { search, limit = "20" } = req.query as Record<string, string | undefined>;
       const limitNum = Math.min(50, Math.max(1, parseInt(limit || "20") || 20));
       const searchTerm = search?.trim() || "";
-      
-      // If no search term, return empty (don't load all customers)
+
+      // No search term: show RELEVANT customers — the ones with the most
+      // recent job activity, so the page is useful before anyone types.
       if (!searchTerm) {
-        return res.json([]);
+        const recentJobs = await db
+          .select({ customerId: crmWorkOrders.customerId, createdAt: crmWorkOrders.createdAt })
+          .from(crmWorkOrders)
+          .orderBy(desc(crmWorkOrders.createdAt))
+          .limit(60);
+        const seen: string[] = [];
+        for (const j of recentJobs) {
+          if (j.customerId && !seen.includes(j.customerId)) seen.push(j.customerId);
+          if (seen.length >= limitNum) break;
+        }
+        if (seen.length === 0) return res.json([]);
+        const rows = await db
+          .select({
+            id: crmCustomers.id,
+            name: crmCustomers.name,
+            phone: crmCustomers.phone,
+            fullAddress: crmCustomers.fullAddress,
+            customerType: crmCustomers.customerType,
+          })
+          .from(crmCustomers)
+          .where(inArray(crmCustomers.id, seen));
+        rows.sort((a, b) => seen.indexOf(a.id) - seen.indexOf(b.id));
+        return res.json(rows);
       }
 
       const customers = await storage.searchCrmCustomers(searchTerm, limitNum);

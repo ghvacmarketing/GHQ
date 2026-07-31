@@ -58,10 +58,44 @@ export async function initNativePush(): Promise<void> {
   }
 }
 
+/** One-time permission priming on the first launch after login — the way
+ *  established apps ask for everything upfront: notifications first (via
+ *  push registration), then camera, microphone, and location. Each prompt
+ *  only ever appears once per install; iOS remembers the answers. */
+let primeStarted = false;
+export async function primeNativePermissions(): Promise<void> {
+  if (!isNativeApp() || primeStarted) return;
+  primeStarted = true;
+  try {
+    if (localStorage.getItem("ghq-perms-primed") === "1") return;
+    localStorage.setItem("ghq-perms-primed", "1");
+    // Give the push-permission dialog (fired by initNativePush) a moment
+    // before stacking the next prompts.
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const { Camera } = await import("@capacitor/camera");
+      await Camera.requestPermissions();
+    } catch { /* plugin missing or denied — fine */ }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch { /* mic denied — Gibbs voice will re-ask contextually */ }
+    try {
+      await new Promise<void>((resolve) => {
+        navigator.geolocation.getCurrentPosition(() => resolve(), () => resolve(), { timeout: 8000 });
+        setTimeout(resolve, 9000);
+      });
+    } catch { /* location denied — nothing depends on it yet */ }
+  } catch { /* priming is best-effort */ }
+}
+
 /** Hook flavor for layouts: registers push once a CRM user is logged in. */
 export function useNativePush(loggedIn: boolean) {
   useEffect(() => {
-    if (loggedIn) void initNativePush();
+    if (loggedIn) {
+      void initNativePush();
+      void primeNativePermissions();
+    }
   }, [loggedIn]);
 }
 

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ClipboardList, Wrench, Clock, ShieldX, Plus,
   FileText, Receipt, Camera, LayoutGrid, Briefcase, Sparkles, CheckSquare, UserRoundPlus,
+  Loader2, Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
@@ -44,6 +45,7 @@ const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
+  const [photoTargetOpen, setPhotoTargetOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantLoaded, setAssistantLoaded] = useState(false);
   const go = (path: string) => { setCreateOpen(false); navigate(path); };
@@ -92,6 +94,22 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 
   // Check if user can access mobile app
   useNativePush(!!currentUser); // iOS shell: register for push once logged in
+  type PhotoTargets = {
+    mode: "tech" | "supervisor";
+    canPickCustomer: boolean;
+    jobs: Array<{ id: string; title: string | null; status: string; scheduledStart: string | null; customerId: string; customerName: string | null; techName: string | null }>;
+  };
+  const { data: photoTargets, isLoading: photoTargetsLoading } = useQuery<PhotoTargets>({
+    queryKey: ["/api/mobile/photo-targets"],
+    queryFn: async () => {
+      const res = await fetch("/api/mobile/photo-targets", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load photo targets");
+      return res.json();
+    },
+    enabled: photoTargetOpen,
+    staleTime: 30 * 1000,
+  });
+
   const canAccessMobile = currentUser && MOBILE_ALLOWED_ROLES.includes(currentUser.role);
   const isSupervisor = !!currentUser && SUPERVISOR_ROLES.includes(currentUser.role);
 
@@ -235,7 +253,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
             <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
-            <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/photos")} testid="create-add-photo" />
+            <SheetTile icon={Camera} label="Add Photo" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
             {isSupervisor && (
               <>
                 <SheetTile icon={UserRoundPlus} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
@@ -250,6 +268,70 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           <div className="grid grid-cols-4 gap-3">
             <SheetTile icon={Sparkles} label="Ask Gibbs" onClick={openAssistant} testid="create-ask-gibbs" />
           </div>
+      </DraggableSheet>
+
+      {/* Add Photo — pick the target first: a job today (role-aware) or a
+          customer. Techs must be ON SITE at their job to add photos. */}
+      <DraggableSheet open={photoTargetOpen} onOpenChange={setPhotoTargetOpen} title="Add photo to…" testid="sheet-photo-target">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Add photo to…</p>
+        {photoTargetsLoading || !photoTargets ? (
+          <div className="flex items-center justify-center py-8 text-slate-400">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-3 pb-2">
+            {photoTargets.jobs.length > 0 ? (
+              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {photoTargets.mode === "tech" ? "You're on site at" : "Jobs today"}
+                </p>
+                {photoTargets.jobs.map((j, i) => (
+                  <button
+                    key={j.id}
+                    onClick={() => {
+                      setPhotoTargetOpen(false);
+                      go(`/mobile/photos?cid=${j.customerId}&cname=${encodeURIComponent(j.customerName || "Customer")}`);
+                    }}
+                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                    data-testid={`photo-target-job-${j.id}`}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-slate-900">{j.customerName || "Customer"}</span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {[j.title, j.scheduledStart ? new Date(j.scheduledStart).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null, photoTargets.mode === "supervisor" ? j.techName : null].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <Camera className="h-4 w-4 shrink-0 text-slate-400" />
+                  </button>
+                ))}
+              </div>
+            ) : photoTargets.mode === "tech" ? (
+              <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-4 py-4 text-center" data-testid="photo-target-blocked">
+                <p className="text-sm font-semibold text-amber-900">You're not on site at a job</p>
+                <p className="mt-1 text-xs text-amber-800">
+                  Photos attach to the job you're working. Open your job and tap On Site first — then come back here.
+                </p>
+              </div>
+            ) : (
+              <p className="rounded-[4px] border border-dashed border-slate-300 bg-white px-4 py-4 text-center text-sm text-slate-400">
+                No jobs scheduled today.
+              </p>
+            )}
+            {photoTargets.canPickCustomer && (
+              <button
+                onClick={() => {
+                  setPhotoTargetOpen(false);
+                  go("/mobile/photos?pick=1");
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 active:bg-slate-50"
+                data-testid="photo-target-customer-search"
+              >
+                <Search className="h-4 w-4" />
+                Search customers instead
+              </button>
+            )}
+          </div>
+        )}
       </DraggableSheet>
 
       {/* AI assistant popup — slides up over the current screen */}

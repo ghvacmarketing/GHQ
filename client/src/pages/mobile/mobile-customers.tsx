@@ -151,6 +151,10 @@ export default function MobileCustomers() {
             ))}
           </div>
         ) : customers && customers.length > 0 ? (
+          <div>
+            {!searchQuery.trim() && (
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Recent customers</h3>
+            )}
           <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-results">
             {customers.map((customer, i) => (
               <button
@@ -179,6 +183,7 @@ export default function MobileCustomers() {
               </button>
             ))}
           </div>
+          </div>
         ) : (
           <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-12 text-center" data-testid="empty-state">
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5">
@@ -186,7 +191,7 @@ export default function MobileCustomers() {
             </span>
             <h3 className="text-base font-semibold text-slate-800">No customers found</h3>
             <p className="mt-0.5 text-sm text-slate-500">
-              {searchQuery ? "Try adjusting your search terms." : "Start typing to search for customers."}
+              {searchQuery ? "Try adjusting your search terms." : "Customers with recent jobs will appear here."}
             </p>
           </div>
         )}
