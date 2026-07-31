@@ -64,6 +64,7 @@ import GhqSearch, { openGlobalAI } from "./ghq-search";
 import { TopNavSearch } from "./topnav-search";
 import NotificationsDrawerContent from "./notifications-drawer";
 import { PinCommentsLayer, enterPinMode } from "./pin-comments";
+import { GibbsMark } from "./gibbs-mark";
 import { useNativePush } from "@/lib/native";
 
 interface CrmLayoutProps {
@@ -571,7 +572,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
 
         <div className="flex flex-1 items-center justify-end gap-1.5">
           <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask Gibbs" data-testid="button-topnav-ai">
-            <Sparkles className="h-5 w-5 text-slate-600" />
+            <GibbsMark className="h-5 w-5 text-slate-600" />
           </Button>
           <Button
             variant="ghost"

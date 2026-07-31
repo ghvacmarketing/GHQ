@@ -44,6 +44,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { GibbsMark } from "@/components/crm/gibbs-mark";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -867,7 +868,7 @@ export default function AiAssistantModal() {
             ) : messages.length === 0 && !pending ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10 text-[#711419]">
-                  <Sparkles className="h-7 w-7" />
+                  <GibbsMark className="h-7 w-7" />
                 </span>
                 <h2 className="text-xl font-semibold text-slate-800">Gibbs here — what can I get done?</h2>
                 <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-500">
@@ -925,7 +926,7 @@ export default function AiAssistantModal() {
                   return (
                     <div key={i} className="flex items-start gap-3">
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
-                        <Sparkles className="h-4 w-4 text-white" />
+                        <GibbsMark className="h-4 w-4 text-white" />
                       </div>
                       <div className="min-w-0 flex-1 space-y-2">
                         {msg.content.trim() !== "" && (
@@ -1193,7 +1194,7 @@ export default function AiAssistantModal() {
                 {pending && (
                   <div className="flex items-start gap-3">
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
-                      <Sparkles className="h-4 w-4 text-white" />
+                      <GibbsMark className="h-4 w-4 text-white" />
                     </div>
                     <div className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-slate-100 px-4 py-3.5">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:0ms]" />
