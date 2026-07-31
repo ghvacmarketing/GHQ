@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
 import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders } from "@shared/schema";
-import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne } from "drizzle-orm";
+import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne, inArray } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { nameSimilarity } from "./customer-match";
@@ -496,6 +496,15 @@ const CRM_TOOLS: ClaudeTool[] = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "team_roster",
+    description: "The staff roster (technicians, supervisors, sales, owner) with their EXACT ids. Run this whenever the user names a staff member for an assignment ('assign it to Ryo') — pin the matched person's id into assignedTechId. If zero or multiple people match the name, ask the user which one BEFORE proposing any action.",
+    input_schema: {
+      type: "object",
+      properties: { name: { type: "string", description: "Optional (partial) name filter; empty returns everyone" } },
+      required: [],
+    },
+  },
+  {
     name: "company_docs",
     description: "Search and READ the company's internal documents (the Documents app): brand guides, SOPs, policies, pricing sheets, call scripts, warranty terms. Use for questions about who Giesbrecht HVAC is, company policy, procedures, branding, or 'how do we do X here'. Text files and PDFs are read in full.",
     input_schema: {
@@ -536,6 +545,20 @@ async function readDocText(objectPath: string, contentType: string, fileName: st
 
 async function executeCrmTool(name: string, input: Record<string, unknown>): Promise<string> {
   const lim = Math.min(Math.max(Number(input?.limit) || 20, 1), 50);
+
+  if (name === "team_roster") {
+    const q = String((input as any)?.name || "").trim().toLowerCase();
+    const staff = await db
+      .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
+      .from(crmUsers)
+      .where(and(eq(crmUsers.isActive, true), inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales"])));
+    const rows = q ? staff.filter((u) => (u.name || "").toLowerCase().includes(q)) : staff;
+    if (rows.length === 0) return `No staff member matches "${q}" — list the full roster (call again without a filter) and ask the user who they meant.`;
+    return JSON.stringify({
+      note: "Pin the chosen person's id into assignedTechId on the action. If more than one row could be who the user meant, ask before proposing.",
+      staff: rows.map((u) => ({ id: u.id, name: u.name, role: u.role })),
+    });
+  }
 
   if (name === "customer_profile") {
     const q = String(input?.name || "").trim();
@@ -881,13 +904,19 @@ The conversation history marks every proposal you made earlier with its outcome:
 3. UNRELATED NEW REQUEST while something else is still pending ("also add a task to order filters"): propose just the new action WITHOUT replacesPrevious — the pending card is still valid and stays.
 In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
 RESOLVE THE TARGET FIRST — settle every ambiguity BEFORE proposing anything:
+
+THE PINNED-CARD RULE (hard requirement): an action card must arrive at the user COMPLETE — customerId pinned, and assignedTechId pinned whenever the job is assigned to someone. The Approve button must never trigger another question or a pick-list; if the user has to select anything at approval time, you failed this rule. If you don't yet hold the exact ids, you are not done clarifying — keep asking, don't propose.
+
+ONE CLARIFICATION ROUND: gather EVERY open question across the WHOLE request into a single reply — which customer for each job, which staff member (run team_roster on any name the user gives for assignment; ask if zero or several match), what date/time. "Three service calls for Ryo" = one round that settles all three customers AND confirms which Ryo on the roster AND any times — then propose all three cards at once, each fully pinned.
+
+USE THE IDS YOU ALREADY HAVE: when you listed candidates and the user picked one, that candidate came with its id — pin THAT id directly into the action. Do not re-look-up by name after a pick, and never propose a card carrying only a name you already disambiguated.
 Any action that touches an existing customer (work order, text, email, quote, invoice, update, delete) must be grounded in a customer_profile lookup from THIS conversation. The lookup fuzzy-matches, so run it even when the spoken name looks misheard or misspelled ("Rio Martin" will find "Ryo Martin") — never assume a customer doesn't exist because the spelling looks off, and never refuse an action because the name looks off.
 If the lookup comes back AMBIGUOUS (multiple candidates), propose NO actions that turn — not even the steps that don't depend on the customer. Ask which one they mean in one short question, listing each candidate with the detail that tells them apart (phone, address), and put each candidate's name in relatedTopics so they can tap to answer. Once the user picks, propose the ENTIRE chain of actions in one reply. Settling who it is first and then dropping all the cards at once is the flow users expect — discovering mid-approval that the customer was ambiguous is exactly what must never happen.
 When the lookup confidently matched one customer, put that record's exact name in customerName (the CRM's spelling, not the misheard one) and copy the record's id into customerId in the params — the id pins execution to exactly the customer shown on the card. If the matched spelling differs from what the user said, say so plainly in your answer ("Found them — Ryo Martin on Fairview Rd").
 Steps that target a customer being CREATED earlier in the same chain are the one exception — no id exists yet, so they carry the exact same customerName as the create_customer step (per DEPENDENT ACTIONS below). Only pass an existing customer's name WITHOUT a lookup when the lookup itself failed twice; in that case pass the name as the user said it — the server fuzzy-matches at approval time as a safety net.
 Action types and their params:
 1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
-2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — a technician's name if the user asked to assign it to someone), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00") }
+2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — the staff member's name as the user said it), "assignedTechId": string (REQUIRED whenever assigning — the exact id from team_roster; a card without it will make the user re-pick at approval, which violates the pinned-card rule), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00") }
 3. send_sms — texts a customer through the CRM's messaging line. params: { "customerName": string (required), "customerPhone": string (optional but strongly preferred — the customer's phone from your customer_profile lookup, so the approval card shows exactly which number the text goes to), "message": string (required — write the COMPLETE, ready-to-send text exactly as it should go out: friendly, professional, concise, signed "— Giesbrecht HVAC"; no placeholders like [time] unless the user left the detail out) }
 4. send_email — emails someone from the approving user's connected Gmail. Recipient — set EXACTLY ONE: pass "customerName" when the user names a customer (the CRM looks up the email on their file; it errors if none is on file), OR pass "toEmail" when the user gives a literal email address (use it verbatim, never invent one). params: { "customerName": string (optional — the customer whose on-file email to use), "customerEmail": string (optional but strongly preferred with customerName — the customer's email from your customer_profile lookup, so the approval card shows exactly where the email goes), "toEmail": string (optional — an actual email address the user provided), "subject": string (required), "body": string (required — the COMPLETE plain-text email body, ready to send: professional and warm, proper greeting and sign-off as Giesbrecht HVAC, no markdown, no placeholders unless a detail is genuinely unknown) }
 5. create_customer — adds a new customer to the CRM. Before proposing you MUST run customer_profile on the name — it fuzzy-matches, so a misheard "Rio Martin" surfaces the real "Ryo Martin". If the lookup finds that person or anyone similar (a match, an ambiguous candidate list, or similarExistingCustomers): do NOT propose create — ask whether they mean that existing customer or truly a new person, naming the match(es), with the existing name(s) in relatedTopics. Propose create_customer only when the lookup found no close match, or the user has explicitly confirmed this is a different person from the similar customer you named — in that confirmed case include "confirmedNew": true in params (NEVER include it otherwise; the server refuses near-duplicate creates without it). Include every detail the user gave. params: { "name": string (required — the customer's full name), "phone": string (optional), "email": string (optional), "fullAddress": string (optional — street, city, state ZIP on one line), "customerType": "residential" | "commercial" (optional, default residential), "leadSource": string (optional — where they came from if mentioned, e.g. Google, referral, door hanger), "notes": string (optional — anything else worth keeping, e.g. "has an old gas furnace, interested in a heat pump"), "confirmedNew": true (ONLY after the user explicitly confirmed the similar existing customer is someone else) }
