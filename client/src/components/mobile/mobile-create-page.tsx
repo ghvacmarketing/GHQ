@@ -46,10 +46,15 @@ export function MobileCreatePage({
 }) {
   const [, navigate] = useLocation();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   const doExit = () => {
-    if (exitTo) navigate(exitTo);
-    else window.history.back();
+    // Slide the sheet back down before leaving — it closes like it opened
+    setClosing(true);
+    setTimeout(() => {
+      if (exitTo) navigate(exitTo);
+      else window.history.back();
+    }, 190);
   };
 
   const handleClose = () => {
@@ -58,7 +63,17 @@ export function MobileCreatePage({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300" data-testid={testid}>
+    <div
+      className={`fixed inset-0 z-[70] flex flex-col bg-slate-50 ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`}
+      data-testid={testid}
+    >
+      {/* Grab handle — top middle, like every bottom sheet */}
+      <div
+        className="pointer-events-none absolute inset-x-0 z-10 flex justify-center"
+        style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+      >
+        <div className="h-1.5 w-12 rounded-full bg-slate-300" />
+      </div>
       {/* Full-page sheet: slides up over everything, no backdrop, no header
           bar — just a floating X and Save over the content. */}
       <button
