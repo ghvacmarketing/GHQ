@@ -58,50 +58,40 @@ export function MobileCreatePage({
   };
 
   return (
-    <div className="fixed inset-0 z-[70]" data-testid={testid}>
-      {/* Apple-invite style: the whole page is a sheet that slides up over a
-          dimmed brand backdrop and closes back down. */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#3c0d10] via-[#711419] to-[#2a0a0c] animate-in fade-in duration-200" onClick={handleClose} />
-      <div
-        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-[0_-12px_48px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom duration-300"
-        style={{ top: "calc(env(safe-area-inset-top) + 28px)" }}
+    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300" data-testid={testid}>
+      {/* Full-page sheet: slides up over everything, no backdrop, no header
+          bar — just a floating X and Save over the content. */}
+      <button
+        onClick={handleClose}
+        className="absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur transition-transform active:scale-95"
+        style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+        aria-label="Close"
+        data-testid="create-page-close"
       >
-      <div className="shrink-0 border-b border-slate-200 bg-white/95 pt-2">
-        <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300" />
-        <div className="grid h-12 grid-cols-[4.5rem_1fr_4.5rem] items-center px-2">
-          <button
-            onClick={handleClose}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-slate-700 transition-colors active:bg-slate-100"
-            aria-label="Close"
-            data-testid="create-page-close"
-          >
-            <X className="h-5 w-5" strokeWidth={2.25} />
-          </button>
-
-          <h1 className="truncate text-center text-[15px] font-semibold text-slate-900">{title}</h1>
-
-          <div className="flex justify-end">
-            {onSave && (
-              <button
-                onClick={onSave}
-                disabled={saveDisabled || saving}
-                className="flex h-11 items-center gap-1.5 rounded-full px-3 text-[15px] font-semibold text-[#711419] transition-colors active:bg-[#711419]/10 disabled:text-slate-300"
-                data-testid="create-page-save"
-              >
-                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                {saveLabel}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+        <X className="h-5 w-5" strokeWidth={2.25} />
+      </button>
+      {onSave && (
+        <button
+          onClick={onSave}
+          disabled={saveDisabled || saving}
+          className="absolute right-3 z-10 flex h-10 items-center gap-1.5 rounded-full bg-[#711419] px-4 text-[15px] font-semibold text-white shadow-md transition-transform active:scale-95 disabled:bg-slate-300"
+          style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+          data-testid="create-page-save"
+        >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          {saveLabel}
+        </button>
+      )}
 
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-4 pt-4"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 32px)" }}
+        className="min-h-0 flex-1 overflow-y-auto px-4"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top) + 60px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 32px)",
+        }}
       >
+        <h1 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
         {children}
-      </div>
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
