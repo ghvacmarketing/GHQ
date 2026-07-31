@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -985,7 +986,7 @@ export default function MobileInvoiceDetail() {
                     <img src={qrDataUrl} alt="Payment QR code" className="h-64 w-64" data-testid="payment-qr" />
                   ) : (
                     <div className="flex h-64 w-64 items-center justify-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+                      <MobileSpinner fullHeight={false} />
                     </div>
                   )}
                 </div>

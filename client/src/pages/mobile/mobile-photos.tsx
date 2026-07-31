@@ -27,22 +27,40 @@ export default function MobilePhotos() {
   // Keyboard inset for the search overlay: the overlay itself always covers
   // the full viewport (so the page never shows through); only the bottom
   // input bar rides up by however much the iOS keyboard eats.
-  const [keyboardInset, setKeyboardInset] = useState(0);
+  const searchBarRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
-    if (!searchActive) {
-      setKeyboardInset(0);
-      return;
+    if (!searchActive) return;
+    const bar = () => searchBarRef.current;
+    const setInset = (px: number) => {
+      // Direct style write — zero React latency between keyboard and bar
+      const el = bar();
+      if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
+    };
+    setInset(0);
+    // Overlay paints first; the keyboard rises a beat later (feels ordered
+    // AND gives the bar its position before any animation starts).
+    const focusT = setTimeout(() => searchInputRef.current?.focus(), 220);
+
+    let removeNative: (() => void) | null = null;
+    if (isNativeApp()) {
+      // Native path: keyboardWillShow carries the height BEFORE the slide
+      import("@capacitor/keyboard").then(({ Keyboard }) => {
+        const subs: any[] = [];
+        Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
+        Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
+        removeNative = () => subs.forEach((h) => h?.remove?.());
+      }).catch(() => {});
     }
     const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () =>
-      setKeyboardInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
+    const update = () => setInset(Math.max(0, window.innerHeight - (vv?.height || window.innerHeight) - (vv?.offsetTop || 0)));
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
     return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
+      clearTimeout(focusT);
+      removeNative?.();
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
     };
   }, [searchActive]);
 
@@ -762,17 +780,14 @@ export default function MobilePhotos() {
             )}
           </div>
           <div
+            ref={searchBarRef}
             className="flex items-center gap-2 px-4 pt-2"
-            style={{
-              paddingBottom: keyboardInset > 0
-                ? `${keyboardInset + 10}px`
-                : "calc(env(safe-area-inset-bottom) + 12px)",
-            }}
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
           >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
-                autoFocus
+                ref={searchInputRef}
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 placeholder="Search customers"

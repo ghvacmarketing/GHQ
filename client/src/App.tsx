@@ -256,7 +256,10 @@ function ProtectedCrmWrapper({ children }: { children: ReactNode }) {
 function MobileLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50" data-testid="mobile-loader">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+      <div className="relative flex h-16 w-16 items-center justify-center">
+        <div className="absolute inset-0 animate-spin rounded-full border-2 border-slate-200 border-t-[#711419]" />
+        <img src={redLogoUrl} alt="GHQ" className="h-8 w-8 rounded-lg object-contain" />
+      </div>
     </div>
   );
 }

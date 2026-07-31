@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Clock, Square, Loader2, AlertCircle, CheckCircle, Briefcase, Plus,
@@ -156,7 +157,7 @@ export default function MobileTime() {
               <CardContent>
                 {loadingCurrent ? (
                   <div className="flex justify-center py-8">
-                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+                    <MobileSpinner fullHeight={false} />
                   </div>
                 ) : (
                   <div className="text-center space-y-4">
@@ -528,7 +529,7 @@ function TimesheetView() {
       {/* Days */}
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+          <MobileSpinner fullHeight={false} />
         </div>
       ) : days.length === 0 ? (
         <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">

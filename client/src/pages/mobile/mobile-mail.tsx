@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -168,7 +169,7 @@ export default function MobileMail() {
         <div className="-mx-4">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+              <MobileSpinner fullHeight={false} />
             </div>
           ) : inbox && !inbox.connected ? (
             <div className="px-6 py-12 text-center text-slate-500">

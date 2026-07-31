@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { MapEmbed, DistanceFromMe } from "@/components/mobile/address-autocomplete";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
@@ -224,7 +225,7 @@ export default function MobileJobNew() {
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711419]" />
+        <MobileSpinner fullHeight={false} />
       </div>
     );
   }

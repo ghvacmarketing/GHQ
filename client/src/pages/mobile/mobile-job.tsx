@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useLocation } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import MobileShell from "./mobile-shell";
@@ -525,7 +526,7 @@ export default function MobileJob() {
     return (
       <MobileShell>
         <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711419]" />
+          <MobileSpinner fullHeight={false} />
         </div>
       </MobileShell>
     );
@@ -629,7 +630,7 @@ export default function MobileJob() {
             </div>
             {historyLoading ? (
               <div className="flex justify-center py-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711419]" />
+                <MobileSpinner fullHeight={false} />
               </div>
             ) : historyGroups.length === 0 ? (
               <Card className="rounded-[4px] border-slate-300/70 shadow-none">

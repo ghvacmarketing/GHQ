@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, isBefore, startOfDay } from "date-fns";
@@ -183,7 +184,7 @@ export default function MobileTasks() {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711419]" />
+            <MobileSpinner fullHeight={false} />
           </div>
         ) : shown.length === 0 ? (
           <div className="rounded-[4px] border border-slate-300/70 bg-white py-10 text-center">

@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { User, LogOut, Mail, Shield, Loader2, Monitor, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +46,7 @@ export default function MobileProfile() {
       <div className="p-4 pt-16 space-y-4" data-testid="mobile-profile">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+            <MobileSpinner fullHeight={false} />
           </div>
         ) : currentUser ? (
           <>

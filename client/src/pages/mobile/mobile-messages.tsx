@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, RefreshCw, Phone,
@@ -226,7 +227,7 @@ export default function MobileMessages() {
         <div className="-mx-4">
           {loadingConversations ? (
             <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+              <MobileSpinner fullHeight={false} />
             </div>
           ) : conversations && conversations.length > 0 ? (
             <div className="divide-y divide-slate-100">
@@ -314,7 +315,7 @@ export default function MobileMessages() {
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
             {loadingDetail && messages.length === 0 ? (
               <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+                <MobileSpinner fullHeight={false} />
               </div>
             ) : timeline.length > 0 ? (
               <div className="space-y-1.5">
@@ -419,7 +420,7 @@ export default function MobileMessages() {
           <ScrollArea className="flex-1">
             {loadingContacts ? (
               <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
+                <MobileSpinner fullHeight={false} />
               </div>
             ) : contacts && contacts.length > 0 ? (
               <div className="divide-y">
