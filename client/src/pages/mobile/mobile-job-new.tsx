@@ -332,6 +332,15 @@ export default function MobileJobNew() {
                 </SelectContent>
               </Select>
             )}
+            {selectedProperty?.address1 && (
+              <iframe
+                title="Job location"
+                src={`https://www.google.com/maps?q=${encodeURIComponent([selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", "))}&output=embed`}
+                className="h-36 w-full rounded-lg border border-slate-200"
+                loading="lazy"
+                data-testid="job-location-map"
+              />
+            )}
           </div>
         )}
 

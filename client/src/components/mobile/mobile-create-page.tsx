@@ -58,14 +58,17 @@ export function MobileCreatePage({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50" data-testid={testid}>
-      {/* Sticky nav — equal side columns keep the title optically centred no
-          matter how wide the save label runs. */}
+    <div className="fixed inset-0 z-[70]" data-testid={testid}>
+      {/* Apple-invite style: the whole page is a sheet that slides up over a
+          dimmed brand backdrop and closes back down. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#3c0d10] via-[#711419] to-[#2a0a0c] animate-in fade-in duration-200" onClick={handleClose} />
       <div
-        className="sticky top-0 z-40 border-b border-slate-200 bg-white"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
+        className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-[0_-12px_48px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom duration-300"
+        style={{ top: "calc(env(safe-area-inset-top) + 28px)" }}
       >
-        <div className="grid h-14 grid-cols-[4.5rem_1fr_4.5rem] items-center px-2">
+      <div className="shrink-0 border-b border-slate-200 bg-white/95 pt-2">
+        <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300" />
+        <div className="grid h-12 grid-cols-[4.5rem_1fr_4.5rem] items-center px-2">
           <button
             onClick={handleClose}
             className="flex h-11 w-11 items-center justify-center rounded-full text-slate-700 transition-colors active:bg-slate-100"
@@ -93,7 +96,13 @@ export function MobileCreatePage({
         </div>
       </div>
 
-      <div className="px-4 pb-16 pt-4">{children}</div>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-4 pt-4"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 32px)" }}
+      >
+        {children}
+      </div>
+      </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-[8px]">

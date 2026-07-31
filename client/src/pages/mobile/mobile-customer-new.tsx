@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LEAD_SOURCES } from "@/lib/lead-sources";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
+import { AddressAutocomplete } from "@/components/mobile/address-autocomplete";
 import type { AccountType, LeadSource } from "@shared/schema";
 
 /** New Customer — the mobile twin of the CRM's account-create wizard. It
@@ -250,6 +251,25 @@ export default function MobileCustomerNew() {
               Property managers don't get a service site from this address — add their properties from the customer's page.
             </p>
           )}
+          <div>
+            <Label className="mb-1.5 block">Find the address</Label>
+            <AddressAutocomplete
+              value={address1 && city ? `${address1}, ${city}, ${state} ${zip}` : ""}
+              onChange={(addr) => {
+                // "123 Main St, Wrens, GA 30833, USA" → split into the fields
+                const parts = addr.split(",").map((x) => x.trim());
+                if (parts.length >= 3) {
+                  setAddress1(parts[0]);
+                  setCity(parts[1]);
+                  const st = parts[2].match(/^([A-Za-z]{2})\s+(\d{5})/);
+                  if (st) { setState(st[1].toUpperCase()); setZip(st[2]); }
+                } else {
+                  setAddress1(addr);
+                }
+              }}
+              testid="nc-address-search"
+            />
+          </div>
           <div>
             <Label htmlFor="nc-address1" className="mb-1.5 block">Address line 1 *</Label>
             <Input id="nc-address1" value={address1} onChange={(e) => setAddress1(e.target.value)} placeholder="123 Main St" data-testid="nc-address1" />
