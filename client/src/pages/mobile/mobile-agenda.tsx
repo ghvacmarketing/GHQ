@@ -386,7 +386,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
       </div>
 
       {/* Notifications sheet */}
-      <DraggableSheet glass open={notifOpen} onOpenChange={setNotifOpen} title="Notifications" testid="sheet-notifications">
+      <DraggableSheet open={notifOpen} onOpenChange={setNotifOpen} title="Notifications" testid="sheet-notifications">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-base font-semibold text-slate-800">Notifications</span>
           {unreadCount > 0 && (
