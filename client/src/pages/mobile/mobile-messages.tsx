@@ -243,7 +243,7 @@ export default function MobileMessages() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate text-[15px] font-semibold text-slate-900">
+                      <p className={`truncate text-[15px] text-slate-900 ${conversation.unreadInboundCount ? "font-bold" : "font-semibold"}`}>
                         {conversation.customerName || "Unknown"}
                       </p>
                       {conversation.lastMessageAt && (
@@ -257,9 +257,7 @@ export default function MobileMessages() {
                         {conversation.phoneNumber || conversation.customerPhone || "No phone"}
                       </p>
                       {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
-                        <span className="shrink-0 rounded-[4px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white">
-                          Needs you{conversation.unreadInboundCount > 1 ? ` · ${conversation.unreadInboundCount}` : ""}
-                        </span>
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
                       )}
                     </div>
                   </div>

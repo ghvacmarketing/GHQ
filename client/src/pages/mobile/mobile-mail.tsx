@@ -205,9 +205,7 @@ export default function MobileMail() {
                         {t.subject || "(no subject)"}
                       </span>
                       {t.isUnread && (
-                        <span className="shrink-0 rounded-[4px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white">
-                          Needs you
-                        </span>
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
                       )}
                     </span>
                     {t.snippet && <span className="mt-0.5 block truncate text-xs text-slate-400">{t.snippet}</span>}

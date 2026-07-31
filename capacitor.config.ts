@@ -12,6 +12,15 @@ const config: CapacitorConfig = {
     url: "https://www.ghvac.app",
     allowNavigation: ["www.ghvac.app", "ghvac.app", "ghvac-tools.onrender.com"],
   },
+  plugins: {
+    Keyboard: {
+      // Never shrink the webview — the shrink exposed the native window as a
+      // black band behind the keyboard and double-lifted keyboard-aware bars.
+      // The web UI handles keyboard insets itself (useKeyboardInset).
+      resize: "none",
+      style: "LIGHT",
+    },
+  },
   ios: {
     // The web app handles safe areas itself (env(safe-area-inset-*)) —
     // "automatic" double-applied insets: maroon band above, offset container

@@ -1,4 +1,5 @@
 import { useRef, type ReactNode } from "react";
+import { useKeyboardInset } from "@/lib/native";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 /**
@@ -22,6 +23,7 @@ export function DraggableSheet({
   tall?: boolean;
   glass?: boolean;
 }) {
+  const keyboardInset = useKeyboardInset();
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragStartY = useRef<number | null>(null);
 
@@ -65,7 +67,11 @@ export function DraggableSheet({
         ref={sheetRef}
         side="bottom"
         className={`rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${tall ? "flex max-h-[90vh] flex-col" : ""}`}
-        style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
+        style={{
+          paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
+          transform: keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : undefined,
+          transition: "transform 0.2s ease-out",
+        }}
         data-testid={testid}
       >
         <div

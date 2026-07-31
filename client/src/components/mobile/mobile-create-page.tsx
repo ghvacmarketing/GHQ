@@ -85,19 +85,6 @@ export function MobileCreatePage({
       >
         <X className="h-5 w-5" strokeWidth={2.25} />
       </button>
-      {onSave && (
-        <button
-          onClick={onSave}
-          disabled={saveDisabled || saving}
-          className="absolute right-3 z-10 flex h-10 items-center gap-1.5 rounded-full bg-[#711419] px-4 text-[15px] font-semibold text-white shadow-md transition-transform active:scale-95 disabled:bg-slate-300"
-          style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
-          data-testid="create-page-save"
-        >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          {saveLabel}
-        </button>
-      )}
-
       <div
         className="min-h-0 flex-1 overflow-y-auto px-4"
         style={{
@@ -107,6 +94,17 @@ export function MobileCreatePage({
       >
         <h1 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
         {children}
+        {onSave && (
+          <button
+            onClick={onSave}
+            disabled={saveDisabled || saving}
+            className="mt-6 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:bg-slate-300"
+            data-testid="create-page-save"
+          >
+            {saving && <Loader2 className="h-5 w-5 animate-spin" />}
+            {saveLabel}
+          </button>
+        )}
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

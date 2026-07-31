@@ -51,6 +51,7 @@ export default function MobileCustomerNew() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address1, setAddress1] = useState("");
+  const [manualAddress, setManualAddress] = useState(false);
   const [addrCheck, setAddrCheck] = useState<AddressValidationResult | null>(null);
   const [addrChecking, setAddrChecking] = useState(false);
   const [address2, setAddress2] = useState("");
@@ -266,8 +267,9 @@ export default function MobileCustomerNew() {
               Property managers don't get a service site from this address — add their properties from the customer's page.
             </p>
           )}
+          {!manualAddress && (
           <div>
-            <Label className="mb-1.5 block">Find the address</Label>
+            <Label className="mb-1.5 block">Address</Label>
             <AddressAutocomplete
               value={address1 && city ? `${address1}, ${city}, ${state} ${zip}` : ""}
               onChange={(addr) => {
@@ -285,6 +287,14 @@ export default function MobileCustomerNew() {
               testid="nc-address-search"
             />
           </div>
+          )}
+          {!manualAddress && address1.trim() && (
+            <div>
+              <Label htmlFor="nc-address2q" className="mb-1.5 block">Apt, suite, unit (optional)</Label>
+              <Input id="nc-address2q" value={address2} onChange={(e) => setAddress2(e.target.value)} placeholder="Apt 2B" data-testid="nc-address2q" />
+            </div>
+          )}
+          {manualAddress && (<>
           <div>
             <Label htmlFor="nc-address1" className="mb-1.5 block">Address line 1 *</Label>
             <Input id="nc-address1" value={address1} onChange={(e) => setAddress1(e.target.value)} placeholder="123 Main St" data-testid="nc-address1" />
@@ -307,6 +317,7 @@ export default function MobileCustomerNew() {
               <Input id="nc-zip" value={zip} inputMode="numeric" onChange={(e) => setZip(e.target.value)} placeholder="30830" data-testid="nc-zip" />
             </div>
           </div>
+          </>)}
           {(addrChecking || addrCheck) && (
             <div data-testid="nc-address-validation">
               {addrChecking ? (
@@ -336,6 +347,13 @@ export default function MobileCustomerNew() {
               )}
             </div>
           )}
+          <button
+            onClick={() => setManualAddress((v) => !v)}
+            className="text-left text-xs font-medium text-[#711419] underline underline-offset-2"
+            data-testid="nc-address-mode-toggle"
+          >
+            {manualAddress ? "Use address search instead" : "Can't find it on Google? Enter the address manually"}
+          </button>
           {!isPM && (
             <>
               <div>

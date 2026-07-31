@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
@@ -106,6 +106,40 @@ export function useNativePush(loggedIn: boolean) {
       void primeNativePermissions();
     }
   }, [loggedIn]);
+}
+
+// ---- Keyboard -----------------------------------------------------------
+
+/** Height of the on-screen keyboard in px, updated BEFORE the slide on the
+ *  native shell (keyboardWillShow) and via visualViewport on the web. Use it
+ *  to lift bottom-pinned bars/sheets — the webview itself never resizes
+ *  (Keyboard resize: "none"). */
+export function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    let removeNative: (() => void) | null = null;
+    if (isNativeApp()) {
+      import("@capacitor/keyboard")
+        .then(({ Keyboard }) => {
+          const subs: any[] = [];
+          Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
+          Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
+          removeNative = () => subs.forEach((h) => h?.remove?.());
+        })
+        .catch(() => {});
+      return () => removeNative?.();
+    }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  return inset;
 }
 
 // ---- Camera -------------------------------------------------------------
