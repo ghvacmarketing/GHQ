@@ -67,6 +67,11 @@ export async function primeNativePermissions(): Promise<void> {
   if (!isNativeApp() || primeStarted) return;
   primeStarted = true;
   try {
+    // Older installed binaries lack the mic/location usage strings — iOS
+    // HARD-CRASHES an app that touches those APIs without them. The Keyboard
+    // plugin only exists in binaries new enough to carry the strings, so its
+    // presence is the safety gate.
+    if (!Capacitor.isPluginAvailable("Keyboard")) return;
     if (localStorage.getItem("ghq-perms-primed") === "1") return;
     localStorage.setItem("ghq-perms-primed", "1");
     // Give the push-permission dialog (fired by initNativePush) a moment
