@@ -2788,13 +2788,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerName: z.string().trim().min(1).max(200),
             customerId: z.string().trim().min(1).max(64).optional(),
             quoteKind: z.enum(["quick", "proposal"]).optional(),
+            quoteMode: z.enum(["single", "options"]).optional(),
             title: z.string().trim().max(200).optional(),
             notes: z.string().trim().max(2000).optional(),
             lineItems: z.array(z.object({
               description: z.string().trim().min(1).max(300),
               quantity: z.number().positive().max(999),
               unitPrice: z.number().min(0).max(1000000),
-            }).strict()).min(1).max(15),
+              optionTag: z.string().trim().max(60).optional(),
+            }).strict()).min(1).max(30),
           }).strict(),
         }),
         z.object({
@@ -3173,6 +3175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subtotal: subtotal.toFixed(2),
           total: subtotal.toFixed(2),
           internalNotes: action.params.notes || null,
+          quoteMode: action.params.quoteMode === "options" ? "options" : null,
           createdById: user.id,
         }).returning();
         for (let idx = 0; idx < action.params.lineItems.length; idx++) {
@@ -3185,7 +3188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unitPrice: li.unitPrice.toFixed(2),
             lineTotal: (li.quantity * li.unitPrice).toFixed(2),
             sortOrder: idx,
+            optionTag: li.optionTag || null,
           });
+        }
+        // Options quotes: stored total = best option + shared lines
+        if (action.params.quoteMode === "options") {
+          await recomputeQuoteStoredTotals(newQuote.id).catch(() => {});
         }
         await logCrmAudit(user.id, "ai_action.create_quote", "crm_quote", newQuote.id, { quoteNumber, customerId: qCustomer.id, total: subtotal.toFixed(2) }, req.ip);
         const quoteLabel = `Draft quote ${quoteNumber} for ${qCustomer.name} — $${subtotal.toFixed(2)}`;
