@@ -940,7 +940,18 @@ export default function MobileJob() {
 
       {/* History filters — dropdown rows; each opens its own option sheet */}
       <DraggableSheet tall open={historyFilterOpen} onOpenChange={setHistoryFilterOpen} title="Filter history" testid="sheet-history-filter">
-        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+          {(historyType !== "all" || historyGroupBy !== "month") && (
+            <button
+              onClick={() => { setHistoryGroupBy("month"); setHistoryType("all"); }}
+              className="text-sm font-semibold text-[#711419]"
+              data-testid="history-filter-clear"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
         <div className="mt-2 min-h-[45vh] divide-y divide-slate-200/80 pb-2">
           <SheetSelect
             label="Group by"

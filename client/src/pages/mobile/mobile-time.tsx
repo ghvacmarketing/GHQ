@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { SheetSelect } from "@/components/mobile/sheet-select";
+import { DateRangeCalendar } from "@/components/mobile/date-range-calendar";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
@@ -351,7 +352,18 @@ export default function MobileTime() {
 
       {/* Timesheet filters — dropdown rows; each opens its own option sheet */}
       <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter timesheet" testid="sheet-timesheet-filter">
-        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+          {filtersActive && (
+            <button
+              onClick={() => { setTsPreset("this-week"); setTsCat("all"); setTsFrom(""); setTsTo(""); }}
+              className="text-sm font-semibold text-[#711419]"
+              data-testid="timesheet-filter-clear"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
         <div className="mt-2 min-h-[45vh] divide-y divide-slate-200/80 pb-2">
           <SheetSelect
             label="Date range"
@@ -366,9 +378,13 @@ export default function MobileTime() {
             testid="timesheet-range"
           />
           {tsPreset === "custom" && (
-            <div className="grid grid-cols-2 gap-2 py-3">
-              <Input type="date" value={tsFrom} onChange={(e) => setTsFrom(e.target.value)} data-testid="timesheet-from" />
-              <Input type="date" value={tsTo} onChange={(e) => setTsTo(e.target.value)} data-testid="timesheet-to" />
+            <div className="py-3">
+              <DateRangeCalendar
+                from={tsFrom}
+                to={tsTo}
+                onChange={(f, t) => { setTsFrom(f); setTsTo(t); }}
+                testid="timesheet-filter-calendar"
+              />
             </div>
           )}
           <SheetSelect

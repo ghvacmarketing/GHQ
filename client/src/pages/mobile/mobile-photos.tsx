@@ -775,7 +775,18 @@ export default function MobilePhotos() {
 
       {/* Media filters — dropdown row; opens its own option sheet */}
       <DraggableSheet tall open={mediaFilterOpen} onOpenChange={setMediaFilterOpen} title="Filter media" testid="sheet-media-filter">
-        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+          {mediaKind !== "all" && (
+            <button
+              onClick={() => setMediaKind("all")}
+              className="text-sm font-semibold text-[#711419]"
+              data-testid="media-filter-clear"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
         <div className="mt-2 min-h-[35vh] divide-y divide-slate-200/80 pb-2">
           <SheetSelect
             label="Kind"

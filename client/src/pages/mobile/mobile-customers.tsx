@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Search, ChevronRight, Users, LogIn, CalendarClock, ListFilter, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { SheetSelect } from "@/components/mobile/sheet-select";
+import { DateRangeCalendar } from "@/components/mobile/date-range-calendar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -407,7 +407,18 @@ export default function MobileCustomers() {
 
       {/* Customer filters — dropdown rows; each opens its own option sheet */}
       <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter customers" testid="sheet-customer-filter">
-        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+          {filtersActive && (
+            <button
+              onClick={() => { setFType("all"); setFStatus("all"); setFAgreement(false); setFRange("all"); setFFrom(""); setFTo(""); }}
+              className="text-sm font-semibold text-[#711419]"
+              data-testid="customers-filter-clear"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
         <div className="mt-2 min-h-[55vh] divide-y divide-slate-200/80 pb-2">
           <SheetSelect
             label="Customer type"
@@ -456,9 +467,13 @@ export default function MobileCustomers() {
             testid="customers-filter-range"
           />
           {fRange === "custom" && (
-            <div className="grid grid-cols-2 gap-2 py-3">
-              <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} data-testid="customers-filter-from" />
-              <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} data-testid="customers-filter-to" />
+            <div className="py-3">
+              <DateRangeCalendar
+                from={fFrom}
+                to={fTo}
+                onChange={(f, t) => { setFFrom(f); setFTo(t); }}
+                testid="customers-filter-calendar"
+              />
             </div>
           )}
         </div>
