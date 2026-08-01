@@ -28,6 +28,9 @@ import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from 
 
 interface ConversationWithCustomer extends CrmMessagingConversation {
   customerPhone?: string | null;
+  /** Live CRM record joined (or phone-matched) server-side — its name wins
+   *  over whatever snapshot customerName holds. */
+  customer?: { id: string; name: string; phone: string | null } | null;
 }
 
 interface ConversationDetailResponse {
@@ -165,8 +168,10 @@ export default function MobileMessages() {
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const displayName =
     conversationDetail?.customer?.name ||
+    selectedConversation?.customer?.name ||
     conversationDetail?.conversation?.customerName ||
     selectedConversation?.customerName ||
+    selectedConversation?.phoneNumber ||
     "Unknown Contact";
   const displayPhone =
     conversationDetail?.customer?.phone ||
@@ -242,15 +247,15 @@ export default function MobileMessages() {
                   data-testid={`conversation-${conversation.id}`}
                 >
                   <img
-                    src={conversation.customerId ? badgeContactKnown : badgeContactUnknown}
-                    alt={conversation.customerId ? "CRM customer" : "Unknown number"}
+                    src={(conversation.customerId || conversation.customer) ? badgeContactKnown : badgeContactUnknown}
+                    alt={(conversation.customerId || conversation.customer) ? "CRM customer" : "Unknown number"}
                     className="h-12 w-12 shrink-0 select-none"
                     draggable={false}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className={`truncate text-[15px] text-slate-900 ${conversation.unreadInboundCount ? "font-bold" : "font-semibold"}`}>
-                        {conversation.customerName || "Unknown"}
+                        {conversation.customer?.name || conversation.customerName || conversation.phoneNumber || "Unknown"}
                       </p>
                       {conversation.lastMessageAt && (
                         <span className={`shrink-0 text-xs ${conversation.unreadInboundCount ? "font-semibold text-[#711419]" : "text-slate-400"}`}>
@@ -260,7 +265,9 @@ export default function MobileMessages() {
                     </div>
                     <div className="mt-0.5 flex items-center justify-between gap-2">
                       <p className="truncate text-sm text-slate-500">
-                        {conversation.phoneNumber || conversation.customerPhone || "No phone"}
+                        {conversation.customer?.name || conversation.customerName
+                          ? conversation.phoneNumber || conversation.customerPhone || "No phone"
+                          : "Not in the CRM yet"}
                       </p>
                       {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
                         <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
@@ -298,7 +305,7 @@ export default function MobileMessages() {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <img
-              src={(conversationDetail?.conversation?.customerId || selectedConversation?.customerId) ? badgeContactKnown : badgeContactUnknown}
+              src={(conversationDetail?.conversation?.customerId || selectedConversation?.customerId || selectedConversation?.customer) ? badgeContactKnown : badgeContactUnknown}
               alt=""
               className="h-10 w-10 shrink-0 select-none"
               draggable={false}

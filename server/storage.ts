@@ -2235,10 +2235,50 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return results.map(r => ({
+    const mapped = results.map(r => ({
       ...r.conversation,
       customer: r.customer || null
     }));
+
+    // Conversations that were never linked to a customer (inbound texts from
+    // numbers Textline didn't match) still deserve a name: match the phone
+    // digits against CRM customers in one pass, and persist the link so the
+    // next load — and the known/unknown avatar — gets it without re-matching.
+    const unlinked = mapped.filter(c => !c.customer && c.phoneNumber);
+    if (unlinked.length > 0) {
+      const byLast10 = new Map<string, typeof unlinked>();
+      for (const c of unlinked) {
+        const last10 = c.phoneNumber.replace(/\D/g, '').slice(-10);
+        if (last10.length < 10) continue;
+        if (!byLast10.has(last10)) byLast10.set(last10, []);
+        byLast10.get(last10)!.push(c);
+      }
+      if (byLast10.size > 0) {
+        const keys = Array.from(byLast10.keys());
+        const matches = await db.select({
+          id: crmCustomers.id,
+          name: crmCustomers.name,
+          phone: crmCustomers.phone,
+        })
+        .from(crmCustomers)
+        .where(sql`RIGHT(regexp_replace(COALESCE(${crmCustomers.phone}, ''), '[^0-9]', '', 'g'), 10) IN (${sql.join(keys.map(k => sql`${k}`), sql`, `)})`);
+
+        for (const m of matches) {
+          const k = (m.phone || '').replace(/\D/g, '').slice(-10);
+          for (const conv of byLast10.get(k) || []) {
+            conv.customer = { id: m.id, name: m.name, phone: m.phone };
+            conv.customerId = m.id;
+            if (!conv.customerName) conv.customerName = m.name;
+            db.update(crmMessagingConversations)
+              .set({ customerId: m.id, customerName: conv.customerName })
+              .where(eq(crmMessagingConversations.id, conv.id))
+              .then(() => {}, () => {});
+          }
+        }
+      }
+    }
+
+    return mapped;
   }
 
   async searchCrmCustomers(search: string, limit: number = 20): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]> {
