@@ -105,7 +105,9 @@ export function DraggableSheet({
         }`}
         style={{
           paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
-          transform: keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : undefined,
+          // Full sheets already cover the screen — translating them under the
+          // keyboard would shove the top off; their content pads instead.
+          transform: !full && keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : undefined,
           transition: "transform 0.2s ease-out",
         }}
         onPointerDown={onPointerDown}

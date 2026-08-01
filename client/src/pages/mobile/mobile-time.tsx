@@ -6,6 +6,7 @@ import {
   ListFilter,
 } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { SheetSelect } from "@/components/mobile/sheet-select";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
@@ -348,65 +349,38 @@ export default function MobileTime() {
         )}
       </div>
 
-      {/* Timesheet filters — range + category, in one bottom sheet */}
-      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter timesheet" testid="sheet-timesheet-filter">
+      {/* Timesheet filters — dropdown rows; each opens its own option sheet */}
+      <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter timesheet" testid="sheet-timesheet-filter">
         <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
-        <div className="mt-4 space-y-4 pb-2">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Date range</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([
-                ["this-week", "This week"],
-                ["last-week", "Last week"],
-                ["this-month", "This month"],
-                ["custom", "Custom"],
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setTsPreset(key)}
-                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    tsPreset === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`timesheet-range-${key}`}
-                >
-                  {label}
-                </button>
-              ))}
+        <div className="mt-2 min-h-[45vh] divide-y divide-slate-200/80 pb-2">
+          <SheetSelect
+            label="Date range"
+            value={tsPreset}
+            onChange={(k) => setTsPreset(k as typeof tsPreset)}
+            options={[
+              { key: "this-week", label: "This week" },
+              { key: "last-week", label: "Last week" },
+              { key: "this-month", label: "This month" },
+              { key: "custom", label: "Custom range" },
+            ]}
+            testid="timesheet-range"
+          />
+          {tsPreset === "custom" && (
+            <div className="grid grid-cols-2 gap-2 py-3">
+              <Input type="date" value={tsFrom} onChange={(e) => setTsFrom(e.target.value)} data-testid="timesheet-from" />
+              <Input type="date" value={tsTo} onChange={(e) => setTsTo(e.target.value)} data-testid="timesheet-to" />
             </div>
-            {tsPreset === "custom" && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Input type="date" value={tsFrom} onChange={(e) => setTsFrom(e.target.value)} data-testid="timesheet-from" />
-                <Input type="date" value={tsTo} onChange={(e) => setTsTo(e.target.value)} data-testid="timesheet-to" />
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Category</p>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setTsCat("all")}
-                className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  tsCat === "all" ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                }`}
-                data-testid="timesheet-cat-all"
-              >
-                All
-              </button>
-              {TIME_CATEGORIES.map((c) => (
-                <button
-                  key={c.key}
-                  onClick={() => setTsCat(c.key)}
-                  className={`flex items-center gap-1.5 rounded-[3px] border px-2 py-1 text-xs font-medium transition-colors ${
-                    tsCat === c.key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`timesheet-cat-${c.key}`}
-                >
-                  <img src={c.img} alt="" className="h-5 w-5 select-none" draggable={false} />
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
+          <SheetSelect
+            label="Category"
+            value={tsCat}
+            onChange={setTsCat}
+            options={[
+              { key: "all", label: "All" },
+              ...TIME_CATEGORIES.map((c) => ({ key: c.key, label: c.label, img: c.img })),
+            ]}
+            testid="timesheet-cat"
+          />
         </div>
       </DraggableSheet>
 

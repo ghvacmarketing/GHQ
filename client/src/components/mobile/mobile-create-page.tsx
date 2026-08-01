@@ -28,6 +28,7 @@ export function MobileCreatePage({
   title,
   dirty,
   exitTo,
+  onClose,
   onSave,
   saveLabel = "Save",
   saveDisabled,
@@ -40,6 +41,9 @@ export function MobileCreatePage({
   dirty: boolean;
   /** Where the X (and a confirmed discard) lands. Defaults to browser back. */
   exitTo?: string;
+  /** Overlay mode: close by unmounting (parent state) instead of navigating.
+   *  Takes precedence over exitTo. */
+  onClose?: () => void;
   /** Submit handler for the nav's save action; omit to leave the slot empty. */
   onSave?: () => void;
   saveLabel?: string;
@@ -68,6 +72,11 @@ export function MobileCreatePage({
     if (keyboardInset === 0) window.scrollTo(0, 0);
   }, [keyboardInset]);
 
+  const leave = () => {
+    if (onClose) onClose();
+    else if (exitTo) navigate(exitTo);
+    else window.history.back();
+  };
   const doExit = (fromDy = 0) => {
     // Slide the sheet down with an eased glide — it closes like it opened.
     const el = rootRef.current;
@@ -79,17 +88,11 @@ export function MobileCreatePage({
       el.style.transition = `transform ${dur}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${dur}ms ease-out`;
       el.style.transform = "translateY(100%)";
       el.style.opacity = "0.6";
-      setTimeout(() => {
-        if (exitTo) navigate(exitTo);
-        else window.history.back();
-      }, dur - 20);
+      setTimeout(leave, dur - 20);
       return;
     }
     setClosing(true);
-    setTimeout(() => {
-      if (exitTo) navigate(exitTo);
-      else window.history.back();
-    }, 190);
+    setTimeout(leave, 190);
   };
 
   const handleClose = () => {

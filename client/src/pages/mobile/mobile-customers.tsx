@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Search, ChevronRight, Users, LogIn, CalendarClock, ListFilter, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { SheetSelect } from "@/components/mobile/sheet-select";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -404,79 +405,62 @@ export default function MobileCustomers() {
         )}
       </div>
 
-      {/* Customer filters — the CRM's filters in one bottom sheet */}
-      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter customers" testid="sheet-customer-filter">
+      {/* Customer filters — dropdown rows; each opens its own option sheet */}
+      <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter customers" testid="sheet-customer-filter">
         <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
-        <div className="mt-4 space-y-4 pb-2">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Customer type</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([["all", "All"], ["residential", "Residential"], ["commercial", "Commercial"], ["property_manager", "Property mgr"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setFType(key)}
-                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    fType === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`customers-filter-type-${key}`}
-                >
-                  {label}
-                </button>
-              ))}
+        <div className="mt-2 min-h-[55vh] divide-y divide-slate-200/80 pb-2">
+          <SheetSelect
+            label="Customer type"
+            value={fType}
+            onChange={(k) => setFType(k as typeof fType)}
+            options={[
+              { key: "all", label: "All" },
+              { key: "residential", label: "Residential", img: typeResidential },
+              { key: "commercial", label: "Commercial", img: typeCommercial },
+              { key: "property_manager", label: "Property manager", img: typePropertyManager },
+            ]}
+            testid="customers-filter-type"
+          />
+          <SheetSelect
+            label="Status"
+            value={fStatus}
+            onChange={(k) => setFStatus(k as typeof fStatus)}
+            options={[
+              { key: "all", label: "All" },
+              { key: "customer", label: "Customer" },
+              { key: "prospect", label: "Prospect" },
+            ]}
+            testid="customers-filter-status"
+          />
+          <SheetSelect
+            label="Agreements"
+            value={fAgreement ? "yes" : "all"}
+            onChange={(k) => setFAgreement(k === "yes")}
+            options={[
+              { key: "all", label: "All customers" },
+              { key: "yes", label: "Has an agreement" },
+            ]}
+            testid="customers-filter-agreement"
+          />
+          <SheetSelect
+            label="Date added"
+            value={fRange}
+            onChange={(k) => setFRange(k as typeof fRange)}
+            options={[
+              { key: "all", label: "All time" },
+              { key: "30", label: "Last 30 days" },
+              { key: "90", label: "Last 90 days" },
+              { key: "year", label: "This year" },
+              { key: "custom", label: "Custom range" },
+            ]}
+            testid="customers-filter-range"
+          />
+          {fRange === "custom" && (
+            <div className="grid grid-cols-2 gap-2 py-3">
+              <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} data-testid="customers-filter-from" />
+              <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} data-testid="customers-filter-to" />
             </div>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Status</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([["all", "All"], ["customer", "Customer"], ["prospect", "Prospect"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setFStatus(key)}
-                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    fStatus === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`customers-filter-status-${key}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Agreements</p>
-            <button
-              onClick={() => setFAgreement((v) => !v)}
-              className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                fAgreement ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-              }`}
-              data-testid="customers-filter-agreement"
-            >
-              Has an agreement
-            </button>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Date added</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([["all", "All time"], ["30", "Last 30 days"], ["90", "Last 90 days"], ["year", "This year"], ["custom", "Custom"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setFRange(key)}
-                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    fRange === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`customers-filter-range-${key}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {fRange === "custom" && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} data-testid="customers-filter-from" />
-                <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} data-testid="customers-filter-to" />
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </DraggableSheet>
 

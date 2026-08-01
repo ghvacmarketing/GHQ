@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { SheetSelect } from "@/components/mobile/sheet-select";
 import type { CrmWorkOrder, CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -937,52 +938,33 @@ export default function MobileJob() {
         </div>
       )}
 
-      {/* History filters — group-by + job type in one bottom sheet */}
-      <DraggableSheet open={historyFilterOpen} onOpenChange={setHistoryFilterOpen} title="Filter history" testid="sheet-history-filter">
+      {/* History filters — dropdown rows; each opens its own option sheet */}
+      <DraggableSheet tall open={historyFilterOpen} onOpenChange={setHistoryFilterOpen} title="Filter history" testid="sheet-history-filter">
         <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
-        <div className="mt-4 space-y-4 pb-2">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Group by</p>
-            <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-200/70 p-0.5">
-              {(["month", "day"] as const).map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setHistoryGroupBy(g)}
-                  className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                    historyGroupBy === g ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
-                  }`}
-                  data-testid={`history-groupby-${g}`}
-                >
-                  {g === "month" ? "Months" : "Days"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Job type</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([
-                ["all", "All"],
-                ["SERVICE", "Service"],
-                ["MAINTENANCE", "Maintenance"],
-                ["INSTALL", "Install"],
-                ["SALES", "Sales"],
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setHistoryType(key)}
-                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    historyType === key
-                      ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
-                      : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`history-filter-${key}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="mt-2 min-h-[45vh] divide-y divide-slate-200/80 pb-2">
+          <SheetSelect
+            label="Group by"
+            value={historyGroupBy}
+            onChange={(k) => setHistoryGroupBy(k as typeof historyGroupBy)}
+            options={[
+              { key: "month", label: "Months" },
+              { key: "day", label: "Days" },
+            ]}
+            testid="history-groupby"
+          />
+          <SheetSelect
+            label="Job type"
+            value={historyType}
+            onChange={(k) => setHistoryType(k as typeof historyType)}
+            options={[
+              { key: "all", label: "All" },
+              { key: "SERVICE", label: "Service" },
+              { key: "MAINTENANCE", label: "Maintenance" },
+              { key: "INSTALL", label: "Install" },
+              { key: "SALES", label: "Sales" },
+            ]}
+            testid="history-filter"
+          />
         </div>
       </DraggableSheet>
 

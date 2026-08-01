@@ -5,7 +5,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
-import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
+import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { useToast } from "@/hooks/use-toast";
@@ -584,54 +585,61 @@ export default function MobileMail() {
         </div>
       )}
 
-      {/* ── Compose — bottom sheet ── */}
-      <DraggableSheet
-        full
-        open={composeOpen}
-        onOpenChange={(o) => { if (!sendMutation.isPending) setComposeOpen(o); }}
-        title="New email"
-        testid="mail-compose"
-      >
-        <h2 className="text-lg font-semibold text-slate-900">New email</h2>
-        <div className="mt-3 space-y-3 pb-2">
-          <Input
-            type="email"
-            placeholder="To"
-            value={compose.to}
-            onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
-            data-testid="mail-compose-to"
-          />
-          <Input
-            placeholder="Subject"
-            value={compose.subject}
-            onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
-            data-testid="mail-compose-subject"
-          />
-          <textarea
-            placeholder="Write your email…"
-            value={compose.body}
-            onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
-            rows={7}
-            className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
-            data-testid="mail-compose-body"
-          />
-          <Button
-            className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
-            disabled={!compose.to.trim() || !compose.subject.trim() || !compose.body.trim() || sendMutation.isPending}
-            onClick={() =>
-              sendMutation.mutate({
-                to: [compose.to.trim()],
-                subject: compose.subject.trim(),
-                html: `<p>${sanitizeHtml(compose.body).replace(/\n/g, "<br/>")}</p>`,
-              })
-            }
-            data-testid="mail-compose-send"
-          >
-            {sendMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
-            Send
-          </Button>
-        </div>
-      </DraggableSheet>
+      {/* ── Compose — the same full-page sheet as creating a job ── */}
+      {composeOpen && (
+        <MobileCreatePage
+          title="New email"
+          dirty={!!(compose.to.trim() || compose.subject.trim() || compose.body.trim())}
+          onClose={() => { if (!sendMutation.isPending) setComposeOpen(false); }}
+          onSave={() =>
+            sendMutation.mutate({
+              to: [compose.to.trim()],
+              subject: compose.subject.trim(),
+              html: `<p>${sanitizeHtml(compose.body).replace(/\n/g, "<br/>")}</p>`,
+            })
+          }
+          saveLabel="Send email"
+          saveDisabled={!compose.to.trim() || !compose.subject.trim() || !compose.body.trim()}
+          saving={sendMutation.isPending}
+          testid="mail-compose"
+        >
+          <div className="space-y-3.5">
+            <div>
+              <Label htmlFor="compose-to" className="mb-1.5 block">To</Label>
+              <Input
+                id="compose-to"
+                type="email"
+                placeholder="name@example.com"
+                value={compose.to}
+                onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
+                data-testid="mail-compose-to"
+              />
+            </div>
+            <div>
+              <Label htmlFor="compose-subject" className="mb-1.5 block">Subject</Label>
+              <Input
+                id="compose-subject"
+                placeholder="What's it about?"
+                value={compose.subject}
+                onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
+                data-testid="mail-compose-subject"
+              />
+            </div>
+            <div>
+              <Label htmlFor="compose-body" className="mb-1.5 block">Message</Label>
+              <textarea
+                id="compose-body"
+                placeholder="Write your email…"
+                value={compose.body}
+                onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
+                rows={8}
+                className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="mail-compose-body"
+              />
+            </div>
+          </div>
+        </MobileCreatePage>
+      )}
     </MobileShell>
   );
 }

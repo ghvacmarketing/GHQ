@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import MobileShell from "./mobile-shell";
 import { PhotoViewer } from "@/components/mobile/photo-viewer";
-import platePhotos from "@/assets/plate-photos.png";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { SheetSelect } from "@/components/mobile/sheet-select";
 import type { CrmUser, CustomerFile } from "@shared/schema";
 
 export default function MobilePhotos() {
@@ -514,14 +514,7 @@ export default function MobilePhotos() {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
             {todayJobs.length === 0 ? (
               <div className="rounded-[4px] border border-dashed border-slate-300 bg-white px-6 py-8 text-center" data-testid="today-photo-jobs-empty">
-                <img src={platePhotos} alt="" className="mx-auto mb-2.5 h-10 w-10 select-none" draggable={false} />
                 <p className="text-sm font-medium text-slate-600">No jobs on the board today</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  Each of today&rsquo;s jobs shows here with its photo coverage — how many shots it needs and how many it has.
-                  {isTechRole
-                    ? " Go On Site at your job, then add media with the “+”."
-                    : " Search a customer to open their gallery, or use the “+” to add media."}
-                </p>
               </div>
             ) : (
             <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
@@ -780,27 +773,21 @@ export default function MobilePhotos() {
         )}
       </div>
 
-      {/* Media filters — kind, in a bottom sheet */}
-      <DraggableSheet open={mediaFilterOpen} onOpenChange={setMediaFilterOpen} title="Filter media" testid="sheet-media-filter">
+      {/* Media filters — dropdown row; opens its own option sheet */}
+      <DraggableSheet tall open={mediaFilterOpen} onOpenChange={setMediaFilterOpen} title="Filter media" testid="sheet-media-filter">
         <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
-        <div className="mt-4 space-y-4 pb-2">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Kind</p>
-            <div className="flex flex-wrap gap-1.5">
-              {([["all", "All"], ["photos", "Photos"], ["videos", "Videos"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setMediaKind(key)}
-                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    mediaKind === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                  data-testid={`media-filter-${key}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="mt-2 min-h-[35vh] divide-y divide-slate-200/80 pb-2">
+          <SheetSelect
+            label="Kind"
+            value={mediaKind}
+            onChange={(k) => setMediaKind(k as typeof mediaKind)}
+            options={[
+              { key: "all", label: "All" },
+              { key: "photos", label: "Photos" },
+              { key: "videos", label: "Videos" },
+            ]}
+            testid="media-filter"
+          />
         </div>
       </DraggableSheet>
 

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { isNativeApp, useKeyboardInset } from "@/lib/native";
 import { compressImage } from "@/lib/compress-image";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
@@ -321,13 +321,27 @@ export default function MobileMessages() {
     return out;
   }, [messages]);
 
+  const openConversation = (conversation: ConversationWithCustomer, fromSearch = false) => {
+    if (fromSearch) closeSearch();
+    setSelectedConversationId(conversation.id);
+    if (conversation.unreadInboundCount) {
+      // Instant read: clear the unread marks in every cached list right now,
+      // then tell the server (which keeps it cleared on the next refetch).
+      queryClient.setQueriesData(
+        { queryKey: ["/api/mobile/messaging/conversations"], exact: false },
+        (old: any) =>
+          Array.isArray(old)
+            ? old.map((c: any) => (c.id === conversation.id ? { ...c, unreadInboundCount: 0, unreadCount: 0 } : c))
+            : old,
+      );
+      apiRequest("POST", `/api/crm/messaging/conversations/${conversation.id}/read`).catch(() => {});
+    }
+  };
+
   const renderConversation = (conversation: ConversationWithCustomer, fromSearch = false) => (
     <button
       key={conversation.id}
-      onClick={() => {
-        if (fromSearch) closeSearch();
-        setSelectedConversationId(conversation.id);
-      }}
+      onClick={() => openConversation(conversation, fromSearch)}
       className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
       data-testid={`conversation-${conversation.id}`}
     >
@@ -680,58 +694,56 @@ export default function MobileMessages() {
         </div>
       )}
 
-      {/* ── New conversation — bottom sheet picker ── */}
-      <DraggableSheet
-        full
-        open={showNewConversation}
-        onOpenChange={(o) => { if (!startConversationMutation.isPending) setShowNewConversation(o); }}
-        title="New message"
-        testid="mobile-new-conversation"
-      >
-        <h2 className="text-lg font-semibold text-slate-900">New message</h2>
-        <div className="mt-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="Search contacts..."
-              value={contactSearch}
-              onChange={(e) => setContactSearch(e.target.value)}
-              className="pl-10"
-              data-testid="input-contact-search"
-            />
+      {/* ── New conversation — the same full-page sheet as creating a job ── */}
+      {showNewConversation && (
+        <MobileCreatePage
+          title="New message"
+          dirty={false}
+          onClose={() => { setShowNewConversation(false); setContactSearch(""); }}
+          testid="mobile-new-conversation"
+        >
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search contacts..."
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+                className="pl-10"
+                data-testid="input-contact-search"
+              />
+            </div>
+            {contacts && contacts.length > 0 ? (
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                {contacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    onClick={() => startConversationMutation.mutate({ customerId: contact.id })}
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50"
+                    data-testid={`contact-${contact.id}`}
+                    disabled={startConversationMutation.isPending}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
+                      {contact.customerName?.charAt(0).toUpperCase() || "?"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-800">{contact.customerName}</p>
+                      <p className="truncate text-sm text-slate-500">{contact.phone}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : contactSearch.length >= 2 && !loadingContacts ? (
+              <div className="py-8 text-center text-slate-500">
+                <User className="mx-auto mb-2 h-12 w-12 text-slate-300" />
+                <p>No contacts found</p>
+              </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-slate-400">Type at least 2 characters to search.</p>
+            )}
           </div>
-        </div>
-        <div className="mt-3 pb-2">
-          {contacts && contacts.length > 0 ? (
-            <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-              {contacts.map((contact) => (
-                <button
-                  key={contact.id}
-                  onClick={() => startConversationMutation.mutate({ customerId: contact.id })}
-                  className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50"
-                  data-testid={`contact-${contact.id}`}
-                  disabled={startConversationMutation.isPending}
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
-                    {contact.customerName?.charAt(0).toUpperCase() || "?"}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-800">{contact.customerName}</p>
-                    <p className="truncate text-sm text-slate-500">{contact.phone}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : contactSearch.length >= 2 && !loadingContacts ? (
-            <div className="py-8 text-center text-slate-500">
-              <User className="mx-auto mb-2 h-12 w-12 text-slate-300" />
-              <p>No contacts found</p>
-            </div>
-          ) : (
-            <p className="py-8 text-center text-sm text-slate-400">Type at least 2 characters to search.</p>
-          )}
-        </div>
-      </DraggableSheet>
+        </MobileCreatePage>
+      )}
     </MobileShell>
   );
 }
