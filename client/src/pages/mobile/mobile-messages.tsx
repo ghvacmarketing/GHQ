@@ -5,18 +5,15 @@ import badgeMessaging from "@/assets/badge-messaging.png";
 import badgeContactKnown from "@/assets/badge-contact-known.png";
 import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
-  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, RefreshCw, Phone,
+  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, Phone,
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
-import { MoreIcon } from "@/components/crm/more-icon";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isNativeApp } from "@/lib/native";
+import { isNativeApp, useKeyboardInset } from "@/lib/native";
+import { compressImage } from "@/lib/compress-image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -69,7 +66,11 @@ export default function MobileMessages() {
   const [messageText, setMessageText] = useState("");
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
+  const [pendingPhotos, setPendingPhotos] = useState<Array<{ dataBase64: string; mimeType: string; filename: string; preview: string }>>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
+  // Composer rides the keyboard with the same eased inset as Gibbs
+  const kbInset = useKeyboardInset();
 
   // Floating-search overlay: bar docked at the bottom rides the keyboard
   // with easing (same pattern as Jobs/Photos/Customers).
@@ -150,11 +151,16 @@ export default function MobileMessages() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ conversationId, body }: { conversationId: string; body: string }) => {
-      return apiRequest("POST", `/api/mobile/messaging/conversations/${conversationId}/messages`, { body });
+    mutationFn: async ({ conversationId, body, attachments }: {
+      conversationId: string;
+      body: string;
+      attachments?: Array<{ dataBase64: string; mimeType: string; filename: string }>;
+    }) => {
+      return apiRequest("POST", `/api/mobile/messaging/conversations/${conversationId}/messages`, { body, attachments });
     },
     onSuccess: () => {
       setMessageText("");
+      setPendingPhotos([]);
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations", selectedConversationId] });
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations"] });
     },
@@ -190,20 +196,28 @@ export default function MobileMessages() {
   const mailUnread = mailInbox?.threads?.filter((t) => t.isUnread).length ?? 0;
   const chatUnread = (conversations ?? []).reduce((n, c) => n + (c.unreadInboundCount || 0), 0);
 
-  const syncMutation = useMutation({
-    mutationFn: async () => apiRequest("POST", "/api/crm/messaging/sync-textline"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations"] });
-      toast({ title: "Synced", description: "Conversations updated from Textline" });
-    },
-    onError: () => {
-      toast({ title: "Sync failed", description: "Could not sync with Textline", variant: "destructive" });
-    },
-  });
-
   const handleSendMessage = () => {
-    if (!messageText.trim() || !selectedConversationId) return;
-    sendMessageMutation.mutate({ conversationId: selectedConversationId, body: messageText.trim() });
+    if ((!messageText.trim() && pendingPhotos.length === 0) || !selectedConversationId) return;
+    sendMessageMutation.mutate({
+      conversationId: selectedConversationId,
+      body: messageText.trim(),
+      attachments: pendingPhotos.length > 0
+        ? pendingPhotos.map(({ dataBase64, mimeType, filename }) => ({ dataBase64, mimeType, filename }))
+        : undefined,
+    });
+  };
+
+  const pickPhotos = async (files: FileList | null) => {
+    if (!files) return;
+    const room = 3 - pendingPhotos.length;
+    for (const f of Array.from(files).slice(0, Math.max(0, room))) {
+      try {
+        const c = await compressImage(f);
+        setPendingPhotos((prev) => (prev.length >= 3 ? prev : [...prev, c]));
+      } catch {
+        toast({ title: "Couldn't read that photo", variant: "destructive" });
+      }
+    }
   };
 
   // Stick to the newest message like a real chat app
@@ -284,31 +298,19 @@ export default function MobileMessages() {
 
   return (
     <MobileShell>
-      {/* ── Conversation list — minimal chrome: title, search, 4-dot menu ── */}
+      {/* ── Conversation list — tabs at the very top, compose pinned right ── */}
       <div className="p-4 space-y-3" data-testid="mobile-messages">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inbox</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
-                aria-label="Message actions"
-                data-testid="messages-actions"
-              >
-                <MoreIcon />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setShowNewConversation(true)} data-testid="menu-new-conversation">
-                <Plus className="mr-2 h-4 w-4" /> New message
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} data-testid="menu-sync-messages">
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`} /> Sync from Textline
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <InboxSwitcher active="chat" mailCount={mailUnread} chatCount={chatUnread} />
+          <button
+            onClick={() => setShowNewConversation(true)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+            aria-label="New message"
+            data-testid="menu-new-conversation"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
-        <InboxSwitcher active="chat" mailCount={mailUnread} chatCount={chatUnread} />
 
         <div className="-mx-4">
           {loadingConversations ? (
@@ -401,11 +403,26 @@ export default function MobileMessages() {
         </div>
       )}
 
-      {/* ── Open thread — fullscreen chat layer (WhatsApp style) ── */}
+      {/* ── Open thread — fullscreen chat panel (WhatsApp style). Edge
+          swipe-back closes it like a pushed panel. ── */}
       {selectedConversationId && (
         <div
           className="fixed inset-0 z-[60] flex flex-col bg-[#efeae2] animate-in slide-in-from-right duration-200"
           data-testid="mobile-conversation-detail"
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            if (t.clientX < 28) (e.currentTarget as any)._swipe = { x: t.clientX, y: t.clientY };
+          }}
+          onTouchMove={(e) => {
+            const st = (e.currentTarget as any)._swipe;
+            if (!st) return;
+            const t = e.touches[0];
+            if (t.clientX - st.x > 70 && Math.abs(t.clientY - st.y) < 60) {
+              (e.currentTarget as any)._swipe = null;
+              setSelectedConversationId(null);
+            }
+          }}
+          onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
         >
           <div
             className="flex items-center gap-2 border-b border-black/5 bg-white px-2 py-2 shadow-sm"
@@ -467,6 +484,15 @@ export default function MobileMessages() {
                         }`}
                         data-testid={`message-${entry.m.id}`}
                       >
+                        {Array.isArray((entry.m as any).attachments) && (entry.m as any).attachments.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            {((entry.m as any).attachments as Array<{ url: string; mimeType?: string }>)
+                              .filter((a) => a?.url && (a.mimeType || "").startsWith("image"))
+                              .map((a, i) => (
+                                <img key={i} src={a.url} alt="" className="max-h-64 w-full rounded-lg object-cover" loading="lazy" />
+                              ))}
+                          </div>
+                        )}
                         <p className="whitespace-pre-wrap break-words pb-1 pr-12 text-[15px] leading-snug">{entry.m.body}</p>
                         <span
                           className={`absolute bottom-1 right-2.5 text-[10px] ${
@@ -488,17 +514,35 @@ export default function MobileMessages() {
             )}
           </div>
 
+          {/* Composer — same box as Gibbs: textarea on top, "+" attach on the
+              left below, round send on the right */}
           <div
-            className="flex items-end gap-2 px-3 pt-2"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
+            className="px-3 pt-2"
+            style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(env(safe-area-inset-bottom) + 10px)" }}
           >
-            <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-3xl bg-white px-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-sm">
+              {pendingPhotos.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {pendingPhotos.map((p, i) => (
+                    <div key={i} className="relative">
+                      <img src={p.preview} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
+                      <button
+                        onClick={() => setPendingPhotos((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 placeholder="Message"
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 rows={1}
-                className="max-h-28 w-full resize-none bg-transparent py-3 text-[16px] leading-5 text-slate-900 outline-none placeholder:text-slate-400"
+                className="max-h-32 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -507,16 +551,45 @@ export default function MobileMessages() {
                 }}
                 data-testid="input-message"
               />
+              <div className="mt-1.5 flex items-center gap-0.5">
+                <input
+                  ref={attachInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    pickPhotos(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => attachInputRef.current?.click()}
+                  disabled={pendingPhotos.length >= 3 || sendMessageMutation.isPending}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-40"
+                  aria-label="Attach photos"
+                  data-testid="message-attach"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={(!messageText.trim() && pendingPhotos.length === 0) || sendMessageMutation.isPending}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:bg-slate-200 disabled:text-slate-400"
+                  data-testid="button-send-message"
+                >
+                  {sendMessageMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleSendMessage}
-              disabled={!messageText.trim() || sendMessageMutation.isPending}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-md transition-transform active:scale-95 disabled:opacity-50"
-              data-testid="button-send-message"
-            >
-              {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-            </button>
           </div>
+          {/* Keyboard spacer — grows with the keyboard so the composer (and
+              the thread above it) glides up in one eased motion */}
+          <div
+            className="shrink-0"
+            style={{ height: kbInset, transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)" }}
+          />
         </div>
       )}
 

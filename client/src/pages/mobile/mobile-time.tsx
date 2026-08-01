@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  Clock, Square, Loader2, AlertCircle, CheckCircle, Briefcase, Plus,
+  Clock, Square, Loader2, Briefcase, Plus,
   Car, Warehouse, GraduationCap, Users, Coffee, MoreHorizontal, Wrench,
   SlidersHorizontal,
 } from "lucide-react";
@@ -10,7 +10,7 @@ import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,13 +146,25 @@ export default function MobileTime() {
     return () => clearInterval(t);
   }, [isClockedIn]);
   const getElapsedTime = () => {
-    if (!currentEntry?.entry?.clockInAt) return null;
+    if (!currentEntry?.entry?.clockInAt) return "0:00:00";
     const secs = Math.max(0, Math.floor((nowTick - new Date(currentEntry.entry.clockInAt).getTime()) / 1000));
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
     return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
+
+  // Today's finished total for the clock card
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const { data: todayTotal } = useQuery<{ totalMinutes: number }>({
+    queryKey: ["/api/mobile/time/timesheet", "today-total", todayStr],
+    queryFn: async () => {
+      const res = await fetch(`/api/mobile/time/timesheet?from=${todayStr}&to=${todayStr}`, { credentials: "include" });
+      if (!res.ok) return { totalMinutes: 0 };
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+  });
 
   // Quick pauses don't need a work summary — only real work does.
   const NO_SUMMARY_CATEGORIES = ["training", "meeting", "break", "other"];
@@ -167,14 +179,14 @@ export default function MobileTime() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-time">
-        {/* Clock | Timesheet switcher centered, filter pinned right */}
-        <div className="relative flex items-center justify-center">
-          <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/70 p-1">
+        {/* Clock | Timesheet switcher — full width, filter inline right */}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-1 rounded-lg bg-slate-200/70 p-1">
             {(["clock", "timesheet"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-all ${
+                className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium capitalize transition-all ${
                   view === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
                 }`}
                 data-testid={`time-view-${v}`}
@@ -186,7 +198,7 @@ export default function MobileTime() {
           {view === "timesheet" && (
             <button
               onClick={() => setFilterOpen(true)}
-              className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
               aria-label="Filter timesheet"
               data-testid="timesheet-filter-open"
             >
@@ -199,49 +211,32 @@ export default function MobileTime() {
         {view === "clock" ? (
           <>
             <Card className="rounded-[4px] border-slate-300/70 shadow-none">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-[#711419]" />
-                  Time Clock
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {loadingCurrent ? (
                   <div className="flex justify-center py-8">
                     <MobileSpinner fullHeight={false} />
                   </div>
                 ) : (
                   <div className="text-center space-y-4">
-                    <div className={`text-sm font-medium px-3 py-1 rounded-[3px] inline-flex items-center gap-1.5 ${
-                      isClockedIn ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
-                    }`}>
-                      {isClockedIn ? (
-                        <>
-                          <CheckCircle className="h-4 w-4" />
-                          Clocked in — {categoryMeta(currentEntry?.entry?.category).label}
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="h-4 w-4" />
-                          Not Clocked In
-                        </>
-                      )}
-                    </div>
+                    <p className={`text-sm font-medium ${isClockedIn ? "text-green-700" : "text-slate-500"}`} data-testid="clock-status">
+                      {isClockedIn
+                        ? `Clocked in — ${categoryMeta(currentEntry?.entry?.category).label}`
+                        : "Not clocked in"}
+                    </p>
 
-                    {isClockedIn && currentEntry?.entry && (
-                      <div className="space-y-1">
-                        <p className="text-3xl font-bold text-slate-800" data-testid="elapsed-time">
-                          {getElapsedTime()}
-                        </p>
+                    <div className="space-y-1">
+                      <p className="text-4xl font-bold tabular-nums text-slate-900" data-testid="elapsed-time">
+                        {getElapsedTime()}
+                      </p>
+                      {isClockedIn && currentEntry?.entry && (
                         <p className="text-sm text-slate-500">
                           Started: {format(new Date(currentEntry.entry.clockInAt), "h:mm a")}
                         </p>
-                      </div>
-                    )}
-
-                    {!isClockedIn && (
-                      <p className="text-sm text-slate-500">Pick what you're starting below.</p>
-                    )}
+                      )}
+                      <p className="text-sm text-slate-500" data-testid="total-today">
+                        Total today: <span className="font-semibold text-slate-700">{formatDuration(todayTotal?.totalMinutes ?? 0)}</span>
+                      </p>
+                    </div>
 
                     {isClockedIn && (
                       <Button

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, SlidersHorizontal, X } from "lucide-react";
+import { Wrench, MapPin, Clock, ChevronRight, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, SlidersHorizontal, X } from "lucide-react";
 import { RoleBadge } from "@/components/mobile/role-badge";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -575,22 +575,36 @@ export default function MobileJob() {
   const upcomingGroups = (groupedJobsByDate || []).filter((g) => g.dateKey > todayKey);
 
   if (userLoading || ordersLoading) {
-    // Skeleton mirrors the real layout (switcher pill + job cards) so the
-    // page settles in place instead of jumping from a centered spinner.
+    // Skeleton = the page's REAL chrome (same switcher, same labels, "Today"
+    // active) with job-card-shaped placeholders where the data lands, so
+    // loading settles in place with zero layout shift.
     return (
       <MobileShell>
         <div className="p-4 space-y-4" data-testid="jobs-skeleton">
-          <div className="mx-auto h-10 w-64 animate-pulse rounded-lg bg-slate-200/70" />
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="space-y-2 rounded-[4px] border border-slate-300/70 bg-slate-100/80 p-4">
-              <div className="flex items-center justify-between">
-                <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
-                <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+          <div className="flex w-full items-center gap-1 rounded-lg bg-slate-200/70 p-1">
+            {(["today", "upcoming", "history"] as const).map((v) => (
+              <span
+                key={v}
+                className={`flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium capitalize ${
+                  v === "today" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
+                }`}
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="w-full rounded-[4px] border border-slate-300/70 bg-slate-100/80 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="h-2.5 w-16 animate-pulse rounded bg-slate-200" />
+                  <div className="h-2.5 w-24 animate-pulse rounded bg-slate-200" />
+                </div>
+                <div className="mt-2.5 h-[18px] w-2/3 animate-pulse rounded bg-slate-200" />
+                <div className="mt-1.5 h-3 w-1/2 animate-pulse rounded bg-slate-200" />
               </div>
-              <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200" />
-              <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </MobileShell>
     );
@@ -609,29 +623,26 @@ export default function MobileJob() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-job-page">
-        {/* Today | Upcoming | History switcher centered, New Job pinned right */}
-        <div className="relative flex items-center justify-center">
-          <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/70 p-1">
-            {(["today", "upcoming", "history"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setJobsView(v)}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-all ${
-                  jobsView === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
-                }`}
-                data-testid={`jobs-view-${v}`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+        {/* Today | Upcoming | History switcher — full width */}
+        <div className="flex w-full items-center gap-1 rounded-lg bg-slate-200/70 p-1">
+          {(["today", "upcoming", "history"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setJobsView(v)}
+              className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium capitalize transition-all ${
+                jobsView === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
+              }`}
+              data-testid={`jobs-view-${v}`}
+            >
+              {v}
+            </button>
+          ))}
         </div>
 
         {jobsView === "today" && (
           todayJobs.length === 0 ? (
             <Card className="rounded-[4px] border-slate-300/70 shadow-none">
               <CardContent className="py-8 text-center">
-                <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
                 <p className="text-slate-600 font-medium">No jobs scheduled today</p>
                 <p className="text-sm text-slate-500 mt-1">Check Upcoming for what's ahead</p>
               </CardContent>

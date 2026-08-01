@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { MobileSpinner } from "@/components/mobile/mobile-spinner";
-import { isNativeApp } from "@/lib/native";
+import { isNativeApp, useKeyboardInset } from "@/lib/native";
+import { compressImage } from "@/lib/compress-image";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
-import { MoreIcon } from "@/components/crm/more-icon";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  ArrowLeft, Loader2, Mail, MailOpen, Monitor, PenSquare, RefreshCw, Search, Send, X,
+  ArrowLeft, Loader2, Mail, MailOpen, Monitor, PenSquare, Plus, Search, Send, X,
 } from "lucide-react";
 
 /** Mobile Mail — the CRM's Gmail inbox on the phone. Threads list + reader +
@@ -64,6 +61,9 @@ export default function MobileMail() {
   const [searchActive, setSearchActive] = useState(false);
   const [searchClosing, setSearchClosing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [replyPhotos, setReplyPhotos] = useState<Array<{ dataBase64: string; mimeType: string; filename: string; preview: string }>>([]);
+  const replyAttachRef = useRef<HTMLInputElement | null>(null);
+  const kbInset = useKeyboardInset();
   const [replyText, setReplyText] = useState("");
   const [compose, setCompose] = useState({ to: "", subject: "", body: "" });
 
@@ -102,10 +102,18 @@ export default function MobileMail() {
   const mailUnread = inbox?.threads?.filter((t) => t.isUnread).length ?? 0;
 
   const sendMutation = useMutation({
-    mutationFn: async (payload: { to: string; subject: string; html: string; threadRowId?: string }) =>
-      apiRequest("POST", "/api/crm/mail/send", payload),
+    // Server expects to: string[] — a plain string silently means "no
+    // recipients" on that end.
+    mutationFn: async (payload: {
+      to: string[];
+      subject: string;
+      html: string;
+      threadRowId?: string;
+      attachments?: Array<{ filename: string; mimeType: string; contentBase64: string }>;
+    }) => apiRequest("POST", "/api/crm/mail/send", payload),
     onSuccess: () => {
       setReplyText("");
+      setReplyPhotos([]);
       setCompose({ to: "", subject: "", body: "" });
       setComposeOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
@@ -166,13 +174,29 @@ export default function MobileMail() {
   })();
 
   const handleReply = () => {
-    if (!replyText.trim() || !replyTo || !openThreadId) return;
+    if ((!replyText.trim() && replyPhotos.length === 0) || !replyTo || !openThreadId) return;
     sendMutation.mutate({
-      to: replyTo,
+      to: [replyTo],
       subject: openThread?.subject?.startsWith("Re:") ? openThread.subject : `Re: ${openThread?.subject || ""}`,
-      html: `<p>${sanitizeHtml(replyText).replace(/\n/g, "<br/>")}</p>`,
+      html: `<p>${sanitizeHtml(replyText || "See attached.").replace(/\n/g, "<br/>")}</p>`,
       threadRowId: openThreadId,
+      attachments: replyPhotos.length > 0
+        ? replyPhotos.map((p) => ({ filename: p.filename, mimeType: p.mimeType, contentBase64: p.dataBase64 }))
+        : undefined,
     });
+  };
+
+  const pickReplyPhotos = async (files: FileList | null) => {
+    if (!files) return;
+    const room = 3 - replyPhotos.length;
+    for (const f of Array.from(files).slice(0, Math.max(0, room))) {
+      try {
+        const c = await compressImage(f);
+        setReplyPhotos((prev) => (prev.length >= 3 ? prev : [...prev, c]));
+      } catch {
+        toast({ title: "Couldn't read that photo", variant: "destructive" });
+      }
+    }
   };
 
   const renderThread = (t: MailThread, fromSearch = false) => (
@@ -212,31 +236,19 @@ export default function MobileMail() {
 
   return (
     <MobileShell>
-      {/* ── Inbox — minimal chrome: title, search, 4-dot menu ── */}
+      {/* ── Inbox — tabs at the very top, compose pinned right ── */}
       <div className="p-4 space-y-3" data-testid="mobile-mail-page">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inbox</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
-                aria-label="Mail actions"
-                data-testid="mail-actions"
-              >
-                <MoreIcon />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setComposeOpen(true)} data-testid="menu-mail-compose">
-                <PenSquare className="mr-2 h-4 w-4" /> New email
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => refetch()} disabled={isRefetching} data-testid="menu-mail-refresh">
-                <RefreshCw className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} /> Refresh
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <InboxSwitcher active="mail" mailCount={mailUnread} chatCount={chatUnread} />
+          <button
+            onClick={() => setComposeOpen(true)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+            aria-label="New email"
+            data-testid="menu-mail-compose"
+          >
+            <PenSquare className="h-4 w-4" />
+          </button>
         </div>
-        <InboxSwitcher active="mail" mailCount={mailUnread} chatCount={chatUnread} />
 
         <div className="-mx-4">
           {isLoading ? (
@@ -337,9 +349,26 @@ export default function MobileMail() {
         </div>
       )}
 
-      {/* ── Thread reader ── */}
+      {/* ── Thread reader — edge swipe-back closes it like a pushed panel ── */}
       {openThreadId && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-slate-50 animate-in slide-in-from-right duration-200" data-testid="mail-thread-view">
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-slate-50 animate-in slide-in-from-right duration-200"
+          data-testid="mail-thread-view"
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            if (t.clientX < 28) (e.currentTarget as any)._swipe = { x: t.clientX, y: t.clientY };
+          }}
+          onTouchMove={(e) => {
+            const st = (e.currentTarget as any)._swipe;
+            if (!st) return;
+            const t = e.touches[0];
+            if (t.clientX - st.x > 70 && Math.abs(t.clientY - st.y) < 60) {
+              (e.currentTarget as any)._swipe = null;
+              setOpenThreadId(null);
+            }
+          }}
+          onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
+        >
           <div
             className="flex items-center gap-2 border-b bg-white px-2 py-2"
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}
@@ -386,29 +415,75 @@ export default function MobileMail() {
             )}
           </div>
 
+          {/* Reply composer — same box as Gibbs: textarea on top, "+" attach
+              on the left below, round send on the right */}
           <div
-            className="flex items-end gap-2 border-t bg-white px-3 pt-2"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
+            className="border-t bg-white px-3 pt-2"
+            style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(env(safe-area-inset-bottom) + 10px)" }}
           >
-            <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-3xl border border-slate-200 bg-slate-50 px-4">
+            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-sm">
+              {replyPhotos.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {replyPhotos.map((p, i) => (
+                    <div key={i} className="relative">
+                      <img src={p.preview} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
+                      <button
+                        onClick={() => setReplyPhotos((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 placeholder={replyTo ? `Reply to ${replyTo}` : "Reply"}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 rows={1}
-                className="max-h-28 w-full resize-none bg-transparent py-3 text-[16px] leading-5 text-slate-900 outline-none placeholder:text-slate-400"
+                className="max-h-32 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400"
                 data-testid="mail-reply-input"
               />
+              <div className="mt-1.5 flex items-center gap-0.5">
+                <input
+                  ref={replyAttachRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    pickReplyPhotos(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => replyAttachRef.current?.click()}
+                  disabled={replyPhotos.length >= 3 || sendMutation.isPending}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-40"
+                  aria-label="Attach photos"
+                  data-testid="mail-reply-attach"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={handleReply}
+                  disabled={(!replyText.trim() && replyPhotos.length === 0) || !replyTo || sendMutation.isPending}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:bg-slate-200 disabled:text-slate-400"
+                  data-testid="mail-reply-send"
+                >
+                  {sendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleReply}
-              disabled={!replyText.trim() || !replyTo || sendMutation.isPending}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-md transition-transform active:scale-95 disabled:opacity-50"
-              data-testid="mail-reply-send"
-            >
-              {sendMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-            </button>
           </div>
+          {/* Keyboard spacer — composer glides above the keys */}
+          <div
+            className="shrink-0 bg-white"
+            style={{ height: kbInset, transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)" }}
+          />
         </div>
       )}
 
@@ -428,7 +503,7 @@ export default function MobileMail() {
               disabled={!compose.to.trim() || !compose.subject.trim() || !compose.body.trim() || sendMutation.isPending}
               onClick={() =>
                 sendMutation.mutate({
-                  to: compose.to.trim(),
+                  to: [compose.to.trim()],
                   subject: compose.subject.trim(),
                   html: `<p>${sanitizeHtml(compose.body).replace(/\n/g, "<br/>")}</p>`,
                 })

@@ -113,14 +113,14 @@ export default function MobileTasks() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-tasks-page">
-        {/* Open | Done switcher, New pinned right */}
-        <div className="relative flex items-center justify-center">
-          <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/70 p-1">
+        {/* Open | Done switcher — full width, New inline right */}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-1 rounded-lg bg-slate-200/70 p-1">
             {(["open", "done"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-all ${
+                className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium capitalize transition-all ${
                   view === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
                 }`}
                 data-testid={`tasks-view-${v}`}
@@ -131,7 +131,7 @@ export default function MobileTasks() {
           </div>
           <button
             onClick={() => navigate("/mobile/tasks/new")}
-            className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
             aria-label="New task"
             data-testid="button-new-task"
           >

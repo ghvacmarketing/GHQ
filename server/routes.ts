@@ -28476,16 +28476,21 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() : "";
-      if (!notes) {
-        return res.status(400).json({ message: "Please describe what you worked on before clocking out." });
-      }
 
       const activeEntry = await storage.getActiveTimeEntry(user.id);
       if (!activeEntry) {
         return res.status(400).json({ message: "Not currently clocked in" });
       }
 
-      const entry = await storage.clockOut(activeEntry.id, notes);
+      // Only real work needs a summary — quick pauses (training, meeting,
+      // break, other) clock out clean.
+      const category = (activeEntry as any).category || "job";
+      const needsSummary = !["training", "meeting", "break", "other"].includes(category);
+      if (needsSummary && !notes) {
+        return res.status(400).json({ message: "Please describe what you worked on before clocking out." });
+      }
+
+      const entry = await storage.clockOut(activeEntry.id, notes || category.charAt(0).toUpperCase() + category.slice(1));
       return res.json(entry);
     } catch (error) {
       console.error("Error clocking out:", error);
@@ -29029,33 +29034,60 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      const { body } = req.body;
-      
-      if (!body || typeof body !== "string" || !body.trim()) {
+      const { body, attachments: rawAttachments } = req.body;
+
+      // Photos ride along as base64; stored in the object store first so the
+      // adapter (and the thread UI) reference them by /objects/ URL.
+      const attachmentInputs = (Array.isArray(rawAttachments) ? rawAttachments : [])
+        .filter((a: any) => a && typeof a.dataBase64 === "string" && a.dataBase64.length > 0)
+        .slice(0, 3);
+
+      if ((!body || typeof body !== "string" || !body.trim()) && attachmentInputs.length === 0) {
         return res.status(400).json({ message: "Message body is required" });
       }
 
-      const messageBody = body.trim();
+      const messageBody = typeof body === "string" ? body.trim() : "";
+
+      const storedAttachments: Array<{ id: string; url: string; mimeType: string; filename: string }> = [];
+      for (const a of attachmentInputs) {
+        try {
+          const buffer = Buffer.from(a.dataBase64, "base64");
+          if (buffer.length === 0 || buffer.length > 8 * 1024 * 1024) continue;
+          const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+          const objectStore = new ObjectStorageService();
+          const url = await objectStore.writeObject(buffer, String(a.mimeType || "image/jpeg"));
+          storedAttachments.push({
+            id: randomUUID(),
+            url,
+            mimeType: String(a.mimeType || "image/jpeg"),
+            filename: String(a.filename || "photo.jpg"),
+          });
+        } catch (e) {
+          console.error("[Mobile] Attachment store failed:", e);
+        }
+      }
 
       // Store message locally first
       const messageData = {
         conversationId: id,
         body: messageBody,
-        channel: "sms" as const,
+        channel: (storedAttachments.length > 0 ? "mms" : "sms") as any,
         direction: "outbound" as const,
         status: "queued" as const,
         authorUserId: user.id,
         sentAt: new Date(),
+        ...(storedAttachments.length > 0 ? { attachments: storedAttachments } : {}),
       };
 
-      const message = await storage.createMessage(messageData);
+      const message = await storage.createMessage(messageData as any);
 
       // Send via messaging adapter (Textline if configured, local otherwise)
       const adapter = getMessagingAdapter();
       const adapterResult = await adapter.sendMessage({
         conversationId: id,
         body: messageBody,
-        channel: "sms",
+        channel: storedAttachments.length > 0 ? "mms" : "sms",
+        attachments: storedAttachments.length > 0 ? storedAttachments : undefined,
         recipientPhone: conversation.phoneNumber || undefined,
         externalConversationId: conversation.externalConversationId || undefined,
       });

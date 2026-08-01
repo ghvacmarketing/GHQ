@@ -254,20 +254,10 @@ function ProtectedCrmWrapper({ children }: { children: ReactNode }) {
 
 // Mobile-specific loading placeholder
 function MobileLoader() {
-  // Between-page fallback: a calm blank canvas. A spinner flashing for the
-  // ~100ms it takes a cached chunk to mount reads as jumpy, so the branded
-  // spinner only fades in if the load genuinely drags past ~450ms.
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50" data-testid="mobile-loader">
-      <div
-        className="relative flex h-16 w-16 items-center justify-center opacity-0"
-        style={{ animation: "ghq-fade-in 0.25s ease-out 0.45s forwards" }}
-      >
-        <div className="absolute inset-0 animate-spin rounded-full border-2 border-slate-200 border-t-[#711419]" />
-        <img src={redLogoUrl} alt="GHQ" className="h-8 w-8 rounded-lg object-contain" />
-      </div>
-    </div>
-  );
+  // Between-page fallback: a plain canvas, nothing else. Pages fade in over
+  // it and their skeletons carry the loading story — any spinner here just
+  // reads as a flash of jumping UI.
+  return <div className="min-h-screen bg-slate-50" data-testid="mobile-loader" />;
 }
 
 // Wrapper for lazy-loaded Mobile pages
