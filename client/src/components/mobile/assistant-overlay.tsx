@@ -849,11 +849,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16">
           {messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center pt-[7vh] text-center">
-              {/* Persona block — Gibbs' badge for an empty conversation */}
-              <img src={badgeGibbs} alt="" className="h-[88px] w-[88px] select-none" draggable={false} />
+              {/* Persona block — the badge already sits in the header, so the
+                  empty state is just the name */}
               <button
                 onClick={() => setPanelOpen(true)}
-                className="mt-4 text-lg font-semibold tracking-tight text-slate-900 transition-opacity active:opacity-60"
+                className="text-lg font-semibold tracking-tight text-slate-900 transition-opacity active:opacity-60"
                 aria-label="Gibbs — history and spaces"
                 data-testid="assistant-persona-pill"
               >
