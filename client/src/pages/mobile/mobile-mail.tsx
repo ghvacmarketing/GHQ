@@ -267,13 +267,27 @@ export default function MobileMail() {
     }
   };
 
+  const handleOpenThread = (t: MailThread, fromSearch = false) => {
+    if (fromSearch) closeSearch();
+    setOpenThreadId(t.id);
+    if (t.isUnread) {
+      // Instant read: flip the badge in every cached list right now, then
+      // tell the server (which marks it read in Gmail too).
+      queryClient.setQueriesData(
+        { queryKey: ["/api/crm/mail/threads"], exact: false },
+        (old: any) =>
+          old?.threads
+            ? { ...old, threads: old.threads.map((x: any) => (x.id === t.id ? { ...x, isUnread: false } : x)) }
+            : old,
+      );
+      apiRequest("POST", `/api/crm/mail/threads/${t.id}/read`).catch(() => {});
+    }
+  };
+
   const renderThread = (t: MailThread, fromSearch = false) => (
     <button
       key={t.id}
-      onClick={() => {
-        if (fromSearch) closeSearch();
-        setOpenThreadId(t.id);
-      }}
+      onClick={() => handleOpenThread(t, fromSearch)}
       className="flex w-full items-start gap-3 px-4 py-3 text-left active:bg-slate-50"
       data-testid={`mail-thread-${t.id}`}
     >
@@ -487,10 +501,10 @@ export default function MobileMail() {
                       {(m.sentAt || m.createdAt) ? format(new Date((m.sentAt || m.createdAt)!), "MMM d, h:mm a") : ""}
                     </p>
                   </div>
-                  <div className="px-3.5 py-3">
+                  <div className="overflow-x-auto px-3.5 py-3">
                     {m.bodyHtml ? (
                       <div
-                        className="prose prose-sm max-w-none break-words text-[14px] leading-relaxed [&_img]:max-w-full"
+                        className="prose prose-sm max-w-none break-words text-[14px] leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_table]:h-auto [&_table]:max-w-full [&_td]:break-words"
                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.bodyHtml) }}
                       />
                     ) : (
