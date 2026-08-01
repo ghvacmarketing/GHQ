@@ -2,9 +2,12 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { requireCrmAuth } from "../../crm-auth";
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB max
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB max (non-video)
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // phone clips run bigger
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'image/heic', 'image/heif',
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v',
   'application/pdf',
   'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -52,10 +55,11 @@ export function registerObjectStorageRoutes(app: Express): void {
         });
       }
 
-      // Validate file size
-      if (size && size > MAX_FILE_SIZE) {
+      // Validate file size — videos get more headroom than documents/photos
+      const sizeCap = String(contentType || "").startsWith("video/") ? MAX_VIDEO_SIZE : MAX_FILE_SIZE;
+      if (size && size > sizeCap) {
         return res.status(400).json({
-          error: `File size exceeds maximum allowed (${MAX_FILE_SIZE / 1024 / 1024}MB)`,
+          error: `File size exceeds maximum allowed (${sizeCap / 1024 / 1024}MB)`,
         });
       }
 
@@ -91,7 +95,7 @@ export function registerObjectStorageRoutes(app: Express): void {
    */
   app.put(
     "/api/uploads/local/:id",
-    express.raw({ type: () => true, limit: MAX_FILE_SIZE }),
+    express.raw({ type: () => true, limit: MAX_VIDEO_SIZE }),
     async (req: Request, res: Response) => {
       try {
         if (!objectStorageService.isLocal()) {

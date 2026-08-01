@@ -439,7 +439,7 @@ export default function MobilePhotos() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "files"] });
-      toast({ title: `${list.length} photo${list.length > 1 ? "s" : ""} uploaded` });
+      toast({ title: `${list.length} file${list.length > 1 ? "s" : ""} uploaded` });
     } catch (e) {
       console.error("Photo upload error:", e);
       toast({ title: "Upload failed", variant: "destructive" });
@@ -580,7 +580,7 @@ export default function MobilePhotos() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               className="hidden"
               onChange={(e) => handleUpload(e.target.files)}
@@ -689,7 +689,7 @@ export default function MobilePhotos() {
           ) : photos.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
               <ImageIcon className="h-10 w-10" />
-              <p className="text-sm text-slate-400">No photos yet for {activeCustomer?.name || "this customer"}.</p>
+              <p className="text-sm text-slate-400">No photos or videos yet for {activeCustomer?.name || "this customer"}.</p>
             </div>
           ) : (
             <div className="photo-grid-noselect grid grid-cols-3 gap-2" data-testid="photo-grid">

@@ -39,7 +39,7 @@ interface MobileShellProps {
 const navTabs = [
   { path: "/mobile", label: "Agenda", icon: ClipboardList },
   { path: "/mobile/job", label: "Job", icon: Wrench },
-  { path: "/mobile/photos", label: "Photos", icon: Camera },
+  { path: "/mobile/photos", label: "Media", icon: Camera },
   { path: "/mobile/time", label: "Time", icon: Clock },
 ];
 
@@ -290,7 +290,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
             <SheetTile icon={CheckSquare} img={createTask} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
-            <SheetTile icon={Camera} img={createPhoto} label="Add Photo" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
+            <SheetTile icon={Camera} img={createPhoto} label="Add Media" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
             {isSupervisor && (
               <>
                 <SheetTile icon={UserRoundPlus} img={createCustomer} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
@@ -309,8 +309,8 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 
       {/* Add Photo — pick the target first: a job today (role-aware) or a
           customer. Techs must be ON SITE at their job to add photos. */}
-      <DraggableSheet open={photoTargetOpen} onOpenChange={setPhotoTargetOpen} title="Add photo to…" testid="sheet-photo-target">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Add photo to…</p>
+      <DraggableSheet open={photoTargetOpen} onOpenChange={setPhotoTargetOpen} title="Add media to…" testid="sheet-photo-target">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Add media to…</p>
         {photoTargetsLoading || !photoTargets ? (
           <div className="flex items-center justify-center py-8 text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -346,7 +346,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
               <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-4 py-4 text-center" data-testid="photo-target-blocked">
                 <p className="text-sm font-semibold text-amber-900">You're not on site at a job</p>
                 <p className="mt-1 text-xs text-amber-800">
-                  Photos attach to the job you're working. Open your job and tap On Site first — then come back here.
+                  Photos and videos attach to the job you're working. Open your job and tap On Site first — then come back here.
                 </p>
               </div>
             ) : (
