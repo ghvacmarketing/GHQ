@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, subDays } from "date-fns";
-import { Search, X, ChevronRight, Plus, Trash2, Loader2, Briefcase, FileText } from "lucide-react";
+import { Search, X, ChevronRight, Plus, Trash2, Briefcase, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,11 +11,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import type { CrmCustomer, CrmProperty, CrmUser, CrmWorkOrder } from "@shared/schema";
 
-/** New Quote — one-page quick-quote creator. Pick a job (customer → work
- *  order), fill the same fields as the in-job Quote tab, submit. The payload
- *  mirrors the in-job QuoteTab exactly so records are identical. */
+/** New Quote — customer-first flow: pick the customer (top recents up
+ *  front), their work orders pop up in a sheet, and only then does the quote
+ *  form appear. The payload mirrors the in-job QuoteTab exactly so records
+ *  are identical. */
 
 interface WorkOrderWithRelations extends CrmWorkOrder {
   customer: CrmCustomer | null;
@@ -203,17 +205,21 @@ export default function MobileQuoteNew() {
     });
   };
 
+  const showRecents = !searchQuery.trim();
+  const shownCustomers = showRecents ? (customers || []).slice(0, 5) : customers || [];
+
   return (
     <MobileCreatePage
       title="New quote"
       dirty={dirty}
-      onSave={handleCreateQuote}
+      onSave={pickedWorkOrder ? handleCreateQuote : undefined}
+      saveLabel="Create quote"
       saveDisabled={!canSubmit}
       saving={createQuoteMutation.isPending}
       testid="mobile-quote-new-page"
     >
       <div className="space-y-4">
-        {/* --- Job picker --- */}
+        {/* --- Step 1: who is this quote for --- */}
         {pickedWorkOrder ? (
           <div
             className="flex items-center justify-between gap-3 rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.05] px-4 py-3"
@@ -232,73 +238,12 @@ export default function MobileQuoteNew() {
               </p>
             </div>
             <button
-              onClick={() => setPickedWorkOrder(null)}
+              onClick={() => { setPickedWorkOrder(null); setPickedCustomer(null); }}
               className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
               data-testid="button-change-job"
             >
               Change
             </button>
-          </div>
-        ) : pickedCustomer ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3 rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.05] px-4 py-3" data-testid="picked-customer">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#711419]/70">Customer</p>
-                <p className="truncate font-semibold text-slate-900">{pickedCustomer.name}</p>
-              </div>
-              <button
-                onClick={() => setPickedCustomer(null)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 active:scale-95"
-                aria-label="Clear customer"
-                data-testid="button-clear-customer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <Label className="block">Pick a work order</Label>
-            {workOrdersLoading ? (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className={`space-y-2 px-3.5 py-3 ${i > 1 ? "border-t border-slate-200/80" : ""}`}>
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-56" />
-                  </div>
-                ))}
-              </div>
-            ) : workOrders.length > 0 ? (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="work-order-results">
-                {workOrders.map((wo, i) => (
-                  <button
-                    key={wo.id}
-                    onClick={() => setPickedWorkOrder(wo)}
-                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-                    data-testid={`work-order-${wo.id}`}
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5">
-                      <Briefcase className="h-4 w-4 text-[#711419]" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{wo.title || "Work order"}</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
-                        {[
-                          wo.scheduledStart ? format(new Date(wo.scheduledStart), "EEE, MMM d, yyyy") : "Unscheduled",
-                          wo.status ? wo.status.replace(/_/g, " ") : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-8 text-center" data-testid="no-work-orders">
-                <p className="text-sm font-medium text-slate-600">No recent work orders</p>
-                <p className="mt-0.5 px-6 text-xs text-slate-400">Quotes need a work order. Create a job for this customer first.</p>
-              </div>
-            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -323,6 +268,9 @@ export default function MobileQuoteNew() {
               )}
             </div>
 
+            {showRecents && (
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Recent customers</h3>
+            )}
             {customersLoading ? (
               <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
                 {[1, 2, 3, 4].map((i) => (
@@ -332,9 +280,9 @@ export default function MobileQuoteNew() {
                   </div>
                 ))}
               </div>
-            ) : customers && customers.length > 0 ? (
+            ) : shownCustomers.length > 0 ? (
               <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-results">
-                {customers.map((customer, i) => (
+                {shownCustomers.map((customer, i) => (
                   <button
                     key={customer.id}
                     onClick={() => setPickedCustomer(customer)}
@@ -365,8 +313,9 @@ export default function MobileQuoteNew() {
           </div>
         )}
 
-        {/* --- Quote fields (same page, no steps) --- */}
-        <div className="space-y-4 rounded-[4px] border border-slate-300/70 bg-white p-4">
+        {/* --- Step 2: the quote itself — appears once a job is picked --- */}
+        {pickedWorkOrder && (
+        <div className="space-y-4 rounded-[4px] border border-slate-300/70 bg-white p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-[#711419]" />
             <h2 className="text-sm font-semibold text-slate-900">Quote details</h2>
@@ -504,20 +453,64 @@ export default function MobileQuoteNew() {
             </div>
           </div>
         </div>
-
-        <Button
-          className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
-          onClick={handleCreateQuote}
-          disabled={!canSubmit}
-          data-testid="button-create-quote"
-        >
-          {createQuoteMutation.isPending ? <Loader2 className="mr-1.5 h-5 w-5 animate-spin" /> : <Plus className="mr-1.5 h-5 w-5" />}
-          Create quote
-        </Button>
-        {!pickedWorkOrder && (
-          <p className="-mt-2 text-center text-xs text-slate-400">Pick a job above to enable the button.</p>
         )}
       </div>
+
+      {/* Work-order picker — pops up the moment a customer is chosen */}
+      <DraggableSheet
+        tall
+        open={!!pickedCustomer && !pickedWorkOrder}
+        onOpenChange={(o) => { if (!o) setPickedCustomer(null); }}
+        title={pickedCustomer ? `${pickedCustomer.name}'s work orders` : "Pick a work order"}
+        testid="sheet-quote-work-order"
+      >
+        <h2 className="text-lg font-semibold text-slate-900">Which visit is this quote for?</h2>
+        <p className="mt-0.5 truncate text-sm text-slate-500">{pickedCustomer?.name}</p>
+        <div className="mt-4 space-y-2 pb-2">
+          {workOrdersLoading ? (
+            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className={`space-y-2 px-3.5 py-3 ${i > 1 ? "border-t border-slate-200/80" : ""}`}>
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+              ))}
+            </div>
+          ) : workOrders.length > 0 ? (
+            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="work-order-results">
+              {workOrders.map((wo, i) => (
+                <button
+                  key={wo.id}
+                  onClick={() => setPickedWorkOrder(wo)}
+                  className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                  data-testid={`work-order-${wo.id}`}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5">
+                    <Briefcase className="h-4 w-4 text-[#711419]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-900">{wo.title || "Work order"}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {[
+                        wo.scheduledStart ? format(new Date(wo.scheduledStart), "EEE, MMM d, yyyy") : "Unscheduled",
+                        wo.status ? wo.status.replace(/_/g, " ") : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-8 text-center" data-testid="no-work-orders">
+              <p className="text-sm font-medium text-slate-600">No recent work orders</p>
+              <p className="mt-0.5 px-6 text-xs text-slate-400">Quotes need a work order. Create a job for this customer first.</p>
+            </div>
+          )}
+        </div>
+      </DraggableSheet>
     </MobileCreatePage>
   );
 }

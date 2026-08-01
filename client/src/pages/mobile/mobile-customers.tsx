@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, ChevronRight, Users, LogIn, Loader2, Plus, CalendarClock } from "lucide-react";
+import { Search, ChevronRight, Users, LogIn, Loader2, Plus, CalendarClock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -34,6 +34,7 @@ type TodayJob = {
 export default function MobileCustomers() {
   const [, navigate] = useLocation();
   const [searchActive, setSearchActive] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -54,8 +55,9 @@ export default function MobileCustomers() {
       if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
     };
     setInset(0);
-    // Overlay paints first; the keyboard rises a beat later.
-    const focusT = setTimeout(() => searchInputRef.current?.focus(), 220);
+    // Focus right away: the keyboard rises WITH the overlay so the bar
+    // travels bottom-to-keyboard in one continuous motion.
+    const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
 
     let removeNative: (() => void) | null = null;
     if (isNativeApp()) {
@@ -79,8 +81,15 @@ export default function MobileCustomers() {
   }, [searchActive]);
 
   const closeSearch = () => {
-    setSearchActive(false);
-    setSearchQuery("");
+    // Blur first so the keyboard drops while the overlay slides away —
+    // one motion out, mirroring the way in.
+    searchInputRef.current?.blur();
+    setSearchClosing(true);
+    setTimeout(() => {
+      setSearchActive(false);
+      setSearchClosing(false);
+      setSearchQuery("");
+    }, 190);
   };
 
   const { data: currentUser } = useQuery<CrmUser | null>({
@@ -287,7 +296,11 @@ export default function MobileCustomers() {
           bottom riding eased above the keyboard (same feel as Photos). */}
       {searchActive && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
+            searchClosing
+              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
+              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
+          }`}
           data-testid="customers-search-overlay"
         >
           <div
@@ -336,14 +349,13 @@ export default function MobileCustomers() {
                 data-testid="customer-search-input"
               />
             </div>
-            {/* The create "+" reborn as the search X — quarter-turned plus */}
             <button
               onClick={closeSearch}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90 animate-in zoom-in-75 duration-300"
+              className="liquid-glass flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-sm transition-transform active:scale-90"
               aria-label="Close search"
               data-testid="customers-search-close"
             >
-              <Plus className="h-6 w-6 rotate-45" strokeWidth={2.25} />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>

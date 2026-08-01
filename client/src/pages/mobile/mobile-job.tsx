@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon } from "lucide-react";
+import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, SlidersHorizontal, X } from "lucide-react";
 import { RoleBadge } from "@/components/mobile/role-badge";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -150,6 +150,8 @@ export default function MobileJob() {
   const [jobsView, setJobsView] = useState<"today" | "upcoming" | "history">("today");
   const [historySearch, setHistorySearch] = useState("");
   const [historySearchOpen, setHistorySearchOpen] = useState(false);
+  const [historySearchClosing, setHistorySearchClosing] = useState(false);
+  const [historyFilterOpen, setHistoryFilterOpen] = useState(false);
   const [historyGroupBy, setHistoryGroupBy] = useState<"month" | "day">("month");
   const [historyType, setHistoryType] = useState<"all" | "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES">("all");
 
@@ -163,7 +165,9 @@ export default function MobileJob() {
       if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
     };
     setInset(0);
-    const focusT = setTimeout(() => historyInputRef.current?.focus(), 220);
+    // Focus right away: the keyboard starts rising WITH the overlay so the
+    // bar travels bottom-to-keyboard in one continuous motion.
+    const focusT = setTimeout(() => historyInputRef.current?.focus(), 60);
 
     let removeNative: (() => void) | null = null;
     if (isNativeApp()) {
@@ -571,10 +575,22 @@ export default function MobileJob() {
   const upcomingGroups = (groupedJobsByDate || []).filter((g) => g.dateKey > todayKey);
 
   if (userLoading || ordersLoading) {
+    // Skeleton mirrors the real layout (switcher pill + job cards) so the
+    // page settles in place instead of jumping from a centered spinner.
     return (
       <MobileShell>
-        <div className="flex items-center justify-center h-full">
-          <MobileSpinner fullHeight={false} />
+        <div className="p-4 space-y-4" data-testid="jobs-skeleton">
+          <div className="mx-auto h-10 w-64 animate-pulse rounded-lg bg-slate-200/70" />
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-2 rounded-[4px] border border-slate-300/70 bg-slate-100/80 p-4">
+              <div className="flex items-center justify-between">
+                <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+              </div>
+              <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200" />
+              <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
+            </div>
+          ))}
         </div>
       </MobileShell>
     );
@@ -665,44 +681,24 @@ export default function MobileJob() {
 
         {jobsView === "history" && (
           <div className="space-y-4" data-testid="jobs-history">
-            {/* Group by day/month + filter by job type */}
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-200/70 p-0.5">
-                {(["month", "day"] as const).map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setHistoryGroupBy(g)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-all ${
-                      historyGroupBy === g ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
-                    }`}
-                    data-testid={`history-groupby-${g}`}
-                  >
-                    {g === "month" ? "Months" : "Days"}
-                  </button>
-                ))}
-              </div>
-              <div className="-my-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-1">
-                {([
-                  ["all", "All"],
-                  ["SERVICE", "Service"],
-                  ["MAINTENANCE", "Maint."],
-                  ["INSTALL", "Install"],
-                  ["SALES", "Sales"],
-                ] as const).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => setHistoryType(key)}
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      historyType === key
-                        ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
-                        : "border-slate-300/70 bg-white text-slate-500"
-                    }`}
-                    data-testid={`history-filter-${key}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+            {/* One filter button; the controls live in a bottom sheet */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Last 12 months
+                {historyType !== "all" &&
+                  ` · ${historyType === "MAINTENANCE" ? "Maintenance" : historyType.charAt(0) + historyType.slice(1).toLowerCase()} only`}
+              </h3>
+              <button
+                onClick={() => setHistoryFilterOpen(true)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+                aria-label="Filter history"
+                data-testid="history-filter-open"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {(historyType !== "all" || historyGroupBy !== "month") && (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#711419]" />
+                )}
+              </button>
             </div>
             {historySearch.trim() && (
               <p className="text-xs text-slate-500">
@@ -835,10 +831,14 @@ export default function MobileJob() {
       )}
 
       {/* Fullscreen history search — results fill from the top, input docked
-          at the bottom; the "+" becomes the X that closes it. */}
+          at the bottom above the keyboard. */}
       {historySearchOpen && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
+            historySearchClosing
+              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
+              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
+          }`}
           data-testid="history-search-overlay"
         >
           <div
@@ -892,18 +892,70 @@ export default function MobileJob() {
                 data-testid="history-search-input"
               />
             </div>
-            {/* The create "+" reborn as the search X — quarter-turned plus */}
             <button
-              onClick={() => setHistorySearchOpen(false)}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90 animate-in zoom-in-75 duration-300"
+              onClick={() => {
+                historyInputRef.current?.blur();
+                setHistorySearchClosing(true);
+                setTimeout(() => { setHistorySearchOpen(false); setHistorySearchClosing(false); }, 190);
+              }}
+              className="liquid-glass flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-sm transition-transform active:scale-90"
               aria-label="Close search"
               data-testid="history-search-close"
             >
-              <Plus className="h-6 w-6 rotate-45" strokeWidth={2.25} />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
       )}
+
+      {/* History filters — group-by + job type in one bottom sheet */}
+      <DraggableSheet open={historyFilterOpen} onOpenChange={setHistoryFilterOpen} title="Filter history" testid="sheet-history-filter">
+        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="mt-4 space-y-4 pb-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Group by</p>
+            <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-200/70 p-0.5">
+              {(["month", "day"] as const).map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setHistoryGroupBy(g)}
+                  className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
+                    historyGroupBy === g ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
+                  }`}
+                  data-testid={`history-groupby-${g}`}
+                >
+                  {g === "month" ? "Months" : "Days"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Job type</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                ["all", "All"],
+                ["SERVICE", "Service"],
+                ["MAINTENANCE", "Maintenance"],
+                ["INSTALL", "Install"],
+                ["SALES", "Sales"],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setHistoryType(key)}
+                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    historyType === key
+                      ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
+                      : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`history-filter-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DraggableSheet>
 
       {/* Create Work Order — big bottom sheet */}
       <DraggableSheet

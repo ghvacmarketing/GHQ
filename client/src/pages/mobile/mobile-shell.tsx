@@ -192,11 +192,14 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           bottom clearance — reserving padding here would end their container
           in a visible band above the tabs. */}
       <main
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-auto animate-in fade-in duration-200"
         style={customNav ? undefined : { paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
       >
-        {children}
+        {/* 1px over-height keeps every page scrollable, so short pages
+            (More, Time) rubber-band like the long ones instead of feeling
+            pinned. Custom-nav pages own their scroll layers — leave alone. */}
+        {customNav ? children : <div className="min-h-[calc(100%+1px)]">{children}</div>}
       </main>
 
       {/* Flat full-width bottom tab bar (icon + label; active = maroon) */}

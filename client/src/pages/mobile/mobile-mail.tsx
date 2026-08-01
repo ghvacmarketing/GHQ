@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MobileSpinner } from "@/components/mobile/mobile-spinner";
+import { isNativeApp } from "@/lib/native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -60,6 +61,8 @@ export default function MobileMail() {
   const { toast } = useToast();
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [compose, setCompose] = useState({ to: "", subject: "", body: "" });
@@ -112,6 +115,50 @@ export default function MobileMail() {
     onError: (e: any) => toast({ title: e?.message || "Couldn't send the email", variant: "destructive" }),
   });
 
+  // Floating-search overlay: bar docked at the bottom rides the keyboard
+  // with easing (same pattern as Jobs/Photos/Customers/Messages).
+  const searchBarRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!searchActive) return;
+    const setInset = (px: number) => {
+      const el = searchBarRef.current;
+      if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
+    };
+    setInset(0);
+    const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
+
+    let removeNative: (() => void) | null = null;
+    if (isNativeApp()) {
+      import("@capacitor/keyboard").then(({ Keyboard }) => {
+        const subs: any[] = [];
+        Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
+        Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
+        removeNative = () => subs.forEach((h) => h?.remove?.());
+      }).catch(() => {});
+    }
+    const vv = window.visualViewport;
+    const update = () => setInset(Math.max(0, window.innerHeight - (vv?.height || window.innerHeight) - (vv?.offsetTop || 0)));
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    return () => {
+      clearTimeout(focusT);
+      removeNative?.();
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+    };
+  }, [searchActive]);
+
+  const closeSearch = () => {
+    searchInputRef.current?.blur();
+    setSearchClosing(true);
+    setTimeout(() => {
+      setSearchActive(false);
+      setSearchClosing(false);
+      setSearch("");
+    }, 190);
+  };
+
   const openThread = inbox?.threads?.find((t) => t.id === openThreadId) || threadDetail?.thread;
   const replyTo = (() => {
     const lastInbound = [...(threadDetail?.messages || [])].reverse().find((m) => m.direction === "inbound");
@@ -127,6 +174,41 @@ export default function MobileMail() {
       threadRowId: openThreadId,
     });
   };
+
+  const renderThread = (t: MailThread, fromSearch = false) => (
+    <button
+      key={t.id}
+      onClick={() => {
+        if (fromSearch) closeSearch();
+        setOpenThreadId(t.id);
+      }}
+      className="flex w-full items-start gap-3 px-4 py-3 text-left active:bg-slate-50"
+      data-testid={`mail-thread-${t.id}`}
+    >
+      <span className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${t.isUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
+        {t.isUnread ? <Mail style={{ height: 18, width: 18 }} /> : <MailOpen style={{ height: 18, width: 18 }} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className={`truncate text-[15px] ${t.isUnread ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
+            {threadWho(t)}
+          </span>
+          <span className={`shrink-0 text-xs ${t.isUnread ? "font-semibold text-[#711419]" : "text-slate-400"}`}>
+            {listTime(t.lastMessageAt)}
+          </span>
+        </span>
+        <span className="mt-0.5 flex items-center gap-1.5">
+          <span className={`min-w-0 truncate text-sm ${t.isUnread ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+            {t.subject || "(no subject)"}
+          </span>
+          {t.isUnread && (
+            <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
+          )}
+        </span>
+        {t.snippet && <span className="mt-0.5 block truncate text-xs text-slate-400">{t.snippet}</span>}
+      </span>
+    </button>
+  );
 
   return (
     <MobileShell>
@@ -155,16 +237,6 @@ export default function MobileMail() {
           </DropdownMenu>
         </div>
         <InboxSwitcher active="mail" mailCount={mailUnread} chatCount={chatUnread} />
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            placeholder="Search mail..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-            data-testid="input-mail-search"
-          />
-        </div>
 
         <div className="-mx-4">
           {isLoading ? (
@@ -181,37 +253,7 @@ export default function MobileMail() {
             </div>
           ) : inbox && inbox.threads.length > 0 ? (
             <div className="divide-y divide-slate-100">
-              {inbox.threads.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setOpenThreadId(t.id)}
-                  className="flex w-full items-start gap-3 px-4 py-3 text-left active:bg-slate-50"
-                  data-testid={`mail-thread-${t.id}`}
-                >
-                  <span className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${t.isUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
-                    {t.isUnread ? <Mail className="h-4.5 w-4.5" style={{ height: 18, width: 18 }} /> : <MailOpen className="h-4.5 w-4.5" style={{ height: 18, width: 18 }} />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className={`truncate text-[15px] ${t.isUnread ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
-                        {threadWho(t)}
-                      </span>
-                      <span className={`shrink-0 text-xs ${t.isUnread ? "font-semibold text-[#711419]" : "text-slate-400"}`}>
-                        {listTime(t.lastMessageAt)}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 flex items-center gap-1.5">
-                      <span className={`min-w-0 truncate text-sm ${t.isUnread ? "font-semibold text-slate-800" : "text-slate-600"}`}>
-                        {t.subject || "(no subject)"}
-                      </span>
-                      {t.isUnread && (
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
-                      )}
-                    </span>
-                    {t.snippet && <span className="mt-0.5 block truncate text-xs text-slate-400">{t.snippet}</span>}
-                  </span>
-                </button>
-              ))}
+              {inbox.threads.map((t) => renderThread(t))}
             </div>
           ) : (
             <div className="py-12 text-center text-slate-500">
@@ -222,6 +264,78 @@ export default function MobileMail() {
           )}
         </div>
       </div>
+
+      {/* Floating search pill — sits above the nav, left of the "+" */}
+      {!searchActive && !openThreadId && (
+        <button
+          onClick={() => setSearchActive(true)}
+          className="fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
+          style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
+          data-testid="mail-search-pill"
+        >
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="text-[16px] text-slate-400">Search mail</span>
+        </button>
+      )}
+
+      {/* Fullscreen mail search — input docked above the keyboard */}
+      {searchActive && (
+        <div
+          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
+            searchClosing
+              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
+              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
+          }`}
+          data-testid="mail-search-overlay"
+        >
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto px-4 ${!inbox?.threads || inbox.threads.length === 0 ? "flex flex-col justify-end" : ""}`}
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+          >
+            {isLoading || isRefetching ? (
+              <div className="flex items-center justify-center pb-6 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : inbox?.threads && inbox.threads.length > 0 ? (
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                {inbox.threads.map((t) => renderThread(t, true))}
+              </div>
+            ) : (
+              <p className="pb-6 text-center text-sm text-slate-400">
+                {search.trim() ? `No mail matches “${search.trim()}”.` : "Type a name, address, or subject."}
+              </p>
+            )}
+          </div>
+          <div
+            ref={searchBarRef}
+            className="flex items-center gap-2 px-4 pt-2"
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
+              transition: "padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
+          >
+            <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search mail"
+                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="input-mail-search"
+              />
+            </div>
+            <button
+              onClick={closeSearch}
+              className="liquid-glass flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-sm transition-transform active:scale-90"
+              aria-label="Close search"
+              data-testid="mail-search-close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Thread reader ── */}
       {openThreadId && (

@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Clock, Square, Loader2, AlertCircle, CheckCircle, Briefcase, Plus,
   Car, Warehouse, GraduationCap, Users, Coffee, MoreHorizontal, Wrench,
+  SlidersHorizontal,
 } from "lucide-react";
-import { format, formatDistanceToNow, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +63,13 @@ export default function MobileTime() {
   const [view, setView] = useState<"clock" | "timesheet">("clock");
   const [showClockOutDialog, setShowClockOutDialog] = useState(false);
   const [workNotes, setWorkNotes] = useState("");
+
+  // Timesheet filters — lifted here so the filter sheet can drive them
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [tsPreset, setTsPreset] = useState<"this-week" | "last-week" | "this-month" | "custom">("this-week");
+  const [tsFrom, setTsFrom] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
+  const [tsTo, setTsTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [tsCat, setTsCat] = useState<string>("all");
 
   // Manual entry dialog
   const [manualOpen, setManualOpen] = useState(false);
@@ -128,16 +137,38 @@ export default function MobileTime() {
   const isClockedIn = !!currentEntry?.entry;
   const isLoading = loadingCurrent || clockInMutation.isPending || clockOutMutation.isPending;
 
+  // Live ticking clock — the card should read like a real time clock, not a
+  // frozen snapshot from whenever the page last rendered.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isClockedIn) return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [isClockedIn]);
   const getElapsedTime = () => {
     if (!currentEntry?.entry?.clockInAt) return null;
-    return formatDistanceToNow(new Date(currentEntry.entry.clockInAt), { includeSeconds: true });
+    const secs = Math.max(0, Math.floor((nowTick - new Date(currentEntry.entry.clockInAt).getTime()) / 1000));
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
+
+  // Quick pauses don't need a work summary — only real work does.
+  const NO_SUMMARY_CATEGORIES = ["training", "meeting", "break", "other"];
+  const handleClockOut = () => {
+    const cat = currentEntry?.entry?.category || "job";
+    if (NO_SUMMARY_CATEGORIES.includes(cat)) clockOutMutation.mutate("");
+    else setShowClockOutDialog(true);
+  };
+
+  const filtersActive = tsCat !== "all" || tsPreset !== "this-week";
 
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-time">
-        {/* Clock | Timesheet — same pill switcher as everywhere else */}
-        <div className="flex justify-center">
+        {/* Clock | Timesheet switcher centered, filter pinned right */}
+        <div className="relative flex items-center justify-center">
           <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/70 p-1">
             {(["clock", "timesheet"] as const).map((v) => (
               <button
@@ -152,6 +183,17 @@ export default function MobileTime() {
               </button>
             ))}
           </div>
+          {view === "timesheet" && (
+            <button
+              onClick={() => setFilterOpen(true)}
+              className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+              aria-label="Filter timesheet"
+              data-testid="timesheet-filter-open"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {filtersActive && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+            </button>
+          )}
         </div>
 
         {view === "clock" ? (
@@ -205,7 +247,7 @@ export default function MobileTime() {
                       <Button
                         size="lg"
                         className="w-full h-16 text-lg font-semibold rounded-[4px] bg-red-600 hover:bg-red-700"
-                        onClick={() => setShowClockOutDialog(true)}
+                        onClick={handleClockOut}
                         disabled={isLoading}
                         data-testid="button-clock-out"
                       >
@@ -286,9 +328,71 @@ export default function MobileTime() {
             )}
           </>
         ) : (
-          <TimesheetView />
+          <TimesheetView preset={tsPreset} customFrom={tsFrom} customTo={tsTo} catFilter={tsCat} />
         )}
       </div>
+
+      {/* Timesheet filters — range + category, in one bottom sheet */}
+      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter timesheet" testid="sheet-timesheet-filter">
+        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="mt-4 space-y-4 pb-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Date range</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                ["this-week", "This week"],
+                ["last-week", "Last week"],
+                ["this-month", "This month"],
+                ["custom", "Custom"],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setTsPreset(key)}
+                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    tsPreset === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`timesheet-range-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tsPreset === "custom" && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Input type="date" value={tsFrom} onChange={(e) => setTsFrom(e.target.value)} data-testid="timesheet-from" />
+                <Input type="date" value={tsTo} onChange={(e) => setTsTo(e.target.value)} data-testid="timesheet-to" />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Category</p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setTsCat("all")}
+                className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  tsCat === "all" ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                }`}
+                data-testid="timesheet-cat-all"
+              >
+                All
+              </button>
+              {TIME_CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setTsCat(c.key)}
+                  className={`flex items-center gap-1.5 rounded-[3px] border px-2 py-1 text-xs font-medium transition-colors ${
+                    tsCat === c.key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`timesheet-cat-${c.key}`}
+                >
+                  <img src={c.img} alt="" className="h-5 w-5 select-none" draggable={false} />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DraggableSheet>
 
       {/* Clock-out dialog */}
       <Dialog open={showClockOutDialog} onOpenChange={(open) => {
@@ -446,11 +550,15 @@ function TimeEntryRow({ entry }: { entry: EntryWithCategory }) {
 
 /** The timesheet: pick a range, see every entry with its label, grouped by
  *  day with per-day and per-category totals. */
-function TimesheetView() {
+function TimesheetView({
+  preset, customFrom, customTo, catFilter,
+}: {
+  preset: "this-week" | "last-week" | "this-month" | "custom";
+  customFrom: string;
+  customTo: string;
+  catFilter: string;
+}) {
   const today = new Date();
-  const [preset, setPreset] = useState<"this-week" | "last-week" | "this-month" | "custom">("this-week");
-  const [customFrom, setCustomFrom] = useState(format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"));
-  const [customTo, setCustomTo] = useState(format(today, "yyyy-MM-dd"));
 
   const range = useMemo(() => {
     if (preset === "this-week") {
@@ -479,9 +587,26 @@ function TimesheetView() {
     },
   });
 
+  // Category filter applies client-side; totals recompute from what's shown
+  const shownEntries = useMemo(
+    () => (data?.entries ?? []).filter((e) => catFilter === "all" || (e.category || "job") === catFilter),
+    [data, catFilter],
+  );
+  const totals = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    let total = 0;
+    for (const e of shownEntries) {
+      const mins = e.durationMinutes ?? 0;
+      total += mins;
+      const cat = e.category || "job";
+      byCategory[cat] = (byCategory[cat] || 0) + mins;
+    }
+    return { total, byCategory };
+  }, [shownEntries]);
+
   const days = useMemo(() => {
     const map = new Map<string, { label: string; entries: EntryWithCategory[]; minutes: number }>();
-    for (const e of data?.entries ?? []) {
+    for (const e of shownEntries) {
       const key = format(new Date(e.clockInAt), "yyyy-MM-dd");
       if (!map.has(key)) map.set(key, { label: format(new Date(e.clockInAt), "EEEE, MMM d"), entries: [], minutes: 0 });
       const day = map.get(key)!;
@@ -489,46 +614,25 @@ function TimesheetView() {
       day.minutes += e.durationMinutes ?? 0;
     }
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([, v]) => v);
-  }, [data]);
+  }, [shownEntries]);
 
   return (
     <div className="space-y-4" data-testid="timesheet-view">
-      {/* Range */}
-      <div className="flex flex-wrap gap-1.5">
-        {([
-          ["this-week", "This week"],
-          ["last-week", "Last week"],
-          ["this-month", "This month"],
-          ["custom", "Custom"],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setPreset(key)}
-            className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
-              preset === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
-            }`}
-            data-testid={`timesheet-range-${key}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {preset === "custom" && (
-        <div className="grid grid-cols-2 gap-2">
-          <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} data-testid="timesheet-from" />
-          <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} data-testid="timesheet-to" />
-        </div>
-      )}
+      {/* Active filters read-back — the controls live in the filter sheet */}
+      <p className="text-xs text-slate-500">
+        {{ "this-week": "This week", "last-week": "Last week", "this-month": "This month", custom: `${customFrom} → ${customTo}` }[preset]}
+        {catFilter !== "all" && ` · ${categoryMeta(catFilter).label} only`}
+      </p>
 
       {/* Totals */}
       <div className="rounded-[4px] border border-slate-300/70 bg-white p-4" data-testid="timesheet-totals">
         <div className="flex items-baseline justify-between">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Total</p>
-          <p className="text-2xl font-bold tabular-nums text-slate-900">{formatDuration(data?.totalMinutes ?? 0)}</p>
+          <p className="text-2xl font-bold tabular-nums text-slate-900">{formatDuration(totals.total)}</p>
         </div>
-        {data && Object.keys(data.byCategory).length > 0 && (
+        {Object.keys(totals.byCategory).length > 0 && (
           <div className="mt-2.5 space-y-1 border-t border-slate-100 pt-2.5">
-            {Object.entries(data.byCategory)
+            {Object.entries(totals.byCategory)
               .sort(([, a], [, b]) => b - a)
               .map(([cat, mins]) => (
                 <div key={cat} className="flex items-center justify-between text-sm">

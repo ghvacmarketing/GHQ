@@ -321,7 +321,11 @@ function TaskDetail({ taskId, users, onClose }: { taskId: string; users: CrmUser
           onFocusCapture={(e) => {
             const t = e.target as HTMLElement;
             if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") {
-              setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+              setTimeout(() => {
+                window.scrollTo(0, 0);
+                t.scrollIntoView({ block: "center", behavior: "smooth" });
+              }, 300);
+              setTimeout(() => window.scrollTo(0, 0), 650);
             }
           }}
         >

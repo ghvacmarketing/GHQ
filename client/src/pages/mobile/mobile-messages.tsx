@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isNativeApp } from "@/lib/native";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -63,10 +64,56 @@ export default function MobileMessages() {
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Floating-search overlay: bar docked at the bottom rides the keyboard
+  // with easing (same pattern as Jobs/Photos/Customers).
+  const searchBarRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!searchActive) return;
+    const setInset = (px: number) => {
+      const el = searchBarRef.current;
+      if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
+    };
+    setInset(0);
+    const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
+
+    let removeNative: (() => void) | null = null;
+    if (isNativeApp()) {
+      import("@capacitor/keyboard").then(({ Keyboard }) => {
+        const subs: any[] = [];
+        Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
+        Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
+        removeNative = () => subs.forEach((h) => h?.remove?.());
+      }).catch(() => {});
+    }
+    const vv = window.visualViewport;
+    const update = () => setInset(Math.max(0, window.innerHeight - (vv?.height || window.innerHeight) - (vv?.offsetTop || 0)));
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    return () => {
+      clearTimeout(focusT);
+      removeNative?.();
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+    };
+  }, [searchActive]);
+
+  const closeSearch = () => {
+    searchInputRef.current?.blur();
+    setSearchClosing(true);
+    setTimeout(() => {
+      setSearchActive(false);
+      setSearchClosing(false);
+      setSearchQuery("");
+    }, 190);
+  };
 
   const { data: conversations, isLoading: loadingConversations } = useQuery<ConversationWithCustomer[]>({
     queryKey: ["/api/mobile/messaging/conversations", searchQuery],
@@ -194,6 +241,47 @@ export default function MobileMessages() {
     return out;
   }, [messages]);
 
+  const renderConversation = (conversation: ConversationWithCustomer, fromSearch = false) => (
+    <button
+      key={conversation.id}
+      onClick={() => {
+        if (fromSearch) closeSearch();
+        setSelectedConversationId(conversation.id);
+      }}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+      data-testid={`conversation-${conversation.id}`}
+    >
+      <img
+        src={(conversation.customerId || conversation.customer) ? badgeContactKnown : badgeContactUnknown}
+        alt={(conversation.customerId || conversation.customer) ? "CRM customer" : "Unknown number"}
+        className="h-12 w-12 shrink-0 select-none"
+        draggable={false}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={`truncate text-[15px] text-slate-900 ${conversation.unreadInboundCount ? "font-bold" : "font-semibold"}`}>
+            {conversation.customer?.name || conversation.customerName || conversation.phoneNumber || "Unknown"}
+          </p>
+          {conversation.lastMessageAt && (
+            <span className={`shrink-0 text-xs ${conversation.unreadInboundCount ? "font-semibold text-[#711419]" : "text-slate-400"}`}>
+              {listTime(conversation.lastMessageAt)}
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p className="truncate text-sm text-slate-500">
+            {conversation.customer?.name || conversation.customerName
+              ? conversation.phoneNumber || conversation.customerPhone || "No phone"
+              : "Not in the CRM yet"}
+          </p>
+          {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
+            <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
+          )}
+        </div>
+      </div>
+    </button>
+  );
+
   return (
     <MobileShell>
       {/* ── Conversation list — minimal chrome: title, search, 4-dot menu ── */}
@@ -221,16 +309,6 @@ export default function MobileMessages() {
           </DropdownMenu>
         </div>
         <InboxSwitcher active="chat" mailCount={mailUnread} chatCount={chatUnread} />
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-conversations"
-          />
-        </div>
 
         <div className="-mx-4">
           {loadingConversations ? (
@@ -239,43 +317,7 @@ export default function MobileMessages() {
             </div>
           ) : conversations && conversations.length > 0 ? (
             <div className="divide-y divide-slate-100">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  onClick={() => setSelectedConversationId(conversation.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
-                  data-testid={`conversation-${conversation.id}`}
-                >
-                  <img
-                    src={(conversation.customerId || conversation.customer) ? badgeContactKnown : badgeContactUnknown}
-                    alt={(conversation.customerId || conversation.customer) ? "CRM customer" : "Unknown number"}
-                    className="h-12 w-12 shrink-0 select-none"
-                    draggable={false}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className={`truncate text-[15px] text-slate-900 ${conversation.unreadInboundCount ? "font-bold" : "font-semibold"}`}>
-                        {conversation.customer?.name || conversation.customerName || conversation.phoneNumber || "Unknown"}
-                      </p>
-                      {conversation.lastMessageAt && (
-                        <span className={`shrink-0 text-xs ${conversation.unreadInboundCount ? "font-semibold text-[#711419]" : "text-slate-400"}`}>
-                          {listTime(conversation.lastMessageAt)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex items-center justify-between gap-2">
-                      <p className="truncate text-sm text-slate-500">
-                        {conversation.customer?.name || conversation.customerName
-                          ? conversation.phoneNumber || conversation.customerPhone || "No phone"
-                          : "Not in the CRM yet"}
-                      </p>
-                      {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
+              {conversations.map((conversation) => renderConversation(conversation))}
             </div>
           ) : (
             <div className="py-12 text-center text-slate-500">
@@ -286,6 +328,78 @@ export default function MobileMessages() {
           )}
         </div>
       </div>
+
+      {/* Floating search pill — sits above the nav, left of the "+" */}
+      {!searchActive && !selectedConversationId && (
+        <button
+          onClick={() => setSearchActive(true)}
+          className="fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
+          style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
+          data-testid="messages-search-pill"
+        >
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="text-[16px] text-slate-400">Search conversations</span>
+        </button>
+      )}
+
+      {/* Fullscreen conversation search — input docked above the keyboard */}
+      {searchActive && (
+        <div
+          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
+            searchClosing
+              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
+              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
+          }`}
+          data-testid="messages-search-overlay"
+        >
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto px-4 ${!conversations || conversations.length === 0 ? "flex flex-col justify-end" : ""}`}
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+          >
+            {loadingConversations ? (
+              <div className="flex items-center justify-center pb-6 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : conversations && conversations.length > 0 ? (
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                {conversations.map((conversation) => renderConversation(conversation, true))}
+              </div>
+            ) : (
+              <p className="pb-6 text-center text-sm text-slate-400">
+                {searchQuery.trim() ? `No conversations match “${searchQuery.trim()}”.` : "Type a name or number."}
+              </p>
+            )}
+          </div>
+          <div
+            ref={searchBarRef}
+            className="flex items-center gap-2 px-4 pt-2"
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
+              transition: "padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
+          >
+            <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search conversations"
+                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="input-search-conversations"
+              />
+            </div>
+            <button
+              onClick={closeSearch}
+              className="liquid-glass flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-sm transition-transform active:scale-90"
+              aria-label="Close search"
+              data-testid="messages-search-close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Open thread — fullscreen chat layer (WhatsApp style) ── */}
       {selectedConversationId && (

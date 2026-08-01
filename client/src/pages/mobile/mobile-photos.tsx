@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Plus, Search, Trash2, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isNativeApp, takeNativePhoto } from "@/lib/native";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ export default function MobilePhotos() {
   // The customer photos get attached to — always chosen via search.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   // Keyboard inset for the search overlay: the overlay itself always covers
   // the full viewport (so the page never shows through); only the bottom
@@ -40,7 +41,7 @@ export default function MobilePhotos() {
     setInset(0);
     // Overlay paints first; the keyboard rises a beat later (feels ordered
     // AND gives the bar its position before any animation starts).
-    const focusT = setTimeout(() => searchInputRef.current?.focus(), 220);
+    const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
 
     let removeNative: (() => void) | null = null;
     if (isNativeApp()) {
@@ -127,8 +128,14 @@ export default function MobilePhotos() {
     setCustomerSearch("");
   };
   const closeSearch = () => {
-    setSearchActive(false);
-    setCustomerSearch("");
+    // Keyboard drops while the overlay slides away — one motion out.
+    searchInputRef.current?.blur();
+    setSearchClosing(true);
+    setTimeout(() => {
+      setSearchActive(false);
+      setSearchClosing(false);
+      setCustomerSearch("");
+    }, 190);
   };
 
   // Today's jobs with their photo coverage — powers the required-photos
@@ -743,7 +750,11 @@ export default function MobilePhotos() {
           window.visualViewport height tracking. */}
       {searchActive && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
+            searchClosing
+              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
+              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
+          }`}
           data-testid="photos-search-overlay"
         >
           <div
@@ -799,14 +810,13 @@ export default function MobilePhotos() {
                 data-testid="photos-search-input"
               />
             </div>
-            {/* The create "+" reborn as the search X — quarter-turned plus */}
             <button
               onClick={closeSearch}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90 animate-in zoom-in-75 duration-300"
+              className="liquid-glass flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-sm transition-transform active:scale-90"
               aria-label="Close search"
               data-testid="photos-search-close"
             >
-              <Plus className="h-6 w-6 rotate-45" strokeWidth={2.25} />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>

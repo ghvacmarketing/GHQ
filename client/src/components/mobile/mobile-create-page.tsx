@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { Loader2, X } from "lucide-react";
 import { useKeyboardInset } from "@/lib/native";
@@ -58,6 +58,14 @@ export function MobileCreatePage({
   // field (notes especially) up into view instead of typing blind under
   // the keyboard.
   const keyboardInset = useKeyboardInset();
+
+  // WebKit "helps" by panning the WHOLE page when the keyboard (or the date
+  // wheel) would cover a focused field — which shoves this fixed sheet off
+  // screen. We do our own in-container scrolling, so undo the pan whenever
+  // it happens and again when the keyboard leaves.
+  useEffect(() => {
+    if (keyboardInset === 0) window.scrollTo(0, 0);
+  }, [keyboardInset]);
 
   const doExit = () => {
     // Slide the sheet back down before leaving — it closes like it opened
@@ -122,12 +130,20 @@ export function MobileCreatePage({
         onFocusCapture={(e) => {
           const t = e.target as HTMLElement;
           if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") {
-            // Wait for the keyboard (and the padding above) to land, then
-            // bring the field to the middle of what's still visible.
-            setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+            // Wait for the keyboard (and the padding above) to land, undo any
+            // whole-page pan WebKit snuck in, then bring the field to the
+            // middle of what's still visible.
+            setTimeout(() => {
+              window.scrollTo(0, 0);
+              t.scrollIntoView({ block: "center", behavior: "smooth" });
+            }, 300);
+            setTimeout(() => window.scrollTo(0, 0), 650);
           }
         }}
       >
+        {/* 1px over-height keeps the form scrollable even before the
+            keyboard shows, so the page always moves under your thumb. */}
+        <div className="min-h-[calc(100%+1px)]">
         <h1 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
         {children}
         {onSave && (
@@ -141,6 +157,7 @@ export function MobileCreatePage({
             {saveLabel}
           </button>
         )}
+        </div>
       </div>
 
       {assistantOpen && (
