@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import badgeMessaging from "@/assets/badge-messaging.png";
+import badgeContactKnown from "@/assets/badge-contact-known.png";
+import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
   MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, RefreshCw, Phone,
 } from "lucide-react";
@@ -239,9 +241,12 @@ export default function MobileMessages() {
                   className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
                   data-testid={`conversation-${conversation.id}`}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
-                    {conversation.customerName?.charAt(0).toUpperCase() || "?"}
-                  </div>
+                  <img
+                    src={conversation.customerId ? badgeContactKnown : badgeContactUnknown}
+                    alt={conversation.customerId ? "CRM customer" : "Unknown number"}
+                    className="h-12 w-12 shrink-0 select-none"
+                    draggable={false}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className={`truncate text-[15px] text-slate-900 ${conversation.unreadInboundCount ? "font-bold" : "font-semibold"}`}>
@@ -292,9 +297,12 @@ export default function MobileMessages() {
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
+            <img
+              src={(conversationDetail?.conversation?.customerId || selectedConversation?.customerId) ? badgeContactKnown : badgeContactUnknown}
+              alt=""
+              className="h-10 w-10 shrink-0 select-none"
+              draggable={false}
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-semibold leading-tight text-slate-900">{displayName}</p>
               {displayPhone && <p className="truncate text-xs text-slate-500">{displayPhone}</p>}
