@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Wrench, MapPin, Clock, ChevronRight, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, SlidersHorizontal, X } from "lucide-react";
+import { Wrench, MapPin, Clock, ChevronRight, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, ListFilter, X } from "lucide-react";
 import { RoleBadge } from "@/components/mobile/role-badge";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -692,24 +692,25 @@ export default function MobileJob() {
 
         {jobsView === "history" && (
           <div className="space-y-4" data-testid="jobs-history">
-            {/* One filter button; the controls live in a bottom sheet */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Last 12 months
-                {historyType !== "all" &&
-                  ` · ${historyType === "MAINTENANCE" ? "Maintenance" : historyType.charAt(0) + historyType.slice(1).toLowerCase()} only`}
-              </h3>
+            {/* Filter pill left, range caption right; controls live in a sheet */}
+            <div className="flex items-center justify-between gap-2">
               <button
                 onClick={() => setHistoryFilterOpen(true)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+                className="relative flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
                 aria-label="Filter history"
                 data-testid="history-filter-open"
               >
-                <SlidersHorizontal className="h-4 w-4" />
+                <ListFilter className="h-4 w-4" />
+                Filters
                 {(historyType !== "all" || historyGroupBy !== "month") && (
-                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#711419]" />
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />
                 )}
               </button>
+              <h3 className="text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Last 12 months
+                {historyType !== "all" &&
+                  ` · ${historyType === "MAINTENANCE" ? "Maintenance" : historyType.charAt(0) + historyType.slice(1).toLowerCase()}`}
+              </h3>
             </div>
             {historySearch.trim() && (
               <p className="text-xs text-slate-500">
