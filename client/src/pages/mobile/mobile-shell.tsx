@@ -13,6 +13,8 @@ import plateTasks from "@/assets/plate-tasks.png";
 import platePhotos from "@/assets/plate-photos.png";
 import plateCustomers from "@/assets/plate-customers.png";
 import plateJobs from "@/assets/plate-jobs.png";
+import plateQuote from "@/assets/plate-quote.png";
+import plateInvoice from "@/assets/plate-invoice.png";
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useNativePush } from "@/lib/native";
@@ -290,8 +292,8 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
               <>
                 <SheetTile icon={UserRoundPlus} img={plateCustomers} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
                 <SheetTile icon={Briefcase} img={plateJobs} label="New Job" onClick={() => go("/mobile/job/new")} testid="create-new-job" />
-                <SheetTile icon={FileText} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
-                <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
+                <SheetTile icon={FileText} img={plateQuote} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
+                <SheetTile icon={Receipt} img={plateInvoice} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
               </>
             )}
           </div>
