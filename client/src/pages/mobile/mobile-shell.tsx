@@ -15,6 +15,15 @@ import createTask from "@/assets/create-task.png";
 import createPhoto from "@/assets/create-photo.png";
 import createCustomer from "@/assets/create-customer.png";
 import createJob from "@/assets/create-job.png";
+
+// Warm the create-sheet badges the moment the shell module loads — without
+// this, the sheet's first open can flash empty tiles while the PNGs fetch.
+if (typeof Image !== "undefined") {
+  for (const src of [createTask, createPhoto, createCustomer, createJob, plateQuote, plateInvoice, badgeGibbs]) {
+    const img = new Image();
+    img.src = src;
+  }
+}
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useNativePush } from "@/lib/native";
