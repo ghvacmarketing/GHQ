@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, ChevronRight, Users, LogIn, Plus, CalendarClock, X } from "lucide-react";
+import { Search, ChevronRight, Users, LogIn, CalendarClock, ListFilter, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
-import badgeCustomer from "@/assets/badge-customer.png";
+import typeResidential from "@/assets/type-residential.png";
+import typeCommercial from "@/assets/type-commercial.png";
+import typePropertyManager from "@/assets/type-property-manager.png";
+
+/** Metallic type badge per customer: house, office, or portfolio+key. */
+const TYPE_BADGES: Record<string, string> = {
+  residential: typeResidential,
+  commercial: typeCommercial,
+  property_manager: typePropertyManager,
+};
 import { format } from "date-fns";
 import { isNativeApp } from "@/lib/native";
 import MobileShell from "./mobile-shell";
@@ -93,6 +104,72 @@ export default function MobileCustomers() {
     }, 190);
   };
 
+  // ── All-customers list filters (same sheet pattern as job history) ──
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fType, setFType] = useState<"all" | "residential" | "commercial" | "property_manager">("all");
+  const [fStatus, setFStatus] = useState<"all" | "customer" | "prospect">("all");
+  const [fAgreement, setFAgreement] = useState(false);
+  const [fRange, setFRange] = useState<"all" | "30" | "90" | "year" | "custom">("all");
+  const [fFrom, setFFrom] = useState("");
+  const [fTo, setFTo] = useState("");
+  const filtersActive = fType !== "all" || fStatus !== "all" || fAgreement || fRange !== "all";
+  const createdFrom =
+    fRange === "30" ? format(new Date(Date.now() - 30 * 864e5), "yyyy-MM-dd")
+    : fRange === "90" ? format(new Date(Date.now() - 90 * 864e5), "yyyy-MM-dd")
+    : fRange === "year" ? format(new Date(new Date().getFullYear(), 0, 1), "yyyy-MM-dd")
+    : fRange === "custom" ? fFrom
+    : "";
+  const createdTo = fRange === "custom" ? fTo : "";
+
+  // Every customer, 25 at a time — pages append as the sentinel scrolls in
+  const allCustomers = useInfiniteQuery({
+    queryKey: ["/api/crm/customers", "mobile-all", fType, fStatus, fAgreement, createdFrom, createdTo],
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({ page: String(pageParam), limit: "25" });
+      if (fType !== "all") params.set("customerType", fType);
+      if (fStatus !== "all") params.set("customerStatus", fStatus);
+      if (fAgreement) params.set("hasAgreement", "true");
+      if (createdFrom) params.set("createdFrom", createdFrom);
+      if (createdTo) params.set("createdTo", createdTo);
+      const res = await fetch(`/api/crm/customers?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load customers");
+      return res.json() as Promise<{
+        customers: CrmCustomer[];
+        pagination: { page: number; totalPages: number; total: number };
+      }>;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.totalPages ? last.pagination.page + 1 : undefined,
+    placeholderData: (prev) => prev,
+  });
+  const allRows = (allCustomers.data?.pages ?? []).flatMap((p) => p.customers);
+  const allTotal = allCustomers.data?.pages?.[0]?.pagination?.total ?? 0;
+
+  // Sentinel-driven paging: current state lives in a ref so the observer
+  // callback (created once) never acts on stale flags.
+  const pagingRef = useRef({ hasNext: false, fetching: false, fetch: () => {} });
+  pagingRef.current = {
+    hasNext: !!allCustomers.hasNextPage,
+    fetching: allCustomers.isFetchingNextPage,
+    fetch: () => { allCustomers.fetchNextPage(); },
+  };
+  const sentinelIO = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = (el: HTMLDivElement | null) => {
+    sentinelIO.current?.disconnect();
+    sentinelIO.current = null;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const p = pagingRef.current;
+        if (entries[0].isIntersecting && p.hasNext && !p.fetching) p.fetch();
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    sentinelIO.current = io;
+  };
+
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
@@ -173,15 +250,15 @@ export default function MobileCustomers() {
       className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
       data-testid={`customer-card-${customer.id}`}
     >
-      <img src={badgeCustomer} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
+      <img
+        src={TYPE_BADGES[(customer.customerType || "residential").toLowerCase()] || typeResidential}
+        alt={customer.customerType || "residential"}
+        className="h-9 w-9 shrink-0 select-none"
+        draggable={false}
+      />
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold text-slate-900" data-testid={`customer-name-${customer.id}`}>
-            {customer.name}
-          </span>
-          <span className="shrink-0 rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
-            {customer.customerType === "commercial" ? "Comm" : customer.customerType === "property_manager" ? "PM" : "Res"}
-          </span>
+        <span className="truncate block text-sm font-semibold text-slate-900" data-testid={`customer-name-${customer.id}`}>
+          {customer.name}
         </span>
         <span className="mt-0.5 block truncate text-xs text-slate-500">
           {[customer.phone, customer.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
@@ -261,24 +338,147 @@ export default function MobileCustomers() {
               )}
             </div>
 
-            {/* Quick action */}
-            <button
-              onClick={() => navigate("/mobile/customers/new")}
-              className="flex w-full items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3 text-left active:bg-slate-50"
-              data-testid="customers-add-new"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] bg-[#711419] text-white">
-                <Plus className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-slate-900">Add a new customer</span>
-                <span className="block text-xs text-slate-500">They&rsquo;re in the CRM the moment you save</span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-            </button>
+            {/* Every customer — filterable, loads as you scroll */}
+            <div data-testid="customers-all">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => setFilterOpen(true)}
+                  className="relative flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+                  aria-label="Filter customers"
+                  data-testid="customers-filter-open"
+                >
+                  <ListFilter className="h-4 w-4" />
+                  Filters
+                  {filtersActive && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+                </button>
+                <h3 className="text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  All customers{allTotal > 0 ? ` · ${allTotal}` : ""}
+                </h3>
+              </div>
+
+              {allCustomers.isLoading ? (
+                <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className={`flex items-center gap-3 px-3.5 py-3 ${i > 1 ? "border-t border-slate-200/80" : ""}`}>
+                      <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-slate-200" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                        <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : allRows.length > 0 ? (
+                <>
+                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customers-all-list">
+                    {allRows.map((c, i) => customerRow(c, i))}
+                  </div>
+                  {allCustomers.isFetchingNextPage && (
+                    <div className="mt-2 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className={`flex items-center gap-3 px-3.5 py-3 ${i > 1 ? "border-t border-slate-200/80" : ""}`}>
+                          <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-slate-200" />
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                            <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div ref={sentinelRef} className="h-1" />
+                  {!allCustomers.hasNextPage && (
+                    <p className="py-3 text-center text-xs text-slate-400">That&rsquo;s everyone.</p>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-10 text-center" data-testid="customers-all-empty">
+                  <p className="text-sm font-medium text-slate-600">No customers match these filters</p>
+                  <button onClick={() => { setFType("all"); setFStatus("all"); setFAgreement(false); setFRange("all"); }} className="mt-1 text-xs font-semibold text-[#711419]">
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
+
+      {/* Customer filters — the CRM's filters in one bottom sheet */}
+      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter customers" testid="sheet-customer-filter">
+        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="mt-4 space-y-4 pb-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Customer type</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([["all", "All"], ["residential", "Residential"], ["commercial", "Commercial"], ["property_manager", "Property mgr"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setFType(key)}
+                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    fType === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`customers-filter-type-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Status</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([["all", "All"], ["customer", "Customer"], ["prospect", "Prospect"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setFStatus(key)}
+                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    fStatus === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`customers-filter-status-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Agreements</p>
+            <button
+              onClick={() => setFAgreement((v) => !v)}
+              className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                fAgreement ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+              }`}
+              data-testid="customers-filter-agreement"
+            >
+              Has an agreement
+            </button>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Date added</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([["all", "All time"], ["30", "Last 30 days"], ["90", "Last 90 days"], ["year", "This year"], ["custom", "Custom"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setFRange(key)}
+                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    fRange === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`customers-filter-range-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {fRange === "custom" && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} data-testid="customers-filter-from" />
+                <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} data-testid="customers-filter-to" />
+              </div>
+            )}
+          </div>
+        </div>
+      </DraggableSheet>
 
       {/* Floating search pill — sits above the nav, left of the "+" */}
       {!needsAuth && !searchActive && (

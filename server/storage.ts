@@ -2235,10 +2235,34 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const mapped = results.map(r => ({
+    const mapped: Array<CrmMessagingConversation & {
+      customer: { id: string; name: string; phone: string | null } | null;
+      lastMessagePreview?: string | null;
+      lastMessageDirection?: string | null;
+    }> = results.map(r => ({
       ...r.conversation,
       customer: r.customer || null
     }));
+
+    // One pass for every conversation's newest message — the list shows the
+    // message itself, not just a phone number.
+    if (mapped.length > 0) {
+      const ids = mapped.map(c => c.id);
+      const lastMsgs = await db.execute(sql`
+        SELECT DISTINCT ON (conversation_id) conversation_id AS cid, body, direction
+        FROM crm_messaging_messages
+        WHERE conversation_id IN (${sql.join(ids.map(i => sql`${i}`), sql`, `)})
+        ORDER BY conversation_id, sent_at DESC NULLS LAST, created_at DESC
+      `);
+      const byId = new Map((lastMsgs.rows as any[]).map(r => [r.cid, r]));
+      for (const c of mapped) {
+        const m = byId.get(c.id);
+        if (m) {
+          c.lastMessagePreview = String(m.body || "").slice(0, 140) || null;
+          c.lastMessageDirection = m.direction || null;
+        }
+      }
+    }
 
     // Conversations that were never linked to a customer (inbound texts from
     // numbers Textline didn't match) still deserve a name: match the phone

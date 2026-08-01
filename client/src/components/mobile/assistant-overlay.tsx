@@ -849,23 +849,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16">
           {messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center pt-[7vh] text-center">
-              {/* Persona block — Gibbs' face for an empty conversation */}
-              <div className="flex h-[88px] w-[88px] items-center justify-center rounded-full border border-slate-200 bg-slate-100">
-                <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-9 w-9 rotate-45 text-[#711419]">
-                  <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
-                  <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
-                  <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
-                  <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
-                </svg>
-              </div>
+              {/* Persona block — Gibbs' badge for an empty conversation */}
+              <img src={badgeGibbs} alt="" className="h-[88px] w-[88px] select-none" draggable={false} />
               <button
                 onClick={() => setPanelOpen(true)}
-                className="mt-4 flex items-center gap-1 rounded-full border border-slate-300/70 bg-white px-4 py-1.5 text-sm font-semibold text-slate-800 transition-colors active:bg-slate-50"
+                className="mt-4 text-lg font-semibold tracking-tight text-slate-900 transition-opacity active:opacity-60"
                 aria-label="Gibbs — history and spaces"
                 data-testid="assistant-persona-pill"
               >
                 Gibbs
-                <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
               <p className="mt-3 max-w-[260px] text-sm text-slate-500">
                 {firstName ? `What can I get done, ${firstName}?` : "What can I get done?"} Anything I set up waits for your approval.

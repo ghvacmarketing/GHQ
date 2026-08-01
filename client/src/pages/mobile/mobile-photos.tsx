@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Search, Trash2, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, ListFilter, Loader2, Play, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isNativeApp, takeNativePhoto } from "@/lib/native";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import {
 import MobileShell from "./mobile-shell";
 import { PhotoViewer } from "@/components/mobile/photo-viewer";
 import platePhotos from "@/assets/plate-photos.png";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import type { CrmUser, CustomerFile } from "@shared/schema";
 
 export default function MobilePhotos() {
@@ -209,6 +210,14 @@ export default function MobilePhotos() {
     (f) => f.contentType?.startsWith("image/") || f.contentType?.startsWith("video/"),
   );
   const isVideo = (f: { contentType?: string | null }) => !!f.contentType?.startsWith("video/");
+
+  // Kind filter (All / Photos / Videos) — applies to the gallery and the
+  // recent strip alike.
+  const [mediaFilterOpen, setMediaFilterOpen] = useState(false);
+  const [mediaKind, setMediaKind] = useState<"all" | "photos" | "videos">("all");
+  const kindMatch = (f: { contentType?: string | null }) =>
+    mediaKind === "all" || (mediaKind === "videos" ? isVideo(f) : !isVideo(f));
+  const shownPhotos = photos.filter(kindMatch);
 
   // Supervisor+ can pull photos down or remove bad shots from the record.
   const isSupervisorPlus = !!currentUser && ["supervisor", "admin", "owner"].includes(currentUser.role);
@@ -462,36 +471,30 @@ export default function MobilePhotos() {
           display: searchActive ? "none" : undefined,
         }}
       >
-        {/* Search icon top right — opens the full-screen search overlay.
-            Techs don't get free targeting: their photos go to the job
-            they're on site at. */}
-        {!isTechRole && (
-        <div className="flex items-center justify-end gap-2">
+        {/* Filters pill top left; search top right (techs don't get free
+            targeting: their photos go to the job they're on site at). */}
+        <div className="flex items-center justify-between gap-2">
           <button
-            onClick={() => setSearchActive(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
-            aria-label="Search customers"
-            data-testid="button-open-search"
+            onClick={() => setMediaFilterOpen(true)}
+            className="relative flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+            aria-label="Filter media"
+            data-testid="media-filter-open"
           >
-            <Search className="h-4 w-4" />
+            <ListFilter className="h-4 w-4" />
+            Filters
+            {mediaKind !== "all" && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
           </button>
+          {!isTechRole && (
+            <button
+              onClick={() => setSearchActive(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+              aria-label="Search customers"
+              data-testid="button-open-search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        )}
-
-        {/* Empty state — says exactly what lives here even when nothing does */}
-        {todayJobs.length === 0 && recentPhotos.length === 0 && !activeCustomer && !techBlocked && (
-          <div className="rounded-[4px] border border-dashed border-slate-300 bg-white px-6 py-10 text-center" data-testid="media-empty-state">
-            <img src={platePhotos} alt="" className="mx-auto mb-3 h-12 w-12 select-none" draggable={false} />
-            <p className="text-sm font-medium text-slate-600">No media yet</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-400">
-              Job photos and videos land here as the crew shoots them — today&rsquo;s jobs with their photo coverage,
-              recent uploads across the company, and every customer&rsquo;s gallery.
-              {isTechRole
-                ? " Go On Site at your job, then add shots with the “+”."
-                : " Search a customer to open their gallery, or use the “+” to add media."}
-            </p>
-          </div>
-        )}
 
         {/* Missing-photos nudge: finished jobs with zero shots on record */}
         {missingPhotoJobs.length > 0 && (
@@ -504,10 +507,23 @@ export default function MobilePhotos() {
           </div>
         )}
 
-        {/* Today's jobs — photo coverage per job; tap to target that customer */}
-        {todayJobs.length > 0 && (
+        {/* Today's jobs — photo coverage per job; tap to target that customer.
+            The section never disappears: an empty card explains itself. */}
+        {!techBlocked && (
           <div data-testid="today-photo-jobs">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
+            {todayJobs.length === 0 ? (
+              <div className="rounded-[4px] border border-dashed border-slate-300 bg-white px-6 py-8 text-center" data-testid="today-photo-jobs-empty">
+                <img src={platePhotos} alt="" className="mx-auto mb-2.5 h-10 w-10 select-none" draggable={false} />
+                <p className="text-sm font-medium text-slate-600">No jobs on the board today</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  Each of today&rsquo;s jobs shows here with its photo coverage — how many shots it needs and how many it has.
+                  {isTechRole
+                    ? " Go On Site at your job, then add media with the “+”."
+                    : " Search a customer to open their gallery, or use the “+” to add media."}
+                </p>
+              </div>
+            ) : (
             <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
               {todayJobs.map((job, ji) => {
                 const needsMore = job.requiredPhotos > 0 && job.photosToday < job.requiredPhotos;
@@ -548,6 +564,7 @@ export default function MobilePhotos() {
                 );
               })}
             </div>
+            )}
           </div>
         )}
 
@@ -653,11 +670,11 @@ export default function MobilePhotos() {
         )}
 
         {/* Recent photos across the company — tap to open who it's linked to */}
-        {recentPhotos.length > 0 && (
+        {recentPhotos.filter(kindMatch).length > 0 && (
           <div className="pt-1" data-testid="recent-photos">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
             <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4 scrollbar-hide">
-              {recentPhotos.map((rp) => (
+              {recentPhotos.filter(kindMatch).map((rp) => (
                 <button
                   key={rp.id}
                   onClick={() => rp.customerId && navigate(`/mobile/customers/${rp.customerId}`)}
@@ -702,14 +719,14 @@ export default function MobilePhotos() {
               <Skeleton className="aspect-square rounded-lg" />
               <Skeleton className="aspect-square rounded-lg" />
             </div>
-          ) : photos.length === 0 ? (
+          ) : shownPhotos.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
               <ImageIcon className="h-10 w-10" />
               <p className="text-sm text-slate-400">No photos or videos yet for {activeCustomer?.name || "this customer"}.</p>
             </div>
           ) : (
             <div className="photo-grid-noselect grid grid-cols-3 gap-2" data-testid="photo-grid">
-              {photos.map((p) => (
+              {shownPhotos.map((p) => (
                 <div key={p.id} className="relative overflow-hidden rounded-lg">
                   <button
                     onClick={() => {
@@ -762,6 +779,30 @@ export default function MobilePhotos() {
           )
         )}
       </div>
+
+      {/* Media filters — kind, in a bottom sheet */}
+      <DraggableSheet open={mediaFilterOpen} onOpenChange={setMediaFilterOpen} title="Filter media" testid="sheet-media-filter">
+        <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
+        <div className="mt-4 space-y-4 pb-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Kind</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([["all", "All"], ["photos", "Photos"], ["videos", "Videos"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setMediaKind(key)}
+                  className={`rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    mediaKind === key ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                  data-testid={`media-filter-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DraggableSheet>
 
       {/* Notion-style full-screen search: results fill from the top while the
           input is docked at the bottom, riding above the iOS keyboard via

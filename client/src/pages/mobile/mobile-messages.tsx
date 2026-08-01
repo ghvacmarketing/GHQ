@@ -28,6 +28,8 @@ interface ConversationWithCustomer extends CrmMessagingConversation {
   /** Live CRM record joined (or phone-matched) server-side — its name wins
    *  over whatever snapshot customerName holds. */
   customer?: { id: string; name: string; phone: string | null } | null;
+  lastMessagePreview?: string | null;
+  lastMessageDirection?: string | null;
 }
 
 interface ConversationDetailResponse {
@@ -126,6 +128,56 @@ export default function MobileMessages() {
       setSearchClosing(false);
       setSearchQuery("");
     }, 190);
+  };
+
+  // ── iOS-style tracked swipe-back for the open thread: the panel follows
+  // the finger and slides off on commit — same feel as leaving a job. ──
+  const threadRef = useRef<HTMLDivElement | null>(null);
+  const threadDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const closeThreadAnimated = (fromDx = 0) => {
+    const el = threadRef.current;
+    if (!el) return setSelectedConversationId(null);
+    const w = el.clientWidth || window.innerWidth;
+    const startP = Math.max(0, Math.min(1, fromDx / w));
+    const dur = 200 * (1 - startP) + 40;
+    el.style.animation = "none";
+    el.style.transition = `transform ${dur}ms ease-in`;
+    el.style.transform = "translateX(100%)";
+    setTimeout(() => setSelectedConversationId(null), dur - 10);
+  };
+  const onThreadSwipeStart = (e: React.PointerEvent) => {
+    if (e.clientX > 48) { threadDrag.current = null; return; }
+    threadDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    threadRef.current?.setPointerCapture?.(e.pointerId);
+  };
+  const onThreadSwipeMove = (e: React.PointerEvent) => {
+    const st = threadDrag.current;
+    const el = threadRef.current;
+    if (!st?.active || !el) return;
+    const dx = e.clientX - st.x;
+    const dy = Math.abs(e.clientY - st.y);
+    if (!st.engaged) {
+      if (dx > 8 && dx > dy) {
+        st.engaged = true;
+        el.style.transition = "none";
+        el.style.animation = "none";
+      } else if (dy > 14) { st.active = false; return; }
+    }
+    if (st.engaged) el.style.transform = `translateX(${Math.max(0, dx)}px)`;
+  };
+  const onThreadSwipeEnd = (e: React.PointerEvent) => {
+    const st = threadDrag.current;
+    threadDrag.current = null;
+    const el = threadRef.current;
+    if (!st?.engaged || !el) return;
+    const dx = e.clientX - st.x;
+    if (dx > Math.min(140, window.innerWidth * 0.33)) {
+      closeThreadAnimated(Math.max(0, dx));
+    } else {
+      el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateX(0)";
+      setTimeout(() => { if (el) el.style.transition = ""; }, 290);
+    }
   };
 
   const { data: conversations, isLoading: loadingConversations } = useQuery<ConversationWithCustomer[]>({
@@ -241,13 +293,13 @@ export default function MobileMessages() {
   }, [messages.length, selectedConversationId]);
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+  // Unknown numbers title as "Unknown" — the number itself sits below.
   const displayName =
     conversationDetail?.customer?.name ||
     selectedConversation?.customer?.name ||
     conversationDetail?.conversation?.customerName ||
     selectedConversation?.customerName ||
-    selectedConversation?.phoneNumber ||
-    "Unknown Contact";
+    "Unknown";
   const displayPhone =
     conversationDetail?.customer?.phone ||
     conversationDetail?.conversation?.phoneNumber ||
@@ -297,10 +349,10 @@ export default function MobileMessages() {
           )}
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-sm text-slate-500">
-            {conversation.customer?.name || conversation.customerName
-              ? conversation.phoneNumber || conversation.customerPhone || "No phone"
-              : "Not in the CRM yet"}
+          <p className={`truncate text-sm ${conversation.unreadInboundCount ? "font-medium text-slate-700" : "text-slate-500"}`}>
+            {conversation.lastMessagePreview
+              ? `${conversation.lastMessageDirection === "outbound" ? "You: " : ""}${conversation.lastMessagePreview}`
+              : "No messages yet"}
           </p>
           {!!conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
             <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" aria-label="Unread" />
@@ -429,33 +481,25 @@ export default function MobileMessages() {
         </div>
       )}
 
-      {/* ── Open thread — fullscreen chat panel (WhatsApp style). Edge
-          swipe-back closes it like a pushed panel. ── */}
+      {/* ── Open thread — fullscreen chat panel (WhatsApp style). The panel
+          tracks an edge swipe and slides off, exactly like leaving a job. ── */}
       {selectedConversationId && (
         <div
-          className="fixed inset-0 z-[60] flex flex-col bg-[#efeae2] animate-in slide-in-from-right duration-200"
+          ref={threadRef}
+          className="fixed inset-0 z-[60] flex flex-col bg-[#efeae2] shadow-[-14px_0_32px_rgba(0,0,0,0.12)] animate-in slide-in-from-right duration-200"
+          style={{ touchAction: "pan-y" }}
           data-testid="mobile-conversation-detail"
-          onTouchStart={(e) => {
-            const t = e.touches[0];
-            if (t.clientX < 28) (e.currentTarget as any)._swipe = { x: t.clientX, y: t.clientY };
-          }}
-          onTouchMove={(e) => {
-            const st = (e.currentTarget as any)._swipe;
-            if (!st) return;
-            const t = e.touches[0];
-            if (t.clientX - st.x > 70 && Math.abs(t.clientY - st.y) < 60) {
-              (e.currentTarget as any)._swipe = null;
-              setSelectedConversationId(null);
-            }
-          }}
-          onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
+          onPointerDown={onThreadSwipeStart}
+          onPointerMove={onThreadSwipeMove}
+          onPointerUp={onThreadSwipeEnd}
+          onPointerCancel={onThreadSwipeEnd}
         >
           <div
             className="flex items-center gap-2 border-b border-black/5 bg-white px-2 py-2 shadow-sm"
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}
           >
             <button
-              onClick={() => setSelectedConversationId(null)}
+              onClick={() => closeThreadAnimated()}
               className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
               data-testid="button-back-to-list"
             >
@@ -638,7 +682,7 @@ export default function MobileMessages() {
 
       {/* ── New conversation — bottom sheet picker ── */}
       <DraggableSheet
-        tall
+        full
         open={showNewConversation}
         onOpenChange={(o) => { if (!startConversationMutation.isPending) setShowNewConversation(o); }}
         title="New message"

@@ -7835,6 +7835,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerType,
         customerStatus,
         hasAgreement,
+        createdFrom,
+        createdTo,
         page = "1",
         limit = "25",
       } = req.query as Record<string, string | undefined>;
@@ -7880,6 +7882,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(
           sql`EXISTS (SELECT 1 FROM crm_agreements WHERE crm_agreements.customer_id = ${crmCustomers.id})`
         );
+      }
+
+      // Date-added range (yyyy-MM-dd, inclusive)
+      if (createdFrom && /^\d{4}-\d{2}-\d{2}$/.test(createdFrom)) {
+        conditions.push(sql`${crmCustomers.createdAt} >= ${new Date(`${createdFrom}T00:00:00`)}`);
+      }
+      if (createdTo && /^\d{4}-\d{2}-\d{2}$/.test(createdTo)) {
+        conditions.push(sql`${crmCustomers.createdAt} <= ${new Date(`${createdTo}T23:59:59`)}`);
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

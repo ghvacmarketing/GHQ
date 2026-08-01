@@ -183,6 +183,55 @@ export default function MobileMail() {
     }, 190);
   };
 
+  // iOS-style tracked swipe-back for the open thread (same feel as jobs)
+  const threadRef = useRef<HTMLDivElement | null>(null);
+  const threadDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const closeThreadAnimated = (fromDx = 0) => {
+    const el = threadRef.current;
+    if (!el) return setOpenThreadId(null);
+    const w = el.clientWidth || window.innerWidth;
+    const startP = Math.max(0, Math.min(1, fromDx / w));
+    const dur = 200 * (1 - startP) + 40;
+    el.style.animation = "none";
+    el.style.transition = `transform ${dur}ms ease-in`;
+    el.style.transform = "translateX(100%)";
+    setTimeout(() => setOpenThreadId(null), dur - 10);
+  };
+  const onThreadSwipeStart = (e: React.PointerEvent) => {
+    if (e.clientX > 48) { threadDrag.current = null; return; }
+    threadDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    threadRef.current?.setPointerCapture?.(e.pointerId);
+  };
+  const onThreadSwipeMove = (e: React.PointerEvent) => {
+    const st = threadDrag.current;
+    const el = threadRef.current;
+    if (!st?.active || !el) return;
+    const dx = e.clientX - st.x;
+    const dy = Math.abs(e.clientY - st.y);
+    if (!st.engaged) {
+      if (dx > 8 && dx > dy) {
+        st.engaged = true;
+        el.style.transition = "none";
+        el.style.animation = "none";
+      } else if (dy > 14) { st.active = false; return; }
+    }
+    if (st.engaged) el.style.transform = `translateX(${Math.max(0, dx)}px)`;
+  };
+  const onThreadSwipeEnd = (e: React.PointerEvent) => {
+    const st = threadDrag.current;
+    threadDrag.current = null;
+    const el = threadRef.current;
+    if (!st?.engaged || !el) return;
+    const dx = e.clientX - st.x;
+    if (dx > Math.min(140, window.innerWidth * 0.33)) {
+      closeThreadAnimated(Math.max(0, dx));
+    } else {
+      el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateX(0)";
+      setTimeout(() => { if (el) el.style.transition = ""; }, 290);
+    }
+  };
+
   const openThread = inbox?.threads?.find((t) => t.id === openThreadId) || threadDetail?.thread;
   const replyTo = (() => {
     const lastInbound = [...(threadDetail?.messages || [])].reverse().find((m) => m.direction === "inbound");
@@ -378,31 +427,23 @@ export default function MobileMail() {
         </div>
       )}
 
-      {/* ── Thread reader — edge swipe-back closes it like a pushed panel ── */}
+      {/* ── Thread reader — the panel tracks an edge swipe and slides off ── */}
       {openThreadId && (
         <div
-          className="fixed inset-0 z-[60] flex flex-col bg-slate-50 animate-in slide-in-from-right duration-200"
+          ref={threadRef}
+          className="fixed inset-0 z-[60] flex flex-col bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)] animate-in slide-in-from-right duration-200"
+          style={{ touchAction: "pan-y" }}
           data-testid="mail-thread-view"
-          onTouchStart={(e) => {
-            const t = e.touches[0];
-            if (t.clientX < 28) (e.currentTarget as any)._swipe = { x: t.clientX, y: t.clientY };
-          }}
-          onTouchMove={(e) => {
-            const st = (e.currentTarget as any)._swipe;
-            if (!st) return;
-            const t = e.touches[0];
-            if (t.clientX - st.x > 70 && Math.abs(t.clientY - st.y) < 60) {
-              (e.currentTarget as any)._swipe = null;
-              setOpenThreadId(null);
-            }
-          }}
-          onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
+          onPointerDown={onThreadSwipeStart}
+          onPointerMove={onThreadSwipeMove}
+          onPointerUp={onThreadSwipeEnd}
+          onPointerCancel={onThreadSwipeEnd}
         >
           <div
             className="flex items-center gap-2 border-b bg-white px-2 py-2"
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}
           >
-            <button onClick={() => setOpenThreadId(null)} className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100" data-testid="mail-thread-back">
+            <button onClick={() => closeThreadAnimated()} className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100" data-testid="mail-thread-back">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="min-w-0 flex-1">
@@ -545,7 +586,7 @@ export default function MobileMail() {
 
       {/* ── Compose — bottom sheet ── */}
       <DraggableSheet
-        tall
+        full
         open={composeOpen}
         onOpenChange={(o) => { if (!sendMutation.isPending) setComposeOpen(o); }}
         title="New email"

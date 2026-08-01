@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Clock, Square, Loader2, Briefcase, Plus,
   Car, Warehouse, GraduationCap, Users, Coffee, MoreHorizontal, Wrench,
-  SlidersHorizontal,
+  ListFilter,
 } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
@@ -178,33 +178,20 @@ export default function MobileTime() {
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-time">
-        {/* Clock | Timesheet switcher — full width, filter inline right */}
-        <div className="flex items-center gap-2">
-          <div className="flex flex-1 items-center gap-1 rounded-lg bg-slate-200/70 p-1">
-            {(["clock", "timesheet"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium capitalize transition-all ${
-                  view === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
-                }`}
-                data-testid={`time-view-${v}`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          {view === "timesheet" && (
+        {/* Clock | Timesheet switcher — full width */}
+        <div className="flex w-full items-center gap-1 rounded-lg bg-slate-200/70 p-1">
+          {(["clock", "timesheet"] as const).map((v) => (
             <button
-              onClick={() => setFilterOpen(true)}
-              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
-              aria-label="Filter timesheet"
-              data-testid="timesheet-filter-open"
+              key={v}
+              onClick={() => setView(v)}
+              className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium capitalize transition-all ${
+                view === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
+              }`}
+              data-testid={`time-view-${v}`}
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              {filtersActive && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+              {v}
             </button>
-          )}
+          ))}
         </div>
 
         {view === "clock" ? (
@@ -233,11 +220,6 @@ export default function MobileTime() {
                       <p className="text-4xl font-bold tabular-nums text-slate-900" data-testid="elapsed-time">
                         {getElapsedTime()}
                       </p>
-                      {isClockedIn && currentEntry?.entry && (
-                        <p className="text-sm text-slate-500">
-                          Started: {format(new Date(currentEntry.entry.clockInAt), "h:mm a")}
-                        </p>
-                      )}
                       <p className="text-sm text-slate-500" data-testid="total-today">
                         Total today: <span className="font-semibold text-slate-700">{formatDuration(todayTotal?.totalMinutes ?? 0)}</span>
                       </p>
@@ -269,12 +251,18 @@ export default function MobileTime() {
                     return (
                       <button
                         key={c.key}
-                        onClick={() => clockInMutation.mutate(c.key)}
-                        disabled={isLoading || isClockedIn}
-                        className={`flex flex-col items-center gap-2 rounded-[4px] border px-2 py-4 transition-all active:scale-[0.97] ${
-                          active
-                            ? "border-[#711419] bg-[#711419]/[0.06] opacity-100"
-                            : "border-slate-300/70 bg-white disabled:opacity-40"
+                        onClick={() => {
+                          if (isLoading) return;
+                          if (isClockedIn) {
+                            if (!active) {
+                              toast({ title: "You're already clocked in", description: `Clock out of ${categoryMeta(currentEntry?.entry?.category).label.toLowerCase()} before starting something else.` });
+                            }
+                            return;
+                          }
+                          clockInMutation.mutate(c.key);
+                        }}
+                        className={`flex flex-col items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-2 py-4 transition-all active:scale-[0.97] ${
+                          isClockedIn && !active ? "opacity-40" : ""
                         }`}
                         data-testid={`clock-in-${c.key}`}
                       >
@@ -285,7 +273,7 @@ export default function MobileTime() {
                         ) : (
                           <img src={c.img} alt="" className="h-11 w-11 select-none" draggable={false} />
                         )}
-                        <span className={`text-sm font-semibold ${active ? "text-[#711419]" : "text-slate-800"}`}>{c.label}</span>
+                        <span className="text-sm font-semibold text-slate-800">{c.label}</span>
                       </button>
                     );
                   })}
@@ -297,12 +285,18 @@ export default function MobileTime() {
                     return (
                       <button
                         key={c.key}
-                        onClick={() => clockInMutation.mutate(c.key)}
-                        disabled={isLoading || isClockedIn}
-                        className={`flex flex-col items-center gap-1.5 rounded-[4px] border px-1 py-3 transition-all active:scale-[0.97] ${
-                          active
-                            ? "border-[#711419] bg-[#711419]/[0.06] opacity-100"
-                            : "border-slate-300/70 bg-white disabled:opacity-40"
+                        onClick={() => {
+                          if (isLoading) return;
+                          if (isClockedIn) {
+                            if (!active) {
+                              toast({ title: "You're already clocked in", description: `Clock out of ${categoryMeta(currentEntry?.entry?.category).label.toLowerCase()} before starting something else.` });
+                            }
+                            return;
+                          }
+                          clockInMutation.mutate(c.key);
+                        }}
+                        className={`flex flex-col items-center gap-1.5 rounded-[4px] border border-slate-300/70 bg-white px-1 py-3 transition-all active:scale-[0.97] ${
+                          isClockedIn && !active ? "opacity-40" : ""
                         }`}
                         data-testid={`clock-in-${c.key}`}
                       >
@@ -313,7 +307,7 @@ export default function MobileTime() {
                         ) : (
                           <img src={c.img} alt="" className="h-9 w-9 select-none" draggable={false} />
                         )}
-                        <span className={`text-[11px] font-medium ${active ? "text-[#711419]" : "text-slate-600"}`}>{c.label}</span>
+                        <span className="text-[11px] font-medium text-slate-600">{c.label}</span>
                       </button>
                     );
                   })}
@@ -343,7 +337,14 @@ export default function MobileTime() {
             )}
           </>
         ) : (
-          <TimesheetView preset={tsPreset} customFrom={tsFrom} customTo={tsTo} catFilter={tsCat} />
+          <TimesheetView
+            preset={tsPreset}
+            customFrom={tsFrom}
+            customTo={tsTo}
+            catFilter={tsCat}
+            filtersActive={filtersActive}
+            onOpenFilters={() => setFilterOpen(true)}
+          />
         )}
       </div>
 
@@ -552,12 +553,14 @@ function TimeEntryRow({ entry }: { entry: EntryWithCategory }) {
 /** The timesheet: pick a range, see every entry with its label, grouped by
  *  day with per-day and per-category totals. */
 function TimesheetView({
-  preset, customFrom, customTo, catFilter,
+  preset, customFrom, customTo, catFilter, filtersActive, onOpenFilters,
 }: {
   preset: "this-week" | "last-week" | "this-month" | "custom";
   customFrom: string;
   customTo: string;
   catFilter: string;
+  filtersActive: boolean;
+  onOpenFilters: () => void;
 }) {
   const today = new Date();
 
@@ -619,11 +622,23 @@ function TimesheetView({
 
   return (
     <div className="space-y-4" data-testid="timesheet-view">
-      {/* Active filters read-back — the controls live in the filter sheet */}
-      <p className="text-xs text-slate-500">
-        {{ "this-week": "This week", "last-week": "Last week", "this-month": "This month", custom: `${customFrom} → ${customTo}` }[preset]}
-        {catFilter !== "all" && ` · ${categoryMeta(catFilter).label} only`}
-      </p>
+      {/* Filters pill left, read-back caption right — same as job history */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={onOpenFilters}
+          className="relative flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+          aria-label="Filter timesheet"
+          data-testid="timesheet-filter-open"
+        >
+          <ListFilter className="h-4 w-4" />
+          Filters
+          {filtersActive && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+        </button>
+        <p className="text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {{ "this-week": "This week", "last-week": "Last week", "this-month": "This month", custom: `${customFrom} → ${customTo}` }[preset]}
+          {catFilter !== "all" && ` · ${categoryMeta(catFilter).label}`}
+        </p>
+      </div>
 
       {/* Totals */}
       <div className="rounded-[4px] border border-slate-300/70 bg-white p-4" data-testid="timesheet-totals">
