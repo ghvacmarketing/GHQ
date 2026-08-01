@@ -17,6 +17,8 @@ import {
   ArrowLeft, Loader2, Mail, MailOpen, Mic, Monitor, PenSquare, Plus, Search, Send, X,
 } from "lucide-react";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
+import mailUnreadBadge from "@/assets/mail-unread.png";
+import mailReadBadge from "@/assets/mail-read.png";
 
 /** Mobile Mail — the CRM's Gmail inbox on the phone. Threads list + reader +
  *  reply/compose, riding the same per-user Gmail connection as desktop
@@ -275,9 +277,12 @@ export default function MobileMail() {
       className="flex w-full items-start gap-3 px-4 py-3 text-left active:bg-slate-50"
       data-testid={`mail-thread-${t.id}`}
     >
-      <span className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${t.isUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
-        {t.isUnread ? <Mail style={{ height: 18, width: 18 }} /> : <MailOpen style={{ height: 18, width: 18 }} />}
-      </span>
+      <img
+        src={t.isUnread ? mailUnreadBadge : mailReadBadge}
+        alt={t.isUnread ? "Unread" : "Read"}
+        className="mt-1 h-10 w-10 shrink-0 select-none"
+        draggable={false}
+      />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
           <span className={`truncate text-[15px] ${t.isUnread ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
@@ -348,7 +353,7 @@ export default function MobileMail() {
             </div>
           ) : (
             <div className="py-12 text-center text-slate-500">
-              <Mail className="mx-auto mb-3 h-16 w-16 text-slate-300" />
+              <img src={mailReadBadge} alt="" className="mx-auto mb-3 h-16 w-16 select-none opacity-90" draggable={false} />
               <p className="text-lg font-medium">Inbox zero</p>
               <p className="text-sm">Nothing in your inbox right now.</p>
             </div>

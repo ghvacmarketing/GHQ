@@ -11,8 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import badgeContactKnown from "@/assets/badge-contact-known.png";
-import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
   Dialog,
   DialogContent,
@@ -653,12 +651,14 @@ export default function CrmMessaging() {
                     data-testid={`conversation-item-${conv.id}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <img
-                        src={(conv.customerId || conv.customer?.id) ? badgeContactKnown : badgeContactUnknown}
-                        alt={(conv.customerId || conv.customer?.id) ? "CRM customer" : "Unknown number"}
-                        className="h-9 w-9 shrink-0 select-none"
-                        draggable={false}
-                      />
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold leading-none",
+                          hasUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
+                        )}
+                      >
+                        {/[a-zA-Z]/.test(name) ? getInitials(name) : (name.replace(/\D/g, "").slice(0, 2) || "#")}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span
