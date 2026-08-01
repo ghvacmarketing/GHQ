@@ -106,6 +106,10 @@ export function MobileCreatePage({
   // scrolling can't be mistaken for a pull-down.
   const drag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
   const onSheetPointerDown = (e: React.PointerEvent) => {
+    // Sheets opened from inside this page (pickers, filters) portal outside
+    // this DOM but still bubble through the React tree — ignore them, or a
+    // drag on the child sheet would drag this page too.
+    if (!rootRef.current?.contains(e.target as Node)) { drag.current = null; return; }
     const wrap = scrollRef.current;
     const inScroll = !!wrap && wrap.contains(e.target as Node);
     drag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroll || wrap!.scrollTop <= 0 };

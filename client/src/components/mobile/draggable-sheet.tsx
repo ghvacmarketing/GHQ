@@ -51,6 +51,10 @@ export function DraggableSheet({
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // Portaled children (option sheets opened from inside this one) bubble
+    // through the REACT tree even though they live outside this sheet's DOM —
+    // a drag there must never move this sheet.
+    if (!sheetRef.current?.contains(e.target as Node)) { drag.current = null; return; }
     const wrap = scrollWrapRef.current;
     const inScroll = !!wrap && wrap.contains(e.target as Node);
     // Inside scrolled-down content the gesture belongs to the scroller.
