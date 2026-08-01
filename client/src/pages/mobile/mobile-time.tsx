@@ -23,16 +23,25 @@ import {
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmTimeEntry } from "@shared/schema";
+import badgeJob from "@/assets/badge-time-job.png";
+import badgeDrive from "@/assets/badge-time-drive.png";
+import badgeShop from "@/assets/badge-time-shop.png";
+import badgeTraining from "@/assets/badge-time-training.png";
+import badgeMeeting from "@/assets/badge-time-meeting.png";
+import badgeBreak from "@/assets/badge-time-break.png";
+import badgeOther from "@/assets/badge-other.png";
 
-/** What a block of time was for — mirrors the server whitelist. */
-const TIME_CATEGORIES: { key: string; label: string; icon: typeof Clock }[] = [
-  { key: "job", label: "Job site", icon: Wrench },
-  { key: "drive", label: "Drive", icon: Car },
-  { key: "shop", label: "Shop", icon: Warehouse },
-  { key: "training", label: "Training", icon: GraduationCap },
-  { key: "meeting", label: "Meeting", icon: Users },
-  { key: "break", label: "Break", icon: Coffee },
-  { key: "other", label: "Other", icon: MoreHorizontal },
+/** What a block of time was for — mirrors the server whitelist. The metallic
+ *  badge (`img`) carries the big touch targets; the lucide icon stays for
+ *  tiny chip contexts where a photo badge would turn to mud. */
+const TIME_CATEGORIES: { key: string; label: string; icon: typeof Clock; img: string }[] = [
+  { key: "job", label: "Job site", icon: Wrench, img: badgeJob },
+  { key: "drive", label: "Drive", icon: Car, img: badgeDrive },
+  { key: "shop", label: "Shop", icon: Warehouse, img: badgeShop },
+  { key: "training", label: "Training", icon: GraduationCap, img: badgeTraining },
+  { key: "meeting", label: "Meeting", icon: Users, img: badgeMeeting },
+  { key: "break", label: "Break", icon: Coffee, img: badgeBreak },
+  { key: "other", label: "Other", icon: MoreHorizontal, img: badgeOther },
 ];
 const categoryMeta = (key: string | null | undefined) =>
   TIME_CATEGORIES.find((c) => c.key === (key || "job")) || TIME_CATEGORIES[0];
@@ -229,7 +238,6 @@ export default function MobileTime() {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Clock in to</h3>
                 <div className="grid grid-cols-3 gap-2">
                   {TIME_CATEGORIES.slice(0, 3).map((c) => {
-                    const Icon = c.icon;
                     const starting = clockInMutation.isPending && clockInMutation.variables === c.key;
                     return (
                       <button
@@ -239,9 +247,13 @@ export default function MobileTime() {
                         className="flex flex-col items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-2 py-4 transition-all active:scale-[0.97] disabled:opacity-60"
                         data-testid={`clock-in-${c.key}`}
                       >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
-                          {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon className="h-5 w-5" />}
-                        </span>
+                        {starting ? (
+                          <span className="flex h-11 w-11 items-center justify-center text-[#711419]">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          </span>
+                        ) : (
+                          <img src={c.img} alt="" className="h-11 w-11 select-none" draggable={false} />
+                        )}
                         <span className="text-sm font-semibold text-slate-800">{c.label}</span>
                       </button>
                     );
@@ -249,7 +261,6 @@ export default function MobileTime() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {TIME_CATEGORIES.slice(3).map((c) => {
-                    const Icon = c.icon;
                     const starting = clockInMutation.isPending && clockInMutation.variables === c.key;
                     return (
                       <button
@@ -259,9 +270,13 @@ export default function MobileTime() {
                         className="flex flex-col items-center gap-1.5 rounded-[4px] border border-slate-300/70 bg-white px-1 py-3 transition-all active:scale-[0.97] disabled:opacity-60"
                         data-testid={`clock-in-${c.key}`}
                       >
-                        <span className="flex h-8 w-8 items-center justify-center rounded-[3px] border border-slate-300/70 bg-slate-100 text-slate-600">
-                          {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-                        </span>
+                        {starting ? (
+                          <span className="flex h-9 w-9 items-center justify-center text-slate-600">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </span>
+                        ) : (
+                          <img src={c.img} alt="" className="h-9 w-9 select-none" draggable={false} />
+                        )}
                         <span className="text-[11px] font-medium text-slate-600">{c.label}</span>
                       </button>
                     );
@@ -338,20 +353,19 @@ export default function MobileTime() {
               <Label className="mb-1.5 block">What was it for?</Label>
               <div className="flex flex-wrap gap-1.5">
                 {TIME_CATEGORIES.map((c) => {
-                  const Icon = c.icon;
                   const active = mCategory === c.key;
                   return (
                     <button
                       key={c.key}
                       onClick={() => setMCategory(c.key)}
-                      className={`flex items-center gap-1.5 rounded-[3px] border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      className={`flex items-center gap-1.5 rounded-[3px] border px-2 py-1 text-xs font-medium transition-colors ${
                         active
                           ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
                           : "border-slate-200 bg-white text-slate-600"
                       }`}
                       data-testid={`manual-category-${c.key}`}
                     >
-                      <Icon className="h-3.5 w-3.5" />
+                      <img src={c.img} alt="" className="h-5 w-5 select-none" draggable={false} />
                       {c.label}
                     </button>
                   );

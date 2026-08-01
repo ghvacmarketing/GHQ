@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import badgeMessaging from "@/assets/badge-messaging.png";
 import {
   MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, RefreshCw, Phone,
 } from "lucide-react";
@@ -266,7 +267,7 @@ export default function MobileMessages() {
             </div>
           ) : (
             <div className="py-12 text-center text-slate-500">
-              <MessageSquare className="mx-auto mb-3 h-16 w-16 text-slate-300" />
+              <img src={badgeMessaging} alt="" className="mx-auto mb-3 h-16 w-16 select-none opacity-90" draggable={false} />
               <p className="mb-1 text-lg font-medium">No conversations yet</p>
               <p className="text-sm">Use the menu to start a new message</p>
             </div>
@@ -352,7 +353,7 @@ export default function MobileMessages() {
               </div>
             ) : (
               <div className="py-8 text-center text-slate-500">
-                <MessageSquare className="mx-auto mb-2 h-12 w-12 text-slate-400/60" />
+                <img src={badgeMessaging} alt="" className="mx-auto mb-2 h-12 w-12 select-none opacity-80" draggable={false} />
                 <p>No messages yet — say hello.</p>
               </div>
             )}
