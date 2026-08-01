@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import badgeMessaging from "@/assets/badge-messaging.png";
 import badgeContactKnown from "@/assets/badge-contact-known.png";
 import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
-  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, Phone,
+  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, Phone, Mic,
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -13,6 +12,7 @@ import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
 import { Input } from "@/components/ui/input";
 import { isNativeApp, useKeyboardInset } from "@/lib/native";
 import { compressImage } from "@/lib/compress-image";
+import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +70,19 @@ export default function MobileMessages() {
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   // Composer rides the keyboard with the same eased inset as Gibbs
   const kbInset = useKeyboardInset();
+
+  // Voice dictation — same engine as Gibbs (Whisper on iOS)
+  const dictationBase = useRef("");
+  const voice = useVoiceDictation({
+    onTranscript: (t) => setMessageText((dictationBase.current ? dictationBase.current + " " : "") + t),
+    onFinal: (t) => { if (t) setMessageText((dictationBase.current ? dictationBase.current + " " : "") + t); },
+    onError: (m) => toast({ title: m, variant: "destructive" }),
+  });
+  const toggleMic = () => {
+    if (voice.listening) { voice.stop(); return; }
+    dictationBase.current = messageText.trim();
+    voice.start();
+  };
 
   // Floating-search overlay: bar docked at the bottom rides the keyboard
   // with easing (same pattern as Jobs/Photos/Customers).
@@ -372,8 +385,12 @@ export default function MobileMessages() {
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
             {conversations && conversations.length > 0 ? (
-              <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
-                {conversations.map((conversation) => renderConversation(conversation, true))}
+              <div className="space-y-2 pb-2">
+                {conversations.map((conversation) => (
+                  <div key={conversation.id} className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                    {renderConversation(conversation, true)}
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="pb-6 text-center text-sm text-slate-400">
@@ -444,12 +461,6 @@ export default function MobileMessages() {
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <img
-              src={(conversationDetail?.conversation?.customerId || selectedConversation?.customerId || selectedConversation?.customer) ? badgeContactKnown : badgeContactUnknown}
-              alt=""
-              className="h-10 w-10 shrink-0 select-none"
-              draggable={false}
-            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-semibold leading-tight text-slate-900">{displayName}</p>
               {displayPhone && <p className="truncate text-xs text-slate-500">{displayPhone}</p>}
@@ -468,8 +479,17 @@ export default function MobileMessages() {
 
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
             {loadingDetail && messages.length === 0 ? (
-              <div className="flex justify-center py-8">
-                <MobileSpinner fullHeight={false} />
+              /* Bubble-shaped skeletons — the thread settles in place */
+              <div className="space-y-2 py-2">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`animate-pulse rounded-2xl ${
+                        i % 2 ? "h-10 w-44 rounded-br-[4px] bg-[#711419]/15" : "h-12 w-56 rounded-bl-[4px] bg-white/80"
+                      }`}
+                    />
+                  </div>
+                ))}
               </div>
             ) : timeline.length > 0 ? (
               <div className="space-y-1.5">
@@ -529,7 +549,7 @@ export default function MobileMessages() {
             className="px-3 pt-2"
             style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(env(safe-area-inset-bottom) + 10px)" }}
           >
-            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-sm">
+            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-md">
               {pendingPhotos.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {pendingPhotos.map((p, i) => (
@@ -581,6 +601,20 @@ export default function MobileMessages() {
                 >
                   <Plus className="h-5 w-5" />
                 </button>
+                {voice.supported && (
+                  <button
+                    onClick={toggleMic}
+                    disabled={voice.processing || sendMessageMutation.isPending}
+                    className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
+                      voice.listening ? "bg-[#711419] text-white" : "text-slate-500 active:bg-slate-100"
+                    }`}
+                    aria-label={voice.listening ? "Stop dictating" : "Dictate a message"}
+                    data-testid="message-mic"
+                  >
+                    {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
+                    {voice.processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                  </button>
+                )}
                 <div className="flex-1" />
                 <button
                   onClick={handleSendMessage}

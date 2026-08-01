@@ -31,7 +31,11 @@ export function InboxSwitcher({
           data-testid={`inbox-seg-${t.key}`}
         >
           {t.label}
-          {t.count > 0 && <span className="h-2 w-2 rounded-full bg-[#711419]" aria-label={`${t.count} unread`} />}
+          {t.count > 0 && (
+            <span className="text-[11px] font-bold tabular-nums text-[#711419]" aria-label={`${t.count} unread`}>
+              {t.count > 99 ? "99+" : t.count}
+            </span>
+          )}
         </button>
       ))}
     </div>

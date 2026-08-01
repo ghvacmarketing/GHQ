@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { User, LogOut, Mail, Shield, Loader2, Monitor, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,8 +44,13 @@ export default function MobileProfile() {
       <SubPage backTo="/mobile">
       <div className="p-4 pt-16 space-y-4" data-testid="mobile-profile">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <MobileSpinner fullHeight={false} />
+          /* Mirrors the profile card: avatar circle + name + role lines */
+          <div className="rounded-[4px] border border-slate-200 bg-white pt-6 pb-6">
+            <div className="flex flex-col items-center">
+              <div className="mb-4 h-20 w-20 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-5 w-36 animate-pulse rounded bg-slate-200" />
+              <div className="mt-2 h-3.5 w-24 animate-pulse rounded bg-slate-100" />
+            </div>
           </div>
         ) : currentUser ? (
           <>

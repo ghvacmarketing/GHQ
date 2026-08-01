@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, isBefore, startOfDay } from "date-fns";
@@ -140,8 +139,17 @@ export default function MobileTasks() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <MobileSpinner fullHeight={false} />
+          /* Task-row skeletons — circle toggle + title/due lines */
+          <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className={`flex items-start gap-3 px-3.5 py-3 ${i > 1 ? "border-t border-slate-200/80" : ""}`}>
+                <div className="mt-0.5 h-6 w-6 shrink-0 animate-pulse rounded-full border-2 border-slate-200" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3.5 w-24 animate-pulse rounded bg-slate-100" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : shown.length === 0 ? (
           <div className="rounded-[4px] border border-slate-300/70 bg-white py-10 text-center">

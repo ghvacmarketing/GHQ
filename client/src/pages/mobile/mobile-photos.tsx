@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import MobileShell from "./mobile-shell";
 import { PhotoViewer } from "@/components/mobile/photo-viewer";
+import platePhotos from "@/assets/plate-photos.png";
 import type { CrmUser, CustomerFile } from "@shared/schema";
 
 export default function MobilePhotos() {
@@ -475,6 +476,21 @@ export default function MobilePhotos() {
             <Search className="h-4 w-4" />
           </button>
         </div>
+        )}
+
+        {/* Empty state — says exactly what lives here even when nothing does */}
+        {todayJobs.length === 0 && recentPhotos.length === 0 && !activeCustomer && !techBlocked && (
+          <div className="rounded-[4px] border border-dashed border-slate-300 bg-white px-6 py-10 text-center" data-testid="media-empty-state">
+            <img src={platePhotos} alt="" className="mx-auto mb-3 h-12 w-12 select-none" draggable={false} />
+            <p className="text-sm font-medium text-slate-600">No media yet</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">
+              Job photos and videos land here as the crew shoots them — today&rsquo;s jobs with their photo coverage,
+              recent uploads across the company, and every customer&rsquo;s gallery.
+              {isTechRole
+                ? " Go On Site at your job, then add shots with the “+”."
+                : " Search a customer to open their gallery, or use the “+” to add media."}
+            </p>
+          </div>
         )}
 
         {/* Missing-photos nudge: finished jobs with zero shots on record */}

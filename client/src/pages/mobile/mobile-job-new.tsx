@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { MapEmbed, DistanceFromMe } from "@/components/mobile/address-autocomplete";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
@@ -223,11 +222,8 @@ export default function MobileJobNew() {
     priority !== "normal";
 
   if (!currentUser) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <MobileSpinner fullHeight={false} />
-      </div>
-    );
+    // Blank sheet canvas — the form fades in as soon as the user loads
+    return <div className="fixed inset-0 z-[70] bg-slate-50" />;
   }
 
   return (

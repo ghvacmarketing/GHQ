@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  ArrowLeft, Loader2, Mail, MailOpen, Monitor, PenSquare, Plus, Search, Send, X,
+  ArrowLeft, Loader2, Mail, MailOpen, Mic, Monitor, PenSquare, Plus, Search, Send, X,
 } from "lucide-react";
+import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 
 /** Mobile Mail — the CRM's Gmail inbox on the phone. Threads list + reader +
  *  reply/compose, riding the same per-user Gmail connection as desktop
@@ -64,6 +65,19 @@ export default function MobileMail() {
   const [replyPhotos, setReplyPhotos] = useState<Array<{ dataBase64: string; mimeType: string; filename: string; preview: string }>>([]);
   const replyAttachRef = useRef<HTMLInputElement | null>(null);
   const kbInset = useKeyboardInset();
+
+  // Voice dictation — same engine as Gibbs (Whisper on iOS)
+  const dictationBase = useRef("");
+  const voice = useVoiceDictation({
+    onTranscript: (t) => setReplyText((dictationBase.current ? dictationBase.current + " " : "") + t),
+    onFinal: (t) => { if (t) setReplyText((dictationBase.current ? dictationBase.current + " " : "") + t); },
+    onError: (m) => toast({ title: m, variant: "destructive" }),
+  });
+  const toggleMic = () => {
+    if (voice.listening) { voice.stop(); return; }
+    dictationBase.current = replyText.trim();
+    voice.start();
+  };
   const [replyText, setReplyText] = useState("");
   const [compose, setCompose] = useState({ to: "", subject: "", body: "" });
 
@@ -320,8 +334,12 @@ export default function MobileMail() {
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
             {inbox?.threads && inbox.threads.length > 0 ? (
-              <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
-                {inbox.threads.map((t) => renderThread(t, true))}
+              <div className="space-y-2 pb-2">
+                {inbox.threads.map((t) => (
+                  <div key={t.id} className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                    {renderThread(t, true)}
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="pb-6 text-center text-sm text-slate-400">
@@ -395,8 +413,21 @@ export default function MobileMail() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3">
             {loadingThread ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              /* Message-card skeletons — the reader settles in place */
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <div key={i} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                    <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 px-3.5 py-2">
+                      <div className="h-3.5 w-28 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div className="space-y-2 px-3.5 py-3">
+                      <div className="h-3.5 w-full animate-pulse rounded bg-slate-100" />
+                      <div className="h-3.5 w-5/6 animate-pulse rounded bg-slate-100" />
+                      <div className="h-3.5 w-2/3 animate-pulse rounded bg-slate-100" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               (threadDetail?.messages || []).map((m) => (
@@ -429,10 +460,10 @@ export default function MobileMail() {
           {/* Reply composer — same box as Gibbs: textarea on top, "+" attach
               on the left below, round send on the right */}
           <div
-            className="border-t bg-white px-3 pt-2"
+            className="px-3 pt-2"
             style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(env(safe-area-inset-bottom) + 10px)" }}
           >
-            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-sm">
+            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-md">
               {replyPhotos.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {replyPhotos.map((p, i) => (
@@ -478,6 +509,20 @@ export default function MobileMail() {
                 >
                   <Plus className="h-5 w-5" />
                 </button>
+                {voice.supported && (
+                  <button
+                    onClick={toggleMic}
+                    disabled={voice.processing || sendMutation.isPending}
+                    className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
+                      voice.listening ? "bg-[#711419] text-white" : "text-slate-500 active:bg-slate-100"
+                    }`}
+                    aria-label={voice.listening ? "Stop dictating" : "Dictate a reply"}
+                    data-testid="mail-reply-mic"
+                  >
+                    {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
+                    {voice.processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                  </button>
+                )}
                 <div className="flex-1" />
                 <button
                   onClick={handleReply}
@@ -492,7 +537,7 @@ export default function MobileMail() {
           </div>
           {/* Keyboard spacer — composer glides above the keys */}
           <div
-            className="shrink-0 bg-white"
+            className="shrink-0"
             style={{ height: kbInset, transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)" }}
           />
         </div>
