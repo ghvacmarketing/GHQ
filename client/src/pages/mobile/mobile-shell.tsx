@@ -9,6 +9,10 @@ import {
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
+import plateTasks from "@/assets/plate-tasks.png";
+import platePhotos from "@/assets/plate-photos.png";
+import plateCustomers from "@/assets/plate-customers.png";
+import plateJobs from "@/assets/plate-jobs.png";
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useNativePush } from "@/lib/native";
@@ -280,12 +284,12 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       <DraggableSheet open={createOpen} onOpenChange={setCreateOpen} title="Create" testid="sheet-create">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
-            <SheetTile icon={Camera} label="Add Photo" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
+            <SheetTile icon={CheckSquare} img={plateTasks} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
+            <SheetTile icon={Camera} img={platePhotos} label="Add Photo" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
             {isSupervisor && (
               <>
-                <SheetTile icon={UserRoundPlus} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
-                <SheetTile icon={Briefcase} label="New Job" onClick={() => go("/mobile/job/new")} testid="create-new-job" />
+                <SheetTile icon={UserRoundPlus} img={plateCustomers} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
+                <SheetTile icon={Briefcase} img={plateJobs} label="New Job" onClick={() => go("/mobile/job/new")} testid="create-new-job" />
                 <SheetTile icon={FileText} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
                 <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
               </>
@@ -382,7 +386,7 @@ function SheetTile({
       data-testid={testid}
     >
       {img ? (
-        <img src={img} alt="" className="h-6 w-6 select-none" draggable={false} />
+        <img src={img} alt="" className="h-8 w-8 select-none" draggable={false} />
       ) : (
         <Icon className="h-6 w-6 text-[#711419]" />
       )}

@@ -9,6 +9,13 @@ import type { CrmUser } from "@shared/schema";
 import badgeMessaging from "@/assets/badge-messaging.png";
 import badgeTimeJob from "@/assets/badge-time-job.png";
 import badgeGibbs from "@/assets/badge-gibbs.png";
+import plateCustomers from "@/assets/plate-customers.png";
+import plateJobs from "@/assets/plate-jobs.png";
+import platePhotos from "@/assets/plate-photos.png";
+import plateTasks from "@/assets/plate-tasks.png";
+import plateAgenda from "@/assets/plate-agenda.png";
+import plateProfile from "@/assets/plate-profile.png";
+import plateDesktop from "@/assets/plate-desktop.png";
 
 /** The More page — everything you can BROWSE, grouped by category. Creation
  *  lives behind the floating "+" button; this is the directory. */
@@ -54,7 +61,7 @@ export default function MobileMore() {
     {
       title: "People & Comms",
       items: [
-        { label: "Customers", sub: "Search every customer and their history", icon: Users, onTap: (n) => n("/mobile/customers"), testid: "more-customers" },
+        { label: "Customers", sub: "Search every customer and their history", icon: Users, img: plateCustomers, onTap: (n) => n("/mobile/customers"), testid: "more-customers" },
         { label: "Inbox", sub: "Texts and email in one place", icon: MessageSquare, img: badgeMessaging, onTap: (n) => n("/mobile/messages"), testid: "more-inbox" },
         {
           label: "Ask Gibbs", sub: "AI help — lookups, drafts, and actions", icon: Sparkles, img: badgeGibbs,
@@ -65,20 +72,20 @@ export default function MobileMore() {
     {
       title: "Work",
       items: [
-        { label: "My Jobs", sub: "Today, upcoming, and history", icon: Wrench, onTap: (n) => n("/mobile/job"), testid: "more-jobs", badge: todayJobs > 0 ? `${todayJobs} today` : null },
-        { label: "Photos", sub: "Job-site shots and required photos", icon: Camera, onTap: (n) => n("/mobile/photos"), testid: "more-photos", badge: needPhotos > 0 ? `${needPhotos} need photos` : null },
-        { label: "My Tasks", sub: "Your personal to-do list from the CRM", icon: CheckSquare, onTap: (n) => n("/mobile/tasks"), testid: "more-tasks" },
+        { label: "My Jobs", sub: "Today, upcoming, and history", icon: Wrench, img: plateJobs, onTap: (n) => n("/mobile/job"), testid: "more-jobs", badge: todayJobs > 0 ? `${todayJobs} today` : null },
+        { label: "Photos", sub: "Job-site shots and required photos", icon: Camera, img: platePhotos, onTap: (n) => n("/mobile/photos"), testid: "more-photos", badge: needPhotos > 0 ? `${needPhotos} need photos` : null },
+        { label: "My Tasks", sub: "Your personal to-do list from the CRM", icon: CheckSquare, img: plateTasks, onTap: (n) => n("/mobile/tasks"), testid: "more-tasks" },
         { label: "Time & Timesheet", sub: "Clock in and review your hours", icon: Clock, img: badgeTimeJob, onTap: (n) => n("/mobile/time"), testid: "more-time" },
-        { label: "Agenda", sub: "Your day at a glance", icon: ClipboardList, onTap: (n) => n("/mobile"), testid: "more-agenda" },
+        { label: "Agenda", sub: "Your day at a glance", icon: ClipboardList, img: plateAgenda, onTap: (n) => n("/mobile"), testid: "more-agenda" },
       ],
     },
     {
       title: "Account",
       items: [
-        { label: "My Profile", sub: "Your info and settings", icon: UserRound, onTap: (n) => n("/mobile/profile"), testid: "more-profile" },
+        { label: "My Profile", sub: "Your info and settings", icon: UserRound, img: plateProfile, onTap: (n) => n("/mobile/profile"), testid: "more-profile" },
         ...(currentUser && currentUser.role !== "tech"
           ? [{
-              label: "Desktop CRM", sub: "Open the full CRM", icon: Monitor,
+              label: "Desktop CRM", sub: "Open the full CRM", icon: Monitor, img: plateDesktop,
               onTap: (n: (p: string) => void) => n("/crm"), testid: "more-desktop",
             }]
           : []),
