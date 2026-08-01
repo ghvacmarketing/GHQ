@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, ChevronRight, Users, LogIn, Loader2, Plus, CalendarClock, X } from "lucide-react";
+import { Search, ChevronRight, Users, LogIn, Plus, CalendarClock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
+import badgeCustomer from "@/assets/badge-customer.png";
 import { format } from "date-fns";
 import { isNativeApp } from "@/lib/native";
 import MobileShell from "./mobile-shell";
@@ -117,8 +118,9 @@ export default function MobileCustomers() {
     },
   });
 
-  // Search results — only while the overlay is up
-  const { data: results = [], isFetching: searching } = useQuery<CrmCustomer[]>({
+  // Search results — only while the overlay is up. Previous results stay on
+  // screen while the next query runs: no loader, no flashing.
+  const { data: results = [] } = useQuery<CrmCustomer[]>({
     queryKey: ["/api/mobile/customers", { search: debouncedSearch, limit: 20 }],
     queryFn: async () => {
       const params = new URLSearchParams({ search: debouncedSearch, limit: "20" });
@@ -127,6 +129,7 @@ export default function MobileCustomers() {
       return res.json();
     },
     enabled: searchActive && debouncedSearch.trim().length >= 2,
+    placeholderData: (prev) => prev,
   });
 
   // Who's on today's schedule — one glance before heading out
@@ -170,9 +173,7 @@ export default function MobileCustomers() {
       className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
       data-testid={`customer-card-${customer.id}`}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-[13px] font-bold text-[#711419]">
-        {(customer.name || "?").trim().charAt(0).toUpperCase()}
-      </span>
+      <img src={badgeCustomer} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <span className="truncate text-sm font-semibold text-slate-900" data-testid={`customer-name-${customer.id}`}>
@@ -304,7 +305,7 @@ export default function MobileCustomers() {
           data-testid="customers-search-overlay"
         >
           <div
-            className={`min-h-0 flex-1 overflow-y-auto px-4 ${searchQuery.trim().length < 2 || searching || results.length === 0 ? "flex flex-col justify-end" : ""}`}
+            className={`min-h-0 flex-1 overflow-y-auto px-4 ${searchQuery.trim().length < 2 || results.length === 0 ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
             {searchQuery.trim().length < 2 ? (
@@ -318,10 +319,6 @@ export default function MobileCustomers() {
               ) : (
                 <p className="pb-6 text-center text-sm text-slate-400">Type a name or phone number.</p>
               )
-            ) : searching ? (
-              <div className="flex items-center justify-center pb-6 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
             ) : results.length === 0 ? (
               <p className="pb-6 text-center text-sm text-slate-400">No customers match &ldquo;{searchQuery.trim()}&rdquo;.</p>
             ) : (

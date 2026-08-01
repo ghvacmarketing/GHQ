@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { isNativeApp, useKeyboardInset } from "@/lib/native";
 import { compressImage } from "@/lib/compress-image";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +77,8 @@ export default function MobileMail() {
       return res.json();
     },
     refetchInterval: 60 * 1000,
+    // Search typing keeps the previous list on screen — no loader flashes
+    placeholderData: (prev) => prev,
   });
 
   const { data: threadDetail, isLoading: loadingThread } = useQuery<{ thread: MailThread; messages: MailMessage[]; customer?: { name?: string } | null }>({
@@ -252,8 +254,21 @@ export default function MobileMail() {
 
         <div className="-mx-4">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <MobileSpinner fullHeight={false} />
+            /* Skeleton rows shaped exactly like threads: round icon + lines */
+            <div className="divide-y divide-slate-100">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex items-start gap-3 px-4 py-3">
+                  <div className="mt-1 h-10 w-10 shrink-0 animate-pulse rounded-full bg-slate-200" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-12 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div className="h-3.5 w-48 animate-pulse rounded bg-slate-100" />
+                    <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : inbox && !inbox.connected ? (
             <div className="px-6 py-12 text-center text-slate-500">
@@ -304,11 +319,7 @@ export default function MobileMail() {
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${!inbox?.threads || inbox.threads.length === 0 ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
-            {isLoading || isRefetching ? (
-              <div className="flex items-center justify-center pb-6 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : inbox?.threads && inbox.threads.length > 0 ? (
+            {inbox?.threads && inbox.threads.length > 0 ? (
               <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
                 {inbox.threads.map((t) => renderThread(t, true))}
               </div>
@@ -487,58 +498,54 @@ export default function MobileMail() {
         </div>
       )}
 
-      {/* ── Compose ── */}
-      {composeOpen && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-white animate-in slide-in-from-bottom duration-200" data-testid="mail-compose">
-          <div
-            className="flex items-center gap-3 border-b bg-white p-4"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+      {/* ── Compose — bottom sheet ── */}
+      <DraggableSheet
+        tall
+        open={composeOpen}
+        onOpenChange={(o) => { if (!sendMutation.isPending) setComposeOpen(o); }}
+        title="New email"
+        testid="mail-compose"
+      >
+        <h2 className="text-lg font-semibold text-slate-900">New email</h2>
+        <div className="mt-3 space-y-3 pb-2">
+          <Input
+            type="email"
+            placeholder="To"
+            value={compose.to}
+            onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
+            data-testid="mail-compose-to"
+          />
+          <Input
+            placeholder="Subject"
+            value={compose.subject}
+            onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
+            data-testid="mail-compose-subject"
+          />
+          <textarea
+            placeholder="Write your email…"
+            value={compose.body}
+            onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
+            rows={7}
+            className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+            data-testid="mail-compose-body"
+          />
+          <Button
+            className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
+            disabled={!compose.to.trim() || !compose.subject.trim() || !compose.body.trim() || sendMutation.isPending}
+            onClick={() =>
+              sendMutation.mutate({
+                to: [compose.to.trim()],
+                subject: compose.subject.trim(),
+                html: `<p>${sanitizeHtml(compose.body).replace(/\n/g, "<br/>")}</p>`,
+              })
+            }
+            data-testid="mail-compose-send"
           >
-            <Button variant="ghost" size="icon" onClick={() => setComposeOpen(false)} data-testid="mail-compose-close">
-              <X className="h-5 w-5" />
-            </Button>
-            <h2 className="flex-1 text-lg font-semibold">New email</h2>
-            <Button
-              className="bg-[#711419] hover:bg-[#8a1a1f]"
-              disabled={!compose.to.trim() || !compose.subject.trim() || !compose.body.trim() || sendMutation.isPending}
-              onClick={() =>
-                sendMutation.mutate({
-                  to: [compose.to.trim()],
-                  subject: compose.subject.trim(),
-                  html: `<p>${sanitizeHtml(compose.body).replace(/\n/g, "<br/>")}</p>`,
-                })
-              }
-              data-testid="mail-compose-send"
-            >
-              {sendMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
-              Send
-            </Button>
-          </div>
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
-            <Input
-              type="email"
-              placeholder="To"
-              value={compose.to}
-              onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
-              data-testid="mail-compose-to"
-            />
-            <Input
-              placeholder="Subject"
-              value={compose.subject}
-              onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
-              data-testid="mail-compose-subject"
-            />
-            <textarea
-              placeholder="Write your email…"
-              value={compose.body}
-              onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
-              rows={10}
-              className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
-              data-testid="mail-compose-body"
-            />
-          </div>
+            {sendMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
+            Send
+          </Button>
         </div>
-      )}
+      </DraggableSheet>
     </MobileShell>
   );
 }

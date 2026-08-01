@@ -858,8 +858,17 @@ export default function MobileJob() {
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
             {historyLoading ? (
-              <div className="flex items-center justify-center pb-6 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
+              <div className="space-y-2.5 pb-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="w-full rounded-[4px] border border-slate-300/70 bg-slate-100/80 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="h-2.5 w-16 animate-pulse rounded bg-slate-200" />
+                      <div className="h-2.5 w-24 animate-pulse rounded bg-slate-200" />
+                    </div>
+                    <div className="mt-2.5 h-[18px] w-2/3 animate-pulse rounded bg-slate-200" />
+                    <div className="mt-1.5 h-3 w-1/2 animate-pulse rounded bg-slate-200" />
+                  </div>
+                ))}
               </div>
             ) : historyGroups.length === 0 ? (
               <p className="pb-6 text-center text-sm text-slate-400">

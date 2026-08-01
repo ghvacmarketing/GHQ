@@ -10,11 +10,10 @@ import {
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isNativeApp, useKeyboardInset } from "@/lib/native";
 import { compressImage } from "@/lib/compress-image";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
@@ -127,6 +126,8 @@ export default function MobileMessages() {
       return res.json();
     },
     refetchInterval: 5000,
+    // Search typing keeps the previous list on screen — no loader flashes
+    placeholderData: (prev) => prev,
   });
 
   const { data: conversationDetail, isLoading: loadingDetail } = useQuery<ConversationDetailResponse>({
@@ -314,8 +315,20 @@ export default function MobileMessages() {
 
         <div className="-mx-4">
           {loadingConversations ? (
-            <div className="flex justify-center py-8">
-              <MobileSpinner fullHeight={false} />
+            /* Skeleton rows shaped exactly like conversations: plate + lines */
+            <div className="divide-y divide-slate-100">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <div className="h-12 w-12 shrink-0 animate-pulse rounded-[10px] bg-slate-200" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-12 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div className="h-3.5 w-40 animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : conversations && conversations.length > 0 ? (
             <div className="divide-y divide-slate-100">
@@ -358,11 +371,7 @@ export default function MobileMessages() {
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${!conversations || conversations.length === 0 ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
-            {loadingConversations ? (
-              <div className="flex items-center justify-center pb-6 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : conversations && conversations.length > 0 ? (
+            {conversations && conversations.length > 0 ? (
               <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
                 {conversations.map((conversation) => renderConversation(conversation, true))}
               </div>
@@ -593,70 +602,58 @@ export default function MobileMessages() {
         </div>
       )}
 
-      {/* ── New conversation — fullscreen picker ── */}
-      {showNewConversation && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-white animate-in slide-in-from-bottom duration-200" data-testid="mobile-new-conversation">
-          <div
-            className="flex items-center gap-3 border-b bg-white p-4"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
-          >
-            <Button variant="ghost" size="icon" onClick={() => setShowNewConversation(false)} data-testid="button-close-new-conversation">
-              <X className="h-5 w-5" />
-            </Button>
-            <h2 className="text-lg font-semibold">New Message</h2>
+      {/* ── New conversation — bottom sheet picker ── */}
+      <DraggableSheet
+        tall
+        open={showNewConversation}
+        onOpenChange={(o) => { if (!startConversationMutation.isPending) setShowNewConversation(o); }}
+        title="New message"
+        testid="mobile-new-conversation"
+      >
+        <h2 className="text-lg font-semibold text-slate-900">New message</h2>
+        <div className="mt-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="Search contacts..."
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              className="pl-10"
+              data-testid="input-contact-search"
+            />
           </div>
-          <div className="p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                autoFocus
-                placeholder="Search contacts..."
-                value={contactSearch}
-                onChange={(e) => setContactSearch(e.target.value)}
-                className="pl-10"
-                data-testid="input-contact-search"
-              />
-            </div>
-          </div>
-          <ScrollArea className="flex-1">
-            {loadingContacts ? (
-              <div className="flex justify-center py-8">
-                <MobileSpinner fullHeight={false} />
-              </div>
-            ) : contacts && contacts.length > 0 ? (
-              <div className="divide-y">
-                {contacts.map((contact) => (
-                  <button
-                    key={contact.id}
-                    onClick={() => startConversationMutation.mutate({ customerId: contact.id })}
-                    className="flex w-full items-center gap-3 p-4 text-left active:bg-slate-50"
-                    data-testid={`contact-${contact.id}`}
-                    disabled={startConversationMutation.isPending}
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
-                      {contact.customerName?.charAt(0).toUpperCase() || "?"}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-800">{contact.customerName}</p>
-                      <p className="truncate text-sm text-slate-500">{contact.phone}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : contactSearch.length >= 2 ? (
-              <div className="py-8 text-center text-slate-500">
-                <User className="mx-auto mb-2 h-12 w-12 text-slate-300" />
-                <p>No contacts found</p>
-              </div>
-            ) : (
-              <div className="py-8 text-center text-slate-500">
-                <Search className="mx-auto mb-2 h-12 w-12 text-slate-300" />
-                <p>Type at least 2 characters to search</p>
-              </div>
-            )}
-          </ScrollArea>
         </div>
-      )}
+        <div className="mt-3 pb-2">
+          {contacts && contacts.length > 0 ? (
+            <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              {contacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  onClick={() => startConversationMutation.mutate({ customerId: contact.id })}
+                  className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50"
+                  data-testid={`contact-${contact.id}`}
+                  disabled={startConversationMutation.isPending}
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
+                    {contact.customerName?.charAt(0).toUpperCase() || "?"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-800">{contact.customerName}</p>
+                    <p className="truncate text-sm text-slate-500">{contact.phone}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : contactSearch.length >= 2 && !loadingContacts ? (
+            <div className="py-8 text-center text-slate-500">
+              <User className="mx-auto mb-2 h-12 w-12 text-slate-300" />
+              <p>No contacts found</p>
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-slate-400">Type at least 2 characters to search.</p>
+          )}
+        </div>
+      </DraggableSheet>
     </MobileShell>
   );
 }

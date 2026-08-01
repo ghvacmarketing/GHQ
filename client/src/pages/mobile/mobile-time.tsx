@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { MobileSpinner } from "@/components/mobile/mobile-spinner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Clock, Square, Loader2, Briefcase, Plus,
@@ -213,8 +212,14 @@ export default function MobileTime() {
             <Card className="rounded-[4px] border-slate-300/70 shadow-none">
               <CardContent className="pt-6">
                 {loadingCurrent ? (
-                  <div className="flex justify-center py-8">
-                    <MobileSpinner fullHeight={false} />
+                  /* Mirrors the loaded card: status line, big timer, totals */
+                  <div className="space-y-4 text-center">
+                    <div className="mx-auto h-4 w-32 animate-pulse rounded bg-slate-200" />
+                    <div className="space-y-1">
+                      <div className="mx-auto h-9 w-40 animate-pulse rounded bg-slate-200" />
+                      <div className="mx-auto h-4 w-36 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div className="mx-auto h-4 w-44 animate-pulse rounded bg-slate-100" />
                   </div>
                 ) : (
                   <div className="text-center space-y-4">
@@ -238,25 +243,6 @@ export default function MobileTime() {
                       </p>
                     </div>
 
-                    {isClockedIn && (
-                      <Button
-                        size="lg"
-                        className="w-full h-16 text-lg font-semibold rounded-[4px] bg-red-600 hover:bg-red-700"
-                        onClick={handleClockOut}
-                        disabled={isLoading}
-                        data-testid="button-clock-out"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-6 w-6 animate-spin" />
-                        ) : (
-                          <>
-                            <Square className="h-6 w-6 mr-2" />
-                            Clock Out
-                          </>
-                        )}
-                      </Button>
-                    )}
-
                     <button
                       onClick={() => setManualOpen(true)}
                       className="mx-auto flex items-center gap-1.5 text-sm font-medium text-[#711419]"
@@ -269,19 +255,27 @@ export default function MobileTime() {
               </CardContent>
             </Card>
 
-            {/* Tap a card to clock straight in to that kind of time */}
-            {!loadingCurrent && !isClockedIn && (
+            {/* The category cards never leave: while clocked in, the active
+                one lights up and the rest lock until you clock out. */}
+            {!loadingCurrent && (
               <div className="space-y-2" data-testid="clock-in-cards">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Clock in to</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {isClockedIn ? "Clocked in to" : "Clock in to"}
+                </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {TIME_CATEGORIES.slice(0, 3).map((c) => {
                     const starting = clockInMutation.isPending && clockInMutation.variables === c.key;
+                    const active = isClockedIn && (currentEntry?.entry?.category || "job") === c.key;
                     return (
                       <button
                         key={c.key}
                         onClick={() => clockInMutation.mutate(c.key)}
-                        disabled={isLoading}
-                        className="flex flex-col items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-2 py-4 transition-all active:scale-[0.97] disabled:opacity-60"
+                        disabled={isLoading || isClockedIn}
+                        className={`flex flex-col items-center gap-2 rounded-[4px] border px-2 py-4 transition-all active:scale-[0.97] ${
+                          active
+                            ? "border-[#711419] bg-[#711419]/[0.06] opacity-100"
+                            : "border-slate-300/70 bg-white disabled:opacity-40"
+                        }`}
                         data-testid={`clock-in-${c.key}`}
                       >
                         {starting ? (
@@ -291,7 +285,7 @@ export default function MobileTime() {
                         ) : (
                           <img src={c.img} alt="" className="h-11 w-11 select-none" draggable={false} />
                         )}
-                        <span className="text-sm font-semibold text-slate-800">{c.label}</span>
+                        <span className={`text-sm font-semibold ${active ? "text-[#711419]" : "text-slate-800"}`}>{c.label}</span>
                       </button>
                     );
                   })}
@@ -299,12 +293,17 @@ export default function MobileTime() {
                 <div className="grid grid-cols-4 gap-2">
                   {TIME_CATEGORIES.slice(3).map((c) => {
                     const starting = clockInMutation.isPending && clockInMutation.variables === c.key;
+                    const active = isClockedIn && (currentEntry?.entry?.category || "job") === c.key;
                     return (
                       <button
                         key={c.key}
                         onClick={() => clockInMutation.mutate(c.key)}
-                        disabled={isLoading}
-                        className="flex flex-col items-center gap-1.5 rounded-[4px] border border-slate-300/70 bg-white px-1 py-3 transition-all active:scale-[0.97] disabled:opacity-60"
+                        disabled={isLoading || isClockedIn}
+                        className={`flex flex-col items-center gap-1.5 rounded-[4px] border px-1 py-3 transition-all active:scale-[0.97] ${
+                          active
+                            ? "border-[#711419] bg-[#711419]/[0.06] opacity-100"
+                            : "border-slate-300/70 bg-white disabled:opacity-40"
+                        }`}
                         data-testid={`clock-in-${c.key}`}
                       >
                         {starting ? (
@@ -314,11 +313,32 @@ export default function MobileTime() {
                         ) : (
                           <img src={c.img} alt="" className="h-9 w-9 select-none" draggable={false} />
                         )}
-                        <span className="text-[11px] font-medium text-slate-600">{c.label}</span>
+                        <span className={`text-[11px] font-medium ${active ? "text-[#711419]" : "text-slate-600"}`}>{c.label}</span>
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Clock Out lives below the cards — the one action available
+                    while a category is running */}
+                {isClockedIn && (
+                  <Button
+                    size="lg"
+                    className="mt-2 h-14 w-full rounded-[4px] bg-red-600 text-lg font-semibold hover:bg-red-700"
+                    onClick={handleClockOut}
+                    disabled={isLoading}
+                    data-testid="button-clock-out"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <>
+                        <Square className="mr-2 h-5 w-5" />
+                        Clock Out
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
           </>
@@ -390,53 +410,39 @@ export default function MobileTime() {
       </DraggableSheet>
 
       {/* Clock-out dialog */}
-      <Dialog open={showClockOutDialog} onOpenChange={(open) => {
-        if (!clockOutMutation.isPending) setShowClockOutDialog(open);
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>What did you work on today?</DialogTitle>
-            <DialogDescription>
-              A summary of your work is required before you can clock out.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="work-notes">Work summary</Label>
-            <Textarea
-              id="work-notes"
-              placeholder="e.g. AC tune-up at Smith residence, replaced capacitor; furnace inspection on Main St..."
-              value={workNotes}
-              onChange={(e) => setWorkNotes(e.target.value)}
-              rows={5}
-              autoFocus
-              data-testid="textarea-work-notes"
-            />
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setShowClockOutDialog(false)}
-              disabled={clockOutMutation.isPending}
-              data-testid="button-cancel-clock-out"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => clockOutMutation.mutate(workNotes.trim())}
-              disabled={clockOutMutation.isPending || !workNotes.trim()}
-              data-testid="button-confirm-clock-out"
-            >
-              {clockOutMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Square className="h-4 w-4 mr-2" />
-              )}
-              Clock Out
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Clock-out summary — bottom sheet */}
+      <DraggableSheet
+        open={showClockOutDialog}
+        onOpenChange={(open) => { if (!clockOutMutation.isPending) setShowClockOutDialog(open); }}
+        title="What did you work on today?"
+        testid="sheet-clock-out"
+      >
+        <h2 className="text-lg font-semibold text-slate-900">What did you work on today?</h2>
+        <p className="mt-0.5 text-sm text-slate-500">A quick summary is required before you clock out.</p>
+        <div className="mt-4 space-y-3 pb-2">
+          <Textarea
+            id="work-notes"
+            placeholder="e.g. AC tune-up at Smith residence, replaced capacitor; furnace inspection on Main St..."
+            value={workNotes}
+            onChange={(e) => setWorkNotes(e.target.value)}
+            rows={4}
+            data-testid="textarea-work-notes"
+          />
+          <Button
+            className="h-12 w-full rounded-[4px] bg-red-600 text-base font-semibold hover:bg-red-700"
+            onClick={() => clockOutMutation.mutate(workNotes.trim())}
+            disabled={clockOutMutation.isPending || !workNotes.trim()}
+            data-testid="button-confirm-clock-out"
+          >
+            {clockOutMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Square className="mr-2 h-4 w-4" />
+            )}
+            Clock Out
+          </Button>
+        </div>
+      </DraggableSheet>
 
       {/* Manual time dialog */}
       <Dialog open={manualOpen} onOpenChange={(open) => {
@@ -639,10 +645,22 @@ function TimesheetView({
         )}
       </div>
 
-      {/* Days */}
+      {/* Days — skeleton mirrors a day group: header row + entry rows */}
       {isLoading ? (
-        <div className="flex justify-center py-8">
-          <MobileSpinner fullHeight={false} />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-32 animate-pulse rounded bg-slate-200" />
+            <div className="h-3 w-12 animate-pulse rounded bg-slate-200" />
+          </div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between rounded-[4px] border border-slate-200 bg-white p-3">
+              <div className="space-y-2">
+                <div className="h-3.5 w-20 animate-pulse rounded bg-slate-200" />
+                <div className="h-3.5 w-40 animate-pulse rounded bg-slate-100" />
+              </div>
+              <div className="h-4 w-12 animate-pulse rounded bg-slate-200" />
+            </div>
+          ))}
         </div>
       ) : days.length === 0 ? (
         <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-400">

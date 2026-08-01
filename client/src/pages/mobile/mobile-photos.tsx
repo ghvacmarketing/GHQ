@@ -112,7 +112,7 @@ export default function MobilePhotos() {
   const customerId = activeCustomer?.id || null;
 
   // Search ANY customer to attach photos to (mobile-friendly, tech-accessible).
-  const { data: searchResults = [], isFetching: searching } = useQuery<Array<{ id: string; name: string; phone?: string | null }>>({
+  const { data: searchResults = [] } = useQuery<Array<{ id: string; name: string; phone?: string | null }>>({
     queryKey: ["/api/mobile/customers", customerSearch],
     queryFn: async () => {
       const res = await fetch(`/api/mobile/customers?search=${encodeURIComponent(customerSearch.trim())}`, { credentials: "include" });
@@ -120,6 +120,8 @@ export default function MobilePhotos() {
       return res.json();
     },
     enabled: searchActive && customerSearch.trim().length >= 2,
+    // Previous results hold while the next query runs — no loader mid-search
+    placeholderData: (prev) => prev,
   });
 
   const chooseCustomer = (c: { id: string; name: string; phone?: string | null }) => {
@@ -758,15 +760,11 @@ export default function MobilePhotos() {
           data-testid="photos-search-overlay"
         >
           <div
-            className={`min-h-0 flex-1 overflow-y-auto px-4 ${customerSearch.trim().length < 2 || searching || searchResults.length === 0 ? "flex flex-col justify-end" : ""}`}
+            className={`min-h-0 flex-1 overflow-y-auto px-4 ${customerSearch.trim().length < 2 || searchResults.length === 0 ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
             {customerSearch.trim().length < 2 ? (
               <p className="pb-6 text-center text-sm text-slate-400">Type to search photos and customers.</p>
-            ) : searching ? (
-              <div className="flex items-center justify-center pb-6 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
             ) : searchResults.length === 0 ? (
               <p className="pb-6 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
             ) : (
