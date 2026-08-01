@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { Loader2, X } from "lucide-react";
-import { GibbsMark } from "@/components/crm/gibbs-mark";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 
 const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
 import {
@@ -97,12 +97,12 @@ export function MobileCreatePage({
       </button>
       <button
         onClick={() => setAssistantOpen(true)}
-        className="absolute right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#711419] shadow-sm backdrop-blur transition-transform active:scale-95"
+        className="absolute right-3 z-10 rounded-full shadow-md transition-transform active:scale-95"
         style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
         aria-label="Ask Gibbs for help"
         data-testid="create-page-gibbs"
       >
-        <GibbsMark className="h-5 w-5" />
+        <img src={badgeGibbs} alt="" className="h-10 w-10 select-none" draggable={false} />
       </button>
       <div
         className="min-h-0 flex-1 overflow-y-auto px-4"

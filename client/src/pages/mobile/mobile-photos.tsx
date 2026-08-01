@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Search, Trash2, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, Loader2, Play, Plus, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isNativeApp, takeNativePhoto } from "@/lib/native";
 import { useToast } from "@/hooks/use-toast";
@@ -799,13 +799,14 @@ export default function MobilePhotos() {
                 data-testid="photos-search-input"
               />
             </div>
+            {/* The create "+" reborn as the search X — quarter-turned plus */}
             <button
               onClick={closeSearch}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-300/70 bg-white text-slate-600 shadow-sm transition-transform active:scale-95"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90 animate-in zoom-in-75 duration-300"
               aria-label="Close search"
               data-testid="photos-search-close"
             >
-              <X className="h-5 w-5" />
+              <Plus className="h-6 w-6 rotate-45" strokeWidth={2.25} />
             </button>
           </div>
         </div>

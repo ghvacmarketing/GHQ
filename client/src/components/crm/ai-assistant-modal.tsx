@@ -47,6 +47,7 @@ import {
   Minimize2,
 } from "lucide-react";
 import { GibbsMark } from "@/components/crm/gibbs-mark";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import {
   DropdownMenu,
@@ -880,9 +881,7 @@ export default function AiAssistantModal() {
               </div>
             ) : messages.length === 0 && !pending ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10 text-[#711419]">
-                  <GibbsMark className="h-7 w-7" />
-                </span>
+                <img src={badgeGibbs} alt="" className="mb-4 h-14 w-14 select-none" draggable={false} />
                 <h2 className="text-xl font-semibold text-slate-800">Gibbs here — what can I get done?</h2>
                 <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-500">
                   I know how GHQ works and can see live data — schedules, agreements, invoices, quotes.

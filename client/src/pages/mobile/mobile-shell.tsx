@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useNativePush } from "@/lib/native";
@@ -293,7 +294,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 
           <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick access</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={Sparkles} label="Ask Gibbs" onClick={openAssistant} testid="create-ask-gibbs" />
+            <SheetTile icon={Sparkles} img={badgeGibbs} label="Ask Gibbs" onClick={openAssistant} testid="create-ask-gibbs" />
           </div>
       </DraggableSheet>
 
@@ -372,15 +373,19 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 }
 
 function SheetTile({
-  icon: Icon, label, onClick, testid,
-}: { icon: typeof Camera; label: string; onClick: () => void; testid: string }) {
+  icon: Icon, img, label, onClick, testid,
+}: { icon: typeof Camera; img?: string; label: string; onClick: () => void; testid: string }) {
   return (
     <button
       onClick={onClick}
       className="flex flex-col items-center gap-1.5 rounded-lg bg-slate-100 px-1 py-3 transition-all active:scale-95 active:bg-slate-200"
       data-testid={testid}
     >
-      <Icon className="h-6 w-6 text-[#711419]" />
+      {img ? (
+        <img src={img} alt="" className="h-6 w-6 select-none" draggable={false} />
+      ) : (
+        <Icon className="h-6 w-6 text-[#711419]" />
+      )}
       <span className="text-[11px] font-medium text-slate-700">{label}</span>
     </button>
   );

@@ -8,6 +8,7 @@ import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 import {
   AI_ACTION_LABELS,
   actionLineItems,
@@ -826,16 +827,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </button>
           <button
             onClick={() => setModeSheetOpen(true)}
-            className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full transition-colors active:bg-white/80"
+            className="pointer-events-auto rounded-full shadow-md transition-transform active:scale-95"
             aria-label="Gibbs mode"
             data-testid="assistant-mode-open"
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-[22px] w-[22px] rotate-45 text-[#711419]">
-              <rect x="2.6" y="2.6" width="4.2" height="4.2" rx="1.4" />
-              <rect x="9.2" y="2.6" width="4.2" height="4.2" rx="1.4" />
-              <rect x="2.6" y="9.2" width="4.2" height="4.2" rx="1.4" />
-              <rect x="9.2" y="9.2" width="4.2" height="4.2" rx="1.4" />
-            </svg>
+            <img src={badgeGibbs} alt="" className="h-11 w-11 select-none" draggable={false} />
           </button>
           <button
             onClick={startNewChat}

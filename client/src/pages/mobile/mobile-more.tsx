@@ -8,6 +8,7 @@ import {
 import type { CrmUser } from "@shared/schema";
 import badgeMessaging from "@/assets/badge-messaging.png";
 import badgeTimeJob from "@/assets/badge-time-job.png";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 
 /** The More page — everything you can BROWSE, grouped by category. Creation
  *  lives behind the floating "+" button; this is the directory. */
@@ -56,7 +57,7 @@ export default function MobileMore() {
         { label: "Customers", sub: "Search every customer and their history", icon: Users, onTap: (n) => n("/mobile/customers"), testid: "more-customers" },
         { label: "Inbox", sub: "Texts and email in one place", icon: MessageSquare, img: badgeMessaging, onTap: (n) => n("/mobile/messages"), testid: "more-inbox" },
         {
-          label: "Ask Gibbs", sub: "AI help — lookups, drafts, and actions", icon: Sparkles,
+          label: "Ask Gibbs", sub: "AI help — lookups, drafts, and actions", icon: Sparkles, img: badgeGibbs,
           onTap: () => window.dispatchEvent(new Event("ghq-mobile-open-assistant")), testid: "more-assistant",
         },
       ],

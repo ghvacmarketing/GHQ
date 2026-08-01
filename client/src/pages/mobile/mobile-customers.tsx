@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Search, ChevronRight, Users, LogIn, X, Loader2, Plus, CalendarClock } from "lucide-react";
+import { Search, ChevronRight, Users, LogIn, Loader2, Plus, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -336,13 +336,14 @@ export default function MobileCustomers() {
                 data-testid="customer-search-input"
               />
             </div>
+            {/* The create "+" reborn as the search X — quarter-turned plus */}
             <button
               onClick={closeSearch}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-300/70 bg-white text-slate-600 shadow-sm transition-transform active:scale-95"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_6px_20px_rgba(113,20,25,0.4)] transition-transform active:scale-90 animate-in zoom-in-75 duration-300"
               aria-label="Close search"
               data-testid="customers-search-close"
             >
-              <X className="h-5 w-5" />
+              <Plus className="h-6 w-6 rotate-45" strokeWidth={2.25} />
             </button>
           </div>
         </div>
