@@ -1,6 +1,7 @@
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { Loader2, X } from "lucide-react";
+import { useKeyboardInset } from "@/lib/native";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 
 const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
@@ -51,6 +52,12 @@ export function MobileCreatePage({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // With Keyboard resize:"none" the webview never shrinks, so the scroll
+  // body must grow by the keyboard height — that's what lets you scroll any
+  // field (notes especially) up into view instead of typing blind under
+  // the keyboard.
+  const keyboardInset = useKeyboardInset();
 
   const doExit = () => {
     // Slide the sheet back down before leaving — it closes like it opened
@@ -105,10 +112,20 @@ export function MobileCreatePage({
         <img src={badgeGibbs} alt="" className="h-10 w-10 select-none" draggable={false} />
       </button>
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-4"
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4"
         style={{
           paddingTop: "calc(env(safe-area-inset-top) + 60px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 32px)",
+          paddingBottom: `calc(env(safe-area-inset-bottom) + 32px + ${keyboardInset}px)`,
+          transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+        }}
+        onFocusCapture={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") {
+            // Wait for the keyboard (and the padding above) to land, then
+            // bring the field to the middle of what's still visible.
+            setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+          }
         }}
       >
         <h1 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">{title}</h1>

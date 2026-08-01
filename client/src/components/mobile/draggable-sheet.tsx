@@ -38,7 +38,9 @@ export function DraggableSheet({
     const dy = e.clientY - dragStartY.current;
     const el = sheetRef.current;
     if (!el) return;
-    el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+    // Down drags dismiss; up drags are clamped — the sheet is already at
+    // its maximum height and shouldn't budge past it.
+    el.style.transform = `translateY(${Math.max(0, dy)}px)`;
   };
   const onPointerUp = (e: React.PointerEvent) => {
     if (dragStartY.current == null) return;

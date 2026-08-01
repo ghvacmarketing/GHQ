@@ -6,6 +6,7 @@ import { format, isBefore, startOfDay } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useKeyboardInset } from "@/lib/native";
 import {
   ArrowLeft, ArrowUp, Calendar, Check, CheckCircle2, ClipboardList, ListPlus,
   Loader2, Plus, Trash2, UserRound,
@@ -230,6 +231,7 @@ function TaskDetail({ taskId, users, onClose }: { taskId: string; users: CrmUser
   const [newSubtask, setNewSubtask] = useState("");
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const dueRef = useRef<HTMLInputElement | null>(null);
+  const keyboardInset = useKeyboardInset();
 
   const { data: task, isLoading } = useQuery<TaskRow>({
     queryKey: ["/api/tasks", taskId],
@@ -310,7 +312,19 @@ function TaskDetail({ taskId, users, onClose }: { taskId: string; users: CrmUser
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-10 space-y-4">
+        <div
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4"
+          style={{
+            paddingBottom: `calc(40px + ${keyboardInset}px)`,
+            transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+          }}
+          onFocusCapture={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") {
+              setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+            }
+          }}
+        >
           <h2 className={`text-xl font-semibold leading-snug ${done ? "text-slate-400 line-through" : "text-slate-900"}`} data-testid="task-detail-title">
             {task.title}
           </h2>

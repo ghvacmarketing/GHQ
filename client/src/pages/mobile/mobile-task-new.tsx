@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
@@ -91,28 +91,24 @@ export default function MobileTaskNew() {
 
         <div>
           <Label className="mb-1.5 block">Assign to</Label>
-          <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="task-assignee-list">
-            {team.map((u, i) => {
-              const selected = u.id === effectiveAssignee;
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => setAssigneeId(u.id === currentUser?.id ? null : u.id)}
-                  className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${i > 0 ? "border-t border-slate-200/80" : ""} ${
-                    selected ? "bg-[#711419]/[0.04]" : "active:bg-slate-50"
-                  }`}
-                  data-testid={`task-assignee-${u.id}`}
-                >
-                  <RoleBadge role={(u as any).role} className="h-8 w-8" />
-                  <span className={`min-w-0 flex-1 truncate text-sm ${selected ? "font-semibold text-[#711419]" : "text-slate-800"}`}>
+          <Select
+            value={effectiveAssignee || "me"}
+            onValueChange={(v) => setAssigneeId(v === currentUser?.id ? null : v)}
+          >
+            <SelectTrigger data-testid="task-assignee-trigger">
+              <SelectValue placeholder="Pick a teammate" />
+            </SelectTrigger>
+            <SelectContent className="max-h-64">
+              {team.map((u) => (
+                <SelectItem key={u.id} value={u.id} data-testid={`task-assignee-${u.id}`}>
+                  <span className="flex items-center gap-2">
+                    <RoleBadge role={(u as any).role} className="h-5 w-5" />
                     {u.name}{u.id === currentUser?.id ? " (me)" : ""}
                   </span>
-                  {selected && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
-                </button>
-              );
-            })}
-          </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
