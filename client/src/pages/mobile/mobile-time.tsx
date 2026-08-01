@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { SheetSelect } from "@/components/mobile/sheet-select";
-import { DateRangeCalendar } from "@/components/mobile/date-range-calendar";
+import { DateRangeSheet } from "@/components/mobile/date-range-calendar";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
@@ -378,14 +378,13 @@ export default function MobileTime() {
             testid="timesheet-range"
           />
           {tsPreset === "custom" && (
-            <div className="py-3">
-              <DateRangeCalendar
-                from={tsFrom}
-                to={tsTo}
-                onChange={(f, t) => { setTsFrom(f); setTsTo(t); }}
-                testid="timesheet-filter-calendar"
-              />
-            </div>
+            <DateRangeSheet
+              label="Dates"
+              from={tsFrom}
+              to={tsTo}
+              onChange={(f, t) => { setTsFrom(f); setTsTo(t); }}
+              testid="timesheet-filter-calendar"
+            />
           )}
           <SheetSelect
             label="Category"

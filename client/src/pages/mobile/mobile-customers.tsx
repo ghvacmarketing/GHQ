@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Search, ChevronRight, Users, LogIn, CalendarClock, ListFilter, X } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { SheetSelect } from "@/components/mobile/sheet-select";
-import { DateRangeCalendar } from "@/components/mobile/date-range-calendar";
+import { DateRangeSheet } from "@/components/mobile/date-range-calendar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
@@ -467,14 +467,13 @@ export default function MobileCustomers() {
             testid="customers-filter-range"
           />
           {fRange === "custom" && (
-            <div className="py-3">
-              <DateRangeCalendar
-                from={fFrom}
-                to={fTo}
-                onChange={(f, t) => { setFFrom(f); setFTo(t); }}
-                testid="customers-filter-calendar"
-              />
-            </div>
+            <DateRangeSheet
+              label="Dates"
+              from={fFrom}
+              to={fTo}
+              onChange={(f, t) => { setFFrom(f); setFTo(t); }}
+              testid="customers-filter-calendar"
+            />
           )}
         </div>
       </DraggableSheet>
