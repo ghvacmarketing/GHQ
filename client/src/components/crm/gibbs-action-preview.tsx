@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, Calendar, Check, Mail, MessageSquare, Phone, User, UserPlus, Wrench } from "lucide-react";
+import { AlertTriangle, Calendar, Check, Mail, MessageSquare, Phone, UserPlus } from "lucide-react";
 
 /** Live previews for Gibbs' proposed actions — instead of a box of fields,
  *  the approval card shows a miniature of the REAL thing being created:
@@ -76,6 +76,21 @@ function QuotePreview({ params }: { params: Record<string, any> }) {
           )}
           <p className="mt-1.5 text-[10px] font-medium text-slate-400">Customer picks one option when they sign.</p>
         </div>
+      ) : params.quoteKind === "proposal" ? (
+        <div className="p-3.5 pt-2.5">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {lines.map((l, i) => (
+              <div key={i} className="min-w-[150px] flex-1 rounded-md border border-slate-200 bg-slate-50/70 p-2.5">
+                <p className="text-base font-bold tabular-nums text-slate-900">{money((l.quantity || 1) * (l.unitPrice || 0))}</p>
+                <p className="mt-1 text-[10px] leading-tight text-slate-500">{l.description}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 border-t-2 border-[#711419] pt-1.5 text-right">
+            <span className="text-[10px] font-bold tracking-wide text-slate-400">TOTAL </span>
+            <span className="text-base font-bold tabular-nums text-[#711419]">{money(total(lines))}</span>
+          </div>
+        </div>
       ) : (
         <div className="px-3.5 pb-3 pt-2">
           <table className="w-full">
@@ -107,25 +122,23 @@ function WorkOrderPreview({ params }: { params: Record<string, any> }) {
   const when = params.scheduledStart
     ? new Date(params.scheduledStart).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     : null;
+  const meta = [
+    when,
+    params.assignTo || (params.assignedTechId ? "Assigned" : null),
+    params.visitType ? String(params.visitType).charAt(0) + String(params.visitType).slice(1).toLowerCase() : null,
+    params.workSubtype || null,
+  ].filter(Boolean);
   return (
-    <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" data-testid="gibbs-preview-workorder">
-      <div className="h-1 bg-[#711419]" />
-      <div className="flex items-start gap-2.5 p-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#711419]/10 text-[#711419]">
-          <Wrench className="h-4.5 w-4.5" style={{ height: 18, width: 18 }} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900">{params.customerName || "Customer"}</p>
-          <p className="truncate text-xs text-slate-600">{params.title || "Service visit"}</p>
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-            {when && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />{when}</span>}
-            {(params.assignTo || params.assignedTechId) && (
-              <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{params.assignTo || "Assigned"}</span>
-            )}
-            {params.visitType && <span className="rounded bg-slate-100 px-1.5 py-px font-semibold uppercase tracking-wide text-slate-500">{params.visitType}</span>}
-          </div>
-        </div>
+    <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm" data-testid="gibbs-preview-workorder">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="truncate text-sm font-semibold text-slate-900">{params.customerName || "Customer"}</p>
+        <p className="shrink-0 text-[10px] font-bold tracking-[0.12em] text-slate-400">WORK ORDER</p>
       </div>
+      <p className="mt-0.5 text-sm text-slate-700">{params.title || "Service visit"}</p>
+      {params.description && <p className="mt-1 line-clamp-2 text-xs leading-snug text-slate-500">{params.description}</p>}
+      {meta.length > 0 && (
+        <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500">{meta.join("  ·  ")}</p>
+      )}
     </div>
   );
 }
@@ -306,6 +319,23 @@ function DeletePreview({ action }: { action: ProposedAction }) {
         <p className="mt-0.5 text-sm text-red-900">{what}</p>
       </div>
     </div>
+  );
+}
+
+/** True when GibbsActionPreview will render something for this action —
+ *  surfaces use it to hide the redundant field-row summary. */
+export function hasGibbsPreview(action: ProposedAction): boolean {
+  const p = action.params || {};
+  return (
+    (action.type === "create_quote" && Array.isArray(p.lineItems) && p.lineItems.length > 0) ||
+    action.type === "create_work_order" ||
+    (action.type === "send_sms" && !!p.message) ||
+    (action.type === "send_email" && !!(p.subject || p.body)) ||
+    action.type === "log_call" ||
+    (action.type === "create_task" && !!p.title) ||
+    (action.type === "create_customer" && !!p.name) ||
+    action.type === "create_invoice" ||
+    action.type === "delete_customer" || action.type === "delete_work_order" || action.type === "delete_quote"
   );
 }
 

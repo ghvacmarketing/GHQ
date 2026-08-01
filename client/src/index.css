@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 :root {
+  /* The app is light-only: without this, dark-mode devices flip native
+     widgets (Google Places autocomplete, selects, date pickers) to black. */
+  color-scheme: light;
+
   /* ── Surfaces (clean neutral slate — no green/yellow cast) ── */
   --background: #f8fafc;            /* slate-50 — clean canvas */
   --foreground: #0f172a;            /* slate-900 — primary text */
@@ -298,13 +302,24 @@
   }
 }
 
-/* Google Places Autocomplete Element Styling */
+/* Google Places Autocomplete Element Styling.
+   color-scheme + explicit surface colors matter: the widget follows the
+   DEVICE dark mode, which painted its host black on phones in dark mode. */
 gmp-place-autocomplete {
+  color-scheme: light !important;
+  background: #ffffff !important;
+  border-radius: 0.75rem;
   --gmpx-color-surface: #ffffff !important;
   --gmpx-color-on-surface: #1a1a1a !important;
   --gmpx-color-on-surface-variant: #6b7280 !important;
   --gmpx-color-primary: #711419 !important;
   --gmpx-color-outline: #e8e8e8 !important;
+  --gmp-mat-color-surface: #ffffff !important;
+  --gmp-mat-color-on-surface: #1a1a1a !important;
+  --gmp-mat-color-on-surface-variant: #6b7280 !important;
+  --gmp-mat-color-primary: #711419 !important;
+  --gmp-mat-color-outline: #e8e8e8 !important;
+  --gmp-mat-color-outline-decorative: #e8e8e8 !important;
   display: block;
   width: 100%;
 }

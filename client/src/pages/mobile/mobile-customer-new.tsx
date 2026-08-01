@@ -169,6 +169,7 @@ export default function MobileCustomerNew() {
       dirty={dirty}
       exitTo="/mobile/customers"
       onSave={submit}
+      saveLabel="Create customer"
       saveDisabled={missing.length > 0}
       saving={createCustomer.isPending}
       testid="mobile-customer-new-page"
@@ -397,15 +398,6 @@ export default function MobileCustomerNew() {
           </div>
         </div>
 
-        <Button
-          onClick={submit}
-          disabled={createCustomer.isPending || missing.length > 0}
-          className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
-          data-testid="nc-save"
-        >
-          {createCustomer.isPending ? <Loader2 className="mr-1.5 h-5 w-5 animate-spin" /> : <Plus className="mr-1.5 h-5 w-5" />}
-          Create customer
-        </Button>
       </div>
     </MobileCreatePage>
   );

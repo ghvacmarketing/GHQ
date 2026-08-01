@@ -1,6 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { Loader2, X } from "lucide-react";
+import { GibbsMark } from "@/components/crm/gibbs-mark";
+
+const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +50,7 @@ export function MobileCreatePage({
   const [, navigate] = useLocation();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   const doExit = () => {
     // Slide the sheet back down before leaving — it closes like it opened
@@ -67,6 +71,12 @@ export function MobileCreatePage({
       className={`fixed inset-0 z-[70] flex flex-col bg-slate-50 ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`}
       data-testid={testid}
     >
+      {/* Content scrolling under the floating controls fades out into the
+          top edge instead of colliding with them. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
+        style={{ height: "calc(env(safe-area-inset-top) + 64px)" }}
+      />
       {/* Grab handle — top middle, like every bottom sheet */}
       <div
         className="pointer-events-none absolute inset-x-0 z-10 flex justify-center"
@@ -75,7 +85,7 @@ export function MobileCreatePage({
         <div className="h-1.5 w-12 rounded-full bg-slate-300" />
       </div>
       {/* Full-page sheet: slides up over everything, no backdrop, no header
-          bar — just a floating X and Save over the content. */}
+          bar — just a floating X (left) and Gibbs (right) over the content. */}
       <button
         onClick={handleClose}
         className="absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur transition-transform active:scale-95"
@@ -84,6 +94,15 @@ export function MobileCreatePage({
         data-testid="create-page-close"
       >
         <X className="h-5 w-5" strokeWidth={2.25} />
+      </button>
+      <button
+        onClick={() => setAssistantOpen(true)}
+        className="absolute right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#711419] shadow-sm backdrop-blur transition-transform active:scale-95"
+        style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+        aria-label="Ask Gibbs for help"
+        data-testid="create-page-gibbs"
+      >
+        <GibbsMark className="h-5 w-5" />
       </button>
       <div
         className="min-h-0 flex-1 overflow-y-auto px-4"
@@ -107,8 +126,14 @@ export function MobileCreatePage({
         )}
       </div>
 
+      {assistantOpen && (
+        <Suspense fallback={null}>
+          <AssistantOverlay open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+        </Suspense>
+      )}
+
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-[8px]">
+        <AlertDialogContent overlayClassName="z-[80]" className="z-[85] max-w-[calc(100vw-2rem)] rounded-[8px]">
           <AlertDialogHeader>
             <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
             <AlertDialogDescription>

@@ -60,6 +60,7 @@ export function AddressAutocomplete({
           componentRestrictions: { country: ["us"] },
         });
         el.style.width = "100%";
+        el.style.colorScheme = "light"; // dark-mode phones painted the widget black
         containerRef.current.innerHTML = "";
         containerRef.current.appendChild(el);
         el.addEventListener("gmp-placeselect", async (event: any) => {

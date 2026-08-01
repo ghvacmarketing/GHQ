@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { GibbsActionPreview } from "@/components/crm/gibbs-action-preview";
+import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
@@ -954,20 +954,25 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                       </p>
                     )}
                     {revealed && msg.proposedAction && msg.actionState !== "dismissed" && msg.actionState !== "superseded" && (
-                      <div className="max-w-[92%] animate-in fade-in slide-in-from-bottom-2 break-words rounded-[4px] border border-[#711419]/30 bg-[#711419]/[0.05] p-3 duration-300" data-testid={`assistant-action-card-${i}`}>
+                      <div className={`max-w-[92%] animate-in fade-in slide-in-from-bottom-2 break-words rounded-[4px] border border-[#711419]/30 bg-[#711419]/[0.05] p-3 duration-300 ${msg.actionBatch ? "relative ml-6" : ""}`} data-testid={`assistant-action-card-${i}`}>
+                        {msg.actionBatch && (
+                          <>
+                            <span className={`absolute -left-6 top-3 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shadow transition-colors ${msg.actionState === "done" ? "bg-[#711419] text-white" : "border-2 border-[#711419] bg-white text-[#711419]"}`}>
+                              {msg.actionState === "done" ? <Check className="h-3 w-3" /> : msg.actionBatch.step}
+                            </span>
+                            {msg.actionBatch.step < msg.actionBatch.total && (
+                              <span className={`absolute -left-[14px] top-9 bottom-[-12px] w-0.5 rounded transition-colors ${msg.actionState === "done" ? "bg-[#711419]/60" : "bg-[#711419]/25"}`} />
+                            )}
+                          </>
+                        )}
                         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#711419]">
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} —{" "}
                           {msg.actionState === "done" ? "approved & ran" : msg.actionState === "executing" ? "running" : "needs your approval"}
-                          {msg.actionBatch && (
-                            <span className="ml-auto rounded-[3px] bg-[#711419]/10 px-1.5 py-0.5 tracking-normal text-[#711419]">
-                              Step {msg.actionBatch.step} of {msg.actionBatch.total}
-                            </span>
-                          )}
                         </p>
                         <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                         {editing?.index !== i && <GibbsActionPreview action={msg.proposedAction} />}
-                        {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
+                        {editing?.index !== i && !hasGibbsPreview(msg.proposedAction) && <div className="mt-1.5 space-y-0.5">
                           {msg.proposedAction.type === "update_customer"
                             ? customerUpdateRows(msg.proposedAction.params).map((row) => (
                                 <p key={row.label} className="text-xs text-slate-500">

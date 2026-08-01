@@ -43,9 +43,11 @@ import {
   Trash2,
   Wrench,
   X,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { GibbsMark } from "@/components/crm/gibbs-mark";
-import { GibbsActionPreview } from "@/components/crm/gibbs-action-preview";
+import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,6 +151,7 @@ export default function AiAssistantModal() {
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [gibbsFullscreen, setGibbsFullscreen] = useState(false);
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
@@ -551,10 +554,10 @@ export default function AiAssistantModal() {
   const activeTitle = activeConvo?.title;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-3 backdrop-blur-[2px]" data-testid="ai-assistant-modal">
+    <div className={`fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-[2px] ${gibbsFullscreen ? "" : "p-3"}`} data-testid="ai-assistant-modal">
       {/* Backdrop click closes; clicks inside the panel don't bubble out */}
       <div className="absolute inset-0" onClick={() => setOpen(false)} />
-      <div className="relative flex h-[min(780px,92vh)] w-[min(1150px,96vw)] overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className={`relative flex overflow-hidden bg-white shadow-2xl transition-all duration-200 ${gibbsFullscreen ? "h-full w-full rounded-none" : "h-[min(780px,92vh)] w-[min(1150px,96vw)] rounded-xl"}`}>
 
         {/* ── Sidebar: grouped conversation history. Always mounted; width
             animates for a smooth ease-out collapse. Inner wrapper stays w-64
@@ -844,6 +847,15 @@ export default function AiAssistantModal() {
               </DropdownMenuContent>
             </DropdownMenu>
             <button
+              onClick={() => setGibbsFullscreen((v) => !v)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              aria-label={gibbsFullscreen ? "Exit full screen" : "Full screen"}
+              title={gibbsFullscreen ? "Exit full screen" : "Full screen"}
+              data-testid="gibbs-fullscreen-toggle"
+            >
+              {gibbsFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            <button
               onClick={() => setOpen(false)}
               className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
               aria-label="Close assistant"
@@ -965,7 +977,17 @@ export default function AiAssistantModal() {
                           </p>
                         )}
                         {revealed && msg.proposedAction && msg.actionState !== "dismissed" && msg.actionState !== "superseded" && (
-                          <div className="animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3 duration-300" data-testid={`ai-action-card-${i}`}>
+                          <div className={`animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.03] p-3 duration-300 ${msg.actionBatch ? "relative ml-7" : ""}`} data-testid={`ai-action-card-${i}`}>
+                            {msg.actionBatch && (
+                              <>
+                                <span className={`absolute -left-7 top-3 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold shadow transition-colors ${msg.actionState === "done" ? "bg-[#711419] text-white" : "border-2 border-[#711419] bg-white text-[#711419]"}`}>
+                                  {msg.actionState === "done" ? <Check className="h-3.5 w-3.5" /> : msg.actionBatch.step}
+                                </span>
+                                {msg.actionBatch.step < msg.actionBatch.total && (
+                                  <span className={`absolute -left-[17px] top-10 bottom-[-14px] w-0.5 rounded transition-colors ${msg.actionState === "done" ? "bg-[#711419]/60" : "bg-[#711419]/25"}`} />
+                                )}
+                              </>
+                            )}
                             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
                               {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} —{" "}
@@ -976,15 +998,10 @@ export default function AiAssistantModal() {
                                   : viewUser
                                     ? `awaiting ${viewUser.name}'s approval`
                                     : "needs your approval"}
-                              {msg.actionBatch && (
-                                <span className="ml-auto rounded bg-[#711419]/10 px-1.5 py-0.5 tracking-normal text-[#711419]">
-                                  Step {msg.actionBatch.step} of {msg.actionBatch.total}
-                                </span>
-                              )}
                             </p>
                             <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                             {editing?.index !== i && <GibbsActionPreview action={msg.proposedAction} />}
-                            {editing?.index !== i && <div className="mt-1.5 space-y-0.5">
+                            {editing?.index !== i && !hasGibbsPreview(msg.proposedAction) && <div className="mt-1.5 space-y-0.5">
                               {msg.proposedAction.type === "update_customer"
                                 ? customerUpdateRows(msg.proposedAction.params).map((row) => (
                                     <p key={row.label} className="text-xs text-slate-500">

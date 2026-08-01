@@ -6,17 +6,16 @@ import { format, isBefore, startOfDay } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import {
   ArrowLeft, ArrowUp, Calendar, Check, CheckCircle2, ClipboardList, ListPlus,
   Loader2, Plus, Trash2, UserRound,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
-/** My Tasks — Asana-style.
+/** My Tasks.
  *
- *  Create: a slim bottom sheet — type the task, assignee chip on the LEFT
- *  and due-date chip on the RIGHT underneath, fire with the round arrow.
+ *  Create: the full-page bottom sheet at /mobile/tasks/new — same shell as
+ *  creating a customer or job.
  *  Detail: tap any task for the fullscreen view — status, assignee, due
  *  date, notes, and subtasks, all editable in place. */
 
@@ -43,24 +42,7 @@ export default function MobileTasks() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [view, setView] = useState<"open" | "done">("open");
-  const [createOpen, setCreateOpen] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
-
-  // Quick-create state
-  const [title, setTitle] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [assigneeId, setAssigneeId] = useState<string | null>(null);
-  const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
-  const dueInputRef = useRef<HTMLInputElement | null>(null);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Let the sheet finish sliding up BEFORE the keyboard rises — focusing
-  // during the animation makes both fight for the screen.
-  useEffect(() => {
-    if (!createOpen) return;
-    const t = setTimeout(() => titleInputRef.current?.focus(), 380);
-    return () => clearTimeout(t);
-  }, [createOpen]);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -82,12 +64,13 @@ export default function MobileTasks() {
     },
   });
 
-  // Deep link: "+" → open the quick-create sheet right here
+  // Deep link: "+" → the full-page create sheet
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("new") === "1") {
-      setCreateOpen(true);
       window.history.replaceState({}, "", "/mobile/tasks");
+      navigate("/mobile/tasks/new");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
@@ -114,33 +97,6 @@ export default function MobileTasks() {
     .filter((t) => t.status === "completed")
     .sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
   const shown = view === "open" ? openTasks : doneTasks;
-
-  const effectiveAssignee = assigneeId || currentUser?.id || null;
-  const assigneeName =
-    users.find((u) => u.id === effectiveAssignee)?.name ||
-    currentUser?.name ||
-    "Me";
-
-  const createMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest("POST", "/api/tasks", {
-        title: title.trim(),
-        description: null,
-        dueAt: dueDate ? `${dueDate}T12:00:00` : null,
-        assignedToUserId: effectiveAssignee,
-        createdByUserId: currentUser!.id,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      toast({ title: "Task added" });
-      setTitle("");
-      setDueDate("");
-      setAssigneeId(null);
-      setAssigneePickerOpen(false);
-      // Sheet stays open — Asana lets you rattle off several in a row
-    },
-    onError: (e: any) => toast({ title: "Couldn't add the task", description: e?.message, variant: "destructive" }),
-  });
 
   const toggleMutation = useMutation({
     mutationFn: async (task: TaskRow) =>
@@ -173,7 +129,7 @@ export default function MobileTasks() {
             ))}
           </div>
           <button
-            onClick={() => setCreateOpen(true)}
+            onClick={() => navigate("/mobile/tasks/new")}
             className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
             aria-label="New task"
             data-testid="button-new-task"
@@ -256,93 +212,6 @@ export default function MobileTasks() {
           </div>
         )}
       </div>
-
-      {/* ── Asana-style quick create: type it, chips underneath, fire ── */}
-      <DraggableSheet open={createOpen} onOpenChange={(o) => !createMutation.isPending && setCreateOpen(o)} title="New task" testid="sheet-new-task">
-        <div className="pb-3">
-          <div className="flex items-start gap-2">
-            <input
-              ref={titleInputRef}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="What needs doing?"
-              className="min-w-0 flex-1 bg-transparent py-2 text-[17px] font-medium text-slate-900 outline-none placeholder:text-slate-400"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && title.trim()) createMutation.mutate();
-              }}
-              data-testid="task-title-input"
-            />
-            <button
-              onClick={() => createMutation.mutate()}
-              disabled={!title.trim() || createMutation.isPending}
-              className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-md transition-transform active:scale-95 disabled:opacity-40"
-              aria-label="Add task"
-              data-testid="task-create-save"
-            >
-              {createMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
-            </button>
-          </div>
-
-          {/* Assignee left · due date right, Asana-style */}
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <div className="relative">
-            {assigneePickerOpen && (
-              <div
-                className="absolute bottom-full left-0 z-20 mb-2 max-h-56 w-64 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150"
-                onTouchMove={(e) => e.stopPropagation()}
-                data-testid="task-assignee-list"
-              >
-                {users.filter((u) => u.isActive !== false).map((u) => (
-                  <button
-                    key={u.id}
-                    onClick={() => { setAssigneeId(u.id === currentUser?.id ? null : u.id); setAssigneePickerOpen(false); }}
-                    className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2.5 text-left text-sm last:border-0 active:bg-slate-50 ${
-                      u.id === effectiveAssignee ? "font-semibold text-[#711419]" : "text-slate-700"
-                    }`}
-                    data-testid={`task-assignee-${u.id}`}
-                  >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#711419]/10 text-[11px] font-bold text-[#711419]">
-                      {(u.name || "?").charAt(0).toUpperCase()}
-                    </span>
-                    {u.name}{u.id === currentUser?.id ? " (me)" : ""}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={() => setAssigneePickerOpen((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                assigneeId ? "border-[#711419]/40 bg-[#711419]/5 text-[#711419]" : "border-slate-300 bg-white text-slate-600"
-              }`}
-              data-testid="task-assignee-chip"
-            >
-              <UserRound className="h-4 w-4" />
-              {assigneeName.split(/\s+/)[0]}
-            </button>
-            </div>
-            <button
-              onClick={() => dueInputRef.current?.showPicker?.() || dueInputRef.current?.click()}
-              className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                dueDate ? "border-[#711419]/40 bg-[#711419]/5 text-[#711419]" : "border-slate-300 bg-white text-slate-600"
-              }`}
-              data-testid="task-due-chip"
-            >
-              <Calendar className="h-4 w-4" />
-              {dueDate ? format(new Date(`${dueDate}T12:00:00`), "EEE, MMM d") : "Due date"}
-              <input
-                ref={dueInputRef}
-                type="date"
-                value={dueDate}
-                min={format(new Date(), "yyyy-MM-dd")}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="absolute inset-0 opacity-0"
-                tabIndex={-1}
-              />
-            </button>
-          </div>
-
-        </div>
-      </DraggableSheet>
 
       {/* ── Fullscreen task detail — everything the CRM has ── */}
       {detailTaskId && (

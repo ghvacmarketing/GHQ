@@ -236,6 +236,7 @@ export default function MobileJobNew() {
       dirty={dirty}
       exitTo="/mobile/job"
       onSave={() => createWorkOrderMutation.mutate()}
+      saveLabel="Create job"
       saveDisabled={!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
       saving={createWorkOrderMutation.isPending}
       testid="mobile-job-new-page"
@@ -520,16 +521,6 @@ export default function MobileJobNew() {
           </div>
         )}
       </div>
-
-      <Button
-        className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
-        onClick={() => createWorkOrderMutation.mutate()}
-        disabled={createWorkOrderMutation.isPending || !selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
-        data-testid="job-create-save"
-      >
-        {createWorkOrderMutation.isPending ? <Loader2 className="mr-1.5 h-5 w-5 animate-spin" /> : <Plus className="mr-1.5 h-5 w-5" />}
-        Create job
-      </Button>
     </MobileCreatePage>
   );
 }

@@ -279,7 +279,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       <DraggableSheet open={createOpen} onOpenChange={setCreateOpen} title="Create" testid="sheet-create">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks?new=1")} testid="create-new-task" />
+            <SheetTile icon={CheckSquare} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
             <SheetTile icon={Camera} label="Add Photo" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
             {isSupervisor && (
               <>

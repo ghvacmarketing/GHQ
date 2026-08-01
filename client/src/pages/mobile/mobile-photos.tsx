@@ -782,7 +782,11 @@ export default function MobilePhotos() {
           <div
             ref={searchBarRef}
             className="flex items-center gap-2 px-4 pt-2"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
+              // Eased ride-up that tracks the iOS keyboard curve instead of jumping
+              transition: "padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />

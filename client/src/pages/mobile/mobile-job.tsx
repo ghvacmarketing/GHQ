@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, HardHat } from "lucide-react";
+import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon } from "lucide-react";
+import { RoleBadge } from "@/components/mobile/role-badge";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -683,9 +684,7 @@ export default function MobileJob() {
                     }`}
                     data-testid={`jobs-tech-${tech.id}`}
                   >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
-                      <HardHat className="h-5 w-5" />
-                    </span>
+                    <RoleBadge role={tech.role} className="h-11 w-11" />
                     <span className="max-w-full truncate text-sm font-semibold text-slate-800">{tech.name}</span>
                     <span className="text-xs text-slate-400">{techJobs.length} job{techJobs.length !== 1 ? "s" : ""} today</span>
                   </button>
