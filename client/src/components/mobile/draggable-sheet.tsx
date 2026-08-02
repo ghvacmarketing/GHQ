@@ -100,7 +100,8 @@ export function DraggableSheet({
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        className={`rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${
+        overlayClassName="z-[85]"
+        className={`z-[90] rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${
           full
             ? "flex h-[calc(100dvh-env(safe-area-inset-top)-10px)] flex-col"
             : tall

@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import MobileShell from "./mobile-shell";
 import MobileCustomers from "./mobile-customers";
 import type { CrmCustomer, CrmWorkOrder, CrmAgreement } from "@shared/schema";
 
@@ -328,8 +327,16 @@ export default function MobileCustomerDetail() {
         onPointerUp={onSwipeEnd}
         onPointerCancel={onSwipeEnd}
       >
-        <MobileShell>
-          <div className="min-h-full" data-testid="mobile-customer-detail-page">
+        {/* No bottom nav / no "+" here — the detail page is a focused sheet;
+            its own scroller keeps the house bounce. */}
+        <div
+          className="h-full overflow-y-auto overscroll-y-contain bg-slate-50"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)",
+          }}
+        >
+          <div className="min-h-[calc(100%+1px)]" data-testid="mobile-customer-detail-page">
             {customerLoading ? (
               <DetailSkeleton />
             ) : customerError ? (
@@ -482,7 +489,7 @@ export default function MobileCustomerDetail() {
               </div>
             ) : null}
           </div>
-        </MobileShell>
+        </div>
       </div>
 
       {/* Floating back — OUTSIDE the sliding panel: it holds its spot while
