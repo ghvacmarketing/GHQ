@@ -135,8 +135,13 @@ app.use((req, res, next) => {
     express.raw({ type: 'application/json' })(req, res, next);
     return;
   }
-  if (req.path === '/api/crm/mail/send' || req.path === '/api/crm/help') {
-    // Email attachments and Gibbs photo uploads (base64) can be large
+  if (
+    req.path === '/api/crm/mail/send' ||
+    req.path === '/api/crm/help' ||
+    /^\/api\/mobile\/messaging\/conversations\/[^/]+\/messages$/.test(req.path)
+  ) {
+    // Email attachments, Gibbs photo uploads, and MMS photos (base64) can be
+    // large — the default 1mb JSON cap would 413 them.
     express.json({ limit: '30mb' })(req, res, next);
     return;
   }

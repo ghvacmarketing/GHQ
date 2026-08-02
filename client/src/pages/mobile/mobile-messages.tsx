@@ -486,7 +486,9 @@ export default function MobileMessages() {
           style={{
             touchAction: "pan-y",
             backgroundImage: `url(${chatBg})`,
-            backgroundSize: "cover",
+            // Stretch the FULL frame across the panel — every corner accent
+            // of the artwork stays visible (no cover-cropping).
+            backgroundSize: "100% 100%",
             backgroundPosition: "center",
           }}
           data-testid="mobile-conversation-detail"
