@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
-import { RoleBadge } from "@/components/mobile/role-badge";
+import { SheetSelect } from "@/components/mobile/sheet-select";
+import { DateSheet } from "@/components/mobile/date-range-calendar";
+import { roleBadgeSrc } from "@/components/mobile/role-badge";
 import type { CrmUser } from "@shared/schema";
 
 /** New Task — the same full-page bottom sheet as creating a customer or job:
@@ -91,35 +91,31 @@ export default function MobileTaskNew() {
 
         <div>
           <Label className="mb-1.5 block">Assign to</Label>
-          <Select
-            value={effectiveAssignee || "me"}
-            onValueChange={(v) => setAssigneeId(v === currentUser?.id ? null : v)}
-          >
-            <SelectTrigger data-testid="task-assignee-trigger">
-              <SelectValue placeholder="Pick a teammate" />
-            </SelectTrigger>
-            <SelectContent className="max-h-64">
-              {team.map((u) => (
-                <SelectItem key={u.id} value={u.id} data-testid={`task-assignee-${u.id}`}>
-                  <span className="flex items-center gap-2">
-                    <RoleBadge role={(u as any).role} className="h-5 w-5" />
-                    {u.name}{u.id === currentUser?.id ? " (me)" : ""}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SheetSelect
+            boxed
+            label="Assign to"
+            placeholder="Pick a teammate"
+            value={effectiveAssignee || ""}
+            options={team.map((u) => ({
+              key: u.id,
+              label: `${u.name}${u.id === currentUser?.id ? " (me)" : ""}`,
+              img: roleBadgeSrc((u as any).role),
+            }))}
+            onChange={(v) => setAssigneeId(v === currentUser?.id ? null : v)}
+            testid="task-assignee-trigger"
+          />
         </div>
 
         <div>
-          <Label htmlFor="task-due" className="mb-1.5 block">Due date (optional)</Label>
-          <Input
-            id="task-due"
-            type="date"
+          <Label className="mb-1.5 block">Due date (optional)</Label>
+          <DateSheet
+            boxed
+            minToday
+            label="Due date"
+            placeholder="Pick a day"
             value={dueDate}
-            min={format(new Date(), "yyyy-MM-dd")}
-            onChange={(e) => setDueDate(e.target.value)}
-            data-testid="task-due-input"
+            onChange={setDueDate}
+            testid="task-due-input"
           />
         </div>
 

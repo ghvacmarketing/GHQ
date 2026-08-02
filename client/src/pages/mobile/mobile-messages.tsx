@@ -5,7 +5,7 @@ import chatBg from "@/assets/chat-bg.webp";
 import badgeContactKnown from "@/assets/badge-contact-known.png";
 import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
-  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, Phone, Mic,
+  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, Phone,
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -14,10 +14,7 @@ import { Input } from "@/components/ui/input";
 import { useKeyboardInset } from "@/lib/native";
 import { useScrollHide } from "@/hooks/use-scroll-hide";
 import { compressImage } from "@/lib/compress-image";
-import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
-import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { ImagePlus } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
@@ -81,28 +78,14 @@ export default function MobileMessages() {
     if (pendingPhotos.length > prevPhotoCount.current) setReviewIndex(pendingPhotos.length - 1);
     prevPhotoCount.current = pendingPhotos.length;
   }, [pendingPhotos.length]);
-  const [plusOpen, setPlusOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
-  // Composer rides the keyboard with the same eased inset as Gibbs
+  // The whole thread rides the keyboard with the same eased inset as Gibbs
   const kbInset = useKeyboardInset();
   // After the keyboard leaves, snap back any leftover page pan Safari did.
   useEffect(() => {
     if (kbInset === 0) window.scrollTo(0, 0);
   }, [kbInset]);
-
-  // Voice dictation — same engine as Gibbs (Whisper on iOS)
-  const dictationBase = useRef("");
-  const voice = useVoiceDictation({
-    onTranscript: (t) => setMessageText((dictationBase.current ? dictationBase.current + " " : "") + t),
-    onFinal: (t) => { if (t) setMessageText((dictationBase.current ? dictationBase.current + " " : "") + t); },
-    onError: (m) => toast({ title: m, variant: "destructive" }),
-  });
-  const toggleMic = () => {
-    if (voice.listening) { voice.stop(); return; }
-    dictationBase.current = messageText.trim();
-    voice.start();
-  };
 
   // Floating-search overlay: the bar floats free (kbInset drives its
   // bottom); this effect only times the focus with the open animation.
@@ -533,6 +516,17 @@ export default function MobileMessages() {
             }
           }}
         >
+          {/* Everything — header, conversation, composer — rides the keyboard
+              as ONE unit: the entire page shifts up on one transform (the
+              wallpaper stays put behind it). */}
+          <div
+            className="relative flex h-full w-full flex-col"
+            style={{
+              transform: kbInset > 0 ? `translateY(-${kbInset}px)` : "translateY(0)",
+              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+              willChange: "transform",
+            }}
+          >
           {/* Header strip — one translucent bar holding back, name, and call */}
           <div
             className="absolute inset-x-0 top-0 z-10 border-b border-white/10 bg-slate-900/70 backdrop-blur-xl"
@@ -571,12 +565,6 @@ export default function MobileMessages() {
               // Room to scroll past the floating composer — messages glide
               // beneath it instead of being clipped at its wrapper edge.
               paddingBottom: "calc(env(safe-area-inset-bottom) + 118px)",
-              // WhatsApp-style: the WHOLE conversation rides up with the
-              // keyboard on the same transform/curve as the composer, so
-              // opening and closing reads as one seamless motion.
-              transform: kbInset > 0 ? `translateY(-${kbInset}px)` : "translateY(0)",
-              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
-              willChange: "transform",
             }}
           >
             {loadingDetail && messages.length === 0 ? (
@@ -645,45 +633,18 @@ export default function MobileMessages() {
           </div>
 
           {/* Composer — truly floating: absolutely positioned over the
-              wallpaper, messages scroll beneath it. Keyboard-gray box. */}
+              wallpaper, messages scroll beneath it. Keyboard-gray box. It
+              rides the keyboard with the whole-page wrapper above. */}
           <div
             className="absolute inset-x-0 z-10 px-3"
             style={{
-              bottom: "calc(env(safe-area-inset-bottom) + 8px)",
-              // Ride the keyboard on a pure transform — compositor-only and
-              // on the exact same curve as the conversation above it.
-              transform: kbInset > 0 ? `translateY(calc(-${kbInset}px + env(safe-area-inset-bottom)))` : "translateY(0)",
-              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
-              willChange: "transform",
+              // The home-indicator gap belongs to the resting state only —
+              // with the keyboard up the bar hugs the keys instead.
+              bottom: kbInset > 0 ? "8px" : "calc(env(safe-area-inset-bottom) + 8px)",
+              transition: "bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
-            {/* Dictation status — its own floating pill, one tap to stop.
-                The + stays a plain + (all voice control lives in its sheet). */}
-            {(voice.listening || voice.processing) && (
-              <div className="mb-2 flex justify-center">
-                <button
-                  onClick={() => { if (voice.listening) voice.stop(); }}
-                  className="flex items-center gap-2 rounded-full bg-slate-900/80 px-4 py-2 text-[13px] font-semibold text-white shadow-lg backdrop-blur"
-                  data-testid="dictation-status"
-                >
-                  {voice.processing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Transcribing…
-                    </>
-                  ) : (
-                    <>
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                        <span className="relative h-2.5 w-2.5 rounded-full bg-red-500" />
-                      </span>
-                      Listening — tap to stop
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-            {/* One-line floating row: + (photos & dictation) | field | send */}
+            {/* One-line floating row: + (photos) | field | send */}
             <div className="flex items-end gap-2">
               <input
                 ref={attachInputRef}
@@ -697,23 +658,17 @@ export default function MobileMessages() {
                 }}
               />
               <button
-                onClick={() => setPlusOpen(true)}
-                disabled={sendMessageMutation.isPending}
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
-                aria-label="Add to message"
+                onClick={() => attachInputRef.current?.click()}
+                disabled={sendMessageMutation.isPending || pendingPhotos.length >= 3}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
+                aria-label="Add photos"
                 data-testid="message-attach"
               >
                 <Plus className="h-5 w-5" />
-                {voice.listening && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
-                    <span className="absolute h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                    <span className="relative h-3 w-3 rounded-full bg-red-500" />
-                  </span>
-                )}
               </button>
               <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-[#d1d3d9] px-4 shadow-lg">
                 <textarea
-                  placeholder={voice.listening ? "Listening…" : "Message"}
+                  placeholder="Message"
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   rows={1}
@@ -738,10 +693,12 @@ export default function MobileMessages() {
               </button>
             </div>
           </div>
+          </div>
 
           {/* ── Photo review — WhatsApp-style: pick a photo, see it big, add a
               caption, then send. Sits over the whole thread (z-20 beats the
-              header strip and composer at z-10). ── */}
+              header strip and composer at z-10) and handles the keyboard with
+              its own padding, so it lives OUTSIDE the riding wrapper. ── */}
           {pendingPhotos.length > 0 && (() => {
             const reviewIdx = Math.min(reviewIndex, pendingPhotos.length - 1);
             const active = pendingPhotos[reviewIdx];
@@ -847,41 +804,6 @@ export default function MobileMessages() {
             );
           })()}
 
-          {/* "+" options — photos or dictation, one tidy sheet */}
-          <DraggableSheet open={plusOpen} onOpenChange={setPlusOpen} title="Add to message" testid="sheet-message-plus">
-            <h2 className="text-lg font-semibold text-slate-900">Add to message</h2>
-            <div className="mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-              <button
-                onClick={() => { setPlusOpen(false); attachInputRef.current?.click(); }}
-                disabled={pendingPhotos.length >= 3}
-                className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left active:bg-slate-50 disabled:opacity-40"
-                data-testid="message-plus-photos"
-              >
-                <ImagePlus className="h-5 w-5 text-[#711419]" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-slate-900">Photos</span>
-                  <span className="block text-xs text-slate-500">Attach up to 3 — they send as MMS</span>
-                </span>
-              </button>
-              {voice.supported && (
-                <button
-                  onClick={() => { setPlusOpen(false); toggleMic(); }}
-                  className="flex w-full items-center gap-3 border-t border-slate-200/80 px-3.5 py-3.5 text-left active:bg-slate-50"
-                  data-testid="message-plus-dictate"
-                >
-                  <Mic className={`h-5 w-5 ${voice.listening ? "text-red-600" : "text-[#711419]"}`} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-slate-900">
-                      {voice.listening ? "Stop dictating" : "Dictate"}
-                    </span>
-                    <span className="block text-xs text-slate-500">
-                      {voice.listening ? "Recording now — tap to finish" : "Speak your message — tap the red pill to stop"}
-                    </span>
-                  </span>
-                </button>
-              )}
-            </div>
-          </DraggableSheet>
         </div>
       )}
 

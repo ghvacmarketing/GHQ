@@ -1,11 +1,40 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, startOfToday } from "date-fns";
 import { ChevronDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import type { DateRange } from "react-day-picker";
 
 const fmtDay = (d: string) => format(new Date(`${d}T12:00:00`), "MMM d, yyyy");
+
+// One shared look for every mobile calendar: full-width weeks, generous row
+// height, floating month arrows, maroon selection.
+const CAL_BASE = {
+  months: "w-full",
+  month: "w-full space-y-4",
+  caption: "relative flex items-center justify-center py-1.5",
+  caption_label: "text-base font-semibold text-slate-900",
+  nav_button:
+    "flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-600 shadow-md transition-transform active:scale-95",
+  table: "w-full border-collapse",
+  head_row: "flex w-full",
+  head_cell: "flex-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400",
+  row: "mt-2 flex w-full",
+  day: "h-11 w-full rounded-md p-0 text-[15px] font-normal aria-selected:opacity-100",
+  day_selected: "bg-[#711419] text-white",
+  day_today: "font-bold text-[#711419] aria-selected:text-white",
+};
+
+const RANGE_CLASSNAMES = {
+  ...CAL_BASE,
+  cell: "relative h-11 flex-1 p-0 text-center text-sm [&:has([aria-selected])]:bg-[#711419]/[0.08] [&:has([aria-selected].day-range-end)]:rounded-r-md first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
+  day_range_middle: "aria-selected:bg-transparent aria-selected:text-slate-900",
+};
+
+const SINGLE_CLASSNAMES = {
+  ...CAL_BASE,
+  cell: "relative h-11 flex-1 p-0 text-center text-sm",
+};
 
 /** Custom-range picker for mobile filters: a dropdown row that opens its own
  *  bottom sheet holding a full-width month calendar — page through months,
@@ -54,9 +83,9 @@ export function DateRangeSheet({
 
       <DraggableSheet tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Tap once for a single day, twice for a range.</p>
+        <p className="mt-1 text-[13px] text-slate-400">Tap once for a single day, twice for a range.</p>
 
-        <div className="mt-3">
+        <div className="mt-5 px-0.5">
           <Calendar
             mode="range"
             selected={selected}
@@ -68,29 +97,108 @@ export function DateRangeSheet({
             defaultMonth={selected?.from ?? new Date()}
             numberOfMonths={1}
             className="w-full p-0"
-            classNames={{
-              months: "w-full",
-              month: "w-full space-y-3",
-              caption: "relative flex items-center justify-center pt-1",
-              caption_label: "text-base font-semibold text-slate-900",
-              nav_button: "flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-600 shadow-md transition-transform active:scale-95",
-              table: "w-full border-collapse",
-              head_row: "flex w-full",
-              head_cell: "flex-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400",
-              row: "mt-1.5 flex w-full",
-              cell: "relative h-11 flex-1 p-0 text-center text-sm [&:has([aria-selected])]:bg-[#711419]/[0.08] [&:has([aria-selected].day-range-end)]:rounded-r-md first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
-              day: "h-11 w-full rounded-md p-0 text-[15px] font-normal aria-selected:opacity-100",
-              day_selected: "bg-[#711419] text-white",
-              day_range_middle: "aria-selected:bg-transparent aria-selected:text-slate-900",
-              day_today: "font-bold text-[#711419] aria-selected:text-white",
-            }}
+            classNames={RANGE_CLASSNAMES}
           />
         </div>
 
-        <div className="mt-4 flex items-center gap-2 pb-2">
+        <div className="mt-6 flex items-center gap-2.5 pb-2">
           <button
             onClick={() => onChange("", "")}
             disabled={!from}
+            className="h-12 rounded-[4px] border border-slate-300/70 bg-white px-4 text-sm font-semibold text-slate-700 transition-transform active:scale-95 disabled:opacity-40"
+            data-testid={testid ? `${testid}-clear` : undefined}
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => setOpen(false)}
+            className="h-12 flex-1 rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98]"
+            data-testid={testid ? `${testid}-done` : undefined}
+          >
+            Done
+          </button>
+        </div>
+      </DraggableSheet>
+    </>
+  );
+}
+
+/** Single-date picker in the same house style — a boxed form field (or filter
+ *  row) that opens a full-width calendar sheet instead of the OS date wheel.
+ *  Value travels as a yyyy-MM-dd string (empty = unset). Picking a day closes
+ *  the sheet on its own. */
+export function DateSheet({
+  value,
+  onChange,
+  label = "Date",
+  placeholder = "Pick a date",
+  boxed,
+  minToday,
+  testid,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+  placeholder?: string;
+  /** Boxed form-field trigger (for create pages) instead of a filter row. */
+  boxed?: boolean;
+  /** Disallow days in the past. */
+  minToday?: boolean;
+  testid?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value ? new Date(`${value}T12:00:00`) : undefined;
+
+  return (
+    <>
+      {boxed ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex h-11 w-full items-center justify-between gap-3 rounded-md border border-input bg-white px-3.5 text-left shadow-xs"
+          data-testid={testid}
+        >
+          <span className={`truncate text-base ${value ? "text-slate-900" : "text-muted-foreground"}`}>
+            {value ? fmtDay(value) : placeholder}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center justify-between gap-3 px-1 py-4 text-left"
+          data-testid={testid}
+        >
+          <span className="text-sm font-medium text-slate-700">{label}</span>
+          <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-slate-500">
+            <span className="truncate">{value ? fmtDay(value) : placeholder}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+          </span>
+        </button>
+      )}
+
+      <DraggableSheet tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
+        <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
+
+        <div className="mt-5 px-0.5">
+          <Calendar
+            mode="single"
+            selected={selected}
+            onSelect={(d) => {
+              onChange(d ? format(d, "yyyy-MM-dd") : "");
+              if (d) setTimeout(() => setOpen(false), 180);
+            }}
+            defaultMonth={selected ?? new Date()}
+            numberOfMonths={1}
+            disabled={minToday ? { before: startOfToday() } : undefined}
+            className="w-full p-0"
+            classNames={SINGLE_CLASSNAMES}
+          />
+        </div>
+
+        <div className="mt-6 flex items-center gap-2.5 pb-2">
+          <button
+            onClick={() => { onChange(""); setOpen(false); }}
+            disabled={!value}
             className="h-12 rounded-[4px] border border-slate-300/70 bg-white px-4 text-sm font-semibold text-slate-700 transition-transform active:scale-95 disabled:opacity-40"
             data-testid={testid ? `${testid}-clear` : undefined}
           >

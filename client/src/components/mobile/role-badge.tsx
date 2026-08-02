@@ -17,3 +17,8 @@ export function RoleBadge({ role, className = "h-9 w-9" }: { role?: string | nul
   const src = ROLE_BADGES[(role || "tech").toLowerCase()] || techBadge;
   return <img src={src} alt={role || "team member"} className={`${className} shrink-0 select-none`} draggable={false} />;
 }
+
+/** The badge asset alone — for pickers that take an image URL (SheetSelect). */
+export function roleBadgeSrc(role?: string | null): string {
+  return ROLE_BADGES[(role || "tech").toLowerCase()] || techBadge;
+}

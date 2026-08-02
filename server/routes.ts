@@ -13989,6 +13989,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/mobile/customers/:id/photos — media linked to one customer,
+  // newest first. Powers the Photos card on the mobile customer detail page.
+  app.get("/api/mobile/customers/:id/photos", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const rows = await db.select({
+        id: customerFiles.id,
+        name: customerFiles.name,
+        url: customerFiles.url,
+        thumbUrl: customerFiles.thumbUrl,
+        contentType: customerFiles.contentType,
+        createdAt: customerFiles.createdAt,
+      })
+        .from(customerFiles)
+        .where(and(
+          eq(customerFiles.customerId, req.params.id),
+          sql`(${customerFiles.contentType} LIKE 'image/%' OR ${customerFiles.contentType} LIKE 'video/%')`,
+        ))
+        .orderBy(desc(customerFiles.createdAt))
+        .limit(60);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching customer photos:", error);
+      res.status(500).json({ message: "Failed to load customer photos" });
+    }
+  });
+
   // GET /api/mobile/eta — distance + drive-time estimate from the tech's
   // current position to a property. Property coordinates are geocoded once
   // via Nominatim and cached on the row; distance is haversine with a
