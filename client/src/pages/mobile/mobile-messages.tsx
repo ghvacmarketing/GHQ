@@ -516,18 +516,9 @@ export default function MobileMessages() {
             }
           }}
         >
-          {/* Everything — header, conversation, composer — rides the keyboard
-              as ONE unit: the entire page shifts up on one transform (the
-              wallpaper stays put behind it). */}
-          <div
-            className="relative flex h-full w-full flex-col"
-            style={{
-              transform: kbInset > 0 ? `translateY(-${kbInset}px)` : "translateY(0)",
-              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
-              willChange: "transform",
-            }}
-          >
-          {/* Header strip — one translucent bar holding back, name, and call */}
+          {/* Header strip — one translucent bar holding back, name, and call.
+              It stays PINNED while the keyboard opens; only the conversation
+              below rides up (and slides beneath its blur). */}
           <div
             className="absolute inset-x-0 top-0 z-10 border-b border-white/10 bg-slate-900/70 backdrop-blur-xl"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -557,6 +548,17 @@ export default function MobileMessages() {
             </div>
           </div>
 
+          {/* The conversation + composer ride the keyboard as ONE piece on a
+              single transform — a page shift, not a scroll. The wallpaper and
+              the header stay put behind/above it. */}
+          <div
+            className="relative flex h-full w-full flex-col"
+            style={{
+              transform: kbInset > 0 ? `translateY(-${kbInset}px)` : "translateY(0)",
+              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+              willChange: "transform",
+            }}
+          >
           <div
             ref={scrollRef}
             className="min-h-0 flex-1 overflow-y-auto px-3 py-3"
@@ -589,39 +591,55 @@ export default function MobileMessages() {
                         {entry.label}
                       </span>
                     </div>
-                  ) : (
-                    <div
-                      key={entry.m.id}
-                      className={`flex ${entry.m.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`relative max-w-[82%] rounded-2xl px-3 py-1.5 shadow-sm ${
-                          entry.m.direction === "outbound"
-                            ? "rounded-br-[4px] bg-[#711419] text-white"
-                            : "rounded-bl-[4px] bg-[#d1d3d9] text-slate-900"
-                        }`}
-                        data-testid={`message-${entry.m.id}`}
-                      >
-                        {Array.isArray((entry.m as any).attachments) && (entry.m as any).attachments.length > 0 && (
-                          <div className="space-y-1.5 pt-1">
-                            {((entry.m as any).attachments as Array<{ url: string; mimeType?: string }>)
-                              .filter((a) => a?.url && (a.mimeType || "").startsWith("image"))
-                              .map((a, i) => (
-                                <img key={i} src={a.url} alt="" className="max-h-64 w-full rounded-lg object-cover" loading="lazy" />
-                              ))}
-                          </div>
-                        )}
-                        <p className="whitespace-pre-wrap break-words pb-1 pr-12 text-[15px] leading-snug">{entry.m.body}</p>
-                        <span
-                          className={`absolute bottom-1 right-2.5 text-[10px] ${
-                            entry.m.direction === "outbound" ? "text-white/60" : "text-slate-500"
+                  ) : (() => {
+                    const images = Array.isArray((entry.m as any).attachments)
+                      ? ((entry.m as any).attachments as Array<{ url: string; mimeType?: string }>)
+                          .filter((a) => a?.url && (a.mimeType || "").startsWith("image"))
+                      : [];
+                    const out = entry.m.direction === "outbound";
+                    const hasText = !!entry.m.body?.trim();
+                    const when = entry.m.sentAt ? format(new Date(entry.m.sentAt), "h:mm a") : "…";
+                    return (
+                      <div key={entry.m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`relative max-w-[82%] overflow-hidden rounded-2xl shadow-sm ${
+                            out ? "rounded-br-[4px]" : "rounded-bl-[4px]"
+                          } ${
+                            // Image-only messages are just the picture — no
+                            // colored frame around it.
+                            images.length > 0 && !hasText
+                              ? ""
+                              : out
+                                ? "bg-[#711419] text-white"
+                                : "bg-[#d1d3d9] text-slate-900"
                           }`}
+                          data-testid={`message-${entry.m.id}`}
                         >
-                          {entry.m.sentAt ? format(new Date(entry.m.sentAt), "h:mm a") : "…"}
-                        </span>
+                          {images.map((a, i) => (
+                            <img key={i} src={a.url} alt="" className="block max-h-64 w-full object-cover" loading="lazy" />
+                          ))}
+                          {hasText && (
+                            <p className="whitespace-pre-wrap break-words px-3 pb-2 pr-14 pt-1.5 text-[15px] leading-snug">
+                              {entry.m.body}
+                            </p>
+                          )}
+                          {hasText || images.length === 0 ? (
+                            <span
+                              className={`absolute bottom-1.5 right-2.5 text-[10px] ${
+                                out ? "text-white/60" : "text-slate-500"
+                              }`}
+                            >
+                              {when}
+                            </span>
+                          ) : (
+                            <span className="absolute bottom-1.5 right-2 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] text-white">
+                              {when}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ),
+                    );
+                  })(),
                 )}
               </div>
             ) : (
@@ -646,19 +664,19 @@ export default function MobileMessages() {
           >
             {/* One-line floating row: + (photos) | field | send */}
             <div className="flex items-end gap-2">
-              <input
-                ref={attachInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  pickPhotos(e.target.files);
-                  e.target.value = "";
-                }}
-              />
               <button
-                onClick={() => attachInputRef.current?.click()}
+                onClick={() => {
+                  // The OS photo sheet ("Take Photo / Choose from Gallery")
+                  // anchors to the page as it was laid out — with the keyboard
+                  // up and the thread translated, it lands way off. Settle the
+                  // keyboard first, then open the picker.
+                  if (kbInset > 0) {
+                    (document.activeElement as HTMLElement | null)?.blur?.();
+                    setTimeout(() => attachInputRef.current?.click(), 300);
+                  } else {
+                    attachInputRef.current?.click();
+                  }
+                }}
                 disabled={sendMessageMutation.isPending || pendingPhotos.length >= 3}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
                 aria-label="Add photos"
@@ -804,6 +822,19 @@ export default function MobileMessages() {
             );
           })()}
 
+          {/* Hidden picker input — OUTSIDE the transformed wrapper so the OS
+              anchors its sheet against the real, untranslated layout. */}
+          <input
+            ref={attachInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              pickPhotos(e.target.files);
+              e.target.value = "";
+            }}
+          />
         </div>
       )}
 

@@ -58,11 +58,9 @@ export interface SendMessageOptions {
   body: string;
   groupUuid?: string;
   attachments?: Array<{
-    contentType: string;
-    filename: string;
-    base64Data: string;
-    /** Public absolute URL of the same file — Textline's documented shape. */
-    url?: string;
+    /** Public absolute URL of the file. Textline's API takes ONLY a url —
+     *  their servers fetch the bytes themselves (Attachment_Upload_Payload). */
+    url: string;
   }>;
 }
 
@@ -145,15 +143,13 @@ class TextlineClient {
         body.group_uuid = options.groupUuid;
       }
 
-      // Handle attachments if provided. Both shapes are sent — inline base64
-      // (`data`) and a public `url` — so whichever one Textline honors works.
+      // Attachments go at the TOP LEVEL of the payload (a sibling of
+      // `comment`, per Textline's Content_Upload_Payload), each as just a
+      // public url — Textline fetches the bytes itself.
       if (options.attachments && options.attachments.length > 0) {
-        body.comment.attachments = options.attachments.map(att => ({
-          content_type: att.contentType,
-          filename: att.filename,
-          data: att.base64Data,
-          ...(att.url ? { url: att.url } : {}),
-        }));
+        body.attachments = options.attachments
+          .filter(att => !!att.url)
+          .map(att => ({ url: att.url }));
       }
 
       const response = await fetch(`${TEXTLINE_BASE_URL}/api/conversations.json`, {

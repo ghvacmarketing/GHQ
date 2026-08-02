@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
-/** Uber-style chrome hiding: returns true while the user is scrolling down
- *  the shell's main scroller, false the moment they scroll back up a little
- *  (or reach the top). Drive a translate/fade off it. */
-export function useScrollHide(threshold = 14) {
+/** Uber-style chrome hiding: returns true once the user has scrolled down a
+ *  real distance (a flick, not a nudge), false the moment they scroll back up
+ *  a little (or reach the top). Drive a translate/fade off it. */
+export function useScrollHide(hideAfter = 64, showAfter = 12) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const main = document.querySelector('[data-testid="mobile-main"]');
@@ -22,8 +22,8 @@ export function useScrollHide(threshold = 14) {
       // Direction flip resets the accumulator so a small counter-scroll acts fast
       if ((dy > 0) !== (acc > 0)) acc = 0;
       acc += dy;
-      if (acc > threshold) setHidden(true);
-      else if (acc < -threshold) setHidden(false);
+      if (acc > hideAfter) setHidden(true);
+      else if (acc < -showAfter) setHidden(false);
     };
     main.addEventListener("scroll", onScroll, { passive: true });
     return () => main.removeEventListener("scroll", onScroll);

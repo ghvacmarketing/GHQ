@@ -1,5 +1,4 @@
 import { textlineClient } from "../../textlineClient";
-import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 
 export interface MessageAttachment {
   id: string;
@@ -59,29 +58,15 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
     // Always prefer phone number-based sending as it's more reliable
     // The phone number approach finds or creates the conversation automatically
     if (request.recipientPhone) {
-      // Turn any /objects/... attachments into base64 so Textline sends them
-      // as an MMS. Bytes are read from our own object store (Neon/disk/GCS).
-      // A public absolute URL rides along too — Textline's documented shape is
-      // URL-based, and /objects/ paths are publicly served (unguessable UUIDs).
+      // Textline's API takes each attachment as a public URL only — their
+      // servers fetch the bytes. /objects/ paths are publicly served
+      // (unguessable UUIDs), so hand over absolute URLs.
       const publicBase = (process.env.PUBLIC_APP_URL || "https://www.ghvac.app").replace(/\/$/, "");
-      let textlineAttachments: Array<{ contentType: string; filename: string; base64Data: string; url?: string }> | undefined;
+      let textlineAttachments: Array<{ url: string }> | undefined;
       if (request.attachments && request.attachments.length > 0) {
-        const objectStore = new ObjectStorageService();
-        textlineAttachments = [];
-        for (const att of request.attachments) {
-          if (!att?.url) continue;
-          try {
-            const bytes = await objectStore.readObjectBytes(att.url);
-            textlineAttachments.push({
-              contentType: att.mimeType || "application/octet-stream",
-              filename: att.filename || "attachment",
-              base64Data: bytes.toString("base64"),
-              url: att.url.startsWith("/") ? publicBase + att.url : att.url,
-            });
-          } catch (err) {
-            console.error("[Textline] Failed to read attachment bytes for", att.url, err);
-          }
-        }
+        textlineAttachments = request.attachments
+          .filter((att) => !!att?.url)
+          .map((att) => ({ url: att.url.startsWith("/") ? publicBase + att.url : att.url }));
         if (textlineAttachments.length === 0) textlineAttachments = undefined;
       }
 
