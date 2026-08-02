@@ -843,7 +843,7 @@ export default function MobileJob() {
       {jobsView === "history" && !historySearchOpen && (
         <button
           onClick={() => setHistorySearchOpen(true)}
-          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-300 ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
+          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-[380ms] [transition-timing-function:cubic-bezier(0.34,1.2,0.64,1)] ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
           style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
           data-testid="history-search-pill"
         >

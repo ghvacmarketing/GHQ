@@ -16,6 +16,8 @@ import { useScrollHide } from "@/hooks/use-scroll-hide";
 import { compressImage } from "@/lib/compress-image";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { ImagePlus } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
@@ -72,6 +74,7 @@ export default function MobileMessages() {
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<Array<{ dataBase64: string; mimeType: string; filename: string; preview: string }>>([]);
+  const [plusOpen, setPlusOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   // Composer rides the keyboard with the same eased inset as Gibbs
@@ -406,7 +409,7 @@ export default function MobileMessages() {
       {!searchActive && !selectedConversationId && (
         <button
           onClick={() => setSearchActive(true)}
-          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-300 ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
+          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-[380ms] [transition-timing-function:cubic-bezier(0.34,1.2,0.64,1)] ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
           style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
           data-testid="messages-search-pill"
         >
@@ -534,8 +537,13 @@ export default function MobileMessages() {
               paddingTop: "calc(env(safe-area-inset-top) + 64px)",
               // Room to scroll past the floating composer — messages glide
               // beneath it instead of being clipped at its wrapper edge.
-              paddingBottom: `calc(env(safe-area-inset-bottom) + 118px + ${kbInset}px)`,
-              transition: "padding-bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 118px)",
+              // WhatsApp-style: the WHOLE conversation rides up with the
+              // keyboard on the same transform/curve as the composer, so
+              // opening and closing reads as one seamless motion.
+              transform: kbInset > 0 ? `translateY(-${kbInset}px)` : "translateY(0)",
+              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+              willChange: "transform",
             }}
           >
             {loadingDetail && messages.length === 0 ? (
@@ -609,10 +617,10 @@ export default function MobileMessages() {
             className="absolute inset-x-0 z-10 px-3"
             style={{
               bottom: "calc(env(safe-area-inset-bottom) + 8px)",
-              // Ride the keyboard on a pure transform — compositor-only, so
-              // the rise and fall stay butter-smooth.
+              // Ride the keyboard on a pure transform — compositor-only and
+              // on the exact same curve as the conversation above it.
               transform: kbInset > 0 ? `translateY(calc(-${kbInset}px + env(safe-area-inset-bottom)))` : "translateY(0)",
-              transition: "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
               willChange: "transform",
             }}
           >
@@ -632,7 +640,7 @@ export default function MobileMessages() {
                 ))}
               </div>
             )}
-            {/* One-line floating row: + | field | mic-or-send */}
+            {/* One-line floating row: + (photos & dictation) | field | send */}
             <div className="flex items-end gap-2">
               <input
                 ref={attachInputRef}
@@ -646,17 +654,29 @@ export default function MobileMessages() {
                 }}
               />
               <button
-                onClick={() => attachInputRef.current?.click()}
-                disabled={pendingPhotos.length >= 3 || sendMessageMutation.isPending}
-                className="liquid-glass flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
-                aria-label="Attach photos"
+                onClick={() => {
+                  if (voice.listening) { voice.stop(); return; }
+                  setPlusOpen(true);
+                }}
+                disabled={sendMessageMutation.isPending || voice.processing}
+                className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md transition-transform active:scale-95 disabled:opacity-40 ${
+                  voice.listening ? "bg-[#711419] text-white" : "liquid-glass text-slate-700"
+                }`}
+                aria-label={voice.listening ? "Stop dictating" : "Add to message"}
                 data-testid="message-attach"
               >
-                <Plus className="h-5 w-5" />
+                {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border-2 border-[#711419]" />}
+                {voice.processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : voice.listening ? (
+                  <Mic className="h-5 w-5" />
+                ) : (
+                  <Plus className="h-5 w-5" />
+                )}
               </button>
               <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-[#d1d3d9] px-4 shadow-lg">
                 <textarea
-                  placeholder="Message"
+                  placeholder={voice.listening ? "Listening…" : "Message"}
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   rows={1}
@@ -670,33 +690,49 @@ export default function MobileMessages() {
                   data-testid="input-message"
                 />
               </div>
-              {/* Mic when empty, send when there's something to send */}
               <button
-                onClick={() => {
-                  if (voice.listening) { voice.stop(); return; }
-                  if (messageText.trim() || pendingPhotos.length > 0) handleSendMessage();
-                  else toggleMic();
-                }}
-                disabled={
-                  sendMessageMutation.isPending ||
-                  voice.processing ||
-                  (!voice.supported && !messageText.trim() && pendingPhotos.length === 0)
-                }
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-transform active:scale-90 disabled:opacity-50"
-                aria-label={voice.listening ? "Stop dictating" : messageText.trim() || pendingPhotos.length ? "Send" : "Dictate a message"}
+                onClick={handleSendMessage}
+                disabled={(!messageText.trim() && pendingPhotos.length === 0) || sendMessageMutation.isPending}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-all active:scale-90 disabled:bg-white/85 disabled:text-slate-400 disabled:shadow-md"
+                aria-label="Send"
                 data-testid="button-send-message"
               >
-                {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border-2 border-[#711419]" />}
-                {sendMessageMutation.isPending || voice.processing ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : messageText.trim() || pendingPhotos.length > 0 ? (
-                  <Send className="h-5 w-5" />
-                ) : (
-                  <Mic className="h-5 w-5" />
-                )}
+                {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </button>
             </div>
           </div>
+
+          {/* "+" options — photos or dictation, one tidy sheet */}
+          <DraggableSheet open={plusOpen} onOpenChange={setPlusOpen} title="Add to message" testid="sheet-message-plus">
+            <h2 className="text-lg font-semibold text-slate-900">Add to message</h2>
+            <div className="mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              <button
+                onClick={() => { setPlusOpen(false); attachInputRef.current?.click(); }}
+                disabled={pendingPhotos.length >= 3}
+                className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left active:bg-slate-50 disabled:opacity-40"
+                data-testid="message-plus-photos"
+              >
+                <ImagePlus className="h-5 w-5 text-[#711419]" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-900">Photos</span>
+                  <span className="block text-xs text-slate-500">Attach up to 3 — they send as MMS</span>
+                </span>
+              </button>
+              {voice.supported && (
+                <button
+                  onClick={() => { setPlusOpen(false); toggleMic(); }}
+                  className="flex w-full items-center gap-3 border-t border-slate-200/80 px-3.5 py-3.5 text-left active:bg-slate-50"
+                  data-testid="message-plus-dictate"
+                >
+                  <Mic className="h-5 w-5 text-[#711419]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-slate-900">Dictate</span>
+                    <span className="block text-xs text-slate-500">Speak your message — tap the pulsing button to stop</span>
+                  </span>
+                </button>
+              )}
+            </div>
+          </DraggableSheet>
         </div>
       )}
 
