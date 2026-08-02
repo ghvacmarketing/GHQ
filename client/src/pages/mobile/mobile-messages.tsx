@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import badgeMessaging from "@/assets/badge-messaging.png";
+import chatBg from "@/assets/chat-bg.webp";
 import badgeContactKnown from "@/assets/badge-contact-known.png";
 import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
@@ -500,42 +501,52 @@ export default function MobileMessages() {
       {selectedConversationId && (
         <div
           ref={threadRef}
-          className="fixed inset-0 z-[60] flex flex-col bg-[#efeae2] shadow-[-14px_0_32px_rgba(0,0,0,0.12)] animate-in slide-in-from-right duration-200"
-          style={{ touchAction: "pan-y" }}
+          className="fixed inset-0 z-[60] flex flex-col bg-slate-900 shadow-[-14px_0_32px_rgba(0,0,0,0.12)] animate-in slide-in-from-right duration-200"
+          style={{
+            touchAction: "pan-y",
+            backgroundImage: `url(${chatBg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
           data-testid="mobile-conversation-detail"
           onPointerDown={onThreadSwipeStart}
           onPointerMove={onThreadSwipeMove}
           onPointerUp={onThreadSwipeEnd}
           onPointerCancel={onThreadSwipeEnd}
         >
-          <div
-            className="flex items-center gap-2 border-b border-black/5 bg-white px-2 py-2 shadow-sm"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}
+          {/* Floating chrome over the wallpaper — glass back, name pill, call */}
+          <button
+            onClick={() => closeThreadAnimated()}
+            className="liquid-glass absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full text-slate-800 shadow-sm transition-transform active:scale-95"
+            style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+            data-testid="button-back-to-list"
           >
-            <button
-              onClick={() => closeThreadAnimated()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
-              data-testid="button-back-to-list"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-semibold leading-tight text-slate-900">{displayName}</p>
-              {displayPhone && <p className="truncate text-xs text-slate-500">{displayPhone}</p>}
-            </div>
-            {displayPhone && (
-              <a
-                href={`tel:${displayPhone}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[#711419] active:bg-slate-100"
-                aria-label="Call"
-                data-testid="button-call-contact"
-              >
-                <Phone className="h-5 w-5" />
-              </a>
-            )}
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div
+            className="liquid-glass absolute left-16 right-16 z-10 rounded-full px-4 py-1.5 text-center shadow-sm"
+            style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+          >
+            <p className="truncate text-[14px] font-semibold leading-tight text-slate-900">{displayName}</p>
+            {displayPhone && <p className="truncate text-[10px] leading-tight text-slate-600">{displayPhone}</p>}
           </div>
+          {displayPhone && (
+            <a
+              href={`tel:${displayPhone}`}
+              className="liquid-glass absolute right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full text-[#711419] shadow-sm transition-transform active:scale-95"
+              style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+              aria-label="Call"
+              data-testid="button-call-contact"
+            >
+              <Phone className="h-5 w-5" />
+            </a>
+          )}
 
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+          <div
+            ref={scrollRef}
+            className="min-h-0 flex-1 overflow-y-auto px-3 py-3"
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 60px)" }}
+          >
             {loadingDetail && messages.length === 0 ? (
               /* Bubble-shaped skeletons — the thread settles in place */
               <div className="space-y-2 py-2">
@@ -543,7 +554,7 @@ export default function MobileMessages() {
                   <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`animate-pulse rounded-2xl ${
-                        i % 2 ? "h-10 w-44 rounded-br-[4px] bg-[#711419]/15" : "h-12 w-56 rounded-bl-[4px] bg-white/80"
+                        i % 2 ? "h-10 w-44 rounded-br-[4px] bg-[#711419]/30" : "h-12 w-56 rounded-bl-[4px] bg-white/10"
                       }`}
                     />
                   </div>
@@ -554,7 +565,7 @@ export default function MobileMessages() {
                 {timeline.map((entry) =>
                   entry.kind === "chip" ? (
                     <div key={entry.key} className="flex justify-center py-2">
-                      <span className="rounded-md bg-white/85 px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm">
+                      <span className="rounded-md bg-black/40 px-2.5 py-1 text-[11px] font-medium text-slate-300 shadow-sm">
                         {entry.label}
                       </span>
                     </div>
@@ -567,7 +578,7 @@ export default function MobileMessages() {
                         className={`relative max-w-[82%] rounded-2xl px-3 py-1.5 shadow-sm ${
                           entry.m.direction === "outbound"
                             ? "rounded-br-[4px] bg-[#711419] text-white"
-                            : "rounded-bl-[4px] bg-white text-slate-900"
+                            : "rounded-bl-[4px] bg-slate-800/95 text-slate-100"
                         }`}
                         data-testid={`message-${entry.m.id}`}
                       >
@@ -583,7 +594,7 @@ export default function MobileMessages() {
                         <p className="whitespace-pre-wrap break-words pb-1 pr-12 text-[15px] leading-snug">{entry.m.body}</p>
                         <span
                           className={`absolute bottom-1 right-2.5 text-[10px] ${
-                            entry.m.direction === "outbound" ? "text-white/60" : "text-slate-400"
+                            entry.m.direction === "outbound" ? "text-white/60" : "text-slate-400/90"
                           }`}
                         >
                           {entry.m.sentAt ? format(new Date(entry.m.sentAt), "h:mm a") : "…"}
@@ -594,8 +605,8 @@ export default function MobileMessages() {
                 )}
               </div>
             ) : (
-              <div className="py-8 text-center text-slate-500">
-                <img src={badgeMessaging} alt="" className="mx-auto mb-2 h-12 w-12 select-none opacity-80" draggable={false} />
+              <div className="py-8 text-center text-slate-300">
+                <img src={badgeMessaging} alt="" className="mx-auto mb-2 h-12 w-12 select-none" draggable={false} />
                 <p>No messages yet — say hello.</p>
               </div>
             )}
