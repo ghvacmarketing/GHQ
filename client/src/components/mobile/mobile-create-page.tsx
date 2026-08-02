@@ -5,16 +5,6 @@ import { useKeyboardInset } from "@/lib/native";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 
 const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 /**
  * Full-screen shell for the mobile "create" flows (job, task, customer, quote,
@@ -247,26 +237,44 @@ export function MobileCreatePage({
         </Suspense>
       )}
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent overlayClassName="z-[80]" className="z-[85] max-w-[calc(100vw-2rem)] rounded-[8px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
-            <AlertDialogDescription>
+      {/* Discard confirmation — a bottom sheet inside this page's stacking
+          context (a portaled dialog would land invisibly beneath it). */}
+      {confirmOpen && (
+        <div
+          className="absolute inset-0 z-30"
+          onClick={() => setConfirmOpen(false)}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-5 pt-3 shadow-2xl animate-in slide-in-from-bottom duration-300"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 20px)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300" />
+            <h2 className="text-lg font-semibold text-slate-900">Discard this draft?</h2>
+            <p className="mt-1 text-sm text-slate-500">
               You haven't saved yet. If you leave now, everything you've entered will be discarded.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="discard-cancel">Keep editing</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => doExit()}
-              data-testid="discard-confirm"
-            >
-              Discard
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </p>
+            <div className="mt-5 space-y-2">
+              <button
+                onClick={() => { setConfirmOpen(false); doExit(); }}
+                className="h-12 w-full rounded-[4px] bg-red-600 text-base font-semibold text-white transition-transform active:scale-[0.98]"
+                data-testid="discard-confirm"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="h-12 w-full rounded-[4px] border border-slate-300/70 bg-white text-base font-semibold text-slate-700 transition-transform active:scale-[0.98]"
+                data-testid="discard-cancel"
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, Check, Home, Loader2, Plus, Users } from "lucide-react";
+import { Check } from "lucide-react";
+import typeResidential from "@/assets/type-residential.png";
+import typeCommercial from "@/assets/type-commercial.png";
+import typePropertyManager from "@/assets/type-property-manager.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LEAD_SOURCES } from "@/lib/lead-sources";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
-import { AddressAutocomplete, validateAddress, type AddressValidationResult } from "@/components/mobile/address-autocomplete";
+import { validateAddress, type AddressValidationResult } from "@/components/mobile/address-autocomplete";
 import type { AccountType, LeadSource } from "@shared/schema";
 
 /** New Customer — the mobile twin of the CRM's account-create wizard. It
@@ -25,10 +28,10 @@ import type { AccountType, LeadSource } from "@shared/schema";
  *  create-with-property payload, and then opens the new customer's detail
  *  page, so a record made in the field is indistinguishable from a desktop one. */
 
-const ACCOUNT_TYPES: { value: AccountType; label: string; hint: string; icon: typeof Home }[] = [
-  { value: "RESIDENTIAL", label: "Residential", hint: "Homeowners and renters", icon: Home },
-  { value: "COMMERCIAL", label: "Commercial", hint: "Business properties", icon: Building2 },
-  { value: "PROPERTY_MANAGER", label: "Property Manager", hint: "Companies with multiple sites", icon: Users },
+const ACCOUNT_TYPES: { value: AccountType; label: string; hint: string; img: string }[] = [
+  { value: "RESIDENTIAL", label: "Residential", hint: "Homeowners and renters", img: typeResidential },
+  { value: "COMMERCIAL", label: "Commercial", hint: "Business properties", img: typeCommercial },
+  { value: "PROPERTY_MANAGER", label: "Property Manager", hint: "Companies with multiple sites", img: typePropertyManager },
 ];
 
 // The CRM stores these display-cased strings — match them exactly.
@@ -51,7 +54,6 @@ export default function MobileCustomerNew() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address1, setAddress1] = useState("");
-  const [manualAddress, setManualAddress] = useState(false);
   const [addrCheck, setAddrCheck] = useState<AddressValidationResult | null>(null);
   const [addrChecking, setAddrChecking] = useState(false);
   const [address2, setAddress2] = useState("");
@@ -180,7 +182,6 @@ export default function MobileCustomerNew() {
           <p className={sectionLabel}>Account type</p>
           <div className="space-y-2">
             {ACCOUNT_TYPES.map((t) => {
-              const Icon = t.icon;
               const selected = accountType === t.value;
               return (
                 <button
@@ -191,7 +192,7 @@ export default function MobileCustomerNew() {
                   }`}
                   data-testid={`nc-type-${t.value}`}
                 >
-                  <Icon className={`h-5 w-5 shrink-0 ${selected ? "text-[#711419]" : "text-slate-400"}`} />
+                  <img src={t.img} alt="" className={`h-9 w-9 shrink-0 select-none ${selected ? "" : "opacity-70"}`} draggable={false} />
                   <span className="min-w-0 flex-1">
                     <span className={`block text-sm font-semibold ${selected ? "text-[#711419]" : "text-slate-900"}`}>
                       {t.label}
@@ -268,34 +269,6 @@ export default function MobileCustomerNew() {
               Property managers don't get a service site from this address — add their properties from the customer's page.
             </p>
           )}
-          {!manualAddress && (
-          <div>
-            <Label className="mb-1.5 block">Address</Label>
-            <AddressAutocomplete
-              value={address1 && city ? `${address1}, ${city}, ${state} ${zip}` : ""}
-              onChange={(addr) => {
-                // "123 Main St, Wrens, GA 30833, USA" → split into the fields
-                const parts = addr.split(",").map((x) => x.trim());
-                if (parts.length >= 3) {
-                  setAddress1(parts[0]);
-                  setCity(parts[1]);
-                  const st = parts[2].match(/^([A-Za-z]{2})\s+(\d{5})/);
-                  if (st) { setState(st[1].toUpperCase()); setZip(st[2]); }
-                } else {
-                  setAddress1(addr);
-                }
-              }}
-              testid="nc-address-search"
-            />
-          </div>
-          )}
-          {!manualAddress && address1.trim() && (
-            <div>
-              <Label htmlFor="nc-address2q" className="mb-1.5 block">Apt, suite, unit (optional)</Label>
-              <Input id="nc-address2q" value={address2} onChange={(e) => setAddress2(e.target.value)} placeholder="Apt 2B" data-testid="nc-address2q" />
-            </div>
-          )}
-          {manualAddress && (<>
           <div>
             <Label htmlFor="nc-address1" className="mb-1.5 block">Address line 1 *</Label>
             <Input id="nc-address1" value={address1} onChange={(e) => setAddress1(e.target.value)} placeholder="123 Main St" data-testid="nc-address1" />
@@ -318,7 +291,6 @@ export default function MobileCustomerNew() {
               <Input id="nc-zip" value={zip} inputMode="numeric" onChange={(e) => setZip(e.target.value)} placeholder="30830" data-testid="nc-zip" />
             </div>
           </div>
-          </>)}
           {(addrChecking || addrCheck) && (
             <div data-testid="nc-address-validation">
               {addrChecking ? (
@@ -348,13 +320,6 @@ export default function MobileCustomerNew() {
               )}
             </div>
           )}
-          <button
-            onClick={() => setManualAddress((v) => !v)}
-            className="text-left text-xs font-medium text-[#711419] underline underline-offset-2"
-            data-testid="nc-address-mode-toggle"
-          >
-            {manualAddress ? "Use address search instead" : "Can't find it on Google? Enter the address manually"}
-          </button>
           {!isPM && (
             <>
               <div>
