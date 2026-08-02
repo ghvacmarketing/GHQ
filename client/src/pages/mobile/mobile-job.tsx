@@ -16,6 +16,7 @@ import { RoleBadge } from "@/components/mobile/role-badge";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { isNativeApp } from "@/lib/native";
+import { useScrollHide } from "@/hooks/use-scroll-hide";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
@@ -148,6 +149,8 @@ export default function MobileJob() {
 
   // Today | Upcoming | History
   const [jobsView, setJobsView] = useState<"today" | "upcoming" | "history">("today");
+  // Uber-style: the floating search pill ducks away on scroll-down
+  const pillHidden = useScrollHide();
   const [historySearch, setHistorySearch] = useState("");
   const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [historySearchClosing, setHistorySearchClosing] = useState(false);
@@ -840,7 +843,7 @@ export default function MobileJob() {
       {jobsView === "history" && !historySearchOpen && (
         <button
           onClick={() => setHistorySearchOpen(true)}
-          className="fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-300 ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
           style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
           data-testid="history-search-pill"
         >

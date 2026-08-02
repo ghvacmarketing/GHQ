@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useKeyboardInset } from "@/lib/native";
+import { useScrollHide } from "@/hooks/use-scroll-hide";
 import { compressImage } from "@/lib/compress-image";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
@@ -58,9 +59,59 @@ const listTime = (d: string | null) => {
   return isToday(dt) ? format(dt, "h:mm a") : format(dt, "MMM d");
 };
 
+/** Gmail-style shrink-to-fit email body: measure the HTML's natural width
+ *  and scale the whole layout down so fixed-width marketing emails fit the
+ *  phone screen edge-to-edge — nothing clipped, nothing to side-scroll. */
+function EmailBody({ html }: { html: string }) {
+  const outerRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    const fit = () => {
+      inner.style.transform = "";
+      inner.style.width = "";
+      outer.style.height = "";
+      const avail = outer.clientWidth;
+      const natural = inner.scrollWidth;
+      if (natural > avail + 2 && avail > 0) {
+        const s = avail / natural;
+        inner.style.width = `${natural}px`;
+        inner.style.transformOrigin = "top left";
+        inner.style.transform = `scale(${s})`;
+        outer.style.height = `${inner.scrollHeight * s}px`;
+      }
+    };
+    fit();
+    // Images landing later change the layout — refit as they arrive
+    const imgs = Array.from(inner.querySelectorAll("img"));
+    imgs.forEach((img) => img.addEventListener("load", fit));
+    const ro = new ResizeObserver(fit);
+    ro.observe(outer);
+    return () => {
+      imgs.forEach((img) => img.removeEventListener("load", fit));
+      ro.disconnect();
+    };
+  }, [html]);
+
+  return (
+    <div ref={outerRef} className="overflow-hidden">
+      <div
+        ref={innerRef}
+        className="text-[14px] leading-relaxed break-words [&_img]:h-auto"
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
+      />
+    </div>
+  );
+}
+
 export default function MobileMail() {
   const { toast } = useToast();
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  // Uber-style: the floating search pill ducks away on scroll-down
+  const pillHidden = useScrollHide();
   const [search, setSearch] = useState("");
   const [searchActive, setSearchActive] = useState(false);
   const [searchClosing, setSearchClosing] = useState(false);
@@ -354,7 +405,7 @@ export default function MobileMail() {
       {!searchActive && !openThreadId && (
         <button
           onClick={() => setSearchActive(true)}
-          className="fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-300 ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
           style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
           data-testid="mail-search-pill"
         >
@@ -479,12 +530,9 @@ export default function MobileMail() {
                       {(m.sentAt || m.createdAt) ? format(new Date((m.sentAt || m.createdAt)!), "MMM d, h:mm a") : ""}
                     </p>
                   </div>
-                  <div className="overflow-x-auto px-3.5 py-3">
+                  <div className="px-3.5 py-3">
                     {m.bodyHtml ? (
-                      <div
-                        className="prose prose-sm max-w-none break-words text-[14px] leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_table]:h-auto [&_table]:max-w-full [&_td]:break-words"
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.bodyHtml) }}
-                      />
+                      <EmailBody html={m.bodyHtml} />
                     ) : (
                       <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed text-slate-800">
                         {m.bodyText || m.snippet || ""}

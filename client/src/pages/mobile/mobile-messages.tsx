@@ -12,6 +12,7 @@ import MobileShell from "./mobile-shell";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
 import { Input } from "@/components/ui/input";
 import { useKeyboardInset } from "@/lib/native";
+import { useScrollHide } from "@/hooks/use-scroll-hide";
 import { compressImage } from "@/lib/compress-image";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
@@ -62,6 +63,8 @@ const dayChip = (d: Date) => {
 export default function MobileMessages() {
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  // Uber-style: the floating search pill ducks away on scroll-down
+  const pillHidden = useScrollHide();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchActive, setSearchActive] = useState(false);
   const [searchClosing, setSearchClosing] = useState(false);
@@ -403,7 +406,7 @@ export default function MobileMessages() {
       {!searchActive && !selectedConversationId && (
         <button
           onClick={() => setSearchActive(true)}
-          className="fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg transition-all duration-300 ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
           style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}
           data-testid="messages-search-pill"
         >
