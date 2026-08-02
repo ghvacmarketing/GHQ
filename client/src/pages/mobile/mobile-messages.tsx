@@ -74,6 +74,13 @@ export default function MobileMessages() {
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<Array<{ dataBase64: string; mimeType: string; filename: string; preview: string }>>([]);
+  // Which pending photo the review screen shows large; new picks jump to it.
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const prevPhotoCount = useRef(0);
+  useEffect(() => {
+    if (pendingPhotos.length > prevPhotoCount.current) setReviewIndex(pendingPhotos.length - 1);
+    prevPhotoCount.current = pendingPhotos.length;
+  }, [pendingPhotos.length]);
   const [plusOpen, setPlusOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
@@ -128,7 +135,8 @@ export default function MobileMessages() {
     setTimeout(() => setSelectedConversationId(null), dur - 10);
   };
   const onThreadSwipeStart = (e: React.PointerEvent) => {
-    if (e.clientX > 48) { threadDrag.current = null; return; }
+    // The photo-review screen owns the thread while it's up — no swipe-back.
+    if (e.clientX > 48 || pendingPhotos.length > 0) { threadDrag.current = null; return; }
     threadDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
     threadRef.current?.setPointerCapture?.(e.pointerId);
   };
@@ -624,22 +632,6 @@ export default function MobileMessages() {
               willChange: "transform",
             }}
           >
-            {pendingPhotos.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {pendingPhotos.map((p, i) => (
-                  <div key={i} className="relative">
-                    <img src={p.preview} alt="" className="h-14 w-14 rounded-lg border border-white/30 object-cover shadow-md" />
-                    <button
-                      onClick={() => setPendingPhotos((prev) => prev.filter((_, j) => j !== i))}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-white shadow"
-                      aria-label="Remove photo"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
             {/* One-line floating row: + (photos & dictation) | field | send */}
             <div className="flex items-end gap-2">
               <input
@@ -701,6 +693,114 @@ export default function MobileMessages() {
               </button>
             </div>
           </div>
+
+          {/* ── Photo review — WhatsApp-style: pick a photo, see it big, add a
+              caption, then send. Sits over the whole thread (z-20 beats the
+              header strip and composer at z-10). ── */}
+          {pendingPhotos.length > 0 && (() => {
+            const reviewIdx = Math.min(reviewIndex, pendingPhotos.length - 1);
+            const active = pendingPhotos[reviewIdx];
+            return (
+              <div
+                className="absolute inset-0 z-20 flex flex-col bg-slate-950/95 backdrop-blur-sm animate-in fade-in duration-200"
+                style={{
+                  // Keyboard shrinks the preview instead of covering the
+                  // caption — same curve as everything else in the thread.
+                  paddingBottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(env(safe-area-inset-bottom) + 10px)",
+                  transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+                }}
+                data-testid="photo-review"
+              >
+                <div
+                  className="flex items-center justify-between px-3"
+                  style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)" }}
+                >
+                  <button
+                    onClick={() => setPendingPhotos([])}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-transform active:scale-95"
+                    aria-label="Cancel"
+                    data-testid="photo-review-cancel"
+                  >
+                    <X className="h-5 w-5" strokeWidth={2.25} />
+                  </button>
+                  <span className="truncate px-3 text-sm font-medium text-white/70">To: {displayName}</span>
+                  <div className="h-10 w-10" />
+                </div>
+                <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-3">
+                  <img
+                    src={active.preview}
+                    alt=""
+                    className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+                    data-testid="photo-review-preview"
+                  />
+                </div>
+                <div className="px-3">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    {pendingPhotos.map((p, i) => (
+                      <div key={i} className="relative shrink-0">
+                        <button
+                          onClick={() => setReviewIndex(i)}
+                          className={`block h-14 w-14 overflow-hidden rounded-lg border-2 transition-opacity ${
+                            i === reviewIdx ? "border-white" : "border-transparent opacity-60"
+                          }`}
+                          aria-label={`Photo ${i + 1}`}
+                        >
+                          <img src={p.preview} alt="" className="h-full w-full object-cover" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPendingPhotos((prev) => prev.filter((_, j) => j !== i));
+                            if (i <= reviewIdx) setReviewIndex(Math.max(0, reviewIdx - 1));
+                          }}
+                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-white shadow"
+                          aria-label="Remove photo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {pendingPhotos.length < 3 && (
+                      <button
+                        onClick={() => attachInputRef.current?.click()}
+                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-white/30 text-white/60 transition-transform active:scale-95"
+                        aria-label="Add another photo"
+                        data-testid="photo-review-add"
+                      >
+                        <Plus className="h-6 w-6" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-white/[0.12] px-4 backdrop-blur">
+                      <textarea
+                        placeholder="Add a caption…"
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        rows={1}
+                        className="max-h-24 w-full resize-none bg-transparent py-[11px] text-[16px] leading-[22px] text-white outline-none placeholder:text-white/50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                        data-testid="input-photo-caption"
+                      />
+                    </div>
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sendMessageMutation.isPending}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-transform active:scale-90 disabled:opacity-60"
+                      aria-label="Send photo"
+                      data-testid="photo-review-send"
+                    >
+                      {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* "+" options — photos or dictation, one tidy sheet */}
           <DraggableSheet open={plusOpen} onOpenChange={setPlusOpen} title="Add to message" testid="sheet-message-plus">

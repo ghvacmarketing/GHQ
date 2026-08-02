@@ -61,6 +61,8 @@ export interface SendMessageOptions {
     contentType: string;
     filename: string;
     base64Data: string;
+    /** Public absolute URL of the same file — Textline's documented shape. */
+    url?: string;
   }>;
 }
 
@@ -143,12 +145,14 @@ class TextlineClient {
         body.group_uuid = options.groupUuid;
       }
 
-      // Handle attachments if provided
+      // Handle attachments if provided. Both shapes are sent — inline base64
+      // (`data`) and a public `url` — so whichever one Textline honors works.
       if (options.attachments && options.attachments.length > 0) {
         body.comment.attachments = options.attachments.map(att => ({
           content_type: att.contentType,
           filename: att.filename,
           data: att.base64Data,
+          ...(att.url ? { url: att.url } : {}),
         }));
       }
 

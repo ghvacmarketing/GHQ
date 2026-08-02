@@ -61,7 +61,10 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
     if (request.recipientPhone) {
       // Turn any /objects/... attachments into base64 so Textline sends them
       // as an MMS. Bytes are read from our own object store (Neon/disk/GCS).
-      let textlineAttachments: Array<{ contentType: string; filename: string; base64Data: string }> | undefined;
+      // A public absolute URL rides along too — Textline's documented shape is
+      // URL-based, and /objects/ paths are publicly served (unguessable UUIDs).
+      const publicBase = (process.env.PUBLIC_APP_URL || "https://www.ghvac.app").replace(/\/$/, "");
+      let textlineAttachments: Array<{ contentType: string; filename: string; base64Data: string; url?: string }> | undefined;
       if (request.attachments && request.attachments.length > 0) {
         const objectStore = new ObjectStorageService();
         textlineAttachments = [];
@@ -73,6 +76,7 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
               contentType: att.mimeType || "application/octet-stream",
               filename: att.filename || "attachment",
               base64Data: bytes.toString("base64"),
+              url: att.url.startsWith("/") ? publicBase + att.url : att.url,
             });
           } catch (err) {
             console.error("[Textline] Failed to read attachment bytes for", att.url, err);
