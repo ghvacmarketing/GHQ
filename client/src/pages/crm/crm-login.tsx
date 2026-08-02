@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { setCrmToken, crmFetch } from "@/lib/crmAuth";
+import { useKeyboardInset } from "@/lib/native";
 import { AlertCircle, Lock, Mail, Loader2 } from "lucide-react";
 import redlogo from "@assets/redlogo.webp";
 import { WhatsNewPanel } from "@/components/crm/whats-new-panel";
@@ -38,6 +39,9 @@ export default function CrmLogin() {
   usePageTitle("CRM Login");
   const [location] = useLocation();
   const { toast } = useToast();
+  // Phones: the sign-in pane must scroll and clear the keyboard so the
+  // focused field is always visible while typing.
+  const kbInset = useKeyboardInset();
 
   const googleError = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -145,9 +149,28 @@ export default function CrmLogin() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Left — sign in */}
-      <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-10 lg:w-[46%] lg:px-16">
+    <div className="flex h-screen bg-background">
+      {/* Left — sign in. Scrollable with keyboard clearance so the focused
+          field always stays visible on phones. */}
+      <div
+        className="relative h-full w-full overflow-y-auto lg:w-[46%]"
+        onFocusCapture={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.tagName === "INPUT") {
+            setTimeout(() => {
+              window.scrollTo(0, 0);
+              t.scrollIntoView({ block: "center", behavior: "smooth" });
+            }, 300);
+          }
+        }}
+      >
+        <div
+          className="flex min-h-[calc(100%+1px)] flex-col justify-center px-6 py-10 sm:px-10 lg:px-16"
+          style={{
+            paddingBottom: `calc(2.5rem + ${kbInset}px)`,
+            transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+          }}
+        >
         <div className="mx-auto w-full max-w-sm">
           <img src={redlogo} alt="Giesbrecht HVAC" className="mb-8 h-12" />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to GHQ</h1>
@@ -225,6 +248,7 @@ export default function CrmLogin() {
               </a>
             </p>
           </div>
+        </div>
         </div>
       </div>
 

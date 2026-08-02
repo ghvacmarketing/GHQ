@@ -614,82 +614,85 @@ export default function MobileMessages() {
               willChange: "transform",
             }}
           >
-            <div className="rounded-2xl bg-[#d1d3d9] p-3 shadow-lg">
-              {pendingPhotos.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {pendingPhotos.map((p, i) => (
-                    <div key={i} className="relative">
-                      <img src={p.preview} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
-                      <button
-                        onClick={() => setPendingPhotos((prev) => prev.filter((_, j) => j !== i))}
-                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
-                        aria-label="Remove photo"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <textarea
-                placeholder="Message"
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                rows={1}
-                className="max-h-32 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                data-testid="input-message"
-              />
-              <div className="mt-1.5 flex items-center gap-0.5">
-                <input
-                  ref={attachInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  hidden
-                  onChange={(e) => {
-                    pickPhotos(e.target.files);
-                    e.target.value = "";
-                  }}
-                />
-                <button
-                  onClick={() => attachInputRef.current?.click()}
-                  disabled={pendingPhotos.length >= 3 || sendMessageMutation.isPending}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-40"
-                  aria-label="Attach photos"
-                  data-testid="message-attach"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-                {voice.supported && (
-                  <button
-                    onClick={toggleMic}
-                    disabled={voice.processing || sendMessageMutation.isPending}
-                    className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
-                      voice.listening ? "bg-[#711419] text-white" : "text-slate-500 active:bg-slate-100"
-                    }`}
-                    aria-label={voice.listening ? "Stop dictating" : "Dictate a message"}
-                    data-testid="message-mic"
-                  >
-                    {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
-                    {voice.processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
-                  </button>
-                )}
-                <div className="flex-1" />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={(!messageText.trim() && pendingPhotos.length === 0) || sendMessageMutation.isPending}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:bg-slate-200 disabled:text-slate-400"
-                  data-testid="button-send-message"
-                >
-                  {sendMessageMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </button>
+            {pendingPhotos.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {pendingPhotos.map((p, i) => (
+                  <div key={i} className="relative">
+                    <img src={p.preview} alt="" className="h-14 w-14 rounded-lg border border-white/30 object-cover shadow-md" />
+                    <button
+                      onClick={() => setPendingPhotos((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-white shadow"
+                      aria-label="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+            {/* One-line floating row: + | field | mic-or-send */}
+            <div className="flex items-end gap-2">
+              <input
+                ref={attachInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  pickPhotos(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                onClick={() => attachInputRef.current?.click()}
+                disabled={pendingPhotos.length >= 3 || sendMessageMutation.isPending}
+                className="liquid-glass flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
+                aria-label="Attach photos"
+                data-testid="message-attach"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+              <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-[#d1d3d9] px-4 shadow-lg">
+                <textarea
+                  placeholder="Message"
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  rows={1}
+                  className="max-h-24 w-full resize-none bg-transparent py-[11px] text-[16px] leading-[22px] text-slate-900 outline-none placeholder:text-slate-500"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  data-testid="input-message"
+                />
+              </div>
+              {/* Mic when empty, send when there's something to send */}
+              <button
+                onClick={() => {
+                  if (voice.listening) { voice.stop(); return; }
+                  if (messageText.trim() || pendingPhotos.length > 0) handleSendMessage();
+                  else toggleMic();
+                }}
+                disabled={
+                  sendMessageMutation.isPending ||
+                  voice.processing ||
+                  (!voice.supported && !messageText.trim() && pendingPhotos.length === 0)
+                }
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-transform active:scale-90 disabled:opacity-50"
+                aria-label={voice.listening ? "Stop dictating" : messageText.trim() || pendingPhotos.length ? "Send" : "Dictate a message"}
+                data-testid="button-send-message"
+              >
+                {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border-2 border-[#711419]" />}
+                {sendMessageMutation.isPending || voice.processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : messageText.trim() || pendingPhotos.length > 0 ? (
+                  <Send className="h-5 w-5" />
+                ) : (
+                  <Mic className="h-5 w-5" />
+                )}
+              </button>
             </div>
           </div>
         </div>
