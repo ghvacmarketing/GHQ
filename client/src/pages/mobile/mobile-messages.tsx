@@ -86,6 +86,10 @@ export default function MobileMessages() {
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   // Composer rides the keyboard with the same eased inset as Gibbs
   const kbInset = useKeyboardInset();
+  // After the keyboard leaves, snap back any leftover page pan Safari did.
+  useEffect(() => {
+    if (kbInset === 0) window.scrollTo(0, 0);
+  }, [kbInset]);
 
   // Voice dictation — same engine as Gibbs (Whisper on iOS)
   const dictationBase = useRef("");
@@ -151,6 +155,9 @@ export default function MobileMessages() {
         st.engaged = true;
         el.style.transition = "none";
         el.style.animation = "none";
+        // Typing mid-swipe: drop the keyboard the moment the back-swipe
+        // engages so the panel and keys leave together.
+        (document.activeElement as HTMLElement | null)?.blur?.();
       } else if (dy > 14) { st.active = false; return; }
     }
     if (st.engaged) el.style.transform = `translateX(${Math.max(0, dx)}px)`;
@@ -435,13 +442,21 @@ export default function MobileMessages() {
               : "animate-in fade-in slide-in-from-bottom-2 duration-200"
           }`}
           data-testid="messages-search-overlay"
+          onFocusCapture={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.tagName === "INPUT") {
+              // Cancel Safari's whole-page pan so the bar's own animated ride
+              // up to the keyboard is the only motion.
+              [0, 120, 300, 650].forEach((ms) => setTimeout(() => window.scrollTo(0, 0), ms));
+            }
+          }}
         >
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${!conversations || conversations.length === 0 ? "flex flex-col justify-end" : ""}`}
             style={{
               paddingTop: "calc(env(safe-area-inset-top) + 12px)",
               paddingBottom: `calc(env(safe-area-inset-bottom) + 84px + ${kbInset}px)`,
-              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+              transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             {conversations && conversations.length > 0 ? (
@@ -462,7 +477,7 @@ export default function MobileMessages() {
             className="absolute inset-x-0 z-10 flex items-center gap-2 px-4"
             style={{
               bottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)",
-              transition: "bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+              transition: "bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
@@ -507,6 +522,16 @@ export default function MobileMessages() {
           onPointerMove={onThreadSwipeMove}
           onPointerUp={onThreadSwipeEnd}
           onPointerCancel={onThreadSwipeEnd}
+          onFocusCapture={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.tagName === "TEXTAREA" || t.tagName === "INPUT") {
+              // Safari "helps" by panning the whole page to reveal the field,
+              // which jolts the fixed panel BEFORE our animated ride starts.
+              // Undo the pan across the keyboard animation so the only motion
+              // is the smooth transform shift.
+              [0, 120, 300, 650].forEach((ms) => setTimeout(() => window.scrollTo(0, 0), ms));
+            }
+          }}
         >
           {/* Header strip — one translucent bar holding back, name, and call */}
           <div
@@ -632,6 +657,32 @@ export default function MobileMessages() {
               willChange: "transform",
             }}
           >
+            {/* Dictation status — its own floating pill, one tap to stop.
+                The + stays a plain + (all voice control lives in its sheet). */}
+            {(voice.listening || voice.processing) && (
+              <div className="mb-2 flex justify-center">
+                <button
+                  onClick={() => { if (voice.listening) voice.stop(); }}
+                  className="flex items-center gap-2 rounded-full bg-slate-900/80 px-4 py-2 text-[13px] font-semibold text-white shadow-lg backdrop-blur"
+                  data-testid="dictation-status"
+                >
+                  {voice.processing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Transcribing…
+                    </>
+                  ) : (
+                    <>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                        <span className="relative h-2.5 w-2.5 rounded-full bg-red-500" />
+                      </span>
+                      Listening — tap to stop
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
             {/* One-line floating row: + (photos & dictation) | field | send */}
             <div className="flex items-end gap-2">
               <input
@@ -646,24 +697,18 @@ export default function MobileMessages() {
                 }}
               />
               <button
-                onClick={() => {
-                  if (voice.listening) { voice.stop(); return; }
-                  setPlusOpen(true);
-                }}
-                disabled={sendMessageMutation.isPending || voice.processing}
-                className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md transition-transform active:scale-95 disabled:opacity-40 ${
-                  voice.listening ? "bg-[#711419] text-white" : "liquid-glass text-slate-700"
-                }`}
-                aria-label={voice.listening ? "Stop dictating" : "Add to message"}
+                onClick={() => setPlusOpen(true)}
+                disabled={sendMessageMutation.isPending}
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
+                aria-label="Add to message"
                 data-testid="message-attach"
               >
-                {voice.listening && <span className="absolute inset-0 animate-ping rounded-full border-2 border-[#711419]" />}
-                {voice.processing ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : voice.listening ? (
-                  <Mic className="h-5 w-5" />
-                ) : (
-                  <Plus className="h-5 w-5" />
+                <Plus className="h-5 w-5" />
+                {voice.listening && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
+                    <span className="absolute h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                    <span className="relative h-3 w-3 rounded-full bg-red-500" />
+                  </span>
                 )}
               </button>
               <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-[#d1d3d9] px-4 shadow-lg">
@@ -824,10 +869,14 @@ export default function MobileMessages() {
                   className="flex w-full items-center gap-3 border-t border-slate-200/80 px-3.5 py-3.5 text-left active:bg-slate-50"
                   data-testid="message-plus-dictate"
                 >
-                  <Mic className="h-5 w-5 text-[#711419]" />
+                  <Mic className={`h-5 w-5 ${voice.listening ? "text-red-600" : "text-[#711419]"}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-slate-900">Dictate</span>
-                    <span className="block text-xs text-slate-500">Speak your message — tap the pulsing button to stop</span>
+                    <span className="block text-sm font-semibold text-slate-900">
+                      {voice.listening ? "Stop dictating" : "Dictate"}
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      {voice.listening ? "Recording now — tap to finish" : "Speak your message — tap the red pill to stop"}
+                    </span>
                   </span>
                 </button>
               )}

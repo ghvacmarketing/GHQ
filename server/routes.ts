@@ -29129,6 +29129,60 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // GET /api/mobile/messaging/contacts - Search customers for new conversations
+  // Address check for the mobile create forms — proxied server-side because
+  // the referrer-restricted browser key silently fails inside app webviews.
+  // Tries Google's Address Validation API first (presenting the app's own
+  // origin as referrer), then the keyless Census geocoder, so the badge
+  // always has an answer. Returns { verdict, standardized? } or null.
+  app.post("/api/mobile/validate-address", requireCrmTechOrAbove, async (req, res) => {
+    const address = typeof req.body?.address === "string" ? req.body.address.trim() : "";
+    if (!address) return res.json(null);
+    const normalize = (s: string) => s.toUpperCase().replace(/[.,#]/g, " ").replace(/\s+/g, " ").trim();
+    try {
+      const key = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_PLACES_API_KEY;
+      if (key) {
+        try {
+          const r = await fetch(`https://addressvalidation.googleapis.com/v1:validateAddress?key=${key}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Referer: "https://www.ghvac.app/" },
+            body: JSON.stringify({ address: { regionCode: "US", addressLines: [address] } }),
+          });
+          if (r.ok) {
+            const data: any = await r.json();
+            const v = data?.result?.verdict;
+            const standardized = (data?.result?.address?.formattedAddress as string | undefined)?.replace(/,\s*USA$/i, "");
+            if (v) {
+              if (v.addressComplete && !v.hasUnconfirmedComponents) return res.json({ verdict: "verified", standardized });
+              if (standardized && normalize(standardized) !== normalize(address)) return res.json({ verdict: "fixable", standardized });
+              return res.json({ verdict: "unverified", standardized });
+            }
+          }
+        } catch { /* fall through to the keyless checker */ }
+      }
+      const cr = await fetch(
+        `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&format=json`,
+      );
+      if (!cr.ok) return res.json(null);
+      const cdata: any = await cr.json();
+      const matched = cdata?.result?.addressMatches?.[0]?.matchedAddress as string | undefined;
+      if (!matched) return res.json({ verdict: "unverified" });
+      // Census returns "123 MAIN ST, WRENS, GA, 30833" — reshape to the
+      // "Addr, City, ST ZIP" form the client's tap-to-use parser expects.
+      const parts = matched.split(",").map((p) => p.trim());
+      const tc = (s: string) => s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
+      const standardized =
+        parts.length >= 4 ? `${tc(parts[0])}, ${tc(parts[1])}, ${parts[2]} ${parts[3]}` : tc(matched);
+      return res.json(
+        normalize(matched) === normalize(address)
+          ? { verdict: "verified", standardized }
+          : { verdict: "fixable", standardized },
+      );
+    } catch (err) {
+      console.error("[validate-address]", err);
+      return res.json(null);
+    }
+  });
+
   app.get("/api/mobile/messaging/contacts", requireCrmTechOrAbove, async (req, res) => {
     try {
       const { search } = req.query;

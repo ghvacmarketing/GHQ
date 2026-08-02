@@ -207,28 +207,21 @@ export type AddressValidationResult = {
   standardized?: string;
 };
 
-/** USPS-grade check via the Address Validation API. Best-effort: any
- *  API/network problem returns null so forms never block on it. */
+/** USPS-grade check, proxied through our server (the browser Google key is
+ *  referrer-restricted and silently fails inside app webviews; the server
+ *  also has a keyless fallback). Best-effort: any problem returns null so
+ *  forms never block on it. */
 export async function validateAddress(address: string): Promise<AddressValidationResult | null> {
-  if (!KEY || !address.trim()) return null;
+  if (!address.trim()) return null;
   try {
-    const res = await fetch(`https://addressvalidation.googleapis.com/v1:validateAddress?key=${KEY}`, {
+    const res = await fetch("/api/mobile/validate-address", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address: { regionCode: "US", addressLines: [address] } }),
+      credentials: "include",
+      body: JSON.stringify({ address: address.trim() }),
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    const v = data?.result?.verdict;
-    const standardized = data?.result?.address?.formattedAddress as string | undefined;
-    if (!v) return null;
-    if (v.addressComplete && !v.hasUnconfirmedComponents) {
-      return { verdict: "verified", standardized };
-    }
-    if (standardized && standardized.toLowerCase() !== address.trim().toLowerCase()) {
-      return { verdict: "fixable", standardized };
-    }
-    return { verdict: "unverified", standardized };
+    return await res.json();
   } catch {
     return null;
   }

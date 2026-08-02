@@ -5,6 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
+import { useKeyboardInset } from "@/lib/native";
 import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
@@ -327,7 +328,12 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   // but not the layout viewport, so a bottom-anchored sheet ends up with its
   // composer (and the last messages) hidden behind the keys. Track how much of
   // the window the keyboard covers and lift the sheet's bottom by that much.
-  const [kbInset, setKbInset] = useState(0);
+  const [kbInsetWeb, setKbInset] = useState(0);
+  // Native shell: visualViewport never changes (Keyboard resize:"none"), so
+  // the shared hook's keyboardWillShow signal is the only one that fires
+  // there. Web PWAs use the burst-remeasured local value. Take whichever.
+  const kbInsetNative = useKeyboardInset();
+  const kbInset = Math.max(kbInsetWeb, kbInsetNative);
   useEffect(() => {
     if (!open) return;
     const measure = () => {
@@ -1286,7 +1292,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         <div
           aria-hidden="true"
           className="shrink-0"
-          style={{ height: kbInset, transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)" }}
+          style={{ height: kbInset, transition: "height 0.32s cubic-bezier(0.32, 0.72, 0, 1)" }}
         />
         </div>
 
