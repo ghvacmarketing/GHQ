@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Check } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import typeResidential from "@/assets/type-residential.png";
 import typeCommercial from "@/assets/type-commercial.png";
 import typePropertyManager from "@/assets/type-property-manager.png";
@@ -21,6 +21,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LEAD_SOURCES } from "@/lib/lead-sources";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import { validateAddress, type AddressValidationResult } from "@/components/mobile/address-autocomplete";
+import { AddressSearchSheet } from "@/components/mobile/address-search-sheet";
 import type { AccountType, LeadSource } from "@shared/schema";
 
 /** New Customer — the mobile twin of the CRM's account-create wizard. It
@@ -56,6 +57,7 @@ export default function MobileCustomerNew() {
   const [address1, setAddress1] = useState("");
   const [addrCheck, setAddrCheck] = useState<AddressValidationResult | null>(null);
   const [addrChecking, setAddrChecking] = useState(false);
+  const [addrSearchOpen, setAddrSearchOpen] = useState(false);
   const [address2, setAddress2] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -269,6 +271,27 @@ export default function MobileCustomerNew() {
               Property managers don't get a service site from this address — add their properties from the customer's page.
             </p>
           )}
+          {/* Look-up first: a search that opens the address sheet (typed
+              suggestions + map). The plain fields below stay for hand entry
+              and edits after a pick. */}
+          <button
+            onClick={() => setAddrSearchOpen(true)}
+            className="flex h-11 w-full items-center gap-2.5 rounded-md border border-input bg-white px-3.5 text-left shadow-xs"
+            data-testid="nc-address-search"
+          >
+            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <span className="text-base text-muted-foreground">Search for the address…</span>
+          </button>
+          <AddressSearchSheet
+            open={addrSearchOpen}
+            onOpenChange={setAddrSearchOpen}
+            onSelect={(a) => {
+              setAddress1(a.address1);
+              setCity(a.city);
+              setState(a.state);
+              setZip(a.zip);
+            }}
+          />
           <div>
             <Label htmlFor="nc-address1" className="mb-1.5 block">Address line 1 *</Label>
             <Input id="nc-address1" value={address1} onChange={(e) => setAddress1(e.target.value)} placeholder="123 Main St" data-testid="nc-address1" />

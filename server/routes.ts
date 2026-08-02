@@ -29209,6 +29209,69 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // Address suggestions for the mobile create forms — server-proxied like
+  // validate-address. Google Places Autocomplete first (browser key works
+  // server-side with the app origin as referrer), Nominatim (OpenStreetMap,
+  // keyless — already used for ETA geocoding) as the fallback. Returns
+  // [{ description, main, secondary, address1?, city?, state?, zip? }].
+  app.post("/api/mobile/address-autocomplete", requireCrmTechOrAbove, async (req, res) => {
+    const query = typeof req.body?.query === "string" ? req.body.query.trim() : "";
+    if (query.length < 3) return res.json([]);
+    const key = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_PLACES_API_KEY;
+    if (key) {
+      try {
+        const r = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": key,
+            Referer: "https://www.ghvac.app/",
+          },
+          body: JSON.stringify({ input: query, includedRegionCodes: ["us"] }),
+        });
+        if (r.ok) {
+          const data: any = await r.json();
+          const out = (data?.suggestions || [])
+            .map((s: any) => s.placePrediction)
+            .filter(Boolean)
+            .slice(0, 6)
+            .map((p: any) => ({
+              description: (p.text?.text || "").replace(/,\s*USA$/i, ""),
+              main: p.structuredFormat?.mainText?.text || p.text?.text || "",
+              secondary: (p.structuredFormat?.secondaryText?.text || "").replace(/,\s*USA$/i, ""),
+            }))
+            .filter((s: any) => s.description);
+          if (out.length > 0) return res.json(out);
+        }
+      } catch { /* fall through to the keyless source */ }
+    }
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=6&q=${encodeURIComponent(query)}`,
+        { headers: { "User-Agent": "GHQ-FieldApp/1.0 (ghvac.app)" } },
+      );
+      const rows: any[] = r.ok ? await r.json() : [];
+      return res.json(rows.map((row) => {
+        const a = row.address || {};
+        const line1 = [a.house_number, a.road].filter(Boolean).join(" ");
+        const city = a.city || a.town || a.village || a.hamlet || "";
+        const state = (a["ISO3166-2-lvl4"] || "").split("-")[1] || "";
+        return {
+          description: String(row.display_name || "").replace(/, United States$/i, ""),
+          main: line1 || String(row.display_name || "").split(",")[0],
+          secondary: [city, [state, a.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+          address1: line1 || undefined,
+          city: city || undefined,
+          state: state || undefined,
+          zip: a.postcode || undefined,
+        };
+      }));
+    } catch (err) {
+      console.error("[address-autocomplete]", err);
+      return res.json([]);
+    }
+  });
+
   app.get("/api/mobile/messaging/contacts", requireCrmTechOrAbove, async (req, res) => {
     try {
       const { search } = req.query;

@@ -1,11 +1,32 @@
-import { useState } from "react";
-import { format, startOfToday } from "date-fns";
+import { useEffect, useRef, useState } from "react";
+import { addMonths, format, startOfToday } from "date-fns";
 import { ChevronDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import type { DateRange } from "react-day-picker";
 
 const fmtDay = (d: string) => format(new Date(`${d}T12:00:00`), "MMM d, yyyy");
+
+/** Horizontal swipe on the calendar pages months (left = forward). Taps on
+ *  days stay taps — only a clearly sideways motion counts. */
+function useMonthSwipe(setMonth: React.Dispatch<React.SetStateAction<Date>>) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      start.current = { x: e.clientX, y: e.clientY };
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      const st = start.current;
+      start.current = null;
+      if (!st) return;
+      const dx = e.clientX - st.x;
+      const dy = Math.abs(e.clientY - st.y);
+      if (Math.abs(dx) > 48 && Math.abs(dx) > dy * 1.4) {
+        setMonth((m) => addMonths(m, dx < 0 ? 1 : -1));
+      }
+    },
+  };
+}
 
 // One shared look for every mobile calendar: full-width weeks, generous row
 // height, floating month arrows, maroon selection.
@@ -66,6 +87,12 @@ export function DateRangeSheet({
     ? { from: new Date(`${from}T12:00:00`), to: to ? new Date(`${to}T12:00:00`) : undefined }
     : undefined;
   const summary = !from ? "Pick dates" : from === to || !to ? fmtDay(from) : `${fmtDay(from)} – ${fmtDay(to)}`;
+  const [month, setMonth] = useState<Date>(new Date());
+  const monthSwipe = useMonthSwipe(setMonth);
+  useEffect(() => {
+    if (open) setMonth(from ? new Date(`${from}T12:00:00`) : new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
     <>
@@ -85,7 +112,7 @@ export function DateRangeSheet({
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
         <p className="mt-1 text-[13px] text-slate-400">Tap once for a single day, twice for a range.</p>
 
-        <div className="mt-5 px-0.5">
+        <div className="mt-5 px-0.5" style={{ touchAction: "pan-y" }} {...monthSwipe}>
           <Calendar
             mode="range"
             selected={selected}
@@ -94,7 +121,8 @@ export function DateRangeSheet({
               const t = r?.to ? format(r.to, "yyyy-MM-dd") : f;
               onChange(f, t);
             }}
-            defaultMonth={selected?.from ?? new Date()}
+            month={month}
+            onMonthChange={setMonth}
             numberOfMonths={1}
             className="w-full p-0"
             classNames={RANGE_CLASSNAMES}
@@ -148,6 +176,12 @@ export function DateSheet({
 }) {
   const [open, setOpen] = useState(false);
   const selected = value ? new Date(`${value}T12:00:00`) : undefined;
+  const [month, setMonth] = useState<Date>(new Date());
+  const monthSwipe = useMonthSwipe(setMonth);
+  useEffect(() => {
+    if (open) setMonth(value ? new Date(`${value}T12:00:00`) : new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
     <>
@@ -179,7 +213,7 @@ export function DateSheet({
       <DraggableSheet tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
 
-        <div className="mt-5 px-0.5">
+        <div className="mt-5 px-0.5" style={{ touchAction: "pan-y" }} {...monthSwipe}>
           <Calendar
             mode="single"
             selected={selected}
@@ -187,7 +221,8 @@ export function DateSheet({
               onChange(d ? format(d, "yyyy-MM-dd") : "");
               if (d) setTimeout(() => setOpen(false), 180);
             }}
-            defaultMonth={selected ?? new Date()}
+            month={month}
+            onMonthChange={setMonth}
             numberOfMonths={1}
             disabled={minToday ? { before: startOfToday() } : undefined}
             className="w-full p-0"
