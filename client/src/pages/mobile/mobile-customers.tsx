@@ -113,6 +113,7 @@ export default function MobileCustomers() {
   const [fRange, setFRange] = useState<"all" | "30" | "90" | "year" | "custom">("all");
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
+  const [fDatesOpen, setFDatesOpen] = useState(false);
   const filtersActive = fType !== "all" || fStatus !== "all" || fAgreement || fRange !== "all";
   const createdFrom =
     fRange === "30" ? format(new Date(Date.now() - 30 * 864e5), "yyyy-MM-dd")
@@ -456,7 +457,11 @@ export default function MobileCustomers() {
           <SheetSelect
             label="Date added"
             value={fRange}
-            onChange={(k) => setFRange(k as typeof fRange)}
+            onChange={(k) => {
+              setFRange(k as typeof fRange);
+              // Picking "Custom range" goes straight to the calendar
+              if (k === "custom") setFDatesOpen(true);
+            }}
             options={[
               { key: "all", label: "All time" },
               { key: "30", label: "Last 30 days" },
@@ -472,6 +477,8 @@ export default function MobileCustomers() {
               from={fFrom}
               to={fTo}
               onChange={(f, t) => { setFFrom(f); setFTo(t); }}
+              open={fDatesOpen}
+              onOpenChange={setFDatesOpen}
               testid="customers-filter-calendar"
             />
           )}

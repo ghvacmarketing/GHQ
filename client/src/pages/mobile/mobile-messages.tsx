@@ -530,7 +530,7 @@ export default function MobileMessages() {
               // Room to scroll past the floating composer — messages glide
               // beneath it instead of being clipped at its wrapper edge.
               paddingBottom: `calc(env(safe-area-inset-bottom) + 118px + ${kbInset}px)`,
-              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+              transition: "padding-bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             {loadingDetail && messages.length === 0 ? (
@@ -603,8 +603,12 @@ export default function MobileMessages() {
           <div
             className="absolute inset-x-0 z-10 px-3"
             style={{
-              bottom: kbInset > 0 ? `${kbInset + 8}px` : "calc(env(safe-area-inset-bottom) + 8px)",
-              transition: "bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+              bottom: "calc(env(safe-area-inset-bottom) + 8px)",
+              // Ride the keyboard on a pure transform — compositor-only, so
+              // the rise and fall stay butter-smooth.
+              transform: kbInset > 0 ? `translateY(calc(-${kbInset}px + env(safe-area-inset-bottom)))` : "translateY(0)",
+              transition: "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              willChange: "transform",
             }}
           >
             <div className="rounded-2xl bg-[#d1d3d9] p-3 shadow-lg">

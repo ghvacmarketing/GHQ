@@ -71,6 +71,7 @@ export default function MobileTime() {
   const [tsFrom, setTsFrom] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [tsTo, setTsTo] = useState(format(new Date(), "yyyy-MM-dd"));
   const [tsCat, setTsCat] = useState<string>("all");
+  const [tsDatesOpen, setTsDatesOpen] = useState(false);
 
   // Manual entry dialog
   const [manualOpen, setManualOpen] = useState(false);
@@ -368,7 +369,11 @@ export default function MobileTime() {
           <SheetSelect
             label="Date range"
             value={tsPreset}
-            onChange={(k) => setTsPreset(k as typeof tsPreset)}
+            onChange={(k) => {
+              setTsPreset(k as typeof tsPreset);
+              // Picking "Custom range" goes straight to the calendar
+              if (k === "custom") setTsDatesOpen(true);
+            }}
             options={[
               { key: "this-week", label: "This week" },
               { key: "last-week", label: "Last week" },
@@ -383,6 +388,8 @@ export default function MobileTime() {
               from={tsFrom}
               to={tsTo}
               onChange={(f, t) => { setTsFrom(f); setTsTo(t); }}
+              open={tsDatesOpen}
+              onOpenChange={setTsDatesOpen}
               testid="timesheet-filter-calendar"
             />
           )}

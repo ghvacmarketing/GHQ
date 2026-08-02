@@ -194,37 +194,57 @@ export default function MobileCustomerDetail() {
       <div
         className="min-h-full"
         data-testid="mobile-customer-detail-page"
-        onTouchStart={(e) => {
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={(e) => {
           const el = e.currentTarget as any;
           if (!el._mountedAt) el._mountedAt = Date.now();
-          const t = e.touches[0];
           // Edge swipe only, and never within the first beat after opening —
           // the tap that navigated here must not double as an exit gesture.
-          if (t.clientX < 40 && Date.now() - el._mountedAt > 500) {
-            el._swipe = { x: t.clientX, y: t.clientY };
-          }
+          if (e.clientX > 48 || Date.now() - el._mountedAt < 500) { el._swipe = null; return; }
+          el._swipe = { x: e.clientX, y: e.clientY, engaged: false };
+          el.setPointerCapture?.(e.pointerId);
         }}
-        onTouchMove={(e) => {
+        onPointerMove={(e) => {
           const el = e.currentTarget as any;
           const st = el._swipe;
           if (!st) return;
-          const t = e.touches[0];
-          const dx = t.clientX - st.x;
-          const dy = Math.abs(t.clientY - st.y);
-          if (dx > 80 && dy < 40 && dx > dy * 2) {
-            el._swipe = null;
-            navigate("/mobile/customers");
-          } else if (dy > 50) {
-            el._swipe = null; // vertical scroll — not a back gesture
+          const dx = e.clientX - st.x;
+          const dy = Math.abs(e.clientY - st.y);
+          if (!st.engaged) {
+            if (dx > 8 && dx > dy) {
+              st.engaged = true;
+              el.style.transition = "none";
+            } else if (dy > 14) { el._swipe = null; return; }
+          }
+          if (st.engaged) el.style.transform = `translateX(${Math.max(0, dx)}px)`;
+        }}
+        onPointerUp={(e) => {
+          const el = e.currentTarget as any;
+          const st = el._swipe;
+          el._swipe = null;
+          if (!st?.engaged) return;
+          const dx = e.clientX - st.x;
+          if (dx > Math.min(140, window.innerWidth * 0.33)) {
+            // Slide off from wherever the finger left it, then leave
+            const w = el.clientWidth || window.innerWidth;
+            const startP = Math.max(0, Math.min(1, dx / w));
+            const dur = 200 * (1 - startP) + 40;
+            el.style.transition = `transform ${dur}ms ease-in`;
+            el.style.transform = "translateX(100%)";
+            setTimeout(() => navigate("/mobile/customers"), dur - 10);
+          } else {
+            el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
+            el.style.transform = "translateX(0)";
+            setTimeout(() => { el.style.transition = ""; }, 290);
           }
         }}
-        onTouchEnd={(e) => { (e.currentTarget as any)._swipe = null; }}
+        onPointerCancel={(e) => { (e.currentTarget as any)._swipe = null; }}
       >
         {/* Floating back — no header bar */}
         <button
           onClick={() => navigate("/mobile/customers")}
           className="liquid-glass fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition-transform active:scale-95"
-          style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
+          style={{ top: "calc(env(safe-area-inset-top) + 2px)" }}
           data-testid="back-button"
         >
           <ArrowLeft className="h-5 w-5" />

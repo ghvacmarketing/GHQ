@@ -16,15 +16,23 @@ export function DateRangeSheet({
   to,
   onChange,
   label = "Dates",
+  open: openProp,
+  onOpenChange,
   testid,
 }: {
   from: string;
   to: string;
   onChange: (from: string, to: string) => void;
   label?: string;
+  /** Controlled open (optional) — lets a parent auto-open the calendar the
+   *  moment "Custom range" is picked. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   testid?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
   const selected: DateRange | undefined = from
     ? { from: new Date(`${from}T12:00:00`), to: to ? new Date(`${to}T12:00:00`) : undefined }
     : undefined;
@@ -65,7 +73,7 @@ export function DateRangeSheet({
               month: "w-full space-y-3",
               caption: "relative flex items-center justify-center pt-1",
               caption_label: "text-base font-semibold text-slate-900",
-              nav_button: "flex h-9 w-9 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95",
+              nav_button: "flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-600 shadow-md transition-transform active:scale-95",
               table: "w-full border-collapse",
               head_row: "flex w-full",
               head_cell: "flex-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400",
