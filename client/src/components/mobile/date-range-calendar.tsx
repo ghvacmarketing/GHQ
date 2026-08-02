@@ -108,7 +108,7 @@ export function DateRangeSheet({
         </span>
       </button>
 
-      <DraggableSheet tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
+      <DraggableSheet nested tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
         <p className="mt-1 text-[13px] text-slate-400">Tap once for a single day, twice for a range.</p>
 
@@ -210,7 +210,7 @@ export function DateSheet({
         </button>
       )}
 
-      <DraggableSheet tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
+      <DraggableSheet nested tall open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-sheet` : undefined}>
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
 
         <div className="mt-5 px-0.5" style={{ touchAction: "pan-y" }} {...monthSwipe}>

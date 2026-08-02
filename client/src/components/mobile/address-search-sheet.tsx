@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, MapPin, Search } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowLeft, Loader2, Search } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { MapEmbed, validateAddress } from "@/components/mobile/address-autocomplete";
+import locationBadge from "@/assets/badge-location.png";
 
-/** Address lookup for the mobile create forms: a full-height bottom sheet
- *  with a plain search box (no OS widget), house-style suggestion cards as
- *  you type, and a map + confirm step once one is picked. Selection hands
+/** Address lookup for the mobile create forms: a bottom sheet with a plain
+ *  search box (no OS widget), house-style suggestion rows (metal pin badge)
+ *  as you type, and a map + confirm step once one is picked. Selection hands
  *  structured fields (address1/city/state/zip) back to the form. */
 
 export interface AddressSuggestion {
@@ -65,8 +66,10 @@ export function AddressSearchSheet({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const seqRef = useRef(0);
 
-  // Fresh sheet every open; focus once the slide-up has landed.
-  useEffect(() => {
+  // Fresh sheet every open — layout effect so the reset lands BEFORE paint;
+  // a plain effect let last time's picked place flash on screen for a frame
+  // as the sheet slid up. Focus once the slide-up has landed.
+  useLayoutEffect(() => {
     if (!open) return;
     setQuery("");
     setSuggestions([]);
@@ -126,9 +129,9 @@ export function AddressSearchSheet({
   };
 
   return (
-    <DraggableSheet full open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
+    <DraggableSheet tall open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
       {!chosen ? (
-        <>
+        <div className="min-h-[52dvh]">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <p className="mt-1 text-[13px] text-slate-400">Start typing a street address — pick a match to fill everything in.</p>
 
@@ -146,15 +149,17 @@ export function AddressSearchSheet({
           </div>
 
           {suggestions.length > 0 ? (
-            <div className="mt-4 space-y-2 pb-4">
+            <div
+              className={`mt-4 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm transition-opacity ${searching ? "opacity-60" : ""}`}
+            >
               {suggestions.map((s, i) => (
                 <button
                   key={`${s.description}-${i}`}
                   onClick={() => choose(s)}
-                  className="flex w-full items-start gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3 text-left shadow-sm active:bg-slate-50"
+                  className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
                   data-testid={`address-suggestion-${i}`}
                 >
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#711419]" />
+                  <img src={locationBadge} alt="" className="h-8 w-8 shrink-0 select-none" draggable={false} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-slate-900">{s.main}</span>
                     {s.secondary && <span className="block truncate text-xs text-slate-500">{s.secondary}</span>}
@@ -165,7 +170,7 @@ export function AddressSearchSheet({
           ) : query.trim().length >= 3 && !searching ? (
             <p className="mt-8 text-center text-sm text-slate-400">No matches — check the spelling or fill the fields in by hand.</p>
           ) : null}
-        </>
+        </div>
       ) : (
         <>
           <button
@@ -177,11 +182,11 @@ export function AddressSearchSheet({
           </button>
 
           <div className="mt-3">
-            <MapEmbed query={chosen.description} className="h-52" />
+            <MapEmbed query={chosen.description} className="h-44" />
           </div>
 
-          <div className="mt-4 flex items-start gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#711419]" />
+          <div className="mt-4 flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3 shadow-sm">
+            <img src={locationBadge} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900">{chosen.address1 || chosen.main}</p>
               <p className="text-xs text-slate-500">
@@ -190,13 +195,13 @@ export function AddressSearchSheet({
                   : [chosen.city, [chosen.state, chosen.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || chosen.secondary}
               </p>
             </div>
-            {resolving && <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-slate-300" />}
+            {resolving && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-300" />}
           </div>
 
           <button
             onClick={confirm}
             disabled={resolving}
-            className="mt-4 h-13 w-full rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
+            className="mt-4 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
             data-testid="address-search-use"
           >
             Use this address

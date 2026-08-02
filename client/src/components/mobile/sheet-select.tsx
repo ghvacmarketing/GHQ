@@ -56,7 +56,7 @@ export function SheetSelect({
         </button>
       )}
 
-      <DraggableSheet open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-options` : undefined}>
+      <DraggableSheet nested open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-options` : undefined}>
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
         <div className="mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
           {options.map((o, i) => (

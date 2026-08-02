@@ -29227,7 +29227,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             "X-Goog-Api-Key": key,
             Referer: "https://www.ghvac.app/",
           },
-          body: JSON.stringify({ input: query, includedRegionCodes: ["us"] }),
+          body: JSON.stringify({
+            input: query,
+            includedRegionCodes: ["us"],
+            // Bias hard toward the service area (Wrens, GA) — without this,
+            // "1291 Adams Rd" ranks same-named streets three states away
+            // above the one in Stapleton. 50km is the API's max circle.
+            locationBias: { circle: { center: { latitude: 33.2079, longitude: -82.3915 }, radius: 50000 } },
+          }),
         });
         if (r.ok) {
           const data: any = await r.json();
@@ -29247,7 +29254,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=6&q=${encodeURIComponent(query)}`,
+        // viewbox (without bounded=1) soft-biases ranking toward the CSRA
+        // service area, mirroring the Google locationBias above.
+        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=6&viewbox=-83.2,33.9,-81.6,32.5&q=${encodeURIComponent(query)}`,
         { headers: { "User-Agent": "GHQ-FieldApp/1.0 (ghvac.app)" } },
       );
       const rows: any[] = r.ok ? await r.json() : [];

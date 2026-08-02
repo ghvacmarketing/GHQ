@@ -20,6 +20,7 @@ export function DraggableSheet({
   tall = false,
   full = false,
   glass = false,
+  nested = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -31,6 +32,11 @@ export function DraggableSheet({
   /** Entire-page sheet: fills the screen below the status bar. Implies tall. */
   full?: boolean;
   glass?: boolean;
+  /** Sheet opened from INSIDE another sheet (option pickers, calendars).
+   *  Stacks above the parent and brings its own lighter scrim so the parent
+   *  sheet dims behind it — without this, both sheets share a z-index and the
+   *  picker reads as part of the parent while the page behind goes double-dark. */
+  nested?: boolean;
 }) {
   const keyboardInset = useKeyboardInset();
   const sheetRef = useRef<HTMLDivElement | null>(null);
@@ -100,8 +106,8 @@ export function DraggableSheet({
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        overlayClassName="z-[85]"
-        className={`z-[90] rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${
+        overlayClassName={nested ? "z-[95] bg-black/40" : "z-[85]"}
+        className={`${nested ? "z-[100] shadow-[0_-8px_32px_rgba(0,0,0,0.3)]" : "z-[90]"} rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${
           full
             ? "flex h-[calc(100dvh-env(safe-area-inset-top)-10px)] flex-col"
             : tall
