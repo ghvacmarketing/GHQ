@@ -11,7 +11,7 @@ import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
 import { Input } from "@/components/ui/input";
-import { isNativeApp, useKeyboardInset } from "@/lib/native";
+import { useKeyboardInset } from "@/lib/native";
 import { compressImage } from "@/lib/compress-image";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
@@ -87,38 +87,13 @@ export default function MobileMessages() {
     voice.start();
   };
 
-  // Floating-search overlay: bar docked at the bottom rides the keyboard
-  // with easing (same pattern as Jobs/Photos/Customers).
-  const searchBarRef = useRef<HTMLDivElement | null>(null);
+  // Floating-search overlay: the bar floats free (kbInset drives its
+  // bottom); this effect only times the focus with the open animation.
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     if (!searchActive) return;
-    const setInset = (px: number) => {
-      const el = searchBarRef.current;
-      if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
-    };
-    setInset(0);
     const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
-
-    let removeNative: (() => void) | null = null;
-    if (isNativeApp()) {
-      import("@capacitor/keyboard").then(({ Keyboard }) => {
-        const subs: any[] = [];
-        Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
-        Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
-        removeNative = () => subs.forEach((h) => h?.remove?.());
-      }).catch(() => {});
-    }
-    const vv = window.visualViewport;
-    const update = () => setInset(Math.max(0, window.innerHeight - (vv?.height || window.innerHeight) - (vv?.offsetTop || 0)));
-    vv?.addEventListener("resize", update);
-    vv?.addEventListener("scroll", update);
-    return () => {
-      clearTimeout(focusT);
-      removeNative?.();
-      vv?.removeEventListener("resize", update);
-      vv?.removeEventListener("scroll", update);
-    };
+    return () => clearTimeout(focusT);
   }, [searchActive]);
 
   const closeSearch = () => {
@@ -449,7 +424,11 @@ export default function MobileMessages() {
         >
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${!conversations || conversations.length === 0 ? "flex flex-col justify-end" : ""}`}
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top) + 12px)",
+              paddingBottom: `calc(env(safe-area-inset-bottom) + 84px + ${kbInset}px)`,
+              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
             {conversations && conversations.length > 0 ? (
               <div className="space-y-2 pb-2">
@@ -466,11 +445,10 @@ export default function MobileMessages() {
             )}
           </div>
           <div
-            ref={searchBarRef}
-            className="flex items-center gap-2 px-4 pt-2"
+            className="absolute inset-x-0 z-10 flex items-center gap-2 px-4"
             style={{
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
-              transition: "padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+              bottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)",
+              transition: "bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
@@ -514,38 +492,46 @@ export default function MobileMessages() {
           onPointerUp={onThreadSwipeEnd}
           onPointerCancel={onThreadSwipeEnd}
         >
-          {/* Floating chrome over the wallpaper — glass back, name pill, call */}
-          <button
-            onClick={() => closeThreadAnimated()}
-            className="liquid-glass absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full text-slate-800 shadow-sm transition-transform active:scale-95"
-            style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
-            data-testid="button-back-to-list"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+          {/* Header strip — one translucent bar holding back, name, and call */}
           <div
-            className="liquid-glass absolute left-16 right-16 z-10 rounded-full px-4 py-1.5 text-center shadow-sm"
-            style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+            className="absolute inset-x-0 top-0 z-10 border-b border-white/10 bg-slate-900/70 backdrop-blur-xl"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
-            <p className="truncate text-[14px] font-semibold leading-tight text-slate-900">{displayName}</p>
-            {displayPhone && <p className="truncate text-[10px] leading-tight text-slate-600">{displayPhone}</p>}
+            <div className="flex items-center gap-2 px-2 py-2">
+              <button
+                onClick={() => closeThreadAnimated()}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-100 transition-colors active:bg-white/10"
+                data-testid="button-back-to-list"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold leading-tight text-white">{displayName}</p>
+                {displayPhone && <p className="truncate text-xs leading-tight text-slate-300">{displayPhone}</p>}
+              </div>
+              {displayPhone && (
+                <a
+                  href={`tel:${displayPhone}`}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-slate-100 transition-colors active:bg-white/10"
+                  aria-label="Call"
+                  data-testid="button-call-contact"
+                >
+                  <Phone className="h-5 w-5" />
+                </a>
+              )}
+            </div>
           </div>
-          {displayPhone && (
-            <a
-              href={`tel:${displayPhone}`}
-              className="liquid-glass absolute right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full text-[#711419] shadow-sm transition-transform active:scale-95"
-              style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
-              aria-label="Call"
-              data-testid="button-call-contact"
-            >
-              <Phone className="h-5 w-5" />
-            </a>
-          )}
 
           <div
             ref={scrollRef}
             className="min-h-0 flex-1 overflow-y-auto px-3 py-3"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 60px)" }}
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top) + 64px)",
+              // Room to scroll past the floating composer — messages glide
+              // beneath it instead of being clipped at its wrapper edge.
+              paddingBottom: `calc(env(safe-area-inset-bottom) + 118px + ${kbInset}px)`,
+              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
             {loadingDetail && messages.length === 0 ? (
               /* Bubble-shaped skeletons — the thread settles in place */
@@ -554,7 +540,7 @@ export default function MobileMessages() {
                   <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`animate-pulse rounded-2xl ${
-                        i % 2 ? "h-10 w-44 rounded-br-[4px] bg-[#711419]/30" : "h-12 w-56 rounded-bl-[4px] bg-white/10"
+                        i % 2 ? "h-10 w-44 rounded-br-[4px] bg-[#711419]/30" : "h-12 w-56 rounded-bl-[4px] bg-[#d1d3d9]/25"
                       }`}
                     />
                   </div>
@@ -578,7 +564,7 @@ export default function MobileMessages() {
                         className={`relative max-w-[82%] rounded-2xl px-3 py-1.5 shadow-sm ${
                           entry.m.direction === "outbound"
                             ? "rounded-br-[4px] bg-[#711419] text-white"
-                            : "rounded-bl-[4px] bg-slate-800/95 text-slate-100"
+                            : "rounded-bl-[4px] bg-[#d1d3d9] text-slate-900"
                         }`}
                         data-testid={`message-${entry.m.id}`}
                       >
@@ -594,7 +580,7 @@ export default function MobileMessages() {
                         <p className="whitespace-pre-wrap break-words pb-1 pr-12 text-[15px] leading-snug">{entry.m.body}</p>
                         <span
                           className={`absolute bottom-1 right-2.5 text-[10px] ${
-                            entry.m.direction === "outbound" ? "text-white/60" : "text-slate-400/90"
+                            entry.m.direction === "outbound" ? "text-white/60" : "text-slate-500"
                           }`}
                         >
                           {entry.m.sentAt ? format(new Date(entry.m.sentAt), "h:mm a") : "…"}
@@ -612,13 +598,16 @@ export default function MobileMessages() {
             )}
           </div>
 
-          {/* Composer — same box as Gibbs: textarea on top, "+" attach on the
-              left below, round send on the right */}
+          {/* Composer — truly floating: absolutely positioned over the
+              wallpaper, messages scroll beneath it. Keyboard-gray box. */}
           <div
-            className="px-3 pt-2"
-            style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(env(safe-area-inset-bottom) + 10px)" }}
+            className="absolute inset-x-0 z-10 px-3"
+            style={{
+              bottom: kbInset > 0 ? `${kbInset + 8}px` : "calc(env(safe-area-inset-bottom) + 8px)",
+              transition: "bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
-            <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-md">
+            <div className="rounded-2xl bg-[#d1d3d9] p-3 shadow-lg">
               {pendingPhotos.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {pendingPhotos.map((p, i) => (
@@ -696,12 +685,6 @@ export default function MobileMessages() {
               </div>
             </div>
           </div>
-          {/* Keyboard spacer — grows with the keyboard so the composer (and
-              the thread above it) glides up in one eased motion */}
-          <div
-            className="shrink-0"
-            style={{ height: kbInset, transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)" }}
-          />
         </div>
       )}
 

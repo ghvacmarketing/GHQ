@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { isNativeApp, useKeyboardInset } from "@/lib/native";
+import { useKeyboardInset } from "@/lib/native";
 import { compressImage } from "@/lib/compress-image";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
@@ -142,38 +142,13 @@ export default function MobileMail() {
     onError: (e: any) => toast({ title: e?.message || "Couldn't send the email", variant: "destructive" }),
   });
 
-  // Floating-search overlay: bar docked at the bottom rides the keyboard
-  // with easing (same pattern as Jobs/Photos/Customers/Messages).
-  const searchBarRef = useRef<HTMLDivElement | null>(null);
+  // Floating-search overlay: the bar floats free (kbInset drives its
+  // bottom); this effect only times the focus with the open animation.
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     if (!searchActive) return;
-    const setInset = (px: number) => {
-      const el = searchBarRef.current;
-      if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
-    };
-    setInset(0);
     const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
-
-    let removeNative: (() => void) | null = null;
-    if (isNativeApp()) {
-      import("@capacitor/keyboard").then(({ Keyboard }) => {
-        const subs: any[] = [];
-        Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
-        Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
-        removeNative = () => subs.forEach((h) => h?.remove?.());
-      }).catch(() => {});
-    }
-    const vv = window.visualViewport;
-    const update = () => setInset(Math.max(0, window.innerHeight - (vv?.height || window.innerHeight) - (vv?.offsetTop || 0)));
-    vv?.addEventListener("resize", update);
-    vv?.addEventListener("scroll", update);
-    return () => {
-      clearTimeout(focusT);
-      removeNative?.();
-      vv?.removeEventListener("resize", update);
-      vv?.removeEventListener("scroll", update);
-    };
+    return () => clearTimeout(focusT);
   }, [searchActive]);
 
   const closeSearch = () => {
@@ -400,7 +375,11 @@ export default function MobileMail() {
         >
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${!inbox?.threads || inbox.threads.length === 0 ? "flex flex-col justify-end" : ""}`}
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top) + 12px)",
+              paddingBottom: `calc(env(safe-area-inset-bottom) + 84px + ${kbInset}px)`,
+              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
             {inbox?.threads && inbox.threads.length > 0 ? (
               <div className="space-y-2 pb-2">
@@ -417,11 +396,10 @@ export default function MobileMail() {
             )}
           </div>
           <div
-            ref={searchBarRef}
-            className="flex items-center gap-2 px-4 pt-2"
+            className="absolute inset-x-0 z-10 flex items-center gap-2 px-4"
             style={{
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
-              transition: "padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+              bottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)",
+              transition: "bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
