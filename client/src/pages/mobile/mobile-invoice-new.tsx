@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, subDays } from "date-fns";
-import { Search, X, ChevronRight, Plus, Trash2, Loader2, Briefcase, Receipt } from "lucide-react";
+import { Search, X, ChevronRight, Plus, Loader2, Briefcase } from "lucide-react";
+import { LineItemsEditor } from "@/components/mobile/line-items-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -349,111 +350,16 @@ export default function MobileInvoiceNew() {
         )}
 
         {/* --- Invoice fields (same page, no steps) --- */}
-        <div className="space-y-4 rounded-[4px] border border-slate-300/70 bg-white p-4">
-          <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-[#711419]" />
-            <h2 className="text-sm font-semibold text-slate-900">Invoice details</h2>
-          </div>
-
-          {/* Line items */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Line items</Label>
-              <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                {lineItems.length} item{lineItems.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-
-            {lineItems.length === 0 ? (
-              <div className="rounded-[4px] border border-dashed border-slate-300 p-6 text-center text-slate-400">
-                <p className="text-sm">No items added yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {lineItems.map((item, index) => (
-                  <div key={item.id} className="space-y-2 rounded-[4px] border border-slate-300/70 bg-slate-50 p-3" data-testid={`line-item-${item.id}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-500">Item {index + 1}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
-                        onClick={() => removeLineItem(item.id)}
-                        data-testid={`button-remove-item-${item.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Input
-                      placeholder="Description (e.g., Labor - AC Repair)"
-                      value={item.description}
-                      onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                      className={`min-h-[44px] ${inputClass}`}
-                      data-testid={`input-description-${item.id}`}
-                    />
-                    <div className="flex gap-2">
-                      <div className="w-20">
-                        <Label className="text-xs text-slate-500">Qty</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                          onFocus={(e) => e.target.select()}
-                          className={`min-h-[44px] ${inputClass}`}
-                          data-testid={`input-quantity-${item.id}`}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs text-slate-500">Price</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.unitPrice || ""}
-                          onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                          onFocus={(e) => e.target.select()}
-                          className={`min-h-[44px] ${inputClass}`}
-                          data-testid={`input-unit-price-${item.id}`}
-                        />
-                      </div>
-                      <div className="w-24 text-right">
-                        <Label className="text-xs text-slate-500">Total</Label>
-                        <p className="flex min-h-[44px] items-center justify-end font-medium" data-testid={`line-total-${item.id}`}>
-                          {formatCurrency(calculateLineTotal(item))}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Button
-              variant="outline"
-              className="min-h-[44px] w-full rounded-[4px] border-slate-300/70"
-              onClick={addLineItem}
-              data-testid="button-add-line-item"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Add line item
-            </Button>
-          </div>
-
-          {/* Totals */}
-          <div className="space-y-2 border-t border-slate-200/80 pt-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Subtotal</span>
-              <span className="font-medium" data-testid="invoice-subtotal">{formatCurrency(subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-lg font-semibold">
-              <span>Total</span>
-              <span className={total >= 0 ? "text-green-700" : "text-red-600"} data-testid="invoice-total">
-                {formatCurrency(total)}
-              </span>
-            </div>
-          </div>
+        <div className="space-y-5">
+          <LineItemsEditor
+            items={lineItems}
+            onAdd={addLineItem}
+            onRemove={removeLineItem}
+            onUpdate={(id, field, value) => updateLineItem(id, field, value)}
+            subtotal={subtotal}
+            total={total}
+            totalsTestPrefix="invoice"
+          />
         </div>
 
         <Button
