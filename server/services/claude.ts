@@ -114,6 +114,13 @@ async function claudeStreamRequest(body: Record<string, unknown>, onTextDelta: (
           onTextDelta(evt.delta.text);
         } else if (evt.delta?.type === "input_json_delta") {
           partialJson[evt.index] = (partialJson[evt.index] || "") + (evt.delta.partial_json || "");
+        } else if (evt.delta?.type === "thinking_delta" && typeof evt.delta.thinking === "string") {
+          // Thinking blocks are replayed verbatim on the next tool round —
+          // dropping their content made the API reject the whole request
+          // ("each thinking block must contain thinking").
+          blocks[evt.index].thinking = (blocks[evt.index]?.thinking || "") + evt.delta.thinking;
+        } else if (evt.delta?.type === "signature_delta" && typeof evt.delta.signature === "string") {
+          blocks[evt.index].signature = (blocks[evt.index]?.signature || "") + evt.delta.signature;
         }
         break;
       case "content_block_stop": {
