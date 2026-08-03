@@ -188,8 +188,9 @@ export function AddressSearchSheet({
 
           {/* Fixed-height results region: the sheet keeps one calm size above
               the keyboard instead of stretching to the top of the screen as
-              results stream in. Overflow scrolls inside. */}
-          <div className="mt-3 h-44 overflow-y-auto overscroll-y-contain">
+              results stream in — sized so ~4 matches show while typing.
+              Overflow scrolls inside. */}
+          <div className="mt-3 h-[28dvh] min-h-[210px] overflow-y-auto overscroll-y-contain">
             {suggestions.length > 0 ? (
               <div
                 className={`overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm transition-opacity ${searching ? "opacity-60" : ""}`}
