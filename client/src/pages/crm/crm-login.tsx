@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { setCrmToken, crmFetch } from "@/lib/crmAuth";
-import { useKeyboardInset } from "@/lib/native";
+import { isNativeApp, useKeyboardInset } from "@/lib/native";
 import { AlertCircle, Lock, Mail, Loader2 } from "lucide-react";
 import redlogo from "@assets/redlogo.webp";
 import { WhatsNewPanel } from "@/components/crm/whats-new-panel";
@@ -74,8 +74,10 @@ export default function CrmLogin() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      // Technicians go to mobile app, others go to CRM
-      if (currentUser.role === "tech") {
+      // Technicians go to the mobile app, others to the CRM — except inside
+      // the App Store shell, where EVERYONE lands on /mobile (the shell is
+      // the field app; the desktop CRM stays web-only).
+      if (currentUser.role === "tech" || isNativeApp()) {
         window.location.href = "/mobile";
       } else {
         window.location.href = "/crm";

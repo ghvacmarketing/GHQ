@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import MobileShell from "./mobile-shell";
 import { ChevronRight } from "lucide-react";
+import { isNativeApp } from "@/lib/native";
 import type { CrmUser } from "@shared/schema";
 
 /** The More page — everything you can BROWSE, grouped by category. Creation
@@ -68,7 +69,9 @@ export default function MobileMore() {
       title: "Account",
       items: [
         { label: "My Profile", sub: "Your info and settings", onTap: (n) => n("/mobile/profile"), testid: "more-profile" },
-        ...(currentUser && currentUser.role !== "tech"
+        // The App Store shell never links out to the desktop CRM — the app
+        // stays a focused field tool (web/PWA users keep the escape hatch).
+        ...(currentUser && currentUser.role !== "tech" && !isNativeApp()
           ? [{
               label: "Desktop CRM", sub: "Open the full CRM",
               onTap: (n: (p: string) => void) => n("/crm"), testid: "more-desktop",

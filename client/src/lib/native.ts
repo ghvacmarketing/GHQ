@@ -19,6 +19,17 @@ export const isNativeApp = () => Capacitor.isNativePlatform();
 // runs wherever native.ts is used.
 if (typeof document !== "undefined" && Capacitor.isNativePlatform()) {
   document.documentElement.classList.add("native-app");
+  // The App Store build IS the field app: it pins to /mobile. The desktop
+  // CRM, the apps launcher, and the other web apps stay web-only — the shell
+  // is a focused native tool, not a portal into the whole suite (App Review
+  // guideline 4.2). Login stays reachable; everything else lands on /mobile.
+  {
+    const path = window.location.pathname;
+    const allowed = ["/mobile", "/crm/login", "/portal", "/objects"];
+    if (!allowed.some((p) => path === p || path.startsWith(`${p}/`))) {
+      window.location.replace("/mobile");
+    }
+  }
   import("@capacitor/keyboard")
     .then(({ Keyboard, KeyboardStyle }) => {
       Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
