@@ -20399,7 +20399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Build payment link URL for SMS (short /i/ route)
-      const host = req.get('host') || process.env.REPLIT_DOMAINS?.split(',')[0] || 'app.ghvacinc.com';
+      const host = req.get('host') || process.env.REPLIT_DOMAINS?.split(',')[0] || 'www.ghvac.app';
       const protocol = req.protocol || 'https';
       const paymentLink = `${protocol}://${host}/i/${currentInvoice.viewToken}`;
 
@@ -29600,12 +29600,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // first. No date window — this is the "all work orders" browser.
   app.get("/api/mobile/work-orders", requireCrmTechOrAbove, async (req, res) => {
     try {
-      const { search, type, limit = "25" } = req.query as Record<string, string | undefined>;
+      const { search, type, status, from, to, limit = "25" } = req.query as Record<string, string | undefined>;
       const limitNum = Math.min(50, Math.max(1, parseInt(limit || "25") || 25));
       const conds: any[] = [];
       if (type && ["SERVICE", "MAINTENANCE", "INSTALL", "SALES"].includes(type)) {
         conds.push(eq(crmWorkOrders.visitType, type as any));
       }
+      if (status && ["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"].includes(status)) {
+        conds.push(eq(crmWorkOrders.status, status as any));
+      }
+      // Scheduled-window filter (ISO datetimes computed client-side in local time)
+      const fromDate = from ? new Date(from) : null;
+      const toDate = to ? new Date(to) : null;
+      if (fromDate && !isNaN(fromDate.getTime())) conds.push(gte(crmWorkOrders.scheduledStart, fromDate));
+      if (toDate && !isNaN(toDate.getTime())) conds.push(lte(crmWorkOrders.scheduledStart, toDate));
       const q = (search || "").trim();
       if (q) {
         conds.push(or(ilike(crmWorkOrders.title, `%${q}%`), ilike(crmCustomers.name, `%${q}%`)));

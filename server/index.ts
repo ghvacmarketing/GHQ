@@ -39,11 +39,16 @@ async function initStripe() {
 
     const stripeSync = await getStripeSync();
 
-    // Set up managed webhook if REPLIT_DOMAINS is available
-    const replitDomains = process.env.REPLIT_DOMAINS;
-    if (replitDomains) {
-      const webhookBaseUrl = `https://${replitDomains.split(',')[0]}`;
-      const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
+    // Set up the managed Stripe webhook against our public host. REPLIT_DOMAINS
+    // is honored only as a legacy override; in production the real domain is the
+    // default so the webhook still self-configures after the Replit teardown.
+    // In local dev (no public host) there's nothing routable to register.
+    const publicHost =
+      process.env.PUBLIC_DOMAIN ||
+      process.env.REPLIT_DOMAINS?.split(',')[0] ||
+      (process.env.NODE_ENV === 'production' ? 'www.ghvac.app' : null);
+    if (publicHost) {
+      const webhookUrl = `https://${publicHost}/api/stripe/webhook`;
       try {
         const result = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
         console.log('Stripe webhook configured:', result?.webhook?.url || webhookUrl);
@@ -51,7 +56,7 @@ async function initStripe() {
         console.log('Stripe webhook setup skipped (may already exist):', webhookUrl);
       }
     } else {
-      console.log('REPLIT_DOMAINS not set - skipping webhook configuration');
+      console.log('No public host in dev - skipping webhook configuration');
     }
 
     // Sync in background so server starts immediately

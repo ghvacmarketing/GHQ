@@ -4,8 +4,6 @@ import type { SignatureField } from "@shared/schema";
 
 const objectStorageService = new ObjectStorageService();
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-
 /**
  * Read the raw bytes of an object stored at an `/objects/...` path.
  */

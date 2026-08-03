@@ -30,9 +30,16 @@ import { eq, and, isNull, isNotNull, inArray, notInArray, sql } from "drizzle-or
 
 const QUICKBOOKS_CLIENT_ID = process.env.QUICKBOOKS_CLIENT_ID || "";
 const QUICKBOOKS_CLIENT_SECRET = process.env.QUICKBOOKS_CLIENT_SECRET || "";
-const QUICKBOOKS_REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
-  ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/quickbooks/callback`
-  : "http://localhost:5000/api/quickbooks/callback";
+// Redirect URI must exactly match one registered in the Intuit developer app.
+// Explicit env wins; REPLIT_DEV_DOMAIN is a legacy shim; production defaults to
+// the public domain (previously it silently fell to localhost off Replit).
+const QUICKBOOKS_REDIRECT_URI =
+  process.env.QUICKBOOKS_REDIRECT_URI ||
+  (process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/quickbooks/callback`
+    : process.env.NODE_ENV === "production"
+      ? "https://www.ghvac.app/api/quickbooks/callback"
+      : "http://localhost:5000/api/quickbooks/callback");
 
 const QB_SANDBOX_BASE_URL = "https://sandbox-quickbooks.api.intuit.com";
 const QB_PRODUCTION_BASE_URL = "https://quickbooks.api.intuit.com";

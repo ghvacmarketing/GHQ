@@ -7,9 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
-import { SheetSelect } from "@/components/mobile/sheet-select";
+import { AssigneeSheet } from "@/components/mobile/assignee-sheet";
 import { DateSheet } from "@/components/mobile/date-range-calendar";
-import { roleBadgeSrc } from "@/components/mobile/role-badge";
 import type { CrmUser } from "@shared/schema";
 
 /** New Task — the same full-page bottom sheet as creating a customer or job:
@@ -45,7 +44,6 @@ export default function MobileTaskNew() {
   });
 
   const effectiveAssignee = assigneeId || currentUser?.id || null;
-  const team = users.filter((u) => u.isActive !== false);
 
   const createMutation = useMutation({
     mutationFn: async () =>
@@ -91,16 +89,10 @@ export default function MobileTaskNew() {
 
         <div>
           <Label className="mb-1.5 block">Assign to</Label>
-          <SheetSelect
-            boxed
-            label="Assign to"
-            placeholder="Pick a teammate"
-            value={effectiveAssignee || ""}
-            options={team.map((u) => ({
-              key: u.id,
-              label: `${u.name}${u.id === currentUser?.id ? " (me)" : ""}`,
-              img: roleBadgeSrc((u as any).role),
-            }))}
+          <AssigneeSheet
+            users={users}
+            meId={currentUser?.id}
+            value={effectiveAssignee}
             onChange={(v) => setAssigneeId(v === currentUser?.id ? null : v)}
             testid="task-assignee-trigger"
           />

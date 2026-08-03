@@ -8,6 +8,12 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
+// Public host for customer-facing redirect links (post-payment bounce-back).
+// REPLIT_DOMAINS is honored only as a legacy override; off Replit the real
+// domain is the default so links never render as "https://undefined/...".
+const publicHost = () =>
+  process.env.PUBLIC_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || 'www.ghvac.app';
+
 // Default deposit percentage for install quotes
 const DEFAULT_DEPOSIT_PERCENTAGE = 50;
 
@@ -142,7 +148,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/q/${quote.viewToken}?payment=success`,
+          url: `https://${publicHost()}/q/${quote.viewToken}?payment=success`,
         },
       },
     });
@@ -253,7 +259,7 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/i/${viewToken}?payment=success`,
+          url: `https://${publicHost()}/i/${viewToken}?payment=success`,
         },
       },
     });
@@ -266,9 +272,9 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       })
       .where(eq(crmInvoices.id, invoiceId));
 
-    // Build tracking URL using request host for non-Replit environments
+    // Build tracking URL from the request host, falling back to the public domain
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.headers.host || process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
+    const host = req.headers.host || publicHost();
     const baseUrl = `${protocol}://${host}`;
     const trackingUrl = `${baseUrl}/api/public/invoice/${invoiceId}/pay`;
 

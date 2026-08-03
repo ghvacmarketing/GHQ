@@ -53,4 +53,5 @@ whenever the app is NOT running on Replit, so no separate object store is needed
 - **Cloudflare R2 (optional)**: files currently live in Neon. If the DB grows
   large from uploads, move the storage layer to R2 (S3-compatible). Not needed
   to launch.
-- Move the `RESEND_API_KEY` out of `.replit` and rotate it.
+- Rotate the `RESEND_API_KEY` (an old key was committed in the now-deleted
+  `.replit` file, so it lives in git history) and set the new value on Render.

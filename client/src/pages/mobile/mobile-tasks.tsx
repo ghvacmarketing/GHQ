@@ -8,8 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useKeyboardInset } from "@/lib/native";
 import {
   ArrowLeft, ArrowUp, Calendar, Check, CheckCircle2, ClipboardList, ListPlus,
-  Loader2, Plus, Trash2, UserRound,
+  Loader2, Plus, Trash2,
 } from "lucide-react";
+import { AssigneeSheet } from "@/components/mobile/assignee-sheet";
 import type { CrmUser } from "@shared/schema";
 
 /** My Tasks.
@@ -227,6 +228,7 @@ export default function MobileTasks() {
         <TaskDetail
           taskId={detailTaskId}
           users={users}
+          meId={currentUser?.id}
           onClose={() => setDetailTaskId(null)}
         />
       )}
@@ -234,7 +236,7 @@ export default function MobileTasks() {
   );
 }
 
-function TaskDetail({ taskId, users, onClose }: { taskId: string; users: CrmUser[]; onClose: () => void }) {
+function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: CrmUser[]; meId?: string; onClose: () => void }) {
   const { toast } = useToast();
   const [newSubtask, setNewSubtask] = useState("");
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
@@ -289,7 +291,6 @@ function TaskDetail({ taskId, users, onClose }: { taskId: string; users: CrmUser
   });
 
   const done = task?.status === "completed";
-  const assignee = users.find((u) => u.id === task?.assignedToUserId);
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-slate-50 animate-in slide-in-from-right duration-200" data-testid="task-detail">
@@ -341,12 +342,16 @@ function TaskDetail({ taskId, users, onClose }: { taskId: string; users: CrmUser
             {task.title}
           </h2>
 
-          {/* Assignee + due — same chips as creation */}
+          {/* Assignee + due — assignee chip opens the teammate grid to reassign */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700">
-              <UserRound className="h-4 w-4 text-slate-400" />
-              {assignee?.name || "Unassigned"}
-            </div>
+            <AssigneeSheet
+              variant="chip"
+              users={users}
+              meId={meId}
+              value={task.assignedToUserId}
+              onChange={(v) => patchTask.mutate({ assignedToUserId: v })}
+              testid="task-detail-assignee"
+            />
             <button
               onClick={() => dueRef.current?.showPicker?.() || dueRef.current?.click()}
               className="relative flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
