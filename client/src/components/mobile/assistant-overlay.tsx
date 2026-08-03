@@ -12,11 +12,13 @@ import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 import {
   AI_ACTION_LABELS,
+  AiStreamStartError,
   actionLineItems,
   type AiChatMessage as ChatMessage,
   type AiConversationSummary,
   type AiSpace,
   applyActionEdits,
+  askGibbsStream,
   compressImageForAi,
   createAiSpace,
   customerUpdateRows,
@@ -85,6 +87,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  // Live answer text while the model streams — rendered in the pending slot
+  // with the word-fade so Gibbs talks as he thinks; null = dots.
+  const [streamText, setStreamText] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -583,7 +588,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     setInput("");
     setAttachments([]);
     setPending(true);
-    apiRequest("POST", "/api/crm/help", {
+    setStreamText(null);
+    const body = {
       question,
       conversationHistory: historyForApi,
       conversationId,
@@ -591,21 +597,44 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
       mode,
+    };
+    // Stream-first: the answer paints as the model generates it. If the
+    // stream can't START, fall back to the plain endpoint (identical
+    // payload). Failures AFTER deltas flowed never auto-resend — the server
+    // may have completed and persisted the exchange.
+    let streamedAcc = "";
+    askGibbsStream(body, (t) => {
+      streamedAcc += t;
+      setStreamText(streamedAcc);
     })
-      .then(async (r) => {
-        const data = await r.json();
+      .catch((e) => {
+        if (e instanceof AiStreamStartError) {
+          return apiRequest("POST", "/api/crm/help", body).then(async (r) => await r.json());
+        }
+        throw e;
+      })
+      .then((data: any) => {
+        const streamed = streamedAcc.length > 0;
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
-        setFreshIndex(messagesLenRef.current);
-        // Hold approval cards until the answer finishes typing. The reveal is
-        // guaranteed by a timer sized to the typewriter's duration — the
-        // animation's onComplete also fires it, but must never be the only
-        // path (a missed callback would strand the cards forever).
         const answerText = String(data.answer ?? "").trim();
-        setTypedOut(!answerText);
-        if (answerText) {
-          const steps = Math.ceil(answerText.length / Math.max(2, Math.ceil(answerText.length / 150)));
-          window.setTimeout(() => setTypedOut(true), steps * 16 + 400);
+        if (streamed) {
+          // The user already watched the answer stream in — append it settled
+          // so nothing re-animates, and reveal cards/chips immediately.
+          setFreshIndex(null);
+          setTypedOut(true);
+        } else {
+          setFreshIndex(messagesLenRef.current);
+          // Hold approval cards until the answer finishes typing. The reveal
+          // is guaranteed by a timer sized to the word-reveal's duration —
+          // the animation's onComplete also fires it, but must never be the
+          // only path (a missed callback would strand the cards forever).
+          setTypedOut(!answerText);
+          if (answerText) {
+            const words = answerText.split(/\s+/).length;
+            const base = Math.min(64, Math.max(16, 2800 / Math.max(1, words)));
+            window.setTimeout(() => setTypedOut(true), Math.min(12000, words * base + 800));
+          }
         }
         // One spoken message can carry several creation requests — each extra
         // action renders as its own approval card.
@@ -650,7 +679,10 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           { role: "assistant", content: e?.message || "Something went wrong reaching the AI. Try again in a moment." },
         ]);
       })
-      .finally(() => setPending(false));
+      .finally(() => {
+        setPending(false);
+        setStreamText(null);
+      });
   };
 
   const runProposedAction = (index: number, extraParams?: Record<string, unknown>) => {
@@ -1161,11 +1193,25 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 );
               })}
               {pending && (
-                <div className="flex max-w-[92%] items-center gap-1.5 rounded-[4px] rounded-tl-[1px] border border-slate-200 bg-slate-50 px-3.5 py-3.5">
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:0ms]" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:200ms]" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:400ms]" />
-                </div>
+                streamText ? (
+                  /* Live stream: the answer paints word by word while the
+                     model is still generating. Same bubble classes as the
+                     settled message so the swap on completion is seamless. */
+                  <div className="max-w-[92%] whitespace-pre-wrap break-words rounded-[4px] rounded-tl-[1px] border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-800">
+                    <TypewriterText
+                      text={stripMarkdown(streamText)}
+                      animate
+                      streaming
+                      onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex max-w-[92%] items-center gap-1.5 rounded-[4px] rounded-tl-[1px] border border-slate-200 bg-slate-50 px-3.5 py-3.5">
+                    <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:0ms]" />
+                    <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:200ms]" />
+                    <span className="h-[5px] w-[5px] animate-pulse rounded-[1px] bg-[#711419]/70 [animation-delay:400ms]" />
+                  </div>
+                )
               )}
               <div ref={bottomRef} />
             </div>

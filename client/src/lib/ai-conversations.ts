@@ -125,6 +125,95 @@ export function applyActionEdits(params: Record<string, unknown>, draft: Record<
   return next;
 }
 
+/** The /api/crm/help response payload (both routes return the same shape). */
+export type AiHelpPayload = {
+  answer: string;
+  relatedTopics?: string[];
+  confidence?: string;
+  proposedAction?: AiProposedAction | null;
+  proposedActions?: AiProposedAction[];
+  conversationId?: string;
+  messageId?: string;
+  extraActions?: { messageId: string; proposedAction: AiProposedAction | null }[];
+  supersededMessageIds?: string[];
+};
+
+/** The stream could not be STARTED (network refusal, non-OK status, old
+ *  server without the endpoint) — safe to fall back to the plain POST.
+ *  Errors thrown after deltas flowed are NOT this class: the server may have
+ *  completed and persisted, so callers must not auto-resend. */
+export class AiStreamStartError extends Error {}
+
+/** Ask Gibbs over the streaming endpoint (NDJSON over fetch). onDelta fires
+ *  with answer text the moment the model generates it; resolves with the
+ *  exact payload the plain endpoint would have returned. */
+export async function askGibbsStream(
+  body: Record<string, unknown>,
+  onDelta: (text: string) => void,
+): Promise<AiHelpPayload> {
+  let res: Response;
+  try {
+    res = await fetch("/api/crm/help/stream", {
+      method: "POST",
+      credentials: "include",
+      // x-no-compression: the server's gzip middleware would buffer deltas
+      headers: { "Content-Type": "application/json", "x-no-compression": "1" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new AiStreamStartError((e as Error)?.message || "network error");
+  }
+  if (!res.ok || !res.body) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      msg = (await res.json())?.message || msg;
+    } catch { /* non-JSON error body */ }
+    throw new AiStreamStartError(msg);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let sawAny = false;
+  let donePayload: AiHelpPayload | null = null;
+  let errMsg: string | null = null;
+  const handleLine = (line: string) => {
+    const t = line.trim();
+    if (!t) return;
+    let evt: any;
+    try {
+      evt = JSON.parse(t);
+    } catch {
+      return;
+    }
+    if (evt.type === "delta" && typeof evt.text === "string") {
+      sawAny = true;
+      onDelta(evt.text);
+    } else if (evt.type === "done") {
+      sawAny = true;
+      donePayload = evt.payload as AiHelpPayload;
+    } else if (evt.type === "error") {
+      sawAny = true;
+      errMsg = String(evt.message || "AI request failed");
+    }
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) !== -1) {
+      handleLine(buf.slice(0, nl));
+      buf = buf.slice(nl + 1);
+    }
+  }
+  handleLine(buf);
+  if (errMsg) throw new Error(errMsg);
+  if (donePayload) return donePayload;
+  if (!sawAny) throw new AiStreamStartError("empty stream");
+  throw new Error("The connection dropped mid-answer — reopen the conversation to see whether the reply was saved.");
+}
+
 export type AiConversationSummary = {
   id: string;
   title: string | null;

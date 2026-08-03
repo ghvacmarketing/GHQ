@@ -2215,19 +2215,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.post("/api/crm/help", requireCrmAuth, async (req, res) => {
-    try {
+  // The full Gibbs exchange — history replay, model call, persistence —
+  // shared by the JSON route and the streaming route so the two can never
+  // drift. onDelta (when given) receives live answer text as it generates.
+  const runCrmHelpExchange = async (
+    req: any,
+    user: { id: string },
+    onDelta?: (text: string) => void,
+  ) => {
+    {
       const { question, conversationHistory, conversationId } = req.body;
-      if (!question || typeof question !== "string") {
-        return res.status(400).json({ message: "Question is required" });
-      }
-      if (!process.env.ANTHROPIC_API_KEY && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
-        return res.status(503).json({
-          message: "AI isn't configured on this server — add ANTHROPIC_API_KEY in the Render environment and redeploy.",
-        });
-      }
-      const user = await getCurrentCrmUser(req);
-      if (!user) return res.status(401).json({ message: "Unauthorized" });
 
       // A conversationId means we replay the stored thread server-side (last
       // 10 turns) — the client-shipped history is only a fallback for the
@@ -2294,7 +2291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : "general";
 
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question, history, images, mode);
+      const result = await askCrmHelp(question, history, images, mode, onDelta);
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
@@ -2374,11 +2371,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("AI conversation persist error (non-fatal):", persistErr);
       }
 
-      res.json({ ...result, conversationId: convoId, messageId, extraActions, supersededMessageIds });
+      return { ...result, conversationId: convoId, messageId, extraActions, supersededMessageIds };
+    }
+  };
+
+  const crmHelpPreflight = (req: any, res: any): boolean => {
+    const { question } = req.body;
+    if (!question || typeof question !== "string") {
+      res.status(400).json({ message: "Question is required" });
+      return false;
+    }
+    if (!process.env.ANTHROPIC_API_KEY && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
+      res.status(503).json({
+        message: "AI isn't configured on this server — add ANTHROPIC_API_KEY in the Render environment and redeploy.",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  app.post("/api/crm/help", requireCrmAuth, async (req, res) => {
+    try {
+      if (!crmHelpPreflight(req, res)) return;
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const payload = await runCrmHelpExchange(req, user);
+      res.json(payload);
     } catch (error: any) {
       console.error("Error in CRM help:", error);
       const detail = error?.message || error?.error?.message || "";
       res.status(500).json({ message: `AI request failed${detail ? `: ${detail}` : ""}` });
+    }
+  });
+
+  // Streaming flavor: NDJSON lines — {type:"delta",text} while the answer
+  // generates, then ONE {type:"done",payload} carrying the exact object the
+  // JSON route returns (actions, ids, everything). The client renders deltas
+  // for feel but finalizes from the done payload, so behavior can't drift.
+  app.post("/api/crm/help/stream", requireCrmAuth, async (req, res) => {
+    try {
+      if (!crmHelpPreflight(req, res)) return;
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      });
+      // flush() (from the compression middleware) pushes each line out
+      // immediately — buffered deltas would defeat the whole point.
+      const write = (obj: unknown) => {
+        res.write(JSON.stringify(obj) + "\n");
+        (res as any).flush?.();
+      };
+      try {
+        const payload = await runCrmHelpExchange(req, user, (text) => write({ type: "delta", text }));
+        write({ type: "done", payload });
+      } catch (error: any) {
+        console.error("Error in CRM help stream:", error);
+        const detail = error?.message || error?.error?.message || "";
+        write({ type: "error", message: `AI request failed${detail ? `: ${detail}` : ""}` });
+      }
+      res.end();
+    } catch (error) {
+      console.error("CRM help stream setup error:", error);
+      if (!res.headersSent) res.status(500).json({ message: "AI request failed" });
+      else res.end();
     }
   });
 

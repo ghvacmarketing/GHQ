@@ -7,10 +7,13 @@ import {
   AI_ACTION_LABELS,
   type AiChatMessage,
   type AiConversationSummary,
+  type AiHelpPayload,
   type AiProposedAction,
   type AiSpace,
+  AiStreamStartError,
   actionLineItems,
   applyActionEdits,
+  askGibbsStream,
   compressImageForAi,
   createAiSpace,
   customerUpdateRows,
@@ -160,6 +163,9 @@ export default function AiAssistantModal() {
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  // Live answer text while the model streams — rendered in the pending slot
+  // with the word-fade so Gibbs talks as he thinks; null = dots.
+  const [streamText, setStreamText] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<string[]>([]);
   // Gibbs behavior mode — persists across sessions, shared with mobile.
   const [mode, setMode] = useState<GibbsMode>(() => {
@@ -313,7 +319,8 @@ export default function AiAssistantModal() {
     setInput("");
     setAttachments([]);
     setPending(true);
-    apiRequest("POST", "/api/crm/help", {
+    setStreamText(null);
+    const body = {
       question,
       conversationHistory: historyForApi,
       conversationId,
@@ -321,22 +328,45 @@ export default function AiAssistantModal() {
       mode,
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
+    };
+    // Stream-first: the answer paints as the model generates it. If the
+    // stream can't START, fall back to the plain endpoint (identical
+    // payload). Failures AFTER deltas flowed never auto-resend — the server
+    // may have completed and persisted the exchange.
+    let streamedAcc = "";
+    askGibbsStream(body, (t) => {
+      streamedAcc += t;
+      setStreamText(streamedAcc);
     })
-      .then(async (r) => {
-        const data = (await r.json()) as HelpResponse;
+      .catch((e) => {
+        if (e instanceof AiStreamStartError) {
+          return apiRequest("POST", "/api/crm/help", body).then(async (r) => (await r.json()) as HelpResponse);
+        }
+        throw e;
+      })
+      .then((data: HelpResponse | AiHelpPayload) => {
+        const streamed = streamedAcc.length > 0;
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
         const extras = (data.extraActions || []).filter((e) => e.proposedAction);
-        setFreshIndex(assistantIndex);
-        // Hold approval cards until the answer finishes typing. The reveal is
-        // guaranteed by a timer sized to the typewriter's duration — the
-        // animation's onComplete also fires it, but must never be the only
-        // path (a missed callback would strand the cards forever).
         const answerText = String(data.answer ?? "").trim();
-        setTypedOut(!answerText);
-        if (answerText) {
-          const steps = Math.ceil(answerText.length / Math.max(2, Math.ceil(answerText.length / 150)));
-          window.setTimeout(() => setTypedOut(true), steps * 16 + 400);
+        if (streamed) {
+          // The user already watched the answer stream in — append it settled
+          // so nothing re-animates, and reveal cards/chips immediately.
+          setFreshIndex(null);
+          setTypedOut(true);
+        } else {
+          setFreshIndex(assistantIndex);
+          // Hold approval cards until the answer finishes typing. The reveal
+          // is guaranteed by a timer sized to the word-reveal's duration —
+          // the animation's onComplete also fires it, but must never be the
+          // only path (a missed callback would strand the cards forever).
+          setTypedOut(!answerText);
+          if (answerText) {
+            const words = answerText.split(/\s+/).length;
+            const base = Math.min(64, Math.max(16, 2800 / Math.max(1, words)));
+            window.setTimeout(() => setTypedOut(true), Math.min(12000, words * base + 800));
+          }
         }
         // Several actions in one reply run as an ordered batch — step 2 can't
         // be approved before step 1 completes (a work order or text for a
@@ -378,7 +408,10 @@ export default function AiAssistantModal() {
           { role: "assistant", content: e?.message || "Something went wrong reaching the AI. Try again in a moment." },
         ]);
       })
-      .finally(() => setPending(false));
+      .finally(() => {
+        setPending(false);
+        setStreamText(null);
+      });
   };
 
   // Voice input — live transcript where Web Speech works, record-then-
@@ -1209,11 +1242,27 @@ export default function AiAssistantModal() {
                 {pending && (
                   <div className="flex items-start gap-3">
                     <img src={badgeGibbs} alt="" className="h-8 w-8 flex-shrink-0 select-none" draggable={false} />
-                    <div className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-slate-100 px-4 py-3.5">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:0ms]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:150ms]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:300ms]" />
-                    </div>
+                    {streamText ? (
+                      /* Live stream: the answer paints word by word while the
+                         model is still generating. Same bubble classes as the
+                         settled message so the swap on completion is seamless. */
+                      <div className="min-w-0 flex-1">
+                        <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
+                          <TypewriterText
+                            text={cleanAnswer(streamText)}
+                            animate
+                            streaming
+                            onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-slate-100 px-4 py-3.5">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:300ms]" />
+                      </div>
+                    )}
                   </div>
                 )}
                 <div ref={bottomRef} />

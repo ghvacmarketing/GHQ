@@ -22,6 +22,12 @@ auto-deploys (Docker). DB: Neon Postgres. No local run.
   `server/services/crm-knowledge.ts`. Live-data lookup tools + approval-gated
   actions (create task/work order, send SMS/email) live in `crmHelpAI.ts` and
   `server/routes.ts` (`/api/crm/help`, `/api/crm/ai/execute-action`).
+- Streaming: `/api/crm/help/stream` (NDJSON deltas + final `done` payload
+  identical to the JSON route; both call the shared `runCrmHelpExchange`).
+  Clients stream-first via `askGibbsStream` and fall back to the plain POST
+  only when the stream can't start. The model's reply is a JSON envelope, so
+  `crmHelpAI.ts` extracts the `answer` string incrementally
+  (`makeAnswerExtractor`) from Anthropic SSE (`claudeStreamRequest`).
 - Surfaces: desktop `client/src/components/crm/ai-assistant-modal.tsx`, mobile
   `client/src/components/mobile/assistant-overlay.tsx`, shared plumbing in
   `client/src/lib/ai-conversations.ts`, voice in

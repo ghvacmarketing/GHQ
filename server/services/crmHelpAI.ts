@@ -820,11 +820,77 @@ const CACHE_TTL_LIVE = 1000 * 60 * 5; // 5 minutes for live data questions
 
 export type GibbsMode = "general" | "conversation" | "implementation";
 
+/** Gibbs' final reply is a JSON envelope, so raw model deltas are JSON
+ *  syntax — this feeds on those deltas and emits ONLY the contents of the
+ *  "answer" string as they generate, un-escaping (\n, \", \uXXXX) on the
+ *  fly. Text from tool rounds never matches the pattern, so nothing leaks. */
+function makeAnswerExtractor(emit: (text: string) => void): (delta: string) => void {
+  let seekBuf = "";
+  let phase: "seek" | "in" | "done" = "seek";
+  let esc = false;
+  let inHex = false;
+  let hex = "";
+
+  const feedInString = (chunk: string) => {
+    let out = "";
+    for (const ch of chunk) {
+      if (phase !== "in") break;
+      if (inHex) {
+        hex += ch;
+        if (hex.length === 4) {
+          const code = parseInt(hex, 16);
+          if (!Number.isNaN(code)) out += String.fromCharCode(code);
+          inHex = false;
+          hex = "";
+        }
+        continue;
+      }
+      if (esc) {
+        esc = false;
+        if (ch === "n") out += "\n";
+        else if (ch === "t") out += "\t";
+        else if (ch === "r") { /* drop */ }
+        else if (ch === "u") { inHex = true; hex = ""; }
+        else out += ch; // \" \\ \/ pass through as themselves
+        continue;
+      }
+      if (ch === "\\") { esc = true; continue; }
+      if (ch === '"') { phase = "done"; break; }
+      out += ch;
+    }
+    if (out) emit(out);
+  };
+
+  return (delta: string) => {
+    if (phase === "done") return;
+    if (phase === "seek") {
+      seekBuf += delta;
+      const m = seekBuf.match(/"answer"\s*:\s*"/);
+      if (!m || m.index === undefined) {
+        // Keep a small tail so the pattern can span chunk boundaries.
+        if (seekBuf.length > 6000) seekBuf = seekBuf.slice(-64);
+        return;
+      }
+      const rest = seekBuf.slice(m.index + m[0].length);
+      seekBuf = "";
+      phase = "in";
+      esc = false;
+      inHex = false;
+      if (rest) feedInString(rest);
+      return;
+    }
+    feedInString(delta);
+  };
+}
+
 export async function askCrmHelp(
   question: string,
   conversationHistory?: Array<{role: 'user'|'assistant', content: string}>,
   images?: string[],
   mode: GibbsMode = "general",
+  /** Live answer text as the model generates it (streaming callers only).
+   *  Purely additive — the returned result stays the source of truth. */
+  onAnswerDelta?: (text: string) => void,
 ): Promise<CrmHelpResponse> {
   const normalizedQuestion = `${mode}:${question.toLowerCase().trim()}`;
   const hasImages = !!images && images.length > 0;
@@ -1005,6 +1071,7 @@ Return JSON with:
             name === "propose_actions" ? collectProposedActions(input) : executeCrmTool(name, input),
           maxTokens: 3500,
           maxIterations: 8,
+          onTextDelta: onAnswerDelta ? makeAnswerExtractor(onAnswerDelta) : undefined,
         }),
       );
     } else {
