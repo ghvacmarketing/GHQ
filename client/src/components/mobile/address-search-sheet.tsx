@@ -100,19 +100,31 @@ export function AddressSearchSheet({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const seqRef = useRef(0);
 
+  // The input does not EXIST until the sheet has finished sliding in: iOS
+  // births the caret against the layer state at focus time, and any residual
+  // animation/transform leaves it rendering displaced. Mounting the field
+  // fresh into a stationary sheet (which drops its landed animation — see
+  // DraggableSheet) keeps the caret glued to the box.
+  const [settled, setSettled] = useState(false);
+
   // Fresh sheet every open — layout effect so the reset lands BEFORE paint;
   // a plain effect let last time's picked place flash on screen for a frame
-  // as the sheet slid up. Focus only after the 500ms slide-in has finished —
-  // focusing mid-animation paints the text caret at the sheet's pre-animation
-  // position (the visible "teleporting" cursor).
+  // as the sheet slid up.
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setSettled(false);
+      return;
+    }
     setQuery("");
     setSuggestions([]);
     setChosen(null);
-    const t = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 520);
+    const t = setTimeout(() => setSettled(true), 540);
     return () => clearTimeout(t);
   }, [open]);
+  // Focus the moment the real input mounts (it only mounts once settled).
+  useEffect(() => {
+    if (settled) inputRef.current?.focus({ preventScroll: true });
+  }, [settled]);
 
   // Debounced lookup through our server proxy.
   useEffect(() => {
@@ -200,14 +212,20 @@ export function AddressSearchSheet({
 
           <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="123 Main St, Wrens"
-              className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
-              data-testid="address-search-input"
-            />
+            {settled ? (
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="123 Main St, Wrens"
+                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="address-search-input"
+              />
+            ) : (
+              /* Placeholder shell while the sheet is still moving — the real
+                 input mounts (and focuses) only once everything is still. */
+              <span className="h-full w-full min-w-0 content-center text-[16px] text-slate-400">123 Main St, Wrens</span>
+            )}
             {searching && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-300" />}
           </div>
 

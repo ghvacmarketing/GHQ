@@ -113,10 +113,27 @@ export function DraggableSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        // The landing handler below pins animation:none on the sheet; give
+        // the exit animation back before Radix flips to data-state=closed.
+        if (!o && sheetRef.current) sheetRef.current.style.animation = "";
+        onOpenChange(o);
+      }}
+    >
       <SheetContent
         ref={sheetRef}
         side="bottom"
+        onAnimationEnd={(e) => {
+          // Once the slide-in lands, drop the (fill-mode-forwards) animation
+          // entirely. iOS draws text carets at the wrong spot inside layers
+          // that still carry a transform animation — inputs in sheets typed
+          // with a teleporting cursor until this.
+          if (e.target === sheetRef.current && open && sheetRef.current) {
+            sheetRef.current.style.animation = "none";
+          }
+        }}
         overlayClassName={nested ? "z-[95] bg-black/40" : "z-[85]"}
         className={`${nested ? "z-[100] shadow-[0_-8px_32px_rgba(0,0,0,0.3)]" : "z-[90]"} rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${
           full
