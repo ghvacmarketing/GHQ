@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
 import { useOnlineStatus, OfflineIndicator, usePendingChanges } from "@/hooks/use-online-status";
 import { PerformanceGauge } from "@/components/ui/performance-gauge";
+import { userAvatarSrc } from "@/components/user-avatar-badge";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { statusDotColor } from "@/components/ui/status-dot";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
@@ -379,9 +380,18 @@ function ProfileHeader({ user }: { user: CrmUser }) {
           data-testid="button-profile-menu"
           aria-label="Profile menu"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#711419] text-xs font-bold text-white shadow-sm">
-            {initials || <User className="h-4 w-4" />}
-          </span>
+          {userAvatarSrc(user.name) ? (
+            <img
+              src={userAvatarSrc(user.name)!}
+              alt=""
+              className="h-8 w-8 select-none rounded-full shadow-sm"
+              draggable={false}
+            />
+          ) : (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#711419] text-xs font-bold text-white shadow-sm">
+              {initials || <User className="h-4 w-4" />}
+            </span>
+          )}
         </button>
       </div>
 

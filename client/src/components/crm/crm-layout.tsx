@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { userAvatarSrc } from "@/components/user-avatar-badge";
 import { cn } from "@/lib/utils";
 
 // Persisted across route changes (the module stays loaded even though CrmLayout
@@ -382,15 +383,26 @@ function SidebarContent({
       <div className={cn("border-t border-slate-700/50", collapsed ? "p-2" : "p-3")}>
         {collapsed ? (
           <div className="flex flex-col items-center gap-1.5">
-            <div
-              className="h-9 w-9 rounded-md bg-[#711419] flex items-center justify-center text-white text-xs font-semibold"
-              title={currentUser?.name || "User"}
-              data-testid="text-sidebar-user-name"
-            >
-              {currentUser?.name
-                ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-                : "U"}
-            </div>
+            {userAvatarSrc(currentUser?.name) ? (
+              <img
+                src={userAvatarSrc(currentUser?.name)!}
+                alt=""
+                title={currentUser?.name || "User"}
+                className="h-9 w-9 select-none"
+                draggable={false}
+                data-testid="text-sidebar-user-name"
+              />
+            ) : (
+              <div
+                className="h-9 w-9 rounded-md bg-[#711419] flex items-center justify-center text-white text-xs font-semibold"
+                title={currentUser?.name || "User"}
+                data-testid="text-sidebar-user-name"
+              >
+                {currentUser?.name
+                  ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                  : "U"}
+              </div>
+            )}
             <button
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
@@ -403,11 +415,20 @@ function SidebarContent({
           </div>
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800/40 p-1.5">
-            <div className="h-7 w-7 shrink-0 rounded-md bg-[#711419] flex items-center justify-center text-white text-[11px] font-semibold">
-              {currentUser?.name
-                ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-                : "U"}
-            </div>
+            {userAvatarSrc(currentUser?.name) ? (
+              <img
+                src={userAvatarSrc(currentUser?.name)!}
+                alt=""
+                className="h-7 w-7 shrink-0 select-none"
+                draggable={false}
+              />
+            ) : (
+              <div className="h-7 w-7 shrink-0 rounded-md bg-[#711419] flex items-center justify-center text-white text-[11px] font-semibold">
+                {currentUser?.name
+                  ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                  : "U"}
+              </div>
+            )}
             <div className="min-w-0 flex-1 leading-tight">
               <p className="truncate text-[13px] font-medium text-white" data-testid="text-sidebar-user-name">
                 {currentUser?.name || "User"}
