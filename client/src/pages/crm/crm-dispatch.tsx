@@ -89,9 +89,18 @@ import {
   X,
   LayoutGrid,
   List,
+  HardHat,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PanelSection, PanelRow } from "@/components/crm/panel-blocks";
+import { roleBadgeSrc } from "@/components/mobile/role-badge";
+import badgeTimeJob from "@/assets/badge-time-job.png";
+import badgeTimeDrive from "@/assets/badge-time-drive.png";
+import badgeTimeShop from "@/assets/badge-time-shop.png";
+import badgeTimeTraining from "@/assets/badge-time-training.png";
+import badgeTimeMeeting from "@/assets/badge-time-meeting.png";
+import badgeTimeBreak from "@/assets/badge-time-break.png";
+import badgeTimeOther from "@/assets/badge-other.png";
 import { addDays, endOfMonth, endOfWeek, format, formatDistanceToNow, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { FleetMap } from "@/components/fleet-map";
 import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE, toLocalTime } from "@/lib/timezone";
@@ -746,6 +755,236 @@ interface BouncieVehicle {
   fuelLevel: string | null;
   isRunning: boolean | null;
   isActive: boolean;
+}
+
+// ── Techs view: an immersive read of everyone's clock for the selected day.
+// Mirrors the mobile Time tab's categories exactly (job/drive/shop/training/
+// meeting/break/other) so every kind of work techs log shows up here. ──
+const TECH_TIME_CATS = [
+  { key: "job", label: "Job site", color: "#16a34a", img: badgeTimeJob },
+  { key: "drive", label: "Drive", color: "#2563eb", img: badgeTimeDrive },
+  { key: "shop", label: "Shop", color: "#d97706", img: badgeTimeShop },
+  { key: "training", label: "Training", color: "#7c3aed", img: badgeTimeTraining },
+  { key: "meeting", label: "Meeting", color: "#0e7490", img: badgeTimeMeeting },
+  { key: "break", label: "Break", color: "#e11d48", img: badgeTimeBreak },
+  { key: "other", label: "Other", color: "#64748b", img: badgeTimeOther },
+] as const;
+const techTimeCat = (k?: string | null) => TECH_TIME_CATS.find((c) => c.key === (k || "job")) ?? TECH_TIME_CATS[6];
+const fmtClockMins = (m: number) => {
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return h > 0 ? `${h}h ${r.toString().padStart(2, "0")}m` : `${r}m`;
+};
+
+type TechDayEntry = {
+  id: string;
+  technicianId: string;
+  technicianName?: string;
+  workOrderId?: string | null;
+  clockInAt: string;
+  clockOutAt?: string | null;
+  durationMinutes?: number | null;
+  category?: string | null;
+};
+
+function TechsDayView({
+  technicians,
+  workOrders,
+  selectedDate,
+}: {
+  technicians: Array<{ id: string; name: string; role?: string | null }>;
+  workOrders: Array<{ id: string; title?: string | null }>;
+  selectedDate: Date;
+}) {
+  const dateString = format(selectedDate, "yyyy-MM-dd");
+  const { data: entries = [], isLoading } = useQuery<TechDayEntry[]>({
+    queryKey: ["/api/crm/time-entries", "techs-day", dateString],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/time-entries?startDate=${dateString}&endDate=${dateString}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 30_000,
+  });
+  // Open entries show a running clock — tick it without waiting on a refetch.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((x) => x + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const isToday = isSameDay(selectedDate, new Date());
+  const roleFor = new Map(technicians.map((t) => [t.id, t.role || "tech"]));
+  const woTitle = new Map(workOrders.map((w) => [w.id, w.title || ""]));
+
+  type Agg = {
+    id: string;
+    name: string;
+    role: string;
+    total: number;
+    byCat: Map<string, number>;
+    active: TechDayEntry | null;
+    lastOut: number;
+  };
+  const byTech = new Map<string, Agg>();
+  for (const e of entries) {
+    const a: Agg = byTech.get(e.technicianId) ?? {
+      id: e.technicianId,
+      name: e.technicianName || technicians.find((t) => t.id === e.technicianId)?.name || "Unknown",
+      role: String(roleFor.get(e.technicianId) || "tech"),
+      total: 0,
+      byCat: new Map(),
+      active: null,
+      lastOut: 0,
+    };
+    const mins = e.clockOutAt
+      ? e.durationMinutes ?? Math.max(0, Math.round((new Date(e.clockOutAt).getTime() - new Date(e.clockInAt).getTime()) / 60000))
+      : Math.max(0, Math.round((Date.now() - new Date(e.clockInAt).getTime()) / 60000));
+    const cat = techTimeCat(e.category).key;
+    a.total += mins;
+    a.byCat.set(cat, (a.byCat.get(cat) || 0) + mins);
+    if (!e.clockOutAt) a.active = e;
+    else a.lastOut = Math.max(a.lastOut, new Date(e.clockOutAt).getTime());
+    byTech.set(e.technicianId, a);
+  }
+  const aggs = Array.from(byTech.values());
+  const onClock = aggs
+    .filter((a) => a.active)
+    .sort((x, y) => new Date(x.active!.clockInAt).getTime() - new Date(y.active!.clockInAt).getTime());
+  const doneToday = aggs.filter((a) => !a.active).sort((x, y) => y.total - x.total);
+  const noTime = technicians.filter((t) => !byTech.has(t.id));
+
+  const TechCard = ({ a }: { a: Agg }) => {
+    const cat = a.active ? techTimeCat(a.active.category) : null;
+    const jobTitle = a.active?.workOrderId ? woTitle.get(a.active.workOrderId) : null;
+    return (
+      <Card className="p-4 bg-white" data-testid={`techs-card-${a.id}`}>
+        <div className="flex items-center gap-3">
+          <img src={roleBadgeSrc(a.role)} alt="" className="h-10 w-10 shrink-0 select-none" draggable={false} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="truncate font-semibold text-slate-900">{a.name}</span>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{fmtClockMins(a.total)}</span>
+            </div>
+            {a.active && cat ? (
+              <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-600">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                </span>
+                <span className="shrink-0">{cat.label} since {format(new Date(a.active.clockInAt), "h:mm a")}</span>
+                {jobTitle ? <span className="truncate text-slate-400">— {jobTitle}</span> : null}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-xs text-slate-400">
+                Clocked out{a.lastOut ? ` at ${format(new Date(a.lastOut), "h:mm a")}` : ""}
+              </p>
+            )}
+          </div>
+          {a.active && cat && <img src={cat.img} alt={cat.label} className="h-9 w-9 shrink-0 select-none" draggable={false} />}
+        </div>
+        <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+          {TECH_TIME_CATS.map((c) => {
+            const m = a.byCat.get(c.key) || 0;
+            if (m <= 0 || a.total <= 0) return null;
+            return <div key={c.key} style={{ width: `${(m / a.total) * 100}%`, background: c.color }} title={`${c.label}: ${fmtClockMins(m)}`} />;
+          })}
+        </div>
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {TECH_TIME_CATS.map((c) => {
+            const m = a.byCat.get(c.key) || 0;
+            if (m <= 0) return null;
+            return (
+              <span
+                key={c.key}
+                className="inline-flex items-center gap-1.5 rounded-[4px] border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600"
+              >
+                <img src={c.img} alt="" className="h-4 w-4 select-none" draggable={false} />
+                {c.label} <span className="tabular-nums text-slate-500">{fmtClockMins(m)}</span>
+              </span>
+            );
+          })}
+        </div>
+      </Card>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="h-36 animate-pulse bg-slate-50" />
+        ))}
+      </div>
+    );
+  }
+
+  if (aggs.length === 0) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center"
+        data-testid="techs-empty"
+      >
+        <img src={badgeTimeJob} alt="" className="mb-3 h-14 w-14 select-none opacity-80" draggable={false} />
+        <p className="text-sm font-semibold text-slate-700">
+          {isToday ? "Nobody has clocked in yet today" : `No time on the clock for ${format(selectedDate, "MMM d")}`}
+        </p>
+        <p className="mt-1 max-w-sm text-xs text-slate-500">
+          Techs clock in from the mobile app's Time tab — job site, drive, shop, training, meetings, and breaks all land here as they happen.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 pb-4" data-testid="techs-day-view">
+      <section>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          On the clock
+          <span className="rounded-[4px] bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-green-700">{onClock.length}</span>
+        </h2>
+        {onClock.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {onClock.map((a) => (
+              <TechCard key={a.id} a={a} />
+            ))}
+          </div>
+        ) : (
+          <p
+            className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500"
+            data-testid="techs-none-active"
+          >
+            No one is on the clock right now.
+          </p>
+        )}
+      </section>
+
+      {doneToday.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-slate-700">Clocked out {isToday ? "today" : format(selectedDate, "MMM d")}</h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {doneToday.map((a) => (
+              <TechCard key={a.id} a={a} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {noTime.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-slate-400">No time {isToday ? "yet today" : "this day"}</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {noTime.map((t) => (
+              <span key={t.id} className="inline-flex items-center gap-1.5 rounded-[4px] border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500">
+                <img src={roleBadgeSrc(t.role)} alt="" className="h-4 w-4 select-none" draggable={false} />
+                {t.name}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
 }
 
 interface TrucksMapViewProps {
@@ -2539,7 +2778,7 @@ function enrichWorkOrder(wo: any): DispatchWorkOrder {
   };
 }
 
-type ViewMode = "day" | "week" | "month" | "trucks";
+type ViewMode = "day" | "week" | "month" | "techs" | "trucks";
 
 function getWeekDates(date: Date): Date[] {
   const d = new Date(date);
@@ -2974,32 +3213,6 @@ export default function CrmDispatch() {
     refetchIntervalInBackground: true, // Keep syncing even when tab is not focused
     refetchOnWindowFocus: true,
   });
-
-  // Time breakdown data for the selected date
-  interface TimeBreakdown {
-    technicianId: string;
-    technicianName: string;
-    role: string;
-    totalClockedMinutes: number;
-    driveTimeMinutes: number;
-    workTimeMinutes: number;
-    idleTimeMinutes: number;
-    workOrdersCompleted: number;
-  }
-  interface TimeBreakdownResponse {
-    breakdowns: TimeBreakdown[];
-  }
-  const { data: timeBreakdownData } = useQuery<TimeBreakdownResponse>({
-    queryKey: ["/api/crm/time-breakdown", dateString],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/time-breakdown?startDate=${dateString}&endDate=${dateString}`, { credentials: "include" });
-      if (!res.ok) return { breakdowns: [] };
-      return res.json();
-    },
-    enabled: !!currentUser,
-    staleTime: 60000,
-  });
-  const [showTimeBreakdown, setShowTimeBreakdown] = useState(false);
 
   // In-flight scheduling edits, overlaid onto every server payload until the
   // server echoes them back. Guards the fast-consecutive-drag race: a refetch
@@ -4409,6 +4622,19 @@ export default function CrmDispatch() {
                 </button>
               ))}
               <button
+                onClick={() => setViewMode("techs")}
+                className={cn(
+                  "px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
+                  viewMode === "techs"
+                    ? "bg-white text-[#711419] shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+                data-testid="button-view-techs"
+              >
+                <HardHat className="h-4 w-4" />
+                Techs
+              </button>
+              <button
                 onClick={() => setViewMode("trucks")}
                 className={cn(
                   "px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
@@ -4433,7 +4659,7 @@ export default function CrmDispatch() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  {viewMode === "day" ? (
+                  {viewMode === "day" || viewMode === "techs" ? (
                     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                       <PopoverTrigger asChild>
                         <button
@@ -4587,67 +4813,6 @@ export default function CrmDispatch() {
           </div>
           </div>
 
-          {/* Time Breakdown Summary Panel */}
-          <Collapsible open={showTimeBreakdown} onOpenChange={setShowTimeBreakdown}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full flex justify-between items-center py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg" data-testid="toggle-time-breakdown">
-                <div className="flex items-center gap-2">
-                  <Timer className="h-4 w-4 text-slate-600" />
-                  <span className="font-medium text-slate-700">Time Breakdown</span>
-                  {timeBreakdownData?.breakdowns && timeBreakdownData.breakdowns.length > 0 && (
-                    <span className="text-xs text-slate-500">
-                      ({timeBreakdownData.breakdowns.length} techs clocked in)
-                    </span>
-                  )}
-                </div>
-                <ChevronDown className={cn("h-4 w-4 text-slate-500 transition-transform", showTimeBreakdown && "rotate-180")} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {timeBreakdownData?.breakdowns && timeBreakdownData.breakdowns.length > 0 ? (
-                  timeBreakdownData.breakdowns.map(tech => {
-                    const total = tech.totalClockedMinutes || 0;
-                    const idle = tech.idleTimeMinutes || 0;
-                    const drive = tech.driveTimeMinutes || 0;
-                    const work = tech.workTimeMinutes || 0;
-                    const idlePct = total > 0 ? Math.round((idle / total) * 100) : 0;
-                    const drivePct = total > 0 ? Math.round((drive / total) * 100) : 0;
-                    const workPct = total > 0 ? Math.round((work / total) * 100) : 0;
-                    const formatMins = (mins: number) => {
-                      const m = mins || 0;
-                      const h = Math.floor(m / 60);
-                      const remainder = m % 60;
-                      return h > 0 ? `${h}h ${remainder}m` : `${remainder}m`;
-                    };
-                    return (
-                      <Card key={tech.technicianId} className="p-3 bg-white" data-testid={`time-card-${tech.technicianId}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm text-slate-800 truncate">{tech.technicianName}</span>
-                          <span className="text-xs text-slate-500">{formatMins(total)}</span>
-                        </div>
-                        {/* Stacked Progress Bar */}
-                        <div className="w-full h-3 rounded-full overflow-hidden flex bg-slate-100">
-                          {idlePct > 0 && <div className="bg-gray-400" style={{ width: `${idlePct}%` }} title={`Idle: ${formatMins(idle)}`} />}
-                          {drivePct > 0 && <div className="bg-blue-500" style={{ width: `${drivePct}%` }} title={`Drive: ${formatMins(drive)}`} />}
-                          {workPct > 0 && <div className="bg-green-500" style={{ width: `${workPct}%` }} title={`Work: ${formatMins(work)}`} />}
-                        </div>
-                        <div className="flex justify-between mt-2 text-xs text-slate-500">
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[2px] bg-gray-400" />Idle {idlePct}%</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[2px] bg-blue-500" />Drive {drivePct}%</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[2px] bg-green-500" />Work {workPct}%</span>
-                        </div>
-                      </Card>
-                    );
-                  })
-                ) : (
-                  <div className="col-span-full text-center py-4 text-sm text-slate-500">
-                    No technicians clocked in for this date
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
         </div>
 
         {/* Main Content Area - Scrollable Schedule + Fixed Queue */}
@@ -4666,6 +4831,8 @@ export default function CrmDispatch() {
             <div className={cn("scrollbar-minimal overflow-x-hidden", viewMode === "day" ? "flex-shrink-0" : "flex-1 min-h-[280px] overflow-y-auto")}>
               {viewMode === "trucks" ? (
                 <TrucksMapView technicians={technicians} />
+              ) : viewMode === "techs" ? (
+                <TechsDayView technicians={technicians} workOrders={localWorkOrders} selectedDate={selectedDate} />
               ) : viewMode === "day" ? (
                 <TechnicianScheduleBoard
                   technicians={technicians}
@@ -4730,8 +4897,8 @@ export default function CrmDispatch() {
               )}
             </div>
             
-            {/* Unassigned Queue — sits directly below the grid (day view), hidden in trucks */}
-            {viewMode !== "trucks" && (
+            {/* Unassigned Queue — sits directly below the grid (day view), hidden in trucks/techs */}
+            {viewMode !== "trucks" && viewMode !== "techs" && (
             <div className={cn("scrollbar-minimal flex-shrink-0 overflow-x-hidden", viewMode === "day" ? "" : "max-h-[220px] overflow-y-auto")}>
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
