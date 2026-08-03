@@ -62,11 +62,10 @@ export function DraggableSheet({
     if (!el) return onOpenChange(false);
     el.style.transition = "transform 0.22s ease-in";
     el.style.transform = "translateY(100%)";
-    setTimeout(() => {
-      onOpenChange(false);
-      el.style.transition = BASE_TRANSITION;
-      el.style.transform = "";
-    }, 200);
+    // Leave the sheet translated off-screen: clearing the transform here made
+    // it snap back up for the length of Radix's exit animation — the glitchy
+    // "bounce" on close. The node mounts fresh on the next open anyway.
+    setTimeout(() => onOpenChange(false), 200);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -134,7 +133,9 @@ export function DraggableSheet({
           // content pads itself instead.
           paddingBottom:
             !full && keyboardInset > 0 ? `${keyboardInset + 12}px` : "calc(24px + env(safe-area-inset-bottom))",
-          transition: BASE_TRANSITION,
+          // No padding animation while closing — the keyboard drops at the
+          // same moment and the shrink fought the slide-out (visible jolt).
+          transition: open ? BASE_TRANSITION : undefined,
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

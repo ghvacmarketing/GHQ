@@ -12,11 +12,13 @@ import {
   ChevronLeft,
   AlertCircle,
   Image as ImageIcon,
+  Pencil,
   Play,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomerEditSheet } from "@/components/mobile/customer-edit-sheet";
 import MobileCustomers from "./mobile-customers";
 import type { CrmCustomer, CrmWorkOrder, CrmAgreement } from "@shared/schema";
 
@@ -152,6 +154,7 @@ export default function MobileCustomerDetail() {
   const [, navigate] = useLocation();
   const { id } = useParams<{ id: string }>();
   const [viewer, setViewer] = useState<CustomerPhoto | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   // ── iOS-style tracked back-swipe with the REAL customers page revealed
   // beneath (parallax + scrim), exactly like leaving a job. The floating back
@@ -162,7 +165,6 @@ export default function MobileCustomerDetail() {
   const scrimRef = useRef<HTMLDivElement | null>(null);
   const backRef = useRef<HTMLButtonElement | null>(null);
   const [showUnderlay, setShowUnderlay] = useState(false);
-  const mountedAt = useRef(Date.now());
   const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
 
   const goBackAnimated = (fromDx = 0) => {
@@ -194,10 +196,13 @@ export default function MobileCustomerDetail() {
   };
 
   const onSwipeStart = (e: React.PointerEvent) => {
-    // Edge swipe only, and never within the first beat after opening — the
-    // tap that navigated here must not double as an exit gesture.
-    if (e.clientX > 48 || Date.now() - mountedAt.current < 500) { swipeDrag.current = null; return; }
+    if (e.clientX > 48) { swipeDrag.current = null; return; }
     swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    // Mount the Customers page underneath NOW, while the finger is still
+    // parked — mounting it mid-drag (it's a heavy list) dropped frames and
+    // made the swipe feel dead. Same fix the job page carries. If this turns
+    // out to be a tap or a scroll, onSwipeEnd unmounts it again.
+    setShowUnderlay(true);
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onSwipeMove = (e: React.PointerEvent) => {
@@ -211,7 +216,6 @@ export default function MobileCustomerDetail() {
         st.engaged = true;
         el.style.transition = "none";
         el.style.animation = "none";
-        setShowUnderlay(true);
       } else if (dy > 14) { st.active = false; setShowUnderlay(false); return; }
     }
     if (st.engaged) {
@@ -383,8 +387,15 @@ export default function MobileCustomerDetail() {
                 })()}
 
                 <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="contact-card">
-                  <div className="border-b border-slate-200 px-3.5 py-2.5">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-3.5 py-2.5">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact Information</h3>
+                    <button
+                      onClick={() => setEditOpen(true)}
+                      className="flex items-center gap-1 text-xs font-semibold text-[#711419] active:opacity-70"
+                      data-testid="customer-edit-open"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
                   </div>
                   <div className="divide-y divide-slate-200 px-3.5">
                     {customer.phone && (
@@ -491,6 +502,9 @@ export default function MobileCustomerDetail() {
           </div>
         </div>
       </div>
+
+      {/* Edit contact info + service address (with the address lookup) */}
+      {customer && <CustomerEditSheet customer={customer} open={editOpen} onOpenChange={setEditOpen} />}
 
       {/* Floating back — OUTSIDE the sliding panel: it holds its spot while
           the page follows your finger, then fades away as the swipe commits.

@@ -2,12 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, Loader2, Search } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { MapEmbed, validateAddress } from "@/components/mobile/address-autocomplete";
+import { useKeyboardInset } from "@/lib/native";
 import locationBadge from "@/assets/badge-location.png";
 
-/** Address lookup for the mobile create forms: a compact bottom sheet with a
- *  plain search box (no OS widget), house-style suggestion rows (metal pin
- *  badge) as you type, and a map + confirm step once one is picked. Selection
- *  hands structured fields (address1/city/state/zip) back to the form. */
+/** Address lookup for the mobile forms: a FULL-HEIGHT sheet built around an
+ *  open keyboard — the sheet itself never moves or resizes when the keyboard
+ *  shows (the results list pads itself clear instead), the search box grabs
+ *  focus whenever the search step is visible, and picking a match leads to a
+ *  map + "Use this address" confirm step. Selection hands structured fields
+ *  (address1/city/state/zip) back to the form. */
 
 export interface AddressSuggestion {
   description: string;
@@ -74,6 +77,7 @@ export function AddressSearchSheet({
   onOpenChange,
   onSelect,
   title = "Find address",
+  nested = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -81,7 +85,11 @@ export function AddressSearchSheet({
    *  form can skip its own validation round-trip. */
   onSelect: (fields: AddressFields, meta?: { verified: boolean }) => void;
   title?: string;
+  /** Opened from inside another sheet (the customer edit sheet) — stacks
+   *  above it instead of colliding at the same z-index. */
+  nested?: boolean;
 }) {
+  const keyboardInset = useKeyboardInset();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [searching, setSearching] = useState(false);
@@ -168,12 +176,12 @@ export function AddressSearchSheet({
   };
 
   return (
-    <DraggableSheet open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
+    <DraggableSheet full nested={nested} open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
       {!chosen ? (
-        <>
+        <div className="flex h-full min-h-0 flex-col">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
 
-          <div className="mt-3 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+          <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
             <input
               ref={inputRef}
@@ -186,11 +194,13 @@ export function AddressSearchSheet({
             {searching && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-300" />}
           </div>
 
-          {/* Fixed-height results region: the sheet keeps one calm size above
-              the keyboard instead of stretching to the top of the screen as
-              results stream in — sized so ~4 matches show while typing.
-              Overflow scrolls inside. */}
-          <div className="mt-3 h-[28dvh] min-h-[210px] overflow-y-auto overscroll-y-contain">
+          {/* The rest of the screen is results. The sheet itself never moves
+              for the keyboard — the list just pads its bottom so the last
+              row scrolls clear of the keys. */}
+          <div
+            className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+            style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
+          >
             {suggestions.length > 0 ? (
               <div
                 className={`overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm transition-opacity ${searching ? "opacity-60" : ""}`}
@@ -218,11 +228,15 @@ export function AddressSearchSheet({
               </p>
             )}
           </div>
-        </>
+        </div>
       ) : (
         <>
           <button
-            onClick={() => setChosen(null)}
+            onClick={() => {
+              setChosen(null);
+              // Back on the search step: keyboard comes right back up.
+              setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 60);
+            }}
             className="flex items-center gap-1.5 py-1 text-sm font-medium text-slate-500 active:opacity-70"
             data-testid="address-search-back"
           >
