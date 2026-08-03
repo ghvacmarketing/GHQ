@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/** Reveals text progressively, like a live model stream — a fresh Gibbs
- *  answer flows in word by word instead of appearing as a wall of text.
- *  Restored/older messages render instantly (animate=false). */
+/** Reveals text like a live model stream — each word of a fresh Gibbs answer
+ *  fades in from a slight blur (the ChatGPT/Gemini feel) instead of typing
+ *  character by character. Whitespace tokens (including newlines) pass
+ *  through as raw text so pre-wrap layout is untouched, and paragraph breaks
+ *  read as natural little pauses. Once the reveal finishes the component
+ *  settles to a single plain text node. Restored/older messages render
+ *  instantly (animate=false). */
 export function TypewriterText({
   text,
   animate,
@@ -17,39 +21,54 @@ export function TypewriterText({
    *  talking". Not fired for instantly-rendered messages. */
   onComplete?: () => void;
 }) {
-  const [shown, setShown] = useState(animate ? 0 : text.length);
+  // Words and whitespace runs, in order — joining tokens reproduces `text`
+  // exactly, so nothing about wrapping or blank lines changes.
+  const tokens = useMemo(() => text.split(/(\s+)/).filter(Boolean), [text]);
+  const [shown, setShown] = useState(animate ? 0 : tokens.length);
   const doneRef = useRef(!animate);
 
   useEffect(() => {
     if (!animate || doneRef.current) {
-      setShown(text.length);
+      setShown(tokens.length);
       return;
     }
     setShown(0);
-    // ~2.5s for a typical answer regardless of length: bigger steps for
-    // longer text, minimum a couple of characters per frame.
-    const step = Math.max(2, Math.ceil(text.length / 150));
+    // ~3s for a typical answer regardless of length, clamped so short
+    // replies don't snap and long ones don't drone.
+    const base = Math.min(64, Math.max(16, 2800 / Math.max(1, tokens.length)));
     let current = 0;
-    const id = setInterval(() => {
-      current = Math.min(text.length, current + step);
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      current = Math.min(tokens.length, current + 1);
       setShown(current);
-      if (current % (step * 8) < step) onProgress?.();
-      if (current >= text.length) {
+      if (current % 6 === 0) onProgress?.();
+      if (current >= tokens.length) {
         doneRef.current = true;
-        clearInterval(id);
         onProgress?.();
         onComplete?.();
+        return;
       }
-    }, 16);
-    return () => clearInterval(id);
+      // Jittered cadence reads as generation, not a metronome.
+      timer = setTimeout(tick, base * (0.6 + Math.random() * 0.8));
+    };
+    timer = setTimeout(tick, base);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, animate]);
 
+  // Settled: collapse the word spans back into one cheap text node.
+  if (shown >= tokens.length) return <>{text}</>;
+
   return (
     <>
-      {text.slice(0, shown)}
-      {shown < text.length && (
-        <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse rounded-sm bg-current align-baseline" />
+      {tokens.slice(0, shown).map((t, i) =>
+        /\S/.test(t) ? (
+          <span key={i} className="gibbs-word-in">
+            {t}
+          </span>
+        ) : (
+          t
+        ),
       )}
     </>
   );
