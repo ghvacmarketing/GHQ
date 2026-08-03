@@ -29346,6 +29346,37 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             .slice(0, 6);
           if (out.length > 0) return res.json(out);
         }
+      } catch { /* fall through to the legacy API */ }
+      // Legacy Places Autocomplete — keys whose API-restriction list predates
+      // the "New" API (like the maps-project key) allow only this one. Same
+      // location bias, mapped to the same shape.
+      try {
+        const r = await fetch(
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:us&location=33.2079,-82.3915&radius=50000&key=${key}`,
+          { headers: { Referer: "https://www.ghvac.app/" } },
+        );
+        if (r.ok) {
+          const data: any = await r.json();
+          if (data?.status === "OK") {
+            const seenL = new Set<string>();
+            const out = (data.predictions || [])
+              .map((p: any) => ({
+                placeId: p.place_id || undefined,
+                description: String(p.description || "").replace(/,\s*USA$/i, ""),
+                main: p.structured_formatting?.main_text || String(p.description || ""),
+                secondary: String(p.structured_formatting?.secondary_text || "").replace(/,\s*USA$/i, ""),
+              }))
+              .filter((s: any) => s.description)
+              .filter((s: any) => {
+                const k = `${addrKeyPart(s.main)}|${addrKeyPart(s.secondary.replace(/\b\d{5}(-\d{4})?\b/g, ""))}`;
+                if (seenL.has(k)) return false;
+                seenL.add(k);
+                return true;
+              })
+              .slice(0, 6);
+            if (out.length > 0) return res.json(out);
+          }
+        }
       } catch { /* fall through to the keyless source */ }
     }
     try {
@@ -29409,20 +29440,36 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     const key = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_PLACES_API_KEY;
     if (!placeId || !key) return res.json(null);
     try {
-      const r = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+      // Places API (New) first; legacy Place Details when the key's API
+      // restrictions only allow the old surface. Same components, older names.
+      let comps: Array<{ types: string[]; long: string; short: string }> = [];
+      const rNew = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
         headers: {
           "X-Goog-Api-Key": key,
           "X-Goog-FieldMask": "addressComponents",
           Referer: "https://www.ghvac.app/",
         },
       });
-      if (!r.ok) return res.json(null);
-      const data: any = await r.json();
-      const comps: any[] = data?.addressComponents || [];
-      const get = (type: string, short = false) => {
-        const c = comps.find((x) => x.types?.includes(type));
-        return (short ? c?.shortText : c?.longText) || "";
-      };
+      if (rNew.ok) {
+        const data: any = await rNew.json();
+        comps = (data?.addressComponents || []).map((c: any) => ({
+          types: c.types || [], long: c.longText || "", short: c.shortText || "",
+        }));
+      } else {
+        const rOld = await fetch(
+          `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=address_components&key=${key}`,
+          { headers: { Referer: "https://www.ghvac.app/" } },
+        );
+        const dOld: any = rOld.ok ? await rOld.json() : null;
+        if (dOld?.status === "OK") {
+          comps = (dOld.result?.address_components || []).map((c: any) => ({
+            types: c.types || [], long: c.long_name || "", short: c.short_name || "",
+          }));
+        }
+      }
+      if (comps.length === 0) return res.json(null);
+      const get = (type: string, short = false) =>
+        comps.find((x) => x.types.includes(type))?.[short ? "short" : "long"] || "";
       const address1 = [get("street_number"), get("route", true)].filter(Boolean).join(" ");
       const city =
         get("locality") || get("postal_town") || get("sublocality_level_1") || get("administrative_area_level_3");
