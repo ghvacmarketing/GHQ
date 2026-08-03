@@ -9790,8 +9790,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "name and email are required" });
       }
 
+      // Deleting a user only DEACTIVATES the row (history stays attributed) —
+      // so re-adding that email must revive the account, not refuse it.
       const existing = await getCrmUserByEmail(email);
-      if (existing) {
+      if (existing && existing.isActive !== false) {
         return res.status(400).json({ message: "User with this email already exists" });
       }
 
@@ -9803,17 +9805,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? password
           : `!google-only:${(await import("crypto")).randomBytes(32).toString("hex")}`;
       const passwordHash = await hashCrmPassword(effectivePassword);
-      const [user] = await db.insert(crmUsers).values({
-        name,
-        email: email.toLowerCase(),
-        passwordHash,
-        role: role || "tech",
-        phone: phone || null,
-      }).returning();
+
+      let user;
+      if (existing) {
+        // Revive the deactivated account with the new details.
+        [user] = await db.update(crmUsers).set({
+          name,
+          passwordHash,
+          role: role || "tech",
+          phone: phone || null,
+          isActive: true,
+        }).where(eq(crmUsers.id, existing.id)).returning();
+      } else {
+        [user] = await db.insert(crmUsers).values({
+          name,
+          email: email.toLowerCase(),
+          passwordHash,
+          role: role || "tech",
+          phone: phone || null,
+        }).returning();
+      }
 
       await logCrmAudit(
         currentUser?.id || null,
-        "user.created",
+        existing ? "user.reactivated" : "user.created",
         "user",
         user.id,
         { name: user.name, email: user.email, role: user.role },
