@@ -48,6 +48,8 @@ const KB_DOC_NAME = "Gibbs — built-in CRM knowledge (auto-updated).md";
 const KB_OBJECT_ID = "gibbs-knowledge-base-doc";
 const HTML_DOC_NAME = "Gibbs knowledge & policies (readable).html";
 const HTML_OBJECT_ID = "gibbs-knowledge-readable-html";
+const BRAND_HTML_DOC_NAME = "Brand voice (readable).html";
+const BRAND_HTML_OBJECT_ID = "gibbs-brand-voice-readable-html";
 const POLICY_DOC_NAME = "Payments & fees policy.md";
 
 const KB_HEADER = `# Gibbs — built-in CRM knowledge
@@ -183,7 +185,13 @@ function mdToHtml(md: string): { html: string; toc: Array<{ id: string; title: s
   return { html: out.join("\n"), toc };
 }
 
-function buildReadableHtml(fullMd: string): string {
+function buildReadableHtml(fullMd: string, opts?: { title: string; intro: string; stamp: string }): string {
+  const meta = opts ?? {
+    title: "Gibbs — knowledge &amp; policies",
+    intro:
+      "Everything Gibbs carries into every conversation: how the CRM works, what exists (and what doesn't), and the company policies folded in below. Live business data — customers, schedules, balances — he looks up fresh each time and is not listed here.",
+    stamp: "Auto-generated on deploy · edit policies in Documents → Gibbs → Markdown",
+  };
   const { html, toc } = mdToHtml(fullMd);
   const tocHtml = toc.map((t) => `<a href="#${t.id}">${escapeHtml(t.title)}</a>`).join("");
   return `<!doctype html>
@@ -191,7 +199,7 @@ function buildReadableHtml(fullMd: string): string {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Gibbs — knowledge &amp; policies</title>
+<title>${meta.title}</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -229,9 +237,9 @@ function buildReadableHtml(fullMd: string): string {
 <body>
 <div class="shell">
   <div class="masthead">
-    <h1>Gibbs — knowledge &amp; policies</h1>
-    <p>Everything Gibbs carries into every conversation: how the CRM works, what exists (and what doesn't), and the company policies folded in below. Live business data — customers, schedules, balances — he looks up fresh each time and is not listed here.</p>
-    <div class="stamp">Auto-generated on deploy · edit policies in Documents → Gibbs → Markdown</div>
+    <h1>${meta.title}</h1>
+    <p>${meta.intro}</p>
+    <div class="stamp">${meta.stamp}</div>
   </div>
   <nav class="toc">${tocHtml}</nav>
   <article>
@@ -381,6 +389,26 @@ export async function seedGibbsDocs(): Promise<void> {
       htmlPath = await svc.writeObject(htmlBuf, "text/html; charset=utf-8");
     }
     await upsertDoc({ folderId: gibbs.id, name: HTML_DOC_NAME, path: htmlPath, contentType: "text/html", size: htmlBuf.length });
+
+    // Brand voice gets its own readable page too — regenerated each deploy
+    // from the LIVE (team-edited) markdown.
+    const brandHtmlBuf = Buffer.from(
+      buildReadableHtml(brandMd, {
+        title: "Brand voice — how we talk",
+        intro:
+          "The Giesbrecht HVAC voice: how Gibbs writes, how our texts and emails should read, and the words we do and don't use. Gibbs reads the live version of this document whenever voice matters.",
+        stamp: "Rendered from Documents → Gibbs → Markdown → Brand voice.md — edit there, updates on the next deploy",
+      }),
+      "utf-8",
+    );
+    let brandHtmlPath: string;
+    if (svc.isLocal()) {
+      await svc.saveUpload(BRAND_HTML_OBJECT_ID, brandHtmlBuf, "text/html; charset=utf-8");
+      brandHtmlPath = `/objects/db/${BRAND_HTML_OBJECT_ID}`;
+    } else {
+      brandHtmlPath = await svc.writeObject(brandHtmlBuf, "text/html; charset=utf-8");
+    }
+    await upsertDoc({ folderId: gibbs.id, name: BRAND_HTML_DOC_NAME, path: brandHtmlPath, contentType: "text/html", size: brandHtmlBuf.length });
   } catch (e) {
     console.error("[GibbsDocs] seeding failed (non-fatal):", (e as Error).message);
   }
