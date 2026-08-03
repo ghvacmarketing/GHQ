@@ -209,6 +209,15 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
   2. Apply for financing (GreenSky link)
 - Financing link is configurable in CRM Settings > Payment Settings
 
+### Deposits & card convenience fee (COMPANY POLICY)
+- Standard deposit on an accepted quote is 50% of the quote total
+- Credit card payments carry a 3% convenience fee ON THE AMOUNT CHARGED to
+  the card (e.g. $10,000 quote → $5,000 deposit; by card that's $5,000 +
+  3% = $5,150). Cash or check payments have no fee.
+- The full current policy lives in the Documents app → Gibbs folder →
+  "Payments & fees policy" — read it with company_docs before answering
+  detailed fee questions (that document wins if it differs from this note)
+
 ---
 
 ## CUSTOMERS
