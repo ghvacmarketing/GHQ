@@ -651,6 +651,18 @@ The Dispatch Board is the scheduling hub for all technician work orders. Access 
 ### No auto-dispatch / no auto-assignment
 There is **no** automatic dispatch, auto-assignment, or round-robin routing in the Dispatch Board. All assignment is done manually by dragging cards.
 
+### Dispatch Board view tabs
+- Day / Week / Month — the schedule grid
+- **Techs** — live read of everyone's time clock for the selected day: who's on the clock right now (category + since when), stacked bars and per-category totals across the mobile time categories (Job site, Drive, Shop, Training, Meeting, Break, Other), who's clocked out, and who hasn't clocked in
+- **Trucks** — live fleet map (Bouncie GPS)
+
+### Gibbs folder in Documents
+The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" page (auto-generated each deploy) plus a Markdown subfolder holding the raw knowledge file and the team-editable "Payments & fees policy" document Gibbs reads live.
+
+### Mobile media capture & markup
+- On the mobile Media page, tapping one of today's jobs opens the camera immediately (photo or video)
+- Captured photos open in a Markup editor first — draw freehand, arrows, and text stamps in several colors (CompanyCam-style) — then upload; videos upload as-is
+
 ---
 
 ## CRM NAVIGATION

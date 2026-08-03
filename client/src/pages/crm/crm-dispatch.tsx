@@ -806,6 +806,18 @@ function TechsDayView({
     },
     refetchInterval: 30_000,
   });
+  // Real roles for the metal badges — the board's technician list doesn't
+  // carry them, and a supervisor must never wear the wrench.
+  const { data: roster = [] } = useQuery<Array<{ id: string; name: string; role?: string | null }>>({
+    queryKey: ["/api/crm/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/users", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : data.users || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
   // Open entries show a running clock — tick it without waiting on a refetch.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -814,7 +826,7 @@ function TechsDayView({
   }, []);
 
   const isToday = isSameDay(selectedDate, new Date());
-  const roleFor = new Map(technicians.map((t) => [t.id, t.role || "tech"]));
+  const roleFor = new Map(roster.map((u) => [u.id, u.role || "tech"]));
   const woTitle = new Map(workOrders.map((w) => [w.id, w.title || ""]));
 
   type Agg = {
@@ -976,7 +988,7 @@ function TechsDayView({
           <div className="flex flex-wrap gap-1.5">
             {noTime.map((t) => (
               <span key={t.id} className="inline-flex items-center gap-1.5 rounded-[4px] border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500">
-                <img src={roleBadgeSrc(t.role)} alt="" className="h-4 w-4 select-none" draggable={false} />
+                <img src={roleBadgeSrc(String(roleFor.get(t.id) || "tech"))} alt="" className="h-4 w-4 select-none" draggable={false} />
                 {t.name}
               </span>
             ))}

@@ -28715,13 +28715,22 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (technicianId && typeof technicianId === "string") {
         filters.technicianId = technicianId;
       }
+      // Date-only params mean a BUSINESS day (Eastern), not a UTC day — the
+      // old `new Date("YYYY-MM-DD")` window started at 8 PM Eastern the night
+      // before, so yesterday-evening clock-outs haunted today's lists.
       if (startDate && typeof startDate === "string") {
-        filters.startDate = new Date(startDate);
+        filters.startDate = /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+          ? fromZonedTime(`${startDate} 00:00:00`, "America/New_York")
+          : new Date(startDate);
       }
       if (endDate && typeof endDate === "string") {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Include the full end date
-        filters.endDate = end;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+          filters.endDate = fromZonedTime(`${endDate} 23:59:59`, "America/New_York");
+        } else {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999); // Include the full end date
+          filters.endDate = end;
+        }
       }
 
       const entries = await storage.getTimeEntries(filters);

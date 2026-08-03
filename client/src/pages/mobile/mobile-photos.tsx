@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import MobileShell from "./mobile-shell";
 import { PhotoViewer } from "@/components/mobile/photo-viewer";
+import { PhotoAnnotator } from "@/components/mobile/photo-annotator";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { SheetSelect } from "@/components/mobile/sheet-select";
 import type { CrmUser, CustomerFile } from "@shared/schema";
@@ -21,6 +22,10 @@ export default function MobilePhotos() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Straight-to-camera input (photo OR video) for the tap-a-job flow.
+  const captureInputRef = useRef<HTMLInputElement | null>(null);
+  // A just-captured image held in the markup editor before upload.
+  const [annotating, setAnnotating] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   // The customer photos get attached to — always chosen via search.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
@@ -524,7 +529,13 @@ export default function MobilePhotos() {
                 return (
                   <button
                     key={job.id}
-                    onClick={() => job.customerId && chooseCustomer({ id: job.customerId, name: job.customerName || "Customer" })}
+                    onClick={() => {
+                      if (!job.customerId) return;
+                      chooseCustomer({ id: job.customerId, name: job.customerName || "Customer" });
+                      // Straight to the camera — the tap IS the intent. Same
+                      // user gesture, so iOS allows the programmatic open.
+                      captureInputRef.current?.click();
+                    }}
                     className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${ji > 0 ? "border-t border-slate-200/80" : ""}`}
                     data-testid={`photo-job-${job.id}`}
                   >
@@ -599,6 +610,25 @@ export default function MobilePhotos() {
             </p>
           </div>
         )}
+
+        {/* Straight-to-camera input for the tap-a-job flow — mounted
+            unconditionally so the SAME tap that targets the job can open it.
+            Captured photos go through Markup first; videos upload as-is. */}
+        <input
+          ref={captureInputRef}
+          type="file"
+          accept="image/*,video/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            if (f.type.startsWith("image/")) setAnnotating(f);
+            else handleUpload([f]);
+          }}
+          data-testid="input-photo-capture"
+        />
 
         {/* Capture / library */}
         {activeCustomer && (
@@ -945,6 +975,18 @@ export default function MobilePhotos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Markup a just-captured shot (draw / arrows / text) before upload */}
+      {annotating && (
+        <PhotoAnnotator
+          file={annotating}
+          onCancel={() => setAnnotating(null)}
+          onDone={(f) => {
+            setAnnotating(null);
+            handleUpload([f]);
+          }}
+        />
+      )}
 
       {/* Fullscreen viewer + markup editor */}
       {viewer && (
