@@ -82,7 +82,17 @@ function stripMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, "$1");
 }
 
-export default function AssistantOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function AssistantOverlay({
+  open,
+  onClose,
+  copilot,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Create-copilot: Gibbs is anchored to the create form the user is on —
+   *  he sees the live draft and fills fields in place (fill_form actions). */
+  copilot?: import("@/lib/ai-conversations").AiCreateCopilot;
+}) {
   const [, navigate] = useLocation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -459,8 +469,10 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
 
   // Resume the most recent stored thread the first time the sheet opens —
   // conversations survive app restarts and are shared with desktop Ask AI.
+  // Copilot opens FRESH instead: yesterday's chat under a "Helping with:
+  // New customer" chip would be noise.
   useEffect(() => {
-    if (!open || hydrated) return;
+    if (!open || hydrated || copilot) return;
     setHydrated(true);
     fetchLatestAiConversation().then((latest) => {
       if (latest) {
@@ -597,6 +609,8 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
       mode,
+      // Copilot: ship the live form draft with every ask.
+      createContext: copilot ? { kind: copilot.kind, fields: copilot.getDraft() } : undefined,
     };
     // Stream-first: the answer paints as the model generates it. If the
     // stream can't START, fall back to the plain endpoint (identical
@@ -617,6 +631,25 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         const streamed = streamedAcc.length > 0;
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+        // Copilot: fill_form actions patch the form RIGHT NOW (the page
+        // shows its own undo) and never render as cards.
+        if (copilot) {
+          const fillActs = (
+            Array.isArray(data.proposedActions) && data.proposedActions.length
+              ? data.proposedActions
+              : data.proposedAction
+                ? [data.proposedAction]
+                : []
+          ).filter((a: any) => a?.type === "fill_form");
+          for (const fa of fillActs) {
+            try {
+              copilot.applyPatch((fa.params as Record<string, unknown>) || {});
+            } catch {
+              /* a bad patch must never break the chat */
+            }
+          }
+          if (data.proposedAction?.type === "fill_form") data.proposedAction = null;
+        }
         const answerText = String(data.answer ?? "").trim();
         if (streamed) {
           // The user already watched the answer stream in — append it settled
@@ -880,6 +913,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             <SquarePen className="h-6 w-6" />
           </button>
         </div>
+        {/* Copilot anchor chip — Gibbs is working THIS form */}
+        {copilot && (
+          <div className="pointer-events-none absolute inset-x-0 top-[72px] z-10 flex justify-center">
+            <span className="rounded-full bg-[#711419]/10 px-3 py-1 text-[11px] font-semibold text-[#711419]" data-testid="assistant-copilot-chip">
+              Helping with: {copilot.label}
+            </span>
+          </div>
+        )}
 
         {/* Conversation — overflow-x-hidden is load-bearing: overflow-y-auto
             alone lets one long unbroken string (a URL, an address) widen the
@@ -1270,7 +1311,15 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                   sendQuestion(input);
                 }
               }}
-              placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask Gibbs anything…"}
+              placeholder={
+                listening
+                  ? "Listening..."
+                  : transcribing
+                    ? "Transcribing..."
+                    : copilot
+                      ? "Tell me the details — I'll fill the form…"
+                      : "Ask Gibbs anything…"
+              }
               className="max-h-32 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:outline-none focus-visible:ring-0"
               data-testid="assistant-input"
             />

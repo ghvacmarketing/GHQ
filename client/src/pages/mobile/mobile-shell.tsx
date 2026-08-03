@@ -300,6 +300,17 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 
       {/* "+" sheet — Create things, with quick access split out below */}
       <DraggableSheet open={createOpen} onOpenChange={setCreateOpen} title="Create" testid="sheet-create">
+          {/* Explicit X alongside drag-down-anywhere and overlay tap — three
+              ways out. (This sheet has no scroller, so a press-and-drag
+              anywhere is unambiguously a dismiss, never a scroll.) */}
+          <button
+            onClick={() => setCreateOpen(false)}
+            className="absolute right-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-transform active:scale-90"
+            aria-label="Close"
+            data-testid="create-sheet-close"
+          >
+            <Plus className="h-5 w-5 rotate-45" />
+          </button>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
             <SheetTile icon={CheckSquare} img={createTask} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />

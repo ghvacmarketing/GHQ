@@ -638,7 +638,7 @@ export default function MobileMessages() {
                             <img key={i} src={a.url} alt="" className="block max-h-64 w-full object-cover" loading="lazy" />
                           ))}
                           {hasText && (
-                            <p className="whitespace-pre-wrap break-words px-3 pb-2 pr-14 pt-1.5 text-[15px] leading-snug">
+                            <p className="select-text whitespace-pre-wrap break-words px-3 pb-2 pr-14 pt-1.5 text-[15px] leading-snug [-webkit-touch-callout:default] [-webkit-user-select:text]">
                               {entry.m.body}
                             </p>
                           )}

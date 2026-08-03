@@ -2290,8 +2290,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? req.body.mode
         : "general";
 
+      // Create-copilot context: which form the user is on + its live draft.
+      const createContext =
+        req.body.createContext &&
+        typeof req.body.createContext === "object" &&
+        typeof req.body.createContext.kind === "string" &&
+        req.body.createContext.fields &&
+        typeof req.body.createContext.fields === "object"
+          ? { kind: String(req.body.createContext.kind).slice(0, 40), fields: req.body.createContext.fields }
+          : undefined;
+
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question, history, images, mode, onDelta);
+      const result = await askCrmHelp(question, history, images, mode, onDelta, createContext);
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
@@ -2324,11 +2334,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           content: question.trim(),
           attachments: images.length > 0 ? images : null,
         });
-        const actions = result.proposedActions?.length
+        // fill_form is a screen operation (create-copilot) — it patches the
+        // form in front of the user and must never persist as an approval.
+        const actions = (result.proposedActions?.length
           ? result.proposedActions
           : result.proposedAction
             ? [result.proposedAction]
-            : [];
+            : []
+        ).filter((a) => a.type !== "fill_form");
         // The model re-proposed an adjusted/expanded set — retire every still-
         // pending card in this conversation BEFORE inserting the new ones, so
         // approving the stale duplicate (two work orders!) becomes impossible.

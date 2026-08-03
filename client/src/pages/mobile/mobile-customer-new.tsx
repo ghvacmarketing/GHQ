@@ -173,6 +173,70 @@ export default function MobileCustomerNew() {
 
   const sectionLabel = "mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400";
 
+  // ── Gibbs create-copilot: he sees this draft and fills fields in place.
+  // Undo restores exactly the values his last fill overwrote. ──
+  const [gibbsUndo, setGibbsUndo] = useState<Record<string, string> | null>(null);
+  const copilotSetters: Record<string, { get: () => string; set: (v: string) => void; label: string }> = {
+    firstName: { get: () => firstName, set: setFirstName, label: "first name" },
+    lastName: { get: () => lastName, set: setLastName, label: "last name" },
+    companyName: { get: () => companyName, set: setCompanyName, label: "company" },
+    displayName: { get: () => displayName, set: (v) => { setDisplayNameEdited(true); setDisplayNameInput(v); }, label: "display name" },
+    phone: { get: () => phone, set: setPhone, label: "phone" },
+    email: { get: () => email, set: setEmail, label: "email" },
+    address1: { get: () => address1, set: setAddress1, label: "address" },
+    address2: { get: () => address2, set: setAddress2, label: "address 2" },
+    city: { get: () => city, set: setCity, label: "city" },
+    state: { get: () => state, set: setState, label: "state" },
+    zip: { get: () => zip, set: setZip, label: "zip" },
+    accessInstructions: { get: () => accessInstructions, set: setAccessInstructions, label: "access notes" },
+    gateCode: { get: () => gateCode, set: setGateCode, label: "gate code" },
+    note: { get: () => note, set: setNote, label: "notes" },
+  };
+  const copilot = {
+    kind: "customer",
+    label: "New customer",
+    getDraft: () => ({
+      accountType,
+      leadSource,
+      ...Object.fromEntries(Object.entries(copilotSetters).map(([k, s]) => [k, s.get()])),
+    }),
+    applyPatch: (patch: Record<string, unknown>) => {
+      const prev: Record<string, string> = {};
+      const applied: string[] = [];
+      for (const [k, v] of Object.entries(patch)) {
+        if (k === "accountType" && typeof v === "string" && ["RESIDENTIAL", "COMMERCIAL", "PROPERTY_MANAGER"].includes(v)) {
+          prev.accountType = accountType;
+          setAccountType(v as AccountType);
+          applied.push("account type");
+          continue;
+        }
+        if (k === "leadSource" && typeof v === "string" && LEAD_SOURCES.some((s) => s.value === v)) {
+          prev.leadSource = leadSource;
+          setLeadSource(v as LeadSource);
+          applied.push("lead source");
+          continue;
+        }
+        const s = copilotSetters[k];
+        if (s && typeof v === "string") {
+          prev[k] = s.get();
+          s.set(v);
+          applied.push(s.label);
+        }
+      }
+      if (applied.length > 0) setGibbsUndo(prev);
+      return applied;
+    },
+  };
+  const undoGibbsFill = () => {
+    if (!gibbsUndo) return;
+    for (const [k, v] of Object.entries(gibbsUndo)) {
+      if (k === "accountType") setAccountType(v as AccountType);
+      else if (k === "leadSource") setLeadSource(v as LeadSource);
+      else copilotSetters[k]?.set(v);
+    }
+    setGibbsUndo(null);
+  };
+
   return (
     <MobileCreatePage
       title="New customer"
@@ -182,9 +246,19 @@ export default function MobileCustomerNew() {
       saveLabel="Create customer"
       saveDisabled={missing.length > 0}
       saving={createCustomer.isPending}
+      assistant={copilot}
       testid="mobile-customer-new-page"
     >
       <div className="space-y-6">
+        {gibbsUndo && (
+          <button
+            onClick={undoGibbsFill}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2 text-xs font-semibold text-[#711419] active:opacity-80"
+            data-testid="gibbs-fill-undo"
+          >
+            Gibbs filled the form — tap to undo
+          </button>
+        )}
         {/* Type — drives which identity fields matter, same as the CRM */}
         <div>
           <p className={sectionLabel}>Account type</p>

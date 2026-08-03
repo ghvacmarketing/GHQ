@@ -39,6 +39,42 @@ payments policy next to this one), which Gibbs reads live.
 
 `;
 
+const BRAND_DOC_NAME = "Brand voice.md";
+const BRAND_SEED = `# Brand voice — how Gibbs (and we) talk
+
+## Who we are
+Giesbrecht HVAC is a family HVAC company in Wrens, Georgia serving the
+Augusta–Wrens area. We're neighbors first, technicians second, salespeople a
+distant third.
+
+## The voice
+- Plain-spoken, warm, practical. Small-town Georgia professional.
+- Direct answers with real numbers, names, and dates — no corporate fluff,
+  no filler, no jargon when a plain word works.
+- Talk to techs like techs; talk to the office like a helpful coworker;
+  talk to customers like a trusted neighbor who happens to know HVAC.
+- Confident, never pushy. We recommend what we'd put in our own homes and
+  say why in concrete terms (comfort, power bills, equipment life).
+- It's fine to open with a short conversational beat ("Looks like a busy
+  morning —") when it fits. Never pad.
+
+## Words we use / avoid
+- Say "visit", "tune-up", "system" — not "service event", "PM", "unit
+  asset".
+- Say "we'll take care of it" — not "your request has been processed".
+- Avoid ALL-CAPS urgency, exclamation stacking, and hard-sell phrasing.
+
+## Customer messages (texts & emails)
+- Lead with what matters to them: when we're coming, what it costs, what we
+  found.
+- Short sentences. One idea per sentence. Sign off as Giesbrecht HVAC.
+- Always give a next step ("Reply here or call (706) 826-0644").
+
+---
+This document is owned by the team — edit it in the Documents app and Gibbs
+reads the live version whenever voice matters.
+`;
+
 const POLICY_SEED = `# Payments & fees policy
 
 ## Quote deposits
@@ -261,10 +297,39 @@ export async function seedGibbsDocs(): Promise<void> {
       console.log("[GibbsDocs] Seeded the Payments & fees policy document");
     }
 
-    // Built-in knowledge md — includes the live policy at the end.
+    // Brand voice doc: seed once, then always read the team's live version.
+    let brandMd = BRAND_SEED;
+    const [brandRow] = await db
+      .select()
+      .from(docFiles)
+      .where(and(eq(docFiles.folderId, mdFolder.id), eq(docFiles.name, BRAND_DOC_NAME)));
+    if (brandRow?.objectPath) {
+      try {
+        brandMd = (await svc.readObjectBytes(brandRow.objectPath)).toString("utf-8");
+      } catch {
+        /* unreadable — fall back to the seed text */
+      }
+    } else {
+      const buf = Buffer.from(BRAND_SEED, "utf-8");
+      const p = await svc.writeObject(buf, "text/markdown");
+      await db.insert(docFiles).values({
+        folderId: mdFolder.id,
+        name: BRAND_DOC_NAME,
+        url: p,
+        objectPath: p,
+        contentType: "text/markdown",
+        size: buf.length,
+      });
+      console.log("[GibbsDocs] Seeded the Brand voice document");
+    }
+
+    // Built-in knowledge md — folds the live brand voice + policy in at the
+    // end so one document is the complete picture.
     const fullMd =
       KB_HEADER +
       CRM_FUNCTIONALITY_KNOWLEDGE +
+      "\n\n---\n\n" +
+      brandMd.replace(/^# /m, "## ") +
       "\n\n---\n\n" +
       policyMd.replace(/^# /m, "## ");
     const kbBuf = Buffer.from(fullMd, "utf-8");

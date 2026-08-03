@@ -221,6 +221,70 @@ export default function MobileJobNew() {
     !!workSubtype ||
     priority !== "normal";
 
+  // ── Gibbs create-copilot: he sees this draft and fills fields in place.
+  const [gibbsUndo, setGibbsUndo] = useState<Record<string, unknown> | null>(null);
+  const copilot = {
+    kind: "work order (job)",
+    label: "New job",
+    getDraft: () => ({
+      customerId: selectedCustomer?.id || "",
+      customerName: selectedCustomer?.name || "",
+      title: woTitle,
+      description: woDescription,
+      visitType,
+      workSubtype,
+      priority,
+      assignedTechId: assignTechId,
+      scheduledDate: selectedDate ? format(selectedDate, "yyyy-MM-dd") : "",
+      startTime: selectedStartTime,
+      endTime: selectedEndTime,
+    }),
+    applyPatch: (patch: Record<string, unknown>) => {
+      const prev: Record<string, unknown> = {};
+      const applied: string[] = [];
+      const str = (v: unknown) => (typeof v === "string" ? v : null);
+      if (str(patch.customerId) && str(patch.customerName)) {
+        prev.customer = selectedCustomer;
+        setSelectedCustomer({ id: patch.customerId, name: patch.customerName } as CrmCustomer);
+        applied.push("customer");
+      }
+      if (str(patch.title) !== null) { prev.title = woTitle; setWoTitle(patch.title as string); applied.push("title"); }
+      if (str(patch.description) !== null) { prev.description = woDescription; setWoDescription(patch.description as string); applied.push("description"); }
+      if (str(patch.visitType) && ["SERVICE", "MAINTENANCE", "INSTALL", "SALES"].includes(patch.visitType as string)) {
+        prev.visitType = visitType; setVisitType(patch.visitType as string); applied.push("visit type");
+      }
+      if (str(patch.workSubtype) !== null) { prev.workSubtype = workSubtype; setWorkSubtype(patch.workSubtype as string); applied.push("work type"); }
+      if (str(patch.priority) && ["normal", "high", "urgent", "low"].includes(patch.priority as string)) {
+        prev.priority = priority; setPriority(patch.priority as string); applied.push("priority");
+      }
+      if (str(patch.assignedTechId) !== null) { prev.assignedTechId = assignTechId; setAssignTechId(patch.assignedTechId as string); applied.push("assignee"); }
+      if (str(patch.scheduledDate) && /^\d{4}-\d{2}-\d{2}$/.test(patch.scheduledDate as string)) {
+        prev.scheduledDate = selectedDate;
+        setSelectedDate(new Date(`${patch.scheduledDate}T12:00:00`));
+        applied.push("date");
+      }
+      if (str(patch.startTime) !== null) { prev.startTime = selectedStartTime; setSelectedStartTime(patch.startTime as string); applied.push("start time"); }
+      if (str(patch.endTime) !== null) { prev.endTime = selectedEndTime; setSelectedEndTime(patch.endTime as string); applied.push("end time"); }
+      if (applied.length > 0) setGibbsUndo(prev);
+      return applied;
+    },
+  };
+  const undoGibbsFill = () => {
+    if (!gibbsUndo) return;
+    const u = gibbsUndo;
+    if ("customer" in u) setSelectedCustomer((u.customer as CrmCustomer) ?? null);
+    if ("title" in u) setWoTitle(u.title as string);
+    if ("description" in u) setWoDescription(u.description as string);
+    if ("visitType" in u) setVisitType(u.visitType as string);
+    if ("workSubtype" in u) setWorkSubtype(u.workSubtype as string);
+    if ("priority" in u) setPriority(u.priority as string);
+    if ("assignedTechId" in u) setAssignTechId(u.assignedTechId as string);
+    if ("scheduledDate" in u) setSelectedDate((u.scheduledDate as Date | undefined) ?? undefined);
+    if ("startTime" in u) setSelectedStartTime(u.startTime as string);
+    if ("endTime" in u) setSelectedEndTime(u.endTime as string);
+    setGibbsUndo(null);
+  };
+
   if (!currentUser) {
     // Blank sheet canvas — the form fades in as soon as the user loads
     return <div className="fixed inset-0 z-[70] bg-slate-50" />;
@@ -235,9 +299,19 @@ export default function MobileJobNew() {
       saveLabel="Create job"
       saveDisabled={!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}
       saving={createWorkOrderMutation.isPending}
+      assistant={copilot}
       testid="mobile-job-new-page"
     >
       <div className="space-y-4">
+        {gibbsUndo && (
+          <button
+            onClick={undoGibbsFill}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2 text-xs font-semibold text-[#711419] active:opacity-80"
+            data-testid="gibbs-fill-undo"
+          >
+            Gibbs filled the form — tap to undo
+          </button>
+        )}
         {/* Customer Search */}
         <div className="space-y-2">
           <Label>Customer *</Label>

@@ -364,9 +364,18 @@ import { CRM_FUNCTIONALITY_KNOWLEDGE } from "./crm-knowledge";
 // /api/crm/ai/execute-action, which re-validates against a strict whitelist
 // and runs under the approving user's session with an audit log.
 export interface ProposedAction {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call";
+  // "fill_form" is create-copilot only: it patches the form on the user's
+  // screen (nothing saves until they tap Create) and is never persisted or
+  // executable through /execute-action.
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
+}
+
+/** Live create-form context: Gibbs helps finish THIS form. */
+export interface CreateCopilotContext {
+  kind: string;
+  fields: Record<string, unknown>;
 }
 
 export interface CrmHelpResponse {
@@ -891,6 +900,8 @@ export async function askCrmHelp(
   /** Live answer text as the model generates it (streaming callers only).
    *  Purely additive — the returned result stays the source of truth. */
   onAnswerDelta?: (text: string) => void,
+  /** Create-copilot: the user is on a create form; Gibbs fills it. */
+  createContext?: CreateCopilotContext,
 ): Promise<CrmHelpResponse> {
   const normalizedQuestion = `${mode}:${question.toLowerCase().trim()}`;
   const hasImages = !!images && images.length > 0;
@@ -904,7 +915,9 @@ export async function askCrmHelp(
   // questions (the answer depends on the image), and anything that sounds like
   // a creation/send request — an action ask must always be freshly proposed,
   // never replayed from a cached action-less answer.
-  const isFollowUp = (conversationHistory && conversationHistory.length > 0) || hasImages;
+  // createContext also counts: copilot answers depend on the live form draft
+  // and must never be replayed from cache.
+  const isFollowUp = (conversationHistory && conversationHistory.length > 0) || hasImages || !!createContext;
   const looksLikeActionAsk = /\b(create|make|add|schedule|send|text|email|set ?up|book|assign)\b/i.test(question);
   if (!isFollowUp && !looksLikeActionAsk) {
     const cached = helpCache.get(normalizedQuestion);
@@ -931,6 +944,11 @@ export async function askCrmHelp(
       : mode === "implementation"
         ? `\n\nMODE — IMPLEMENTATION (the user selected this): They're here to get things DONE. Bias strongly toward preparing concrete proposed actions (every standard proposal rule and approval requirement still applies). Keep answers short and operational — gather exactly the missing required details, then propose. Answer informational side-questions briefly and steer back to what to set up.`
         : "";
+
+  // Create-copilot: Gibbs is embedded in a create form and fills it live.
+  const copilotSection = createContext
+    ? `\n\nCREATE COPILOT MODE — the user is on the "New ${createContext.kind}" form RIGHT NOW. Their current draft (empty string = blank field):\n${JSON.stringify(createContext.fields)}\nYour one job: help complete THIS form. When the user supplies details (typed, dictated, or pasted from a text/email — extract everything useful), register a fill via the propose_actions tool: ONE action { "type": "fill_form", "summary": one sentence saying what you filled, "params": ONLY the field keys you are setting, using EXACTLY the draft's key names }. fill_form applies to the form on their screen instantly — nothing saves until they tap Create, so fill confidently without asking permission; put any clarifying question in your answer text alongside a best-effort fill. Never include fields the user gave no information for. Customer forms: run customer_profile on the name first and WARN in your answer when someone similar already exists (still fill). Job forms: resolve staff names via team_roster and fill assignedTechId with the exact id; resolve the customer via customer_profile and fill customerId AND customerName from the record's exact spelling. Do NOT propose create_task/create_work_order or any other create/send action in this mode — the form IS the creation. Everything else about you (lookups, advice, shop talk) stays available.`
+    : "";
 
     const systemPrompt = `You are Gibbs — the AI teammate at Giesbrecht HVAC, a family HVAC company based in Wrens, Georgia serving the Augusta–Wrens area. Your name comes from Giesbrecht; if someone asks who or what you are, that's your answer. You know the CRM inside out, you can see live business data, and you're also a seasoned HVAC pro who can talk shop.
 
@@ -1008,7 +1026,7 @@ Return JSON with:
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
 - proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
-- replacesPrevious: true ONLY when proposedActions replaces earlier still-un-approved proposal(s) per the ADJUSTMENTS rules — omit otherwise${modeSection}`;
+- replacesPrevious: true ONLY when proposedActions replaces earlier still-un-approved proposal(s) per the ADJUSTMENTS rules — omit otherwise${modeSection}${copilotSection}`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -1033,7 +1051,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "fill_form") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -1171,6 +1189,10 @@ Return JSON with:
       const prose = !content.includes('"answer"') ? content.trim() : null;
       // Tool-registered actions survive a broken final JSON — this is exactly
       // the failure that used to eat email approval cards.
+      const survivors = (createContext
+        ? toolProposed.filter((a) => a.type === "fill_form")
+        : toolProposed.filter((a) => a.type !== "fill_form")
+      ).slice(0, 5);
       return {
         answer: partial
           ? partial.replace(/\\n/g, "\n").replace(/\\"/g, '"')
@@ -1179,9 +1201,9 @@ Return JSON with:
             : "I ran into a problem formatting my response. Please try asking a more specific question.",
         relatedTopics: [],
         confidence: partial || prose ? "medium" : "low",
-        proposedAction: toolProposed[0] ?? null,
-        proposedActions: toolProposed.slice(0, 5),
-        replacesPrevious: toolProposed.length > 0 && toolReplacesPrevious,
+        proposedAction: survivors[0] ?? null,
+        proposedActions: survivors,
+        replacesPrevious: survivors.length > 0 && toolReplacesPrevious,
       };
     }
     
@@ -1199,7 +1221,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "fill_form") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&
@@ -1212,9 +1234,15 @@ Return JSON with:
     // Tool-registered actions are authoritative (parse-proof); JSON-embedded
     // ones remain the fallback for models without the tool. Conversation-only
     // mode drops every proposal regardless of what the model returned.
-    const mergedActions = mode === "conversation"
+    // Copilot mode keeps ONLY fill_form (the form is the creation — a stray
+    // create_* card here could double-create); outside copilot, fill_form
+    // has no form to land on and is dropped.
+    const mergedRaw = mode === "conversation"
       ? []
       : toolProposed.length > 0 ? toolProposed.slice(0, 5) : proposedActions;
+    const mergedActions = createContext
+      ? mergedRaw.filter((a) => a.type === "fill_form")
+      : mergedRaw.filter((a) => a.type !== "fill_form");
 
     const result: CrmHelpResponse = {
       answer: parsed.answer || "I don't have information about that feature.",

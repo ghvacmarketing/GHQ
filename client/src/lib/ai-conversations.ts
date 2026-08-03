@@ -3,9 +3,23 @@
 // conversation started on one surface resumes on the other.
 
 export type AiProposedAction = {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call";
+  // "fill_form" is create-copilot only: applied straight to the open form,
+  // never rendered as an approval card and never persisted.
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
+};
+
+/** Create-copilot wiring a create page hands to the assistant overlay:
+ *  Gibbs sees the live draft and fills the form in place. */
+export type AiCreateCopilot = {
+  kind: string;
+  /** Chip label, e.g. "New customer". */
+  label: string;
+  getDraft: () => Record<string, unknown>;
+  /** Apply Gibbs' field patch; returns human labels of fields it changed
+   *  (the page owns its own undo affordance). */
+  applyPatch: (patch: Record<string, unknown>) => string[];
 };
 
 /** Approval-card titles per action type. */
@@ -22,6 +36,7 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   create_invoice: "New invoice — draft",
   delete_quote: "Delete quote — permanent",
   log_call: "Log a call",
+  fill_form: "Filled the form",
 };
 
 /** Normalized line items for quote/invoice approval cards, with the total the

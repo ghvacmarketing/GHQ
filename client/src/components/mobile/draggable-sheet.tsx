@@ -150,6 +150,12 @@ export function DraggableSheet({
           // content pads itself instead.
           paddingBottom:
             !full && keyboardInset > 0 ? `${keyboardInset + 12}px` : "calc(24px + env(safe-area-inset-bottom))",
+          // While the keyboard is up, a scrollable sheet goes FULL height —
+          // otherwise the max-h cap left a slice of the keyboard padding
+          // poking out as an empty white "container" above the keys.
+          ...(!full && scrollable && keyboardInset > 0
+            ? { height: "calc(100dvh - env(safe-area-inset-top) - 10px)", maxHeight: "none" }
+            : {}),
           // No padding animation while closing — the keyboard drops at the
           // same moment and the shrink fought the slide-out (visible jolt).
           transition: open ? BASE_TRANSITION : undefined,

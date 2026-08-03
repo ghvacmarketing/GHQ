@@ -337,6 +337,11 @@ export default function MobileCustomerDetail() {
         onPointerUp={onSwipeEnd}
         onPointerCancel={onSwipeEnd}
       >
+        {/* Edge gutter: touches born here can NEVER be claimed by the
+            browser as a scroll (touch-action none), so the back-swipe always
+            tracks to completion — before this, a few pixels of vertical
+            drift let the scroller steal the gesture mid-swipe. */}
+        <div className="absolute inset-y-0 left-0 z-20 w-6" style={{ touchAction: "none" }} aria-hidden />
         {/* No bottom nav / no "+" here — the detail page is a focused sheet;
             its own scroller keeps the house bounce. */}
         <div
@@ -404,7 +409,8 @@ export default function MobileCustomerDetail() {
                         data-testid="customer-phone"
                       >
                         <Phone className="h-4 w-4 flex-shrink-0" />
-                        <span>{customer.phone}</span>
+                        {/* Hold-to-copy: selection + the copy callout stay native here */}
+                        <span className="select-text [-webkit-touch-callout:default] [-webkit-user-select:text]">{customer.phone}</span>
                       </a>
                     )}
                     {customer.email && (
@@ -414,13 +420,13 @@ export default function MobileCustomerDetail() {
                         data-testid="customer-email"
                       >
                         <Mail className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{customer.email}</span>
+                        <span className="truncate select-text [-webkit-touch-callout:default] [-webkit-user-select:text]">{customer.email}</span>
                       </a>
                     )}
                     {customer.fullAddress && (
                       <div className="flex min-h-[44px] items-start gap-3 py-2.5 text-sm text-slate-600">
                         <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-                        <span data-testid="customer-address">{customer.fullAddress}</span>
+                        <span className="select-text [-webkit-touch-callout:default] [-webkit-user-select:text]" data-testid="customer-address">{customer.fullAddress}</span>
                       </div>
                     )}
                     {!customer.phone && !customer.email && !customer.fullAddress && (

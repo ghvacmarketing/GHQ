@@ -24,6 +24,7 @@ export function MobileCreatePage({
   saveLabel = "Save",
   saveDisabled,
   saving,
+  assistant,
   children,
   testid,
 }: {
@@ -40,6 +41,9 @@ export function MobileCreatePage({
   saveLabel?: string;
   saveDisabled?: boolean;
   saving?: boolean;
+  /** Create-copilot context — the Gibbs button opens him anchored to THIS
+   *  form (sees the draft, fills fields) instead of a generic chat. */
+  assistant?: import("@/lib/ai-conversations").AiCreateCopilot;
   children: ReactNode;
   testid?: string;
 }) {
@@ -234,7 +238,7 @@ export function MobileCreatePage({
 
       {assistantOpen && (
         <Suspense fallback={null}>
-          <AssistantOverlay open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+          <AssistantOverlay open={assistantOpen} onClose={() => setAssistantOpen(false)} copilot={assistant} />
         </Suspense>
       )}
 
