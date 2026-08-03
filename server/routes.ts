@@ -29273,6 +29273,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // server-side with the app origin as referrer), Nominatim (OpenStreetMap,
   // keyless — already used for ETA geocoding) as the fallback. Returns
   // [{ description, main, secondary, address1?, city?, state?, zip? }].
+  //
+  // Dedupe key: the same house shows up under cosmetic variants — "Road" vs
+  // "Rd", with/without ZIP, OSM node vs way — so keys normalize street-type
+  // words and EXCLUDE the zip. Different houses always differ by number,
+  // street, or city, so nothing real collapses.
+  const ROAD_ABBREV: Record<string, string> = {
+    road: "rd", street: "st", avenue: "ave", drive: "dr", lane: "ln", court: "ct",
+    circle: "cir", highway: "hwy", place: "pl", boulevard: "blvd", terrace: "ter",
+    parkway: "pkwy", trail: "trl", crossing: "xing", north: "n", south: "s",
+    east: "e", west: "w",
+  };
+  const addrKeyPart = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
+      .map((w) => ROAD_ABBREV[w] || w).join(" ");
   app.post("/api/mobile/address-autocomplete", requireCrmTechOrAbove, async (req, res) => {
     const query = typeof req.body?.query === "string" ? req.body.query.trim() : "";
     if (query.length < 3) return res.json([]);
@@ -29311,7 +29325,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             }))
             .filter((s: any) => s.description)
             .filter((s: any) => {
-              const k = `${s.main}|${s.secondary}`.toLowerCase().replace(/[^a-z0-9|]/g, "");
+              const k = `${addrKeyPart(s.main)}|${addrKeyPart(s.secondary.replace(/\b\d{5}(-\d{4})?\b/g, ""))}`;
               if (seen.has(k)) return false;
               seen.add(k);
               return true;
@@ -29334,24 +29348,39 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .map((row) => {
           const a = row.address || {};
           const line1 = [a.house_number, a.road].filter(Boolean).join(" ");
-          const city = a.city || a.town || a.village || a.hamlet || "";
+          // Rural OSM rows often carry no city/town — municipality or county
+          // fills the slot so same-named roads in different counties don't
+          // read as three copies of one address.
+          const city = a.city || a.town || a.village || a.hamlet || a.municipality || "";
+          const cityShown = city || String(a.county || "").replace(/ County$/i, "");
           const state = (a["ISO3166-2-lvl4"] || "").split("-")[1] || "";
+          // Distance from the shop (Wrens) — OSM's own ranking ignores the
+          // viewbox for ordering, so "our" Adams Rd must be pushed up by us.
+          const lat = parseFloat(row.lat), lon = parseFloat(row.lon);
+          const dist = Number.isFinite(lat) && Number.isFinite(lon)
+            ? Math.hypot(lat - 33.2079, (lon + 82.3915) * Math.cos((lat * Math.PI) / 180))
+            : Number.MAX_VALUE;
           return {
             description: String(row.display_name || "").replace(/, United States$/i, ""),
             main: line1 || String(row.display_name || "").split(",")[0],
-            secondary: [city, [state, a.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+            secondary: [cityShown, [state, a.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
             address1: line1 || undefined,
             city: city || undefined,
             state: state || undefined,
             zip: a.postcode || undefined,
+            dist,
           };
         })
         .filter((s) => {
-          const k = `${s.main}|${s.secondary}`.toLowerCase().replace(/[^a-z0-9|]/g, "");
+          // Zip left out of the key: the node/way pair for one house often
+          // differs only by postcode presence.
+          const k = `${addrKeyPart(s.main)}|${addrKeyPart(s.secondary.replace(/\b\d{5}(-\d{4})?\b/g, ""))}`;
           if (seenOsm.has(k)) return false;
           seenOsm.add(k);
           return true;
-        }));
+        })
+        .sort((x, y) => x.dist - y.dist)
+        .map(({ dist: _dist, ...s }) => s));
     } catch (err) {
       console.error("[address-autocomplete]", err);
       return res.json([]);
