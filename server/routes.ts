@@ -20323,6 +20323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             personalMessage,
             sentByName,
             {
+              senderUserId: user.id,
               senderEmail: user.email,
               senderName: sentByName,
               replyToEmail,

@@ -1,10 +1,10 @@
-import { Resend } from "resend";
-import type { CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
-import { crmInvoices } from "@shared/schema";
+import type { CrmInvoice, CrmInvoiceLineItem, CrmUser } from "@shared/schema";
+import { crmInvoices, crmUsers } from "@shared/schema";
 import { getUncachableStripeClient } from "../stripeClient";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 import { storage } from "../storage";
+import { sendEmail as sendViaGmail, isGmailOAuthConfigured } from "./gmailService";
 
 const brandDefaults = {
   name: "Giesbrecht HVAC",
@@ -140,10 +140,30 @@ async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> 
 }
 
 export interface CrmInvoiceEmailOptions {
+  /** CRM user id of whoever hit Send — their linked Gmail is used when connected. */
+  senderUserId?: string;
   senderEmail?: string;
   senderName?: string;
   replyToEmail?: string;
   isManual?: boolean;
+}
+
+/** Invoices go out through a CRM-linked Gmail account (no third-party
+ *  sender): the sending user's own connection when they have one, otherwise
+ *  any connected account — owner/admin first — so automated sends (agreement
+ *  renewals) work too. */
+async function pickGmailSender(preferredUserId?: string, preferredEmail?: string): Promise<CrmUser | null> {
+  if (!isGmailOAuthConfigured()) return null;
+  const connected = await db.select().from(crmUsers).where(isNotNull(crmUsers.gmailRefreshTokenEnc));
+  if (connected.length === 0) return null;
+  const byId = preferredUserId ? connected.find((u) => u.id === preferredUserId) : undefined;
+  if (byId) return byId;
+  const byEmail = preferredEmail
+    ? connected.find((u) => (u.email || "").toLowerCase() === preferredEmail.toLowerCase())
+    : undefined;
+  if (byEmail) return byEmail;
+  const rank = (r: string | null) => (r === "owner" ? 0 : r === "admin" ? 1 : 2);
+  return [...connected].sort((a, b) => rank(a.role) - rank(b.role))[0];
 }
 
 export async function sendCrmInvoiceEmail(
@@ -163,22 +183,21 @@ export async function sendCrmInvoiceEmail(
     }
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
   const brandName = brandDefaults.name;
 
-  console.log("[CRM Invoice Email] API Key prefix:", apiKey ? apiKey.substring(0, 15) + "..." : "NOT SET");
-
-  if (!apiKey) {
-    console.error("RESEND_API_KEY is not configured");
-    return { success: false, error: "Email service not configured" };
+  const sender = await pickGmailSender(options?.senderUserId, options?.senderEmail);
+  if (!sender) {
+    console.error("[CRM Invoice Email] No linked Gmail account available to send from");
+    return {
+      success: false,
+      error: "No linked Gmail account — connect one under CRM → Mail, then try again.",
+    };
   }
 
-  const resend = new Resend(apiKey);
-
-  const standardFromEmail = "invoices@ghvacinc.com";
+  const standardFromEmail = sender.gmailAddress || sender.email;
   const replyToEmail = options?.replyToEmail;
-  
-  console.log("[CRM Invoice Email] Sending invoice email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
+
+  console.log("[CRM Invoice Email] Sending via Gmail FROM:", standardFromEmail, "TO:", recipientEmail);
 
   // Generate payment link for invoices with balance due
   let paymentLinkUrl: string | null = null;
@@ -218,25 +237,16 @@ export async function sendCrmInvoiceEmail(
   const text = buildTextBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl, introText, signatureText);
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: standardFromEmail,
+    const { gmailThreadId } = await sendViaGmail(sender, {
       to: [recipientEmail],
-      replyTo: replyToEmail || undefined,
       subject,
       html,
-      text,
-      headers: { "X-Entity-Ref-ID": `crm-invoice-${invoice.id}` },
     });
 
-    if (error) {
-      console.error("Resend error sending invoice email:", error);
-      return { success: false, error: (error as any).message || "Failed to send email" };
-    }
-
-    console.log("CRM Invoice email sent successfully:", data?.id);
-    return { 
-      success: true, 
-      messageId: data?.id,
+    console.log("CRM Invoice email sent via Gmail, thread:", gmailThreadId);
+    return {
+      success: true,
+      messageId: gmailThreadId,
       htmlContent: html,
       textContent: text,
       fromEmail: standardFromEmail,
@@ -245,8 +255,12 @@ export async function sendCrmInvoiceEmail(
       paymentLinkUrl: paymentLinkUrl || undefined,
     };
   } catch (err) {
-    console.error("Error sending CRM invoice email:", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    console.error("Error sending CRM invoice email via Gmail:", err);
+    const raw = err instanceof Error ? err.message : "Unknown error";
+    const friendly = raw.includes("gmail_revoked")
+      ? "The linked Gmail connection was revoked — reconnect it under CRM → Mail."
+      : raw;
+    return { success: false, error: friendly };
   }
 }
 
