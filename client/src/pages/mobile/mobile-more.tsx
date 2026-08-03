@@ -59,6 +59,7 @@ export default function MobileMore() {
       title: "Work",
       items: [
         { label: "My Jobs", sub: "Today, upcoming, and history", onTap: (n) => n("/mobile/job"), testid: "more-jobs", badge: todayJobs > 0 ? `${todayJobs} today` : null },
+        { label: "Work Orders", sub: "Search every job across the company", onTap: (n) => n("/mobile/work-orders"), testid: "more-work-orders" },
         { label: "Media", sub: "Job-site photos and videos", onTap: (n) => n("/mobile/photos"), testid: "more-photos", badge: needPhotos > 0 ? `${needPhotos} need photos` : null },
         { label: "My Tasks", sub: "Your personal to-do list from the CRM", onTap: (n) => n("/mobile/tasks"), testid: "more-tasks" },
         { label: "Time & Timesheet", sub: "Clock in and review your hours", onTap: (n) => n("/mobile/time"), testid: "more-time" },

@@ -665,6 +665,9 @@ There is **no** automatic dispatch, auto-assignment, or round-robin routing in t
 ### Gibbs folder in Documents
 The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" page (auto-generated each deploy) plus a Markdown subfolder holding the raw knowledge file and the team-editable "Payments & fees policy" document Gibbs reads live.
 
+### Mobile Work Orders directory
+- Mobile → More → Work Orders (/mobile/work-orders): search EVERY work order company-wide by job title or customer name, filter by visit type (Service / Maintenance / Install / Sales — metal badge pills), tap through to the job's detail page
+
 ### Mobile media capture & markup
 - On the mobile Media page, tapping one of today's jobs opens the camera immediately (photo or video)
 - Captured photos open in a Markup editor first — draw freehand, arrows, and text stamps in several colors (CompanyCam-style) — then upload; videos upload as-is

@@ -29595,6 +29595,43 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/mobile/work-orders — the mobile work-order directory: search
+  // EVERY job (title or customer name), optionally by visit type, newest
+  // first. No date window — this is the "all work orders" browser.
+  app.get("/api/mobile/work-orders", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search, type, limit = "25" } = req.query as Record<string, string | undefined>;
+      const limitNum = Math.min(50, Math.max(1, parseInt(limit || "25") || 25));
+      const conds: any[] = [];
+      if (type && ["SERVICE", "MAINTENANCE", "INSTALL", "SALES"].includes(type)) {
+        conds.push(eq(crmWorkOrders.visitType, type as any));
+      }
+      const q = (search || "").trim();
+      if (q) {
+        conds.push(or(ilike(crmWorkOrders.title, `%${q}%`), ilike(crmCustomers.name, `%${q}%`)));
+      }
+      const rows = await db
+        .select({
+          id: crmWorkOrders.id,
+          title: crmWorkOrders.title,
+          status: crmWorkOrders.status,
+          visitType: crmWorkOrders.visitType,
+          workSubtype: crmWorkOrders.workSubtype,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          customerName: crmCustomers.name,
+        })
+        .from(crmWorkOrders)
+        .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(sql`COALESCE(${crmWorkOrders.scheduledStart}, ${crmWorkOrders.createdAt}) DESC`)
+        .limit(limitNum);
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error fetching mobile work orders:", error);
+      return res.status(500).json({ message: "Failed to fetch work orders" });
+    }
+  });
+
   // GET /api/mobile/customers - Mobile customer lookup (for field technicians)
   app.get("/api/mobile/customers", requireCrmTechOrAbove, async (req, res) => {
     try {
