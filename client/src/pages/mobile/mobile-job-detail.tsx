@@ -65,6 +65,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
+import { markSkipEntrance } from "@/lib/page-transitions";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
 import MobileJob from "./mobile-job";
@@ -4019,6 +4020,9 @@ export default function MobileJobDetail() {
   const pageRef = useRef<HTMLDivElement | null>(null);
   const swipe = useRef<{ x: number; y: number; active: boolean } | null>(null);
   const goBackAnimated = (fromDx = 0) => {
+    // The jobs page is already on screen as the underlay — its remount after
+    // navigation must not fade in again (the post-swipe "flash").
+    markSkipEntrance();
     const el = pageRef.current;
     if (!el) return navigate("/mobile/job");
     const w = el.clientWidth || window.innerWidth;

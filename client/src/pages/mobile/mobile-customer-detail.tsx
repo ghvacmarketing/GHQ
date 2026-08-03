@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CustomerEditSheet } from "@/components/mobile/customer-edit-sheet";
+import { markSkipEntrance } from "@/lib/page-transitions";
 import MobileCustomers from "./mobile-customers";
 import type { CrmCustomer, CrmWorkOrder, CrmAgreement } from "@shared/schema";
 
@@ -169,6 +170,9 @@ export default function MobileCustomerDetail() {
   const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
 
   const goBackAnimated = (fromDx = 0) => {
+    // The customers page is already on screen as the underlay — its remount
+    // after navigation must not fade in again (the post-swipe "flash").
+    markSkipEntrance();
     const el = pageRef.current;
     if (!el) return navigate("/mobile/customers");
     const w = el.clientWidth || window.innerWidth;

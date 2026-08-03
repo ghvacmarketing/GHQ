@@ -27,6 +27,7 @@ if (typeof Image !== "undefined") {
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useNativePush } from "@/lib/native";
+import { skipEntranceOnce } from "@/lib/page-transitions";
 
 // The AI assistant popup — loaded on first open, then kept mounted so the
 // conversation survives closing and reopening the sheet.
@@ -60,6 +61,9 @@ const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
 export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
+  // Arriving from a tracked back-swipe: the destination was already fully
+  // visible as the swipe underlay, so the mount fade must not blink it.
+  const [skipEntrance] = useState(skipEntranceOnce);
   const [createOpen, setCreateOpen] = useState(false);
   const [photoTargetOpen, setPhotoTargetOpen] = useState(false);
   // The tab bar ducks while the keyboard is up — otherwise iOS shoves it
@@ -201,7 +205,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           bottom clearance — reserving padding here would end their container
           in a visible band above the tabs. */}
       <main
-        className="flex-1 overflow-auto animate-in fade-in duration-200"
+        className={`flex-1 overflow-auto ${skipEntrance ? "" : "animate-in fade-in duration-200"}`}
         style={customNav ? undefined : { paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
       >
