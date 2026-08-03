@@ -46,7 +46,6 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import { GibbsMark } from "@/components/crm/gibbs-mark";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import {
@@ -937,9 +936,7 @@ export default function AiAssistantModal() {
                   const revealed = freshIndex === null || i < freshIndex || typedOut;
                   return (
                     <div key={i} className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
-                        <GibbsMark className="h-4 w-4 text-white" />
-                      </div>
+                      <img src={badgeGibbs} alt="" className="h-8 w-8 flex-shrink-0 select-none" draggable={false} />
                       <div className="min-w-0 flex-1 space-y-2">
                         {msg.content.trim() !== "" && (
                           <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
@@ -1211,9 +1208,7 @@ export default function AiAssistantModal() {
                 })}
                 {pending && (
                   <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#711419] to-[#e8704f]">
-                      <GibbsMark className="h-4 w-4 text-white" />
-                    </div>
+                    <img src={badgeGibbs} alt="" className="h-8 w-8 flex-shrink-0 select-none" draggable={false} />
                     <div className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-slate-100 px-4 py-3.5">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:0ms]" />
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#711419] [animation-delay:150ms]" />
