@@ -2,6 +2,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, Plus, Search, X } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { useKeyboardInset } from "@/lib/native";
+
+const categoryLabel = (c: string) =>
+  c === "field_edge" ? "FieldEdge" : c.charAt(0).toUpperCase() + c.slice(1);
 
 /** A price-book row offered by the catalog picker. */
 export type CatalogPick = { name: string; description?: string | null; rate: number; category?: string | null };
@@ -46,6 +50,8 @@ export function LineItemsEditor({
 }) {
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCat, setCatalogCat] = useState<string>("all");
+  const keyboardInset = useKeyboardInset();
   const { data: catalogItems = [], isLoading: catalogLoading } = useQuery<
     Array<{ id: string; name: string; description?: string | null; category?: string | null; rate?: string | null; isActive?: boolean | null }>
   >({
@@ -58,11 +64,13 @@ export function LineItemsEditor({
     enabled: catalogOpen,
     staleTime: 5 * 60 * 1000,
   });
+  const activeItems = catalogItems.filter((it) => it.isActive !== false);
+  const catalogCats = Array.from(new Set(activeItems.map((it) => it.category || "").filter(Boolean))).sort();
   const q = catalogSearch.trim().toLowerCase();
-  const shownCatalog = catalogItems
-    .filter((it) => it.isActive !== false)
+  const shownCatalog = activeItems
+    .filter((it) => catalogCat === "all" || (it.category || "") === catalogCat)
     .filter((it) => !q || it.name.toLowerCase().includes(q) || (it.description || "").toLowerCase().includes(q))
-    .slice(0, 30);
+    .slice(0, 50);
 
   return (
     <div className="space-y-3">
@@ -159,50 +167,82 @@ export function LineItemsEditor({
       </div>
 
       {onAddFromCatalog && (
-        <DraggableSheet tall open={catalogOpen} onOpenChange={setCatalogOpen} title="Price book" testid="sheet-catalog-picker">
-          <h2 className="text-lg font-semibold text-slate-900">Price book</h2>
-          <div className="mt-3 flex h-11 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
-              value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
-              placeholder="Search items…"
-              className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
-              data-testid="catalog-search-input"
-            />
-          </div>
-          <div className="mt-3 pb-2">
-            {catalogLoading ? (
-              <p className="py-8 text-center text-sm text-slate-400">Loading the catalog…</p>
-            ) : shownCatalog.length > 0 ? (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-                {shownCatalog.map((it, i) => (
-                  <button
-                    key={it.id}
-                    onClick={() => {
-                      onAddFromCatalog({ name: it.name, description: it.description, rate: parseFloat(it.rate || "0") || 0, category: it.category });
-                      setCatalogOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-                    data-testid={`catalog-item-${it.id}`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{it.name}</span>
-                      {(it.description || it.category) && (
-                        <span className="block truncate text-xs text-slate-500">
-                          {[it.category, it.description].filter(Boolean).join(" · ")}
+        <DraggableSheet full open={catalogOpen} onOpenChange={setCatalogOpen} title="Price book" testid="sheet-catalog-picker">
+          {/* Full-height like the address sheet: the sheet never moves or
+              pads for the keyboard — the list pads itself clear instead, so
+              there's no empty white container behind the keys. */}
+          <div className="flex h-full min-h-0 flex-col">
+            <h2 className="text-lg font-semibold text-slate-900">Price book</h2>
+            <div className="mt-3 flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                placeholder="Search items…"
+                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="catalog-search-input"
+              />
+            </div>
+
+            {/* Category pills */}
+            <div className="scrollbar-none -mx-5 mt-3 flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-0.5">
+              {["all", ...catalogCats].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCatalogCat(c)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    catalogCat === c
+                      ? "border-[#711419] bg-[#711419] text-white"
+                      : "border-slate-300/70 bg-white text-slate-600"
+                  }`}
+                  data-testid={`catalog-cat-${c}`}
+                >
+                  {c === "all" ? "All" : categoryLabel(c)}
+                </button>
+              ))}
+            </div>
+
+            <div
+              className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+              style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
+            >
+              {catalogLoading ? (
+                <p className="py-8 text-center text-sm text-slate-400">Loading the catalog…</p>
+              ) : shownCatalog.length > 0 ? (
+                <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                  {shownCatalog.map((it, i) => (
+                    <button
+                      key={it.id}
+                      onClick={() => {
+                        onAddFromCatalog({ name: it.name, description: it.description, rate: parseFloat(it.rate || "0") || 0, category: it.category });
+                        setCatalogOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                      data-testid={`catalog-item-${it.id}`}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="min-w-0 truncate text-sm font-semibold text-slate-900">{it.name}</span>
+                          {it.category && (
+                            <span className="shrink-0 rounded-full border border-slate-300/70 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              {categoryLabel(it.category)}
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{money(parseFloat(it.rate || "0") || 0)}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="py-8 text-center text-sm text-slate-400">
-                {q ? "No catalog items match that search." : "The price book is empty."}
-              </p>
-            )}
+                        {it.description && (
+                          <span className="mt-0.5 block truncate text-xs text-slate-500">{it.description}</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{money(parseFloat(it.rate || "0") || 0)}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-8 text-center text-sm text-slate-400">
+                  {q || catalogCat !== "all" ? "No catalog items match." : "The price book is empty."}
+                </p>
+              )}
+            </div>
           </div>
         </DraggableSheet>
       )}

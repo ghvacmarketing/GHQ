@@ -942,3 +942,7 @@ body.ios-preview-open .ios-preview-actions {
 .gibbs-word-in {
   animation: gibbs-word-in 0.4s ease-out both;
 }
+
+/* Horizontal pill rails: scrollable, no visible scrollbar */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
