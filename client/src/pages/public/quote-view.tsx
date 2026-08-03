@@ -56,22 +56,33 @@ function getOptionSortOrder(tag: string): number {
 
 function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
   const groups = new Map<string, CrmQuoteLineItem[]>();
-  
+  // Untagged lines are SHARED — included with every option. They must show
+  // in each card and count toward each displayed total, because the deposit
+  // charge math includes them (dropping them here once hid lines the
+  // customer was actually being charged for).
+  const shared: CrmQuoteLineItem[] = [];
+
   lineItems.forEach(item => {
     const tag = item.optionTag;
-    if (!tag) return;
+    if (!tag) {
+      shared.push(item);
+      return;
+    }
     if (!groups.has(tag)) {
       groups.set(tag, []);
     }
     groups.get(tag)!.push(item);
   });
-  
+
   return Array.from(groups.entries())
-    .map(([tag, items]) => ({
-      tag,
-      items,
-      total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
-    }))
+    .map(([tag, items]) => {
+      const all = [...items, ...shared];
+      return {
+        tag,
+        items: all,
+        total: all.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
+      };
+    })
     .sort((a, b) => getOptionSortOrder(a.tag) - getOptionSortOrder(b.tag));
 }
 
@@ -319,8 +330,9 @@ function QuoteAlreadyAccepted({ quote, lineItems }: { quote: CrmQuote; lineItems
   let total = quote.total ? parseFloat(quote.total.toString()) : 0;
   
   if (quote.quoteMode === "options" && quote.selectedOption && lineItems.length > 0) {
-    // Calculate total from selected option's line items only
-    const selectedOptionItems = lineItems.filter(item => item.optionTag === quote.selectedOption);
+    // Selected option's lines PLUS untagged shared lines (charged with
+    // every option — the deposit math includes them).
+    const selectedOptionItems = lineItems.filter(item => item.optionTag === quote.selectedOption || !item.optionTag);
     if (selectedOptionItems.length > 0) {
       total = selectedOptionItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
     }
@@ -672,7 +684,9 @@ export default function PublicQuoteView() {
   // multi-option quotes, otherwise the whole quote total.
   const effectiveTotal = (() => {
     if (quoteData.quoteMode === "options" && selectedOption) {
-      const items = lineItems.filter((i) => i.optionTag === selectedOption);
+      // Selected option + untagged shared lines — mirrors the server's
+      // deposit math exactly.
+      const items = lineItems.filter((i) => i.optionTag === selectedOption || !i.optionTag);
       if (items.length) return items.reduce((s, i) => s + parseFloat(i.lineTotal?.toString() || "0"), 0);
     }
     return parseFloat(quoteData.total?.toString() || "0");

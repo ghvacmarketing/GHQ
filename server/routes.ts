@@ -21788,14 +21788,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmQuotes.id, req.params.id));
       }
 
-      // Only draft quotes can be edited for other fields (status changes use dedicated endpoints)
+      // Draft quotes edit freely. SENT (not yet accepted) quotes stay live-
+      // editable for CONTENT fields — the customer link renders the current
+      // record, so description/title fixes reach them without a re-send.
+      // Accepted/declined/converted quotes are agreed terms: content locked.
+      const SENT_EDITABLE_FIELDS = ["description", "title", "notes"];
       if (existing.status !== 'draft' && Object.keys(updateData).length > 0) {
-        // If only assignedToId was being updated, that's already done
-        if (assignedToId !== undefined) {
-          const [updated] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
-          return res.json(updated);
+        const disallowed = Object.keys(updateData).filter((k) => !SENT_EDITABLE_FIELDS.includes(k));
+        if (existing.status !== 'sent' || disallowed.length > 0) {
+          // If only assignedToId was being updated, that's already done
+          if (assignedToId !== undefined) {
+            const [updated] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+            return res.json(updated);
+          }
+          return res.status(400).json({
+            message:
+              existing.status === 'sent'
+                ? `Only ${SENT_EDITABLE_FIELDS.join("/")} can change on a sent quote (${disallowed.join(", ")} can't).`
+                : "Only draft quotes can be edited. Use status endpoints for sent/accepted/declined quotes.",
+          });
         }
-        return res.status(400).json({ message: "Only draft quotes can be edited. Use status endpoints for sent/accepted/declined quotes." });
       }
       
       if (scope || workOrderId || projectId) {

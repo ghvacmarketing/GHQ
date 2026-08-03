@@ -3838,12 +3838,15 @@ export default function CrmQuoteDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Editable Description for custom install quotes and proposal quotes */}
-        {(quote.quoteType === "custom_install" || quote.quoteType === "proposal") && (
+        {/* Editable Description — every quote type (the customer-facing page
+            shows it live, so quick quotes need it editable too). The contract
+            template loader stays install/proposal-only. */}
+        {(
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Description</CardTitle>
               <div className="flex items-center gap-2">
+                {(quote.quoteType === "custom_install" || quote.quoteType === "proposal") && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -3886,6 +3889,7 @@ export default function CrmQuoteDetail() {
                   <ClipboardList className="h-4 w-4 mr-1" />
                   Load Template
                 </Button>
+                )}
                 {!isEditingDescription && (
                   <Button
                     variant="ghost"
