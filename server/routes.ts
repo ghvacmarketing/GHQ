@@ -13994,6 +13994,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // pages of ~120 and offers Load more.
       const limitNum = Math.min(300, parseInt(String(req.query.limit || "120"), 10) || 120);
       const offsetNum = Math.max(0, parseInt(String(req.query.offset || "0"), 10) || 0);
+      // type narrows pages SERVER-side. Client-side filtering of newest-first
+      // pages buried anything rare: with thousands of photos, the Videos tab
+      // only ever surfaced today's clips — older ones sat hundreds of pages
+      // deep even though every row was in the DB.
+      const type = String(req.query.type || "all");
+      const typeCond =
+        type === "videos"
+          ? sql`${customerFiles.contentType} LIKE 'video/%'`
+          : type === "photos"
+            ? sql`${customerFiles.contentType} LIKE 'image/%'`
+            : type === "documents"
+              ? sql`(${customerFiles.contentType} NOT LIKE 'image/%' AND ${customerFiles.contentType} NOT LIKE 'video/%')`
+              : undefined;
       const rows = await db.select({
         id: customerFiles.id,
         name: customerFiles.name,
@@ -14008,7 +14021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(customerFiles)
         .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
-        // All file types — the Media page filters photos vs documents client-side.
+        .where(typeCond)
         .orderBy(desc(customerFiles.createdAt))
         .limit(limitNum)
         .offset(offsetNum);

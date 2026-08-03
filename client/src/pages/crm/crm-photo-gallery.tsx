@@ -670,7 +670,19 @@ export default function CrmPhotoGallery() {
 
   // Paged feed — thousands of CompanyCam references made the all-at-once load
   // crawl. Pages of 120 with Load more; refresh runs on a calmer cadence.
+  // The active tab narrows pages SERVER-side: filtering newest-first pages in
+  // the client buried anything rare — the Videos tab only ever showed the
+  // last day or so of clips because older ones sat hundreds of photo-pages
+  // deep in the feed.
   const PAGE_SIZE = 120;
+  const feedType =
+    typeTab === "videos"
+      ? "videos"
+      : typeTab === "photos" || typeTab === "checklist"
+        ? "photos"
+        : typeTab === "documents"
+          ? "documents"
+          : "all";
   const {
     data: feedPages,
     isLoading: isLoadingRaw,
@@ -678,9 +690,9 @@ export default function CrmPhotoGallery() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["/api/crm/photos/feed"],
+    queryKey: ["/api/crm/photos/feed", feedType],
     queryFn: async ({ pageParam }) => {
-      const res = await fetch(`/api/crm/photos/feed?limit=${PAGE_SIZE}&offset=${pageParam}`, { credentials: "include" });
+      const res = await fetch(`/api/crm/photos/feed?limit=${PAGE_SIZE}&offset=${pageParam}&type=${feedType}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load the media feed");
       return res.json() as Promise<FeedPhoto[]>;
     },
