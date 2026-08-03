@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, subDays } from "date-fns";
 import { Search, X, ChevronRight, Plus, Loader2, Briefcase } from "lucide-react";
-import { LineItemsEditor } from "@/components/mobile/line-items-editor";
+import { LineItemsEditor, type CatalogPick } from "@/components/mobile/line-items-editor";
+import { customerTypeBadge } from "./mobile-quote-new";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,6 +163,16 @@ export default function MobileInvoiceNew() {
     setLineItems(lineItems.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
   };
 
+  const addFromCatalog = (item: CatalogPick) => {
+    const cat = (item.category || "").toLowerCase();
+    const lineType: InvoiceLineItem["lineType"] =
+      cat === "service" ? "service" : cat === "maintenance" ? "maintenance" : "part";
+    setLineItems((prev) => [
+      ...prev,
+      { id: Date.now().toString(), description: item.name, quantity: 1, unitPrice: item.rate, lineType },
+    ]);
+  };
+
   const subtotal = lineItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
   const total = subtotal;
 
@@ -316,18 +327,21 @@ export default function MobileInvoiceNew() {
                   </div>
                 ))}
               </div>
-            ) : customers && customers.length > 0 ? (
+            ) : customers && customers.slice(0, 5).length > 0 ? (
               <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-results">
-                {customers.map((customer, i) => (
+                {customers.slice(0, 5).map((customer, i) => (
                   <button
                     key={customer.id}
                     onClick={() => setPickedCustomer(customer)}
                     className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
                     data-testid={`customer-card-${customer.id}`}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-[13px] font-bold text-[#711419]">
-                      {(customer.name || "?").trim().charAt(0).toUpperCase()}
-                    </span>
+                    <img
+                      src={customerTypeBadge(customer.customerType)}
+                      alt=""
+                      className="h-9 w-9 shrink-0 select-none"
+                      draggable={false}
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">{customer.name}</span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">
@@ -350,18 +364,23 @@ export default function MobileInvoiceNew() {
         )}
 
         {/* --- Invoice fields (same page, no steps) --- */}
+        {/* Customer-first: nothing to fill until a job is picked */}
+        {pickedWorkOrder && (
         <div className="space-y-5">
           <LineItemsEditor
             items={lineItems}
             onAdd={addLineItem}
             onRemove={removeLineItem}
             onUpdate={(id, field, value) => updateLineItem(id, field, value)}
+            onAddFromCatalog={addFromCatalog}
             subtotal={subtotal}
             total={total}
             totalsTestPrefix="invoice"
           />
         </div>
+        )}
 
+        {pickedWorkOrder && (
         <Button
           className="h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
           onClick={handleCreateInvoice}
@@ -371,8 +390,6 @@ export default function MobileInvoiceNew() {
           {createInvoiceMutation.isPending ? <Loader2 className="mr-1.5 h-5 w-5 animate-spin" /> : <Plus className="mr-1.5 h-5 w-5" />}
           Create invoice
         </Button>
-        {!pickedWorkOrder && (
-          <p className="-mt-2 text-center text-xs text-slate-400">Pick a job above to enable the button.</p>
         )}
       </div>
     </MobileCreatePage>

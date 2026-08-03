@@ -10,10 +10,22 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { LineItemsEditor } from "@/components/mobile/line-items-editor";
+import { LineItemsEditor, type CatalogPick } from "@/components/mobile/line-items-editor";
 import { SheetSelect } from "@/components/mobile/sheet-select";
 import { roleBadgeSrc } from "@/components/mobile/role-badge";
+import typeResidential from "@/assets/type-residential.png";
+import typeCommercial from "@/assets/type-commercial.png";
+import typePropertyManager from "@/assets/type-property-manager.png";
 import type { CrmCustomer, CrmProperty, CrmUser, CrmWorkOrder } from "@shared/schema";
+
+/** Metal badge for the customer's type — the same imagery the create flow
+ *  uses, so pickers read at a glance. */
+export function customerTypeBadge(t?: string | null): string {
+  const s = (t || "").toLowerCase();
+  if (s.includes("commercial")) return typeCommercial;
+  if (s.includes("property")) return typePropertyManager;
+  return typeResidential;
+}
 
 /** New Quote — customer-first flow: pick the customer (top recents up
  *  front), their work orders pop up in a sheet, and only then does the quote
@@ -207,7 +219,18 @@ export default function MobileQuoteNew() {
   };
 
   const showRecents = !searchQuery.trim();
-  const shownCustomers = showRecents ? (customers || []).slice(0, 5) : customers || [];
+  // Keep the list tight — the 5 most relevant either way.
+  const shownCustomers = (customers || []).slice(0, 5);
+
+  const addFromCatalog = (item: CatalogPick) => {
+    const cat = (item.category || "").toLowerCase();
+    const lineType: QuickQuoteLineItem["lineType"] =
+      cat === "service" ? "service" : cat === "maintenance" ? "maintenance" : "part";
+    setLineItems((prev) => [
+      ...prev,
+      { id: Date.now().toString(), description: item.name, quantity: 1, unitPrice: item.rate, lineType },
+    ]);
+  };
 
   return (
     <MobileCreatePage
@@ -290,9 +313,12 @@ export default function MobileQuoteNew() {
                     className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
                     data-testid={`customer-card-${customer.id}`}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5 text-[13px] font-bold text-[#711419]">
-                      {(customer.name || "?").trim().charAt(0).toUpperCase()}
-                    </span>
+                    <img
+                      src={customerTypeBadge(customer.customerType)}
+                      alt=""
+                      className="h-9 w-9 shrink-0 select-none"
+                      draggable={false}
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">{customer.name}</span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">
@@ -347,6 +373,7 @@ export default function MobileQuoteNew() {
             onAdd={addLineItem}
             onRemove={removeLineItem}
             onUpdate={(id, field, value) => updateLineItem(id, field, value)}
+            onAddFromCatalog={addFromCatalog}
             subtotal={subtotal}
             total={total}
             totalsTestPrefix="quote"
