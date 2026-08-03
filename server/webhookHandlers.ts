@@ -82,21 +82,42 @@ export class WebhookHandlers {
           console.log(`[Webhook] Processing invoice payment for invoice ${invoiceId}`);
 
           const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, invoiceId));
-          
+
           if (invoice && invoice.status !== 'paid') {
-            const amountPaid = session.amount_total ? session.amount_total / 100 : parseFloat(invoice.balanceDue?.toString() || "0");
+            const charged = session.amount_total ? session.amount_total / 100 : parseFloat(invoice.balanceDue?.toString() || "0");
             const now = new Date();
+
+            // Convenience fee (card 3% / ACH free) rides the charge as its
+            // own Stripe line — mirror it onto the CRM invoice as a real
+            // line item and grow the totals, so the invoice matches the
+            // charge to the penny and the fee revenue is visible.
+            const surcharge = Math.max(0, parseFloat(metadata.surchargeAmount || "0") || 0);
+            const priorPaid = parseFloat(invoice.amountPaid?.toString() || "0") || 0;
+            const newTotal = (parseFloat(invoice.total?.toString() || "0") || 0) + surcharge;
+            const newSubtotal = (parseFloat(invoice.subtotal?.toString() || "0") || 0) + surcharge;
+            if (surcharge > 0) {
+              await db.insert(crmInvoiceLineItems).values({
+                invoiceId,
+                description: metadata.paymentMethod === "ach" ? "Bank transfer convenience fee" : "Card payment convenience fee (3%)",
+                lineType: "part",
+                quantity: "1",
+                unitPrice: surcharge.toFixed(2),
+                lineTotal: surcharge.toFixed(2),
+                sortOrder: 999,
+              });
+            }
 
             await db.update(crmInvoices)
               .set({
                 status: 'paid',
-                amountPaid: amountPaid.toFixed(2),
+                ...(surcharge > 0 ? { subtotal: newSubtotal.toFixed(2), total: newTotal.toFixed(2) } : {}),
+                amountPaid: (priorPaid + charged).toFixed(2),
                 balanceDue: "0.00",
                 paidAt: now,
               })
               .where(eq(crmInvoices.id, invoiceId));
 
-            console.log(`[Webhook] Invoice ${invoice.invoiceNumber} marked as paid - amount: $${amountPaid}`);
+            console.log(`[Webhook] Invoice ${invoice.invoiceNumber} marked as paid - charged: $${charged}${surcharge > 0 ? ` (includes $${surcharge.toFixed(2)} convenience fee, itemized)` : ""}`);
 
             // Auto-update customer status from "prospect" to "customer" when invoice is paid
             if (invoice.customerId) {
@@ -166,9 +187,15 @@ export class WebhookHandlers {
           console.log(`[Webhook] Processing quote deposit for quote ${quoteId}, selected option: ${selectedOption}`);
 
           const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
-          
+
           if (quote) {
-            const depositAmount = session.amount_total ? session.amount_total / 100 : 0;
+            const chargedTotal = session.amount_total ? session.amount_total / 100 : 0;
+            // The convenience fee (card 3% / ACH free) is part of the charge
+            // but NOT part of the deposit against the quote — split it out so
+            // the quote's deposit math stays honest and the fee is itemized
+            // on the deposit invoice.
+            const depositSurcharge = Math.max(0, parseFloat(metadata.surchargeAmount || "0") || 0);
+            const depositAmount = Math.max(0, chargedTotal - depositSurcharge);
             const now = new Date();
 
             // Auto-accept the quote when deposit is paid (signature was captured before payment)
@@ -236,7 +263,9 @@ export class WebhookHandlers {
                 (quote.quoteCategory === null && quote.quoteType === "proposal");
               const lineType: "part" | "install" = isInstallQuote ? "install" : "part";
 
-              // Create the deposit invoice - marked as paid since we just received payment
+              // Create the deposit invoice - marked as paid since we just
+              // received payment. Totals = the FULL charge (deposit + any
+              // convenience fee) so the books match Stripe to the penny.
               const [depositInvoice] = await db.insert(crmInvoices).values({
                 invoiceNumber: depositInvoiceNumber,
                 customerId: quote.accountId || quote.customerId || null,
@@ -245,17 +274,17 @@ export class WebhookHandlers {
                 workOrderId: workOrderId,
                 quoteId: quote.id,
                 status: "paid" as const,
-                subtotal: depositAmount.toFixed(2),
+                subtotal: chargedTotal.toFixed(2),
                 laborTotal: "0",
-                total: depositAmount.toFixed(2),
-                amountPaid: depositAmount.toFixed(2),
+                total: chargedTotal.toFixed(2),
+                amountPaid: chargedTotal.toFixed(2),
                 balanceDue: "0.00",
                 paidAt: now,
                 notes: depositDescription,
                 isDepositInvoice: true,
               }).returning();
 
-              console.log(`[Webhook] Created deposit invoice ${depositInvoiceNumber} for $${depositAmount} (workOrder: ${workOrderId})`);
+              console.log(`[Webhook] Created deposit invoice ${depositInvoiceNumber} for $${chargedTotal} (deposit $${depositAmount}${depositSurcharge > 0 ? ` + fee $${depositSurcharge.toFixed(2)}` : ""}, workOrder: ${workOrderId})`);
 
               // Create a line item for the deposit with correct lineType for P&L mapping
               await db.insert(crmInvoiceLineItems).values({
@@ -267,6 +296,19 @@ export class WebhookHandlers {
                 lineTotal: depositAmount.toFixed(2),
                 sortOrder: 0,
               });
+
+              // The convenience fee gets its OWN line for clean tracking
+              if (depositSurcharge > 0) {
+                await db.insert(crmInvoiceLineItems).values({
+                  invoiceId: depositInvoice.id,
+                  description: metadata.paymentMethod === "ach" ? "Bank transfer convenience fee" : "Card payment convenience fee (3%)",
+                  lineType: "part",
+                  quantity: "1",
+                  unitPrice: depositSurcharge.toFixed(2),
+                  lineTotal: depositSurcharge.toFixed(2),
+                  sortOrder: 1,
+                });
+              }
 
               // Link the deposit invoice back to the quote
               await db.update(crmQuotes)

@@ -44,19 +44,35 @@ export function achFeeLabel(cfg: PaymentFeeConfig = PAYMENT_FEE_DEFAULTS): strin
 // method, so the fee is passed to them. Shared by the quote view (display) and
 // the payment-link backend (charge) so both compute the same amount.
 export type PaymentMethod = "card" | "ach";
+// Company policy (2026-08): cards carry a 3% convenience fee; ACH/bank
+// transfer is FREE on purpose — the visible difference steers customers to
+// the rail that costs us ~nothing (0.8% capped at $5) instead of 2.9%.
 export const SURCHARGE = {
-  cardPercent: 2.9,
-  achPercent: 0.8,
-  achCapUsd: 5,
+  cardPercent: 3,
+  achPercent: 0,
+  achCapUsd: 0,
 } as const;
 
 /** Surcharge dollars added to `amount` for the chosen method. */
 export function surchargeFor(method: PaymentMethod, amount: number): number {
   if (!(amount > 0)) return 0;
-  if (method === "ach") return round2(Math.min(amount * (SURCHARGE.achPercent / 100), SURCHARGE.achCapUsd));
+  if (method === "ach") {
+    if (SURCHARGE.achPercent <= 0) return 0;
+    return round2(Math.min(amount * (SURCHARGE.achPercent / 100), SURCHARGE.achCapUsd));
+  }
   return round2(amount * (SURCHARGE.cardPercent / 100));
 }
 
 export function surchargeLabel(method: PaymentMethod): string {
-  return method === "ach" ? `${SURCHARGE.achPercent}% (max $${SURCHARGE.achCapUsd})` : `${SURCHARGE.cardPercent}%`;
+  if (method === "ach") {
+    return SURCHARGE.achPercent > 0 ? `${SURCHARGE.achPercent}% (max $${SURCHARGE.achCapUsd})` : "no fee";
+  }
+  return `${SURCHARGE.cardPercent}%`;
+}
+
+/** Line-item description used when the fee is added to an invoice. */
+export function surchargeLineDescription(method: PaymentMethod): string {
+  return method === "ach"
+    ? "Bank transfer convenience fee"
+    : `Card payment convenience fee (${SURCHARGE.cardPercent}%)`;
 }

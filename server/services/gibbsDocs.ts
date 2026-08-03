@@ -1,7 +1,31 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../db";
-import { docFiles, docFolders } from "@shared/schema";
+import { crmItems, docFiles, docFolders } from "@shared/schema";
 import { CRM_FUNCTIONALITY_KNOWLEDGE } from "./crm-knowledge";
+
+/** Catalog item for taking card payments outside Stripe (over the phone,
+ *  in person): staff add this line manually so the 3% is tracked the same
+ *  way the automatic online-payment fee lines are. Seeded once. */
+export async function seedFeeCatalogItem(): Promise<void> {
+  try {
+    const NAME = "Card payment convenience fee (3%)";
+    const [existing] = await db.select({ id: crmItems.id }).from(crmItems).where(eq(crmItems.name, NAME));
+    if (existing) return;
+    await db.insert(crmItems).values({
+      name: NAME,
+      description:
+        "Convenience fee for credit/debit card payments — 3% of the amount being charged. Added automatically on online card payments; add this line manually for phone/in-person card payments. Bank transfer (ACH), cash, and check have no fee.",
+      category: "service",
+      itemType: "parts",
+      rate: "0",
+      unit: "each",
+      isVariableRate: true,
+    });
+    console.log("[PaymentFees] Seeded the card convenience fee catalog item");
+  } catch (e) {
+    console.error("[PaymentFees] catalog seed failed (non-fatal):", (e as Error).message);
+  }
+}
 
 /** Documents app → "Gibbs" folder: makes what Gibbs knows visible and
  *  ownable, in two forms.
@@ -82,12 +106,16 @@ const POLICY_SEED = `# Payments & fees policy
 - The remaining balance is due on completion.
 
 ## Credit card convenience fee — 3%
-- When a customer pays by credit card, a 3% convenience fee is added to the
-  amount being charged to the card.
+- When a customer pays by credit/debit card, a 3% convenience fee is added
+  to the amount being charged to the card.
 - On a quote deposit that means 3% of the deposit, not of the full quote:
   a $10,000 quote takes a $5,000 deposit; paid by card the charge is
   $5,000 + 3% = $5,150.
-- Cash and check payments have no fee.
+- Bank transfer (ACH), cash, and check have NO fee — offer bank transfer to
+  customers who want to avoid the fee.
+- Online payments add the fee automatically as its own line item; for
+  phone/in-person card payments add the catalog item "Card payment
+  convenience fee (3%)" manually.
 
 ---
 This document is owned by the team — edit it in the Documents app and Gibbs

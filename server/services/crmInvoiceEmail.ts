@@ -1,6 +1,5 @@
 import type { CrmInvoice, CrmInvoiceLineItem, CrmUser } from "@shared/schema";
 import { crmInvoices, crmUsers } from "@shared/schema";
-import { getUncachableStripeClient } from "../stripeClient";
 import { db } from "../db";
 import { eq, isNotNull } from "drizzle-orm";
 import { storage } from "../storage";
@@ -86,53 +85,18 @@ async function ensureViewToken(invoice: CrmInvoice): Promise<string> {
   return viewToken;
 }
 
-// Generate a Stripe payment link for an invoice and store its ID for later deactivation
+// The email's Pay button goes to OUR invoice page, not straight to Stripe:
+// the page is where the customer picks bank transfer (free) vs card (+3%
+// convenience fee) and the right Stripe link is generated on demand.
 async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> {
   try {
     const balanceDue = parseFloat(invoice.balanceDue?.toString() || invoice.total?.toString() || "0");
     if (balanceDue <= 0) {
       return null; // No balance due, no payment link needed
     }
-
-    // Ensure we have a viewToken for short URLs
     const viewToken = await ensureViewToken(invoice);
-
-    const stripe = await getUncachableStripeClient();
-    
-    const paymentLink = await stripe.paymentLinks.create({
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Invoice #${invoice.invoiceNumber}`,
-              description: `Payment for HVAC Service Invoice`,
-            },
-            unit_amount: Math.round(balanceDue * 100), // Convert to cents
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        type: 'invoice_payment',
-      },
-      after_completion: {
-        type: 'redirect',
-        redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/i/${viewToken}?payment=success`,
-        },
-      },
-    });
-
-    // Store the payment link ID on the invoice so it can be deactivated when marked as paid
-    await db.update(crmInvoices)
-      .set({ stripePaymentLinkId: paymentLink.id })
-      .where(eq(crmInvoices.id, invoice.id));
-    console.log(`[CRM Invoice Email] Stored payment link ID ${paymentLink.id} on invoice ${invoice.invoiceNumber}`);
-
-    return paymentLink.url;
+    const host = process.env.REPLIT_DOMAINS?.split(",")[0] || "www.ghvac.app";
+    return `https://${host}/i/${viewToken}`;
   } catch (error) {
     console.error("Error generating payment link for invoice:", error);
     return null;

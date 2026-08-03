@@ -3,7 +3,7 @@ import { getUncachableStripeClient } from "./stripeClient";
 import { storage } from "./storage";
 import { db } from "./db";
 import { crmQuotes, crmInvoices, crmQuoteLineItems } from "@shared/schema";
-import { surchargeFor, surchargeLabel, type PaymentMethod } from "@shared/payment-fees";
+import { surchargeFor, surchargeLabel, surchargeLineDescription, type PaymentMethod } from "@shared/payment-fees";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -172,6 +172,9 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
 router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
   try {
     const { invoiceId } = req.params;
+    // Chosen payment method drives the surcharge and which method the link
+    // allows — same policy as quote deposits (card +3%, bank transfer free).
+    const paymentMethod: PaymentMethod = req.body?.paymentMethod === "ach" ? "ach" : "card";
 
     // Get the invoice
     const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, invoiceId));
@@ -209,8 +212,14 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
         .where(eq(crmInvoices.id, invoice.id));
     }
 
-    // Create a Payment Link for the full balance
+    // Convenience fee for the chosen method (card 3%, ACH free) — added as
+    // its OWN Stripe line so the receipt itemizes it; the webhook mirrors it
+    // onto the CRM invoice as a line item so the books match to the penny.
+    const surchargeAmount = surchargeFor(paymentMethod, amountDue);
+
+    // Create a Payment Link for the full balance, restricted to the method.
     const paymentLink = await stripe.paymentLinks.create({
+      payment_method_types: paymentMethod === "ach" ? ["us_bank_account"] : ["card"],
       line_items: [
         {
           price_data: {
@@ -223,11 +232,23 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
           },
           quantity: 1,
         },
+        ...(surchargeAmount > 0
+          ? [{
+              price_data: {
+                currency: 'usd' as const,
+                product_data: { name: surchargeLineDescription(paymentMethod) },
+                unit_amount: Math.round(surchargeAmount * 100),
+              },
+              quantity: 1,
+            }]
+          : []),
       ],
       metadata: {
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         type: 'invoice_payment',
+        paymentMethod,
+        surchargeAmount: surchargeAmount.toFixed(2),
       },
       after_completion: {
         type: 'redirect',
@@ -257,6 +278,9 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       paymentLinkId: paymentLink.id,
       amountDue,
       invoiceTotal: parseFloat(invoice.total?.toString() || "0"),
+      paymentMethod,
+      surchargeAmount,
+      chargedTotal: amountDue + surchargeAmount,
     });
   } catch (error: any) {
     console.error("Error creating invoice payment link:", error);

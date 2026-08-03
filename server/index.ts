@@ -1186,9 +1186,13 @@ async function runWaterHeaterSeeds() {
       .catch((e) => console.error("Gmail sync start failed:", e));
 
     // Documents → Gibbs folder: knowledge read-out (regenerated each boot)
-    // + one-time policy seeds Gibbs reads live via company_docs
+    // + one-time policy seeds Gibbs reads live via company_docs; also seeds
+    // the card-convenience-fee catalog item for manual card payments
     import("./services/gibbsDocs")
-      .then(({ seedGibbsDocs }) => seedGibbsDocs())
+      .then(({ seedGibbsDocs, seedFeeCatalogItem }) => {
+        seedGibbsDocs();
+        seedFeeCatalogItem();
+      })
       .catch((e) => console.error("Gibbs docs seed failed:", e));
 
     // Textline message sync every 30s — keeps inbound AND outbound SMS

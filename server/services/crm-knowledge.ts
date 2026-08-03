@@ -213,7 +213,13 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - Standard deposit on an accepted quote is 50% of the quote total
 - Credit card payments carry a 3% convenience fee ON THE AMOUNT CHARGED to
   the card (e.g. $10,000 quote → $5,000 deposit; by card that's $5,000 +
-  3% = $5,150). Cash or check payments have no fee.
+  3% = $5,150). Bank transfer (ACH), cash, and check have NO fee — steer
+  customers to bank transfer when they ask how to avoid the fee.
+- Online payments (invoice pay page + quote deposits) offer both methods,
+  disclose the fee up front, and automatically add the fee as its own line
+  item on the invoice so totals match the Stripe charge exactly. For
+  phone/in-person card payments, staff add the catalog item "Card payment
+  convenience fee (3%)" manually.
 - The full current policy lives in the Documents app → Gibbs folder →
   "Payments & fees policy" — read it with company_docs before answering
   detailed fee questions (that document wins if it differs from this note)

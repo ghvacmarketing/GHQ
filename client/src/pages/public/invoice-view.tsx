@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, MapPin, Calendar } from "lucide-react";
+import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, Landmark, MapPin, Calendar } from "lucide-react";
+import { surchargeFor, surchargeLabel } from "@shared/payment-fees";
 import type { CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -140,7 +141,7 @@ export default function PublicInvoiceView() {
     }
   }, [isPaymentSuccess, invoice?.id, invoice?.status, paymentVerified, isVerifying, refetch]);
 
-  const handlePayNow = async () => {
+  const handlePayNow = async (paymentMethod: "card" | "ach" = "card") => {
     if (!invoice?.id) return;
     setIsGeneratingPayment(true);
     setPaymentError(null);
@@ -148,6 +149,7 @@ export default function PublicInvoiceView() {
       const res = await fetch(`/api/stripe/invoice/${invoice.id}/payment-link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMethod }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -407,8 +409,11 @@ export default function PublicInvoiceView() {
                       {paymentError}
                     </div>
                   )}
+                  {/* Method choice: bank transfer is free; cards carry the
+                      3% convenience fee, disclosed up front and itemized on
+                      the Stripe page and the invoice. */}
                   <Button
-                    onClick={handlePayNow}
+                    onClick={() => handlePayNow("ach")}
                     disabled={isGeneratingPayment}
                     className="w-full text-white py-6 text-lg"
                     style={{ backgroundColor: BRAND_COLOR }}
@@ -420,11 +425,25 @@ export default function PublicInvoiceView() {
                       </>
                     ) : (
                       <>
-                        <CreditCard className="mr-2 h-5 w-5" />
-                        Pay Now - {formatCurrency(balanceDue)}
+                        <Landmark className="mr-2 h-5 w-5" />
+                        Pay by Bank Transfer - {formatCurrency(balanceDue)}
                       </>
                     )}
                   </Button>
+                  <Button
+                    onClick={() => handlePayNow("card")}
+                    disabled={isGeneratingPayment}
+                    variant="outline"
+                    className="w-full py-6 text-lg"
+                    style={{ borderColor: BRAND_COLOR, color: BRAND_COLOR }}
+                  >
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Pay by Card - {formatCurrency(balanceDue + surchargeFor("card", balanceDue))}
+                  </Button>
+                  <p className="text-center text-xs text-slate-500">
+                    Bank transfer has no fee. Card payments include a {surchargeLabel("card")} convenience fee
+                    ({formatCurrency(surchargeFor("card", balanceDue))}).
+                  </p>
                   <p className="text-xs text-center text-slate-500">
                     Secure payment powered by Stripe
                   </p>
