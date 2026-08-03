@@ -210,9 +210,13 @@ export type AddressValidationResult = {
 /** USPS-grade check, proxied through our server (the browser Google key is
  *  referrer-restricted and silently fails inside app webviews; the server
  *  also has a keyless fallback). Best-effort: any problem returns null so
- *  forms never block on it. */
+ *  forms never block on it. Memoized per address — re-checking the same
+ *  string (field edits toggled back, re-renders) answers instantly. */
+const validateCache = new Map<string, AddressValidationResult | null>();
 export async function validateAddress(address: string): Promise<AddressValidationResult | null> {
-  if (!address.trim()) return null;
+  const key = address.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!key) return null;
+  if (validateCache.has(key)) return validateCache.get(key) ?? null;
   try {
     const res = await fetch("/api/mobile/validate-address", {
       method: "POST",
@@ -220,8 +224,9 @@ export async function validateAddress(address: string): Promise<AddressValidatio
       credentials: "include",
       body: JSON.stringify({ address: address.trim() }),
     });
-    if (!res.ok) return null;
-    return await res.json();
+    const out = res.ok ? await res.json() : null;
+    validateCache.set(key, out);
+    return out;
   } catch {
     return null;
   }

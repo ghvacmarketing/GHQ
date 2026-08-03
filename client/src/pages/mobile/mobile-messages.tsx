@@ -5,7 +5,7 @@ import chatBg from "@/assets/chat-bg.webp";
 import badgeContactKnown from "@/assets/badge-contact-known.png";
 import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
-  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Plus, X, Phone,
+  MessageSquare, Search, ArrowUp, Loader2, ArrowLeft, User, Plus, X, Phone,
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -78,8 +78,24 @@ export default function MobileMessages() {
     if (pendingPhotos.length > prevPhotoCount.current) setReviewIndex(pendingPhotos.length - 1);
     prevPhotoCount.current = pendingPhotos.length;
   }, [pendingPhotos.length]);
+  // Review overlay just opened while the user was typing: hand focus to the
+  // caption box (from the picker's own event, so iOS allows it) — the
+  // keyboard never dips and keys land in the visible field, not the one
+  // hidden under the overlay.
+  const reviewOpen = pendingPhotos.length > 0;
+  useEffect(() => {
+    if (reviewOpen && keyboardWasUpRef.current) {
+      keyboardWasUpRef.current = false;
+      const t = setTimeout(() => captionRef.current?.focus({ preventScroll: true }), 50);
+      return () => clearTimeout(t);
+    }
+  }, [reviewOpen]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
+  // Attaching mid-typing must not dip the keyboard: remember it was up, and
+  // once the review overlay opens, retarget typing into the caption box.
+  const captionRef = useRef<HTMLTextAreaElement | null>(null);
+  const keyboardWasUpRef = useRef(false);
   // The whole thread rides the keyboard with the same eased inset as Gibbs
   const kbInset = useKeyboardInset();
   // After the keyboard leaves, snap back any leftover page pan Safari did.
@@ -665,35 +681,34 @@ export default function MobileMessages() {
               transition: "bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
-            {/* One-line floating row: + (photos) | field | send */}
+            {/* One-line floating row: + (photos) | field with the send button
+                INSIDE it, iMessage-style — the maroon arrow pops in the moment
+                there's something to send, so "can I send?" is always legible
+                against the maroon bubbles. */}
             <div className="flex items-end gap-2">
               <button
                 onClick={() => {
-                  // The OS photo sheet ("Take Photo / Choose from Gallery")
-                  // anchors to the page as it was laid out — with the keyboard
-                  // up and the thread translated, it lands way off. Settle the
-                  // keyboard first, then open the picker.
-                  if (kbInset > 0) {
-                    (document.activeElement as HTMLElement | null)?.blur?.();
-                    setTimeout(() => attachInputRef.current?.click(), 300);
-                  } else {
-                    attachInputRef.current?.click();
-                  }
+                  // Keep the keyboard exactly where it is — the hidden picker
+                  // input lives OUTSIDE the translated wrapper, so the OS
+                  // sheet anchors fine. Just remember typing was in progress
+                  // so the caption box can inherit focus.
+                  keyboardWasUpRef.current = kbInset > 0;
+                  attachInputRef.current?.click();
                 }}
                 disabled={sendMessageMutation.isPending || pendingPhotos.length >= 3}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
+                className="mb-[3px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
                 aria-label="Add photos"
                 data-testid="message-attach"
               >
                 <Plus className="h-5 w-5" />
               </button>
-              <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-[#d1d3d9] px-4 shadow-lg">
+              <div className="flex min-h-[44px] min-w-0 flex-1 items-end rounded-full bg-[#d1d3d9] py-1 pl-4 pr-1 shadow-lg">
                 <textarea
                   placeholder="Message"
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   rows={1}
-                  className="max-h-24 w-full resize-none bg-transparent py-[11px] text-[16px] leading-[22px] text-slate-900 outline-none placeholder:text-slate-500"
+                  className="max-h-24 w-full resize-none bg-transparent py-[7px] text-[16px] leading-[22px] text-slate-900 outline-none placeholder:text-slate-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -702,16 +717,24 @@ export default function MobileMessages() {
                   }}
                   data-testid="input-message"
                 />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={(!messageText.trim() && pendingPhotos.length === 0) || sendMessageMutation.isPending}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow transition-all duration-200 active:scale-90 ${
+                    messageText.trim() || pendingPhotos.length > 0
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-50 opacity-0"
+                  }`}
+                  aria-label="Send"
+                  data-testid="button-send-message"
+                >
+                  {sendMessageMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
+                  )}
+                </button>
               </div>
-              <button
-                onClick={handleSendMessage}
-                disabled={(!messageText.trim() && pendingPhotos.length === 0) || sendMessageMutation.isPending}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-all active:scale-90 disabled:bg-white/85 disabled:text-slate-400 disabled:shadow-md"
-                aria-label="Send"
-                data-testid="button-send-message"
-              >
-                {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              </button>
             </div>
           </div>
           </div>
@@ -793,31 +816,30 @@ export default function MobileMessages() {
                       </button>
                     )}
                   </div>
-                  <div className="flex items-end gap-2">
-                    <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-full bg-white/[0.12] px-4 backdrop-blur">
-                      <textarea
-                        placeholder="Add a caption…"
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                        rows={1}
-                        className="max-h-24 w-full resize-none bg-transparent py-[11px] text-[16px] leading-[22px] text-white outline-none placeholder:text-white/50"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage();
-                          }
-                        }}
-                        data-testid="input-photo-caption"
-                      />
-                    </div>
+                  <div className="flex min-h-[44px] items-end rounded-full bg-white/[0.12] py-1 pl-4 pr-1 backdrop-blur">
+                    <textarea
+                      ref={captionRef}
+                      placeholder="Add a caption…"
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      rows={1}
+                      className="max-h-24 w-full resize-none bg-transparent py-[7px] text-[16px] leading-[22px] text-white outline-none placeholder:text-white/50"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      data-testid="input-photo-caption"
+                    />
                     <button
                       onClick={handleSendMessage}
                       disabled={sendMessageMutation.isPending}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-transform active:scale-90 disabled:opacity-60"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow transition-transform active:scale-90 disabled:opacity-60"
                       aria-label="Send photo"
                       data-testid="photo-review-send"
                     >
-                      {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                      {sendMessageMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-5 w-5" strokeWidth={2.5} />}
                     </button>
                   </div>
                 </div>

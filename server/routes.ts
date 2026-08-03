@@ -29238,16 +29238,26 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         });
         if (r.ok) {
           const data: any = await r.json();
+          // Dedupe — the same house can come back as both a street address
+          // and a premise prediction with identical text.
+          const seen = new Set<string>();
           const out = (data?.suggestions || [])
             .map((s: any) => s.placePrediction)
             .filter(Boolean)
-            .slice(0, 6)
             .map((p: any) => ({
+              placeId: p.placeId || undefined,
               description: (p.text?.text || "").replace(/,\s*USA$/i, ""),
               main: p.structuredFormat?.mainText?.text || p.text?.text || "",
               secondary: (p.structuredFormat?.secondaryText?.text || "").replace(/,\s*USA$/i, ""),
             }))
-            .filter((s: any) => s.description);
+            .filter((s: any) => s.description)
+            .filter((s: any) => {
+              const k = `${s.main}|${s.secondary}`.toLowerCase().replace(/[^a-z0-9|]/g, "");
+              if (seen.has(k)) return false;
+              seen.add(k);
+              return true;
+            })
+            .slice(0, 6);
           if (out.length > 0) return res.json(out);
         }
       } catch { /* fall through to the keyless source */ }
@@ -29260,24 +29270,68 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         { headers: { "User-Agent": "GHQ-FieldApp/1.0 (ghvac.app)" } },
       );
       const rows: any[] = r.ok ? await r.json() : [];
-      return res.json(rows.map((row) => {
-        const a = row.address || {};
-        const line1 = [a.house_number, a.road].filter(Boolean).join(" ");
-        const city = a.city || a.town || a.village || a.hamlet || "";
-        const state = (a["ISO3166-2-lvl4"] || "").split("-")[1] || "";
-        return {
-          description: String(row.display_name || "").replace(/, United States$/i, ""),
-          main: line1 || String(row.display_name || "").split(",")[0],
-          secondary: [city, [state, a.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
-          address1: line1 || undefined,
-          city: city || undefined,
-          state: state || undefined,
-          zip: a.postcode || undefined,
-        };
-      }));
+      const seenOsm = new Set<string>();
+      return res.json(rows
+        .map((row) => {
+          const a = row.address || {};
+          const line1 = [a.house_number, a.road].filter(Boolean).join(" ");
+          const city = a.city || a.town || a.village || a.hamlet || "";
+          const state = (a["ISO3166-2-lvl4"] || "").split("-")[1] || "";
+          return {
+            description: String(row.display_name || "").replace(/, United States$/i, ""),
+            main: line1 || String(row.display_name || "").split(",")[0],
+            secondary: [city, [state, a.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+            address1: line1 || undefined,
+            city: city || undefined,
+            state: state || undefined,
+            zip: a.postcode || undefined,
+          };
+        })
+        .filter((s) => {
+          const k = `${s.main}|${s.secondary}`.toLowerCase().replace(/[^a-z0-9|]/g, "");
+          if (seenOsm.has(k)) return false;
+          seenOsm.add(k);
+          return true;
+        }));
     } catch (err) {
       console.error("[address-autocomplete]", err);
       return res.json([]);
+    }
+  });
+
+  // Resolve a picked Google prediction to structured fields via Place
+  // Details — a fraction of the Address Validation API's latency, and the
+  // prediction IS the exact address (no point re-verifying what Google just
+  // served). Returns { address1, city, state, zip } or null.
+  app.post("/api/mobile/address-resolve", requireCrmTechOrAbove, async (req, res) => {
+    const placeId = typeof req.body?.placeId === "string" ? req.body.placeId.trim() : "";
+    const key = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_PLACES_API_KEY;
+    if (!placeId || !key) return res.json(null);
+    try {
+      const r = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+        headers: {
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask": "addressComponents",
+          Referer: "https://www.ghvac.app/",
+        },
+      });
+      if (!r.ok) return res.json(null);
+      const data: any = await r.json();
+      const comps: any[] = data?.addressComponents || [];
+      const get = (type: string, short = false) => {
+        const c = comps.find((x) => x.types?.includes(type));
+        return (short ? c?.shortText : c?.longText) || "";
+      };
+      const address1 = [get("street_number"), get("route", true)].filter(Boolean).join(" ");
+      const city =
+        get("locality") || get("postal_town") || get("sublocality_level_1") || get("administrative_area_level_3");
+      const state = get("administrative_area_level_1", true);
+      const zip = get("postal_code");
+      if (!address1 || !state) return res.json(null);
+      return res.json({ address1, city, state, zip });
+    } catch (err) {
+      console.error("[address-resolve]", err);
+      return res.json(null);
     }
   });
 

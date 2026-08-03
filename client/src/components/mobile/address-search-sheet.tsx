@@ -4,15 +4,16 @@ import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { MapEmbed, validateAddress } from "@/components/mobile/address-autocomplete";
 import locationBadge from "@/assets/badge-location.png";
 
-/** Address lookup for the mobile create forms: a bottom sheet with a plain
- *  search box (no OS widget), house-style suggestion rows (metal pin badge)
- *  as you type, and a map + confirm step once one is picked. Selection hands
- *  structured fields (address1/city/state/zip) back to the form. */
+/** Address lookup for the mobile create forms: a compact bottom sheet with a
+ *  plain search box (no OS widget), house-style suggestion rows (metal pin
+ *  badge) as you type, and a map + confirm step once one is picked. Selection
+ *  hands structured fields (address1/city/state/zip) back to the form. */
 
 export interface AddressSuggestion {
   description: string;
   main: string;
   secondary: string;
+  placeId?: string;
   address1?: string;
   city?: string;
   state?: string;
@@ -47,6 +48,27 @@ function parseSecondary(main: string, secondary: string): AddressFields {
   };
 }
 
+/** Google predictions resolve through Place Details (fast, exact); cached so
+ *  re-picking the same suggestion is instant. */
+const placeCache = new Map<string, AddressFields | null>();
+async function resolvePlace(placeId: string): Promise<AddressFields | null> {
+  if (placeCache.has(placeId)) return placeCache.get(placeId) ?? null;
+  try {
+    const res = await fetch("/api/mobile/address-resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ placeId }),
+    });
+    const data = res.ok ? await res.json() : null;
+    const fields: AddressFields | null = data?.address1 ? data : null;
+    placeCache.set(placeId, fields);
+    return fields;
+  } catch {
+    return null;
+  }
+}
+
 export function AddressSearchSheet({
   open,
   onOpenChange,
@@ -55,7 +77,9 @@ export function AddressSearchSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (fields: AddressFields) => void;
+  /** meta.verified = the fields came back complete from the geocoder, so the
+   *  form can skip its own validation round-trip. */
+  onSelect: (fields: AddressFields, meta?: { verified: boolean }) => void;
   title?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -68,13 +92,15 @@ export function AddressSearchSheet({
 
   // Fresh sheet every open — layout effect so the reset lands BEFORE paint;
   // a plain effect let last time's picked place flash on screen for a frame
-  // as the sheet slid up. Focus once the slide-up has landed.
+  // as the sheet slid up. Focus only after the 500ms slide-in has finished —
+  // focusing mid-animation paints the text caret at the sheet's pre-animation
+  // position (the visible "teleporting" cursor).
   useLayoutEffect(() => {
     if (!open) return;
     setQuery("");
     setSuggestions([]);
     setChosen(null);
-    const t = setTimeout(() => inputRef.current?.focus(), 350);
+    const t = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 520);
     return () => clearTimeout(t);
   }, [open]);
 
@@ -94,48 +120,60 @@ export function AddressSearchSheet({
           body: JSON.stringify({ query: q }),
         });
         const rows: AddressSuggestion[] = res.ok ? await res.json() : [];
-        if (seq === seqRef.current) setSuggestions(Array.isArray(rows) ? rows : []);
+        // Belt-and-suspenders dedupe (the proxy dedupes too): the same house
+        // can come back as both a street address and a premise.
+        const seen = new Set<string>();
+        const unique = (Array.isArray(rows) ? rows : []).filter((r) => {
+          const k = `${r.main}|${r.secondary}`.toLowerCase().replace(/[^a-z0-9|]/g, "");
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        if (seq === seqRef.current) setSuggestions(unique);
       } catch {
         if (seq === seqRef.current) setSuggestions([]);
       } finally {
         if (seq === seqRef.current) setSearching(false);
       }
-    }, 300);
+    }, 250);
     return () => clearTimeout(t);
   }, [query, open]);
 
   const choose = async (s: AddressSuggestion) => {
     inputRef.current?.blur();
     setChosen(s);
-    // Google predictions carry only text — resolve components through the
-    // validate proxy (which standardizes to "Addr, City, ST ZIP").
-    if (!s.address1 || !s.city || !s.state) {
-      setResolving(true);
+    if (s.address1 && s.city && s.state && s.zip) return; // keyless rows arrive complete
+    setResolving(true);
+    // Fast path: Place Details by id (~200ms). The validation proxy is the
+    // fallback — it re-verifies an address Google itself just suggested, and
+    // that round trip is what made picking feel slow.
+    let fields = s.placeId ? await resolvePlace(s.placeId) : null;
+    if (!fields) {
       const v = await validateAddress(s.description);
-      const parsed = v?.standardized ? parseStandardized(v.standardized) : null;
-      setChosen((prev) => (prev && prev.description === s.description ? { ...prev, ...(parsed || {}) } : prev));
-      setResolving(false);
+      fields = v?.standardized ? parseStandardized(v.standardized) : null;
     }
+    setChosen((prev) => (prev && prev.description === s.description ? { ...prev, ...(fields || {}) } : prev));
+    setResolving(false);
   };
 
   const confirm = () => {
     if (!chosen) return;
+    const complete = !!(chosen.address1 && chosen.city && chosen.state && chosen.zip);
     const fields: AddressFields =
       chosen.address1 && chosen.city && chosen.state
         ? { address1: chosen.address1, city: chosen.city, state: chosen.state, zip: chosen.zip || "" }
         : parseSecondary(chosen.main, chosen.secondary);
-    onSelect(fields);
+    onSelect(fields, { verified: complete });
     onOpenChange(false);
   };
 
   return (
-    <DraggableSheet tall open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
+    <DraggableSheet open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
       {!chosen ? (
-        <div className="min-h-[52dvh]">
+        <>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <p className="mt-1 text-[13px] text-slate-400">Start typing a street address — pick a match to fill everything in.</p>
 
-          <div className="mt-4 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+          <div className="mt-3 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
             <input
               ref={inputRef}
@@ -148,29 +186,38 @@ export function AddressSearchSheet({
             {searching && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-300" />}
           </div>
 
-          {suggestions.length > 0 ? (
-            <div
-              className={`mt-4 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm transition-opacity ${searching ? "opacity-60" : ""}`}
-            >
-              {suggestions.map((s, i) => (
-                <button
-                  key={`${s.description}-${i}`}
-                  onClick={() => choose(s)}
-                  className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-                  data-testid={`address-suggestion-${i}`}
-                >
-                  <img src={locationBadge} alt="" className="h-8 w-8 shrink-0 select-none" draggable={false} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-900">{s.main}</span>
-                    {s.secondary && <span className="block truncate text-xs text-slate-500">{s.secondary}</span>}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : query.trim().length >= 3 && !searching ? (
-            <p className="mt-8 text-center text-sm text-slate-400">No matches — check the spelling or fill the fields in by hand.</p>
-          ) : null}
-        </div>
+          {/* Fixed-height results region: the sheet keeps one calm size above
+              the keyboard instead of stretching to the top of the screen as
+              results stream in. Overflow scrolls inside. */}
+          <div className="mt-3 h-44 overflow-y-auto overscroll-y-contain">
+            {suggestions.length > 0 ? (
+              <div
+                className={`overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm transition-opacity ${searching ? "opacity-60" : ""}`}
+              >
+                {suggestions.map((s, i) => (
+                  <button
+                    key={`${s.description}-${i}`}
+                    onClick={() => choose(s)}
+                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                    data-testid={`address-suggestion-${i}`}
+                  >
+                    <img src={locationBadge} alt="" className="h-8 w-8 shrink-0 select-none" draggable={false} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-slate-900">{s.main}</span>
+                      {s.secondary && <span className="block truncate text-xs text-slate-500">{s.secondary}</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="pt-9 text-center text-sm text-slate-400">
+                {query.trim().length >= 3 && !searching
+                  ? "No matches — check the spelling or fill the fields in by hand."
+                  : "Start typing a street address — pick a match to fill everything in."}
+              </p>
+            )}
+          </div>
+        </>
       ) : (
         <>
           <button

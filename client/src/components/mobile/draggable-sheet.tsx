@@ -38,11 +38,24 @@ export function DraggableSheet({
    *  picker reads as part of the parent while the page behind goes double-dark. */
   nested?: boolean;
 }) {
+  // Resting transition — the drag handlers swap transitions in and out and
+  // must restore THIS one so keyboard padding keeps animating afterwards.
+  const BASE_TRANSITION = "padding-bottom 0.2s ease-out";
   const keyboardInset = useKeyboardInset();
   const sheetRef = useRef<HTMLDivElement | null>(null);
-  const scrollWrapRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
   const scrollable = tall || full;
+
+  /** Nearest scrollable ancestor of a touch, up to the sheet itself — the
+   *  tall-sheet content wrap or any fixed-height list a child renders. */
+  const scrollerAt = (node: Node | null): HTMLElement | null => {
+    let el = node instanceof HTMLElement ? node : null;
+    while (el && el !== sheetRef.current) {
+      if (el.scrollHeight > el.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) return el;
+      el = el.parentElement;
+    }
+    return null;
+  };
 
   const dismissAnimated = () => {
     const el = sheetRef.current;
@@ -51,7 +64,7 @@ export function DraggableSheet({
     el.style.transform = "translateY(100%)";
     setTimeout(() => {
       onOpenChange(false);
-      el.style.transition = "";
+      el.style.transition = BASE_TRANSITION;
       el.style.transform = "";
     }, 200);
   };
@@ -61,10 +74,9 @@ export function DraggableSheet({
     // through the REACT tree even though they live outside this sheet's DOM —
     // a drag there must never move this sheet.
     if (!sheetRef.current?.contains(e.target as Node)) { drag.current = null; return; }
-    const wrap = scrollWrapRef.current;
-    const inScroll = !!wrap && wrap.contains(e.target as Node);
     // Inside scrolled-down content the gesture belongs to the scroller.
-    drag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroll || wrap!.scrollTop <= 0 };
+    const scroller = scrollerAt(e.target as Node);
+    drag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !scroller || scroller.scrollTop <= 0 };
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const st = drag.current;
@@ -97,7 +109,7 @@ export function DraggableSheet({
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
-      setTimeout(() => { if (el) el.style.transition = ""; }, 260);
+      setTimeout(() => { if (el) el.style.transition = BASE_TRANSITION; }, 260);
     }
   };
 
@@ -115,11 +127,14 @@ export function DraggableSheet({
               : ""
         }`}
         style={{
-          paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
-          // Full sheets already cover the screen — translating them under the
-          // keyboard would shove the top off; their content pads instead.
-          transform: !full && keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : undefined,
-          transition: "transform 0.2s ease-out",
+          // The keyboard PADS the sheet instead of translating it: the sheet
+          // stays anchored to the screen bottom (so the keyboard sits on the
+          // white sheet body, not on a strip of dimmed backdrop) and only the
+          // content lifts. Full sheets already cover the screen — their
+          // content pads itself instead.
+          paddingBottom:
+            !full && keyboardInset > 0 ? `${keyboardInset + 12}px` : "calc(24px + env(safe-area-inset-bottom))",
+          transition: BASE_TRANSITION,
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -134,7 +149,7 @@ export function DraggableSheet({
           <SheetTitle>{title}</SheetTitle>
         </SheetHeader>
         {scrollable ? (
-          <div ref={scrollWrapRef} className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5">
+          <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5">
             {children}
           </div>
         ) : (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Check, Search } from "lucide-react";
@@ -152,8 +152,12 @@ export default function MobileCustomerNew() {
     createCustomer.mutate();
   };
 
-  // USPS-grade address validation — badge updates as the address completes
+  // USPS-grade address validation — badge updates as the address completes.
+  // A pick from the search sheet arrives pre-verified by the geocoder, so
+  // that one render skips the round-trip and badges instantly.
+  const skipAddrCheck = useRef(false);
   useEffect(() => {
+    if (skipAddrCheck.current) { skipAddrCheck.current = false; setAddrChecking(false); return; }
     const full = address1.trim() && city.trim() && state.trim() ? `${address1}, ${city}, ${state} ${zip}`.trim() : "";
     if (!full) { setAddrCheck(null); return; }
     setAddrChecking(true);
@@ -285,11 +289,15 @@ export default function MobileCustomerNew() {
           <AddressSearchSheet
             open={addrSearchOpen}
             onOpenChange={setAddrSearchOpen}
-            onSelect={(a) => {
+            onSelect={(a, meta) => {
               setAddress1(a.address1);
               setCity(a.city);
               setState(a.state);
               setZip(a.zip);
+              if (meta?.verified) {
+                skipAddrCheck.current = true;
+                setAddrCheck({ verdict: "verified" });
+              }
             }}
           />
           <div>
