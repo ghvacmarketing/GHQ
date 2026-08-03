@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MapEmbed, DistanceFromMe } from "@/components/mobile/address-autocomplete";
+import { MapView } from "@/components/mobile/address-autocomplete";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Clock, Plus, Search, Loader2, AlertTriangle, CalendarIcon } from "lucide-react";
+import { Check, ChevronRight, Clock, Plus, Search, Loader2, AlertTriangle, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
+import { CustomerSearchSheet } from "@/components/mobile/customer-search-sheet";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { customerTypeBadge } from "@/pages/mobile/mobile-quote-new";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import type { CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
 
@@ -28,6 +31,45 @@ function formatSubtype(subtype: string | null | undefined): string {
  * the work order (assigned to self or a teammate), then navigates to the new
  * job's detail page. Supervisor/admin/owner only.
  */
+// "09:00" -> "9:00 AM"
+function fmt12(t: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t || "");
+  if (!m) return t || "";
+  let h = parseInt(m[1], 10);
+  const ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${m[2]} ${ap}`;
+}
+function durationLabel(start: string, end: string): string {
+  const toMin = (t: string) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(t || "");
+    return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 0;
+  };
+  let mins = toMin(end) - toMin(start);
+  if (mins <= 0) mins += 24 * 60;
+  const h = Math.floor(mins / 60);
+  const r = mins % 60;
+  return h > 0 ? (r > 0 ? `${h}h ${r}m` : `${h}h`) : `${r}m`;
+}
+
+// The house full-width calendar look (mirrors the mobile date sheets)
+const SCHEDULE_CAL_CLASSNAMES = {
+  months: "w-full",
+  month: "w-full space-y-4",
+  caption: "relative flex items-center justify-center py-1.5",
+  caption_label: "text-base font-semibold text-slate-900",
+  nav_button:
+    "flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-600 shadow-md transition-transform active:scale-95",
+  table: "w-full border-collapse",
+  head_row: "flex w-full",
+  head_cell: "flex-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400",
+  row: "mt-2 flex w-full",
+  cell: "relative h-11 flex-1 p-0 text-center text-sm",
+  day: "h-11 w-full rounded-md p-0 text-[15px] font-normal aria-selected:opacity-100",
+  day_selected: "bg-[#711419] text-white",
+  day_today: "font-bold text-[#711419] aria-selected:text-white",
+};
+
 export default function MobileJobNew() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -43,6 +85,9 @@ export default function MobileJobNew() {
   const [priority, setPriority] = useState<string>("normal");
   const [assignTechId, setAssignTechId] = useState<string>(""); // "" = assign to myself
   const [dateOpen, setDateOpen] = useState(false);
+  const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
+  const [propertySheetOpen, setPropertySheetOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
@@ -141,6 +186,10 @@ export default function MobileJobNew() {
   useEffect(() => {
     if (customerProperties.length === 1 && !selectedProperty) {
       setSelectedProperty(customerProperties[0]);
+    } else if (customerProperties.length > 1 && !selectedProperty) {
+      // Several service locations — the picker sheet prompts immediately so
+      // a job can never silently land on the wrong property.
+      setPropertySheetOpen(true);
     }
   }, [customerProperties, selectedProperty]);
 
@@ -312,107 +361,82 @@ export default function MobileJobNew() {
             Gibbs filled the form — tap to undo
           </button>
         )}
-        {/* Customer Search */}
+        {/* Customer — full-sheet lookup, house-style selected card */}
         <div className="space-y-2">
           <Label>Customer *</Label>
           {selectedCustomer ? (
-            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div>
-                <p className="font-medium text-slate-800">{selectedCustomer.name}</p>
-                {selectedCustomer.phone && (
-                  <p className="text-sm text-slate-500">{selectedCustomer.phone}</p>
-                )}
+            <div
+              className="flex items-center gap-3 rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.05] px-3.5 py-3"
+              data-testid="picked-customer"
+            >
+              <img src={customerTypeBadge(selectedCustomer.customerType)} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-slate-900">{selectedCustomer.name}</p>
+                {selectedCustomer.phone && <p className="truncate text-xs text-slate-500">{selectedCustomer.phone}</p>}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={() => {
                   setSelectedCustomer(null);
                   setSelectedProperty(null);
-                  setCustomerSearch("");
+                  setCustomerSheetOpen(true);
                 }}
+                className="shrink-0 rounded-[4px] border border-slate-300/70 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
                 data-testid="button-change-customer"
               >
                 Change
-              </Button>
+              </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search customers..."
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-customer-search"
-                />
-              </div>
-              {searchedCustomers.length > 0 && (
-                <div className="border rounded-lg max-h-40 overflow-y-auto">
-                  {searchedCustomers.map((customer) => (
-                    <button
-                      key={customer.id}
-                      onClick={() => {
-                        setSelectedCustomer(customer);
-                        setCustomerSearch("");
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-100 border-b last:border-b-0"
-                      data-testid={`customer-option-${customer.id}`}
-                    >
-                      <p className="font-medium text-sm">{customer.name}</p>
-                      {customer.phone && (
-                        <p className="text-xs text-slate-500">{customer.phone}</p>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => setCustomerSheetOpen(true)}
+              className="flex h-11 w-full items-center gap-2.5 rounded-md border border-input bg-white px-3.5 text-left shadow-xs"
+              data-testid="input-customer-search"
+            >
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="text-base text-muted-foreground">Search for a customer…</span>
+            </button>
           )}
         </div>
 
-        {/* Property Selection */}
+        {/* Property — auto-picked when there's one; prompted when several */}
         {selectedCustomer && (
           <div className="space-y-2">
             <Label>Property *</Label>
             {customerProperties.length === 0 ? (
               <p className="text-sm text-slate-500">No properties found for this customer</p>
-            ) : customerProperties.length === 1 ? (
-              <div className="p-3 bg-slate-50 border rounded-lg">
-                <p className="font-medium text-sm">{customerProperties[0].address1}</p>
-                <p className="text-xs text-slate-500">
-                  {[customerProperties[0].city, customerProperties[0].state, customerProperties[0].zip].filter(Boolean).join(", ")}
-                </p>
+            ) : selectedProperty ? (
+              <div className="flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3" data-testid="picked-property">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">{selectedProperty.address1}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {[selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", ")}
+                  </p>
+                </div>
+                {customerProperties.length > 1 && (
+                  <button
+                    onClick={() => setPropertySheetOpen(true)}
+                    className="shrink-0 rounded-[4px] border border-slate-300/70 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
+                    data-testid="button-change-property"
+                  >
+                    Change
+                  </button>
+                )}
               </div>
             ) : (
-              <Select
-                value={selectedProperty?.id || ""}
-                onValueChange={(val) => {
-                  const prop = customerProperties.find(p => p.id === val);
-                  setSelectedProperty(prop || null);
-                }}
+              <button
+                onClick={() => setPropertySheetOpen(true)}
+                className="flex h-11 w-full items-center justify-between rounded-md border border-input bg-white px-3.5 text-left shadow-xs"
+                data-testid="select-property"
               >
-                <SelectTrigger data-testid="select-property">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customerProperties.map((prop) => (
-                    <SelectItem key={prop.id} value={prop.id}>
-                      {prop.address1} - {prop.city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <span className="text-base text-muted-foreground">Choose which property…</span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+              </button>
             )}
             {selectedProperty?.address1 && (
               <div data-testid="job-location-map">
-                <MapEmbed
+                <MapView
                   query={[selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", ")}
-                  className="h-40"
-                />
-                <DistanceFromMe
-                  address={[selectedProperty.address1, selectedProperty.city, selectedProperty.state, selectedProperty.zip].filter(Boolean).join(", ")}
+                  className="h-56"
                 />
               </div>
             )}
@@ -509,59 +533,72 @@ export default function MobileJobNew() {
           </Select>
         </div>
 
-        {/* Schedule - Date Picker and Time Slots */}
-        <div className="space-y-3">
+        {/* Schedule — its own sheet (calendar + revolving times); the trigger
+            doubles as the summary, replacing the old green strip */}
+        <div className="space-y-2">
           <Label>Schedule *</Label>
+          <button
+            onClick={() => setScheduleOpen(true)}
+            className="flex h-11 w-full items-center justify-between rounded-md border border-input bg-white px-3.5 text-left shadow-xs"
+            data-testid="button-date-picker"
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400" />
+              {selectedDate ? (
+                <span className="truncate text-base text-slate-900">
+                  {format(selectedDate, "EEE, MMM d")} · {fmt12(selectedStartTime)} – {fmt12(selectedEndTime)}
+                </span>
+              ) : (
+                <span className="text-base text-muted-foreground">Pick a date & time…</span>
+              )}
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+          </button>
+          {selectedDate && selectedStartTime && selectedEndTime && (
+            <p className="flex items-center gap-1.5 pl-1 text-xs text-slate-500" data-testid="schedule-duration">
+              <Clock className="h-3.5 w-3.5 text-slate-400" />
+              {durationLabel(selectedStartTime, selectedEndTime)} visit
+            </p>
+          )}
+        </div>
 
-          {/* Date Picker */}
-          <Popover open={dateOpen} onOpenChange={setDateOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-left font-normal"
-                data-testid="button-date-picker"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  setSelectedDate(date);
-                  // Wheels always show a value, so seed a default 1-hour window.
-                  setSelectedStartTime((t) => t || "09:00");
-                  setSelectedEndTime((t) => t || "10:00");
-                  if (date) setDateOpen(false); // picking a date closes the calendar
-                }}
-                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+        <DraggableSheet tall open={scheduleOpen} onOpenChange={setScheduleOpen} title="Schedule" testid="sheet-schedule">
+          <h2 className="text-lg font-semibold text-slate-900">When's the visit?</h2>
 
-          {/* Time selection — alarm-style wheels snapping to the shared increment */}
+          <div className="mt-4 px-0.5" style={{ touchAction: "pan-y" }}>
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => {
+                setSelectedDate(date ?? undefined);
+                // Wheels always show a value, so seed a default 1-hour window.
+                setSelectedStartTime((t) => t || "09:00");
+                setSelectedEndTime((t) => t || "10:00");
+              }}
+              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+              numberOfMonths={1}
+              className="w-full p-0"
+              classNames={SCHEDULE_CAL_CLASSNAMES}
+            />
+          </div>
+
           {selectedDate && (
-            <div className="space-y-3">
+            <div className="mt-5 space-y-3">
               <div className="space-y-1">
-                <Label className="text-xs text-slate-500">Start Time</Label>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Start time</p>
                 <WheelTimePicker
                   value={selectedStartTime}
                   stepMinutes={stepMinutes}
                   onChange={(v) => {
                     setSelectedStartTime(v);
-                    // Default the end to 1 hour after the start. 60 min is a
-                    // clean multiple of both 15- and 30-min boards, so it
-                    // always lands on a valid slot.
+                    // Default the end to 1 hour after the start.
                     setSelectedEndTime(addMinutesTo(v, 60));
                   }}
                   testId="wheel-start-time"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-slate-500">End Time</Label>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">End time</p>
                 <WheelTimePicker
                   value={selectedEndTime}
                   stepMinutes={stepMinutes}
@@ -572,16 +609,15 @@ export default function MobileJobNew() {
             </div>
           )}
 
-          {/* Selected Time Display */}
-          {selectedSlot && (
-            <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-              <Clock className="h-4 w-4" />
-              <span>
-                {format(new Date(selectedSlot.start), "h:mm a")} - {format(new Date(selectedSlot.end), "h:mm a")}
-              </span>
-            </div>
-          )}
-        </div>
+          <button
+            onClick={() => setScheduleOpen(false)}
+            disabled={!selectedDate}
+            className="mb-2 mt-6 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-50"
+            data-testid="schedule-done"
+          >
+            Done
+          </button>
+        </DraggableSheet>
 
         {/* Conflict Error */}
         {conflictError && (
@@ -591,6 +627,45 @@ export default function MobileJobNew() {
           </div>
         )}
       </div>
+
+      {/* Customer lookup — full sheet, address-search style */}
+      <CustomerSearchSheet
+        open={customerSheetOpen}
+        onOpenChange={setCustomerSheetOpen}
+        onSelect={(c) => {
+          setSelectedCustomer(c);
+          setSelectedProperty(null);
+        }}
+      />
+
+      {/* Property picker — prompts automatically when a customer has several */}
+      <DraggableSheet tall open={propertySheetOpen} onOpenChange={setPropertySheetOpen} title="Which property?" testid="sheet-property-picker">
+        <h2 className="text-lg font-semibold text-slate-900">Which property?</h2>
+        <p className="mt-0.5 truncate text-sm text-slate-500">{selectedCustomer?.name}</p>
+        <div className="mt-4 pb-2">
+          <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+            {customerProperties.map((prop, i) => (
+              <button
+                key={prop.id}
+                onClick={() => {
+                  setSelectedProperty(prop);
+                  setPropertySheetOpen(false);
+                }}
+                className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                data-testid={`property-option-${prop.id}`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-900">{prop.address1}</span>
+                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                    {[prop.city, prop.state, prop.zip].filter(Boolean).join(", ")}
+                  </span>
+                </span>
+                {selectedProperty?.id === prop.id && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      </DraggableSheet>
     </MobileCreatePage>
   );
 }

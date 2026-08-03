@@ -124,6 +124,63 @@ export function AddressAutocomplete({
   );
 }
 
+/** Fully interactive map for an address: real Maps JS (one-finger pan,
+ *  pinch zoom — gestureHandling "greedy"), no "view larger map" link, no
+ *  default UI chrome. Falls back to the iframe embed when the key/script
+ *  is unavailable. Google's small logo is contractually required and can't
+ *  be removed. */
+export function MapView({ query, className = "h-56" }: { query: string; className?: string }) {
+  const holderRef = useRef<HTMLDivElement | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!query.trim()) return;
+    (async () => {
+      try {
+        const ok = await loadMaps();
+        if (!ok || cancelled || !holderRef.current) return setFailed(true);
+        const g = (window as any).google;
+        const { Map } = await g.maps.importLibrary("maps");
+        const { Geocoder } = await g.maps.importLibrary("geocoding");
+        const { Marker } = await g.maps.importLibrary("marker");
+        const geo = new Geocoder();
+        const res = await geo.geocode({ address: query }).catch(() => null);
+        const loc = res?.results?.[0]?.geometry?.location;
+        if (cancelled || !holderRef.current) return;
+        if (!loc) return setFailed(true);
+        const map = new Map(holderRef.current, {
+          center: loc,
+          zoom: 17,
+          mapTypeId: "hybrid",
+          disableDefaultUI: true,
+          zoomControl: false,
+          // One finger pans, two fingers pinch — never the "use two fingers
+          // to move the map" scroll trap.
+          gestureHandling: "greedy",
+          clickableIcons: false,
+        });
+        new Marker({ map, position: loc });
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  if (!KEY || failed) return <MapEmbed query={query} className={className} />;
+  return (
+    <div
+      ref={holderRef}
+      className={`${className} w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm`}
+      style={{ touchAction: "none" }}
+      data-testid="interactive-map"
+    />
+  );
+}
+
 /** Mobile-friendly embedded map for an address string. Uses the Maps Embed
  *  API when a key exists (crisper, branded pin), else the keyless embed. */
 export function MapEmbed({ query, className = "h-40" }: { query: string; className?: string }) {
