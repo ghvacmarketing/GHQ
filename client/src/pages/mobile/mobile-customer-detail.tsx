@@ -164,6 +164,7 @@ export default function MobileCustomerDetail() {
   const underlayRef = useRef<HTMLDivElement | null>(null);
   const scrimRef = useRef<HTMLDivElement | null>(null);
   const backRef = useRef<HTMLButtonElement | null>(null);
+  const editBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showUnderlay, setShowUnderlay] = useState(false);
   const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
 
@@ -178,10 +179,11 @@ export default function MobileCustomerDetail() {
       el.style.animation = "none";
       el.style.transition = `transform ${dur}ms ease-in`;
       el.style.transform = "translateX(100%)";
-      if (backRef.current) {
-        backRef.current.style.transition = `opacity ${Math.max(120, dur - 40)}ms ease-out`;
-        backRef.current.style.opacity = "0";
-        backRef.current.style.pointerEvents = "none";
+      for (const btn of [backRef.current, editBtnRef.current]) {
+        if (!btn) continue;
+        btn.style.transition = `opacity ${Math.max(120, dur - 40)}ms ease-out`;
+        btn.style.opacity = "0";
+        btn.style.pointerEvents = "none";
       }
       underlayRef.current?.animate(
         [{ transform: `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
@@ -387,15 +389,8 @@ export default function MobileCustomerDetail() {
                 })()}
 
                 <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="contact-card">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-3.5 py-2.5">
+                  <div className="border-b border-slate-200 px-3.5 py-2.5">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact Information</h3>
-                    <button
-                      onClick={() => setEditOpen(true)}
-                      className="flex items-center gap-1 text-xs font-semibold text-[#711419] active:opacity-70"
-                      data-testid="customer-edit-open"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </button>
                   </div>
                   <div className="divide-y divide-slate-200 px-3.5">
                     {customer.phone && (
@@ -519,6 +514,22 @@ export default function MobileCustomerDetail() {
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
+
+      {/* Edit — top-right pill (same family as the customers page's Filters
+          pill), floating with the back button and fading out on exit. */}
+      {customer && (
+        <button
+          ref={editBtnRef}
+          onClick={() => setEditOpen(true)}
+          className="fixed right-3 z-30 flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+          style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
+          data-testid="customer-edit-open"
+          aria-label="Edit customer"
+        >
+          <Pencil className="h-4 w-4" />
+          Edit
+        </button>
+      )}
 
       {/* Lightbox — tap a tile, see it big; videos play inline */}
       {viewer && (
