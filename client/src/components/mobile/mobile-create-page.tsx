@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { Loader2, X } from "lucide-react";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useKeyboardInset } from "@/lib/native";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 
@@ -237,44 +238,31 @@ export function MobileCreatePage({
         </Suspense>
       )}
 
-      {/* Discard confirmation — a bottom sheet inside this page's stacking
-          context (a portaled dialog would land invisibly beneath it). */}
-      {confirmOpen && (
-        <div
-          className="absolute inset-0 z-30"
-          onClick={() => setConfirmOpen(false)}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
-          <div
-            className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-5 pt-3 shadow-2xl animate-in slide-in-from-bottom duration-300"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 20px)" }}
-            onClick={(e) => e.stopPropagation()}
+      {/* Discard confirmation — a REAL bottom sheet (drag down = keep
+          editing). Portaled sheets stack above the create page fine now
+          (content z-[90] beats the page's z-[70]). */}
+      <DraggableSheet open={confirmOpen} onOpenChange={setConfirmOpen} title="Discard this draft?" testid="discard-sheet">
+        <h2 className="text-lg font-semibold text-slate-900">Discard this draft?</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          You haven't saved yet. If you leave now, everything you've entered will be discarded.
+        </p>
+        <div className="mt-5 space-y-2">
+          <button
+            onClick={() => { setConfirmOpen(false); doExit(); }}
+            className="h-12 w-full rounded-[4px] bg-red-600 text-base font-semibold text-white transition-transform active:scale-[0.98]"
+            data-testid="discard-confirm"
           >
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300" />
-            <h2 className="text-lg font-semibold text-slate-900">Discard this draft?</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              You haven't saved yet. If you leave now, everything you've entered will be discarded.
-            </p>
-            <div className="mt-5 space-y-2">
-              <button
-                onClick={() => { setConfirmOpen(false); doExit(); }}
-                className="h-12 w-full rounded-[4px] bg-red-600 text-base font-semibold text-white transition-transform active:scale-[0.98]"
-                data-testid="discard-confirm"
-              >
-                Discard
-              </button>
-              <button
-                onClick={() => setConfirmOpen(false)}
-                className="h-12 w-full rounded-[4px] border border-slate-300/70 bg-white text-base font-semibold text-slate-700 transition-transform active:scale-[0.98]"
-                data-testid="discard-cancel"
-              >
-                Keep editing
-              </button>
-            </div>
-          </div>
+            Discard
+          </button>
+          <button
+            onClick={() => setConfirmOpen(false)}
+            className="h-12 w-full rounded-[4px] border border-slate-300/70 bg-white text-base font-semibold text-slate-700 transition-transform active:scale-[0.98]"
+            data-testid="discard-cancel"
+          >
+            Keep editing
+          </button>
         </div>
-      )}
+      </DraggableSheet>
     </div>
   );
 }

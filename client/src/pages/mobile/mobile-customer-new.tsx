@@ -120,23 +120,25 @@ export default function MobileCustomerNew() {
       toast({ title: "Couldn't create the customer", description: e?.message, variant: "destructive" }),
   });
 
-  // Required fields mirror the CRM wizard: identity by type, plus a full address.
+  // Required fields mirror the CRM wizard: identity by type, phone, lead
+  // source, plus a full address.
   const missing = useMemo(() => {
     const m: string[] = [];
     if (isPM) {
       if (!companyName.trim()) m.push("Company name");
-      if (!phone.trim()) m.push("Main office phone");
     } else {
       if (!firstName.trim()) m.push("First name");
       if (accountType === "COMMERCIAL" && !companyName.trim()) m.push("Company name");
     }
+    if (!phone.trim()) m.push(isPM ? "Main office phone" : "Phone");
     if (!displayName.trim()) m.push("Display name");
+    if (!leadSource) m.push("Lead source");
     if (!address1.trim()) m.push("Address");
     if (!city.trim()) m.push("City");
     if (!state.trim()) m.push("State");
     if (!zip.trim()) m.push("ZIP");
     return m;
-  }, [isPM, accountType, companyName, phone, firstName, displayName, address1, city, state, zip]);
+  }, [isPM, accountType, companyName, phone, firstName, displayName, leadSource, address1, city, state, zip]);
 
   const dirty =
     [firstName, lastName, companyName, phone, email, address1, address2, city, state, zip, accessInstructions, gateCode, note]
@@ -255,7 +257,7 @@ export default function MobileCustomerNew() {
           </div>
           <div>
             <Label htmlFor="nc-phone" className="mb-1.5 block">
-              {isPM ? "Main office phone *" : "Phone"}
+              {isPM ? "Main office phone *" : "Phone *"}
             </Label>
             <Input id="nc-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(706) 555-0123" data-testid="nc-phone" />
           </div>
@@ -369,7 +371,7 @@ export default function MobileCustomerNew() {
         <div className="space-y-3.5">
           <p className={sectionLabel}>Details</p>
           <div>
-            <Label className="mb-1.5 block">Lead source</Label>
+            <Label className="mb-1.5 block">Lead source *</Label>
             <Select value={leadSource} onValueChange={(v) => setLeadSource(v as LeadSource)}>
               <SelectTrigger data-testid="nc-lead-source">
                 <SelectValue placeholder="How did they find us?" />

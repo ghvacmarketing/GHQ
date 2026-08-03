@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2, Search } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { MapEmbed, validateAddress } from "@/components/mobile/address-autocomplete";
 import { useKeyboardInset } from "@/lib/native";
+import { useToast } from "@/hooks/use-toast";
 import locationBadge from "@/assets/badge-location.png";
 
 /** Address lookup for the mobile forms: a FULL-HEIGHT sheet built around an
@@ -90,6 +91,7 @@ export function AddressSearchSheet({
   nested?: boolean;
 }) {
   const keyboardInset = useKeyboardInset();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [searching, setSearching] = useState(false);
@@ -172,13 +174,28 @@ export function AddressSearchSheet({
         ? { address1: chosen.address1, city: chosen.city, state: chosen.state, zip: chosen.zip || "" }
         : parseSecondary(chosen.main, chosen.secondary);
     onSelect(fields, { verified: complete });
+    // Visible confirmation — the sheet closing alone read as "did that take?"
+    toast({
+      title: complete ? "Verified address filled in" : "Address filled in",
+      description: [fields.address1, fields.city, [fields.state, fields.zip].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", "),
+    });
     onOpenChange(false);
   };
 
   return (
     <DraggableSheet full nested={nested} open={open} onOpenChange={onOpenChange} title={title} testid="address-search-sheet">
       {!chosen ? (
-        <div className="flex h-full min-h-0 flex-col">
+        <div
+          className="flex h-full min-h-0 flex-col"
+          onPointerDown={(e) => {
+            // Nothing on this step may steal the caret: taps on suggestions
+            // or empty space keep focus (and the keyboard) pinned to the
+            // search box — scrolling and button clicks still work.
+            if (e.target !== inputRef.current) e.preventDefault();
+          }}
+        >
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
 
           <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
@@ -244,7 +261,10 @@ export function AddressSearchSheet({
           </button>
 
           <div className="mt-3">
-            <MapEmbed query={chosen.description} className="h-44" />
+            {/* Tall and fully interactive — the Embed API iframe pans and
+                zooms on its own; pointer events inside it never reach the
+                sheet's drag logic. */}
+            <MapEmbed query={chosen.description} className="h-80" />
           </div>
 
           <div className="mt-4 flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3 shadow-sm">
