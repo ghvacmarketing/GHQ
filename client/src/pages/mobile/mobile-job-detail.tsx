@@ -4031,6 +4031,7 @@ export default function MobileJobDetail() {
     setShowUnderlay(true);
     requestAnimationFrame(() => {
       el.style.animation = "none";
+      el.style.borderRadius = "24px 0 0 24px";
       el.style.transition = `transform ${dur}ms ease-in`;
       el.style.transform = "translateX(100%)";
       pageUnderlayRef.current?.animate(
@@ -4131,7 +4132,12 @@ export default function MobileJobDetail() {
     if (!el) return;
     el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
     el.style.transform = "translateX(0)";
-    setTimeout(() => { if (el) el.style.transition = ""; }, 290);
+    setTimeout(() => {
+      if (el) {
+        el.style.transition = "";
+        el.style.borderRadius = "";
+      }
+    }, 290);
   };
   const onSwipeStart = (e: React.PointerEvent) => {
     // Wider start zone — Android's system gesture owns the outermost edge,
@@ -4164,7 +4170,11 @@ export default function MobileJobDetail() {
           // jumps. Kill it before dragging.
           target.style.animation = "none";
         }
-        if (!st.section) setShowUnderlay(true);
+        if (!st.section) {
+          setShowUnderlay(true);
+          // iOS-card curve while the page rides the finger
+          el.style.borderRadius = "24px 0 0 24px";
+        }
       }
       else if (dy > 14) { st.active = false; setShowUnderlay(false); return; }
     }

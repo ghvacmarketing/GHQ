@@ -7,7 +7,7 @@ import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-acti
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { useKeyboardInset } from "@/lib/native";
-import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, CheckCircle2, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
@@ -31,6 +31,8 @@ import {
   fetchLatestAiConversation,
   formatConversationWhen,
   groupAiConversations,
+  moveAiConversation,
+  renameAiConversation,
 } from "@/lib/ai-conversations";
 
 /** The mobile GHQ assistant — a light, Notion-AI-style popup that slides
@@ -103,10 +105,14 @@ export default function AssistantOverlay({
   const [streamText, setStreamText] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
-  // History — a second stacked sheet over the chat (replaces the old side panel)
+  // History — a true bottom sheet stacked over the chat sheet
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
+  // Long-press context menu over the history sheet: rename / move / delete a
+  // chat, or delete a space. One overlay, several views.
+  const [chatMenu, setChatMenu] = useState<{ convo: AiConversationSummary; view: "menu" | "rename" | "move"; draft: string } | null>(null);
+  const [spaceMenu, setSpaceMenu] = useState<AiSpace | null>(null);
+  const [menuBusy, setMenuBusy] = useState(false);
   // Gibbs behavior mode — survives restarts; picked from the floating icon.
   const [mode, setMode] = useState<GibbsMode>(() => {
     const saved = typeof localStorage !== "undefined" ? localStorage.getItem("gibbs-mode") : null;
@@ -251,96 +257,100 @@ export default function AssistantOverlay({
     }
   };
 
-  // ChatGPT-style panel gesture: swipe right anywhere on the chat to drag the
-  // panel in (the chat page slides over with your finger), swipe left on the
-  // panel or scrim to push it back. Direction-locked so vertical scrolling in
-  // the message list is untouched.
-  const panelRef = useRef<HTMLElement>(null);
-  const mainRef = useRef<HTMLDivElement>(null);
-  const scrimRef = useRef<HTMLDivElement>(null);
-  const hDragRef = useRef<{ x: number; y: number; locked: boolean; opening: boolean; p: number; lastX: number; lastT: number; vx: number } | null>(null);
-  const suppressClickRef = useRef(false);
-
-  const applyPanelProgress = (p: number, animate: boolean) => {
-    const w = panelRef.current?.offsetWidth || 300;
-    const move = animate ? "transform 0.28s cubic-bezier(0.32, 0.72, 0.35, 1)" : "none";
-    if (panelRef.current) {
-      panelRef.current.style.transition = move;
-      panelRef.current.style.transform = `translateX(${(p - 1) * w}px)`;
-    }
-    if (mainRef.current) {
-      // Parallax: the chat drifts a third of the panel's travel, so the
-      // panel clearly overlaps it instead of shoving it off screen.
-      mainRef.current.style.transition = move;
-      mainRef.current.style.transform = `translateX(${p * w * (1 / 3)}px)`;
-    }
-    if (scrimRef.current) {
-      scrimRef.current.style.transition = animate ? "opacity 0.28s ease-out" : "none";
-      scrimRef.current.style.opacity = String(p);
+  // History sheet drag-to-dismiss — a true bottom sheet: the handle follows
+  // the finger, commits past ~110px, springs back otherwise.
+  const histSheetRef = useRef<HTMLDivElement>(null);
+  const histDragY = useRef<number | null>(null);
+  const onHistDragDown = (e: React.PointerEvent) => {
+    histDragY.current = e.clientY;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    if (histSheetRef.current) histSheetRef.current.style.transition = "none";
+  };
+  const onHistDragMove = (e: React.PointerEvent) => {
+    if (histDragY.current == null) return;
+    const dy = e.clientY - histDragY.current;
+    const el = histSheetRef.current;
+    if (el) el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+  };
+  const onHistDragEnd = (e: React.PointerEvent) => {
+    if (histDragY.current == null) return;
+    const dy = e.clientY - histDragY.current;
+    histDragY.current = null;
+    const el = histSheetRef.current;
+    if (!el) return;
+    if (dy > 110) {
+      el.style.transition = "transform 0.22s ease-in";
+      el.style.transform = "translateY(100%)";
+      setTimeout(() => {
+        setHistoryOpen(false);
+        el.style.transition = "";
+        el.style.transform = "";
+      }, 200);
+    } else {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateY(0)";
+      setTimeout(() => {
+        if (el) {
+          el.style.transition = "";
+          el.style.transform = "";
+        }
+      }, 260);
     }
   };
 
-  const clearPanelDragStyles = () => {
-    for (const el of [panelRef.current, mainRef.current, scrimRef.current]) {
-      if (!el) continue;
-      el.style.transition = "";
-      el.style.transform = "";
-      el.style.opacity = "";
-    }
-  };
-
-  const onHStart = (e: React.PointerEvent, opening: boolean) => {
-    if ((e.target as HTMLElement).closest("[data-vdrag], textarea, input")) return;
-    hDragRef.current = { x: e.clientX, y: e.clientY, locked: false, opening, p: opening ? 0 : 1, lastX: e.clientX, lastT: performance.now(), vx: 0 };
-  };
-  const onHMove = (e: React.PointerEvent) => {
-    const st = hDragRef.current;
-    if (!st) return;
-    const dx = e.clientX - st.x;
-    const dy = e.clientY - st.y;
-    if (!st.locked) {
-      // Wait until the gesture is clearly horizontal; bail if it heads the
-      // wrong way so taps and vertical scrolls stay untouched.
-      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-      if (st.opening ? dx < 0 : dx > 0) {
-        hDragRef.current = null;
-        return;
-      }
-      st.locked = true;
+  // Long-press (hold) on a chat row or space chip → context menu. Movement
+  // cancels it so the list still scrolls; a fired hold suppresses the tap
+  // that follows the release.
+  const pressRef = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  const startPress = (e: React.PointerEvent, fire: () => void) => {
+    const x = e.clientX;
+    const y = e.clientY;
+    const timer = window.setTimeout(() => {
+      if (pressRef.current) pressRef.current.fired = true;
       try {
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        navigator.vibrate?.(10);
       } catch {
-        // capture can fail if the pointer is already gone — drag still works
+        /* no haptics — the menu opening is feedback enough */
       }
+      fire();
+    }, 420);
+    pressRef.current = { timer, x, y, fired: false };
+  };
+  const movePress = (e: React.PointerEvent) => {
+    const st = pressRef.current;
+    if (!st || st.fired) return;
+    if (Math.abs(e.clientX - st.x) > 10 || Math.abs(e.clientY - st.y) > 10) {
+      window.clearTimeout(st.timer);
+      pressRef.current = null;
     }
-    const w = panelRef.current?.offsetWidth || 300;
-    const p = Math.min(1, Math.max(0, (st.opening ? dx : w + dx) / w));
-    const now = performance.now();
-    st.vx = (e.clientX - st.lastX) / Math.max(1, now - st.lastT);
-    st.lastX = e.clientX;
-    st.lastT = now;
-    st.p = p;
-    applyPanelProgress(p, false);
   };
-  const onHEnd = () => {
-    const st = hDragRef.current;
-    hDragRef.current = null;
-    if (!st?.locked) return;
-    // The finger moved — the release must not also count as a tap on
-    // whatever row it happens to land on.
-    suppressClickRef.current = true;
-    window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 200);
-    const target = Math.abs(st.vx) > 0.35 ? st.vx > 0 : st.p > 0.5;
-    applyPanelProgress(target ? 1 : 0, true);
-    setPanelOpen(target);
-    window.setTimeout(clearPanelDragStyles, 340);
+  const endPress = () => {
+    const st = pressRef.current;
+    if (!st) return;
+    window.clearTimeout(st.timer);
+    if (st.fired) {
+      // Keep the flag through the click that iOS fires on release
+      window.setTimeout(() => {
+        pressRef.current = null;
+      }, 250);
+    } else {
+      pressRef.current = null;
+    }
   };
-  const guardClick = (e: React.MouseEvent) => {
-    if (!suppressClickRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
+  const pressFired = () => !!pressRef.current?.fired;
+
+  // Stick-to-bottom scrolling: auto-scroll only while the user is already at
+  // (or near) the bottom. Scrolling up to reread never gets yanked back down
+  // mid-stream; scrolling back near the bottom re-engages the follow.
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const onChatScroll = () => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (stickRef.current) bottomRef.current?.scrollIntoView({ behavior });
   };
 
   // Keyboard-aware layout: the on-screen keyboard shrinks the visual viewport
@@ -390,9 +400,11 @@ export default function AssistantOverlay({
     };
   }, [open]);
 
-  // When the keyboard claims its space, keep the newest messages in view.
+  // When the keyboard claims its space, keep the newest messages in view —
+  // unless the user has scrolled up on purpose.
   useEffect(() => {
-    if (kbInset > 0) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (kbInset > 0) scrollToBottom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kbInset]);
 
   // iOS keyboard hangover: focusing the composer can scroll the whole PWA up
@@ -503,7 +515,7 @@ export default function AssistantOverlay({
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: open && panelOpen,
+    enabled: open && historyOpen,
   });
 
   const addSpace = () => {
@@ -530,17 +542,16 @@ export default function AssistantOverlay({
     setInput("");
     setConversationId(null);
     setFreshIndex(null);
-    setPanelOpen(false);
   };
 
   const openConversationFromPanel = (id: string) => {
     setHistoryOpen(false);
     setFreshIndex(null);
+    stickRef.current = true;
     fetchAiConversation(id).then((loaded) => {
       if (loaded) {
         setConversationId(loaded.id);
         setMessages(loaded.messages);
-        setPanelOpen(false);
       }
     });
   };
@@ -553,6 +564,57 @@ export default function AssistantOverlay({
         setMessages([]);
       }
     });
+  };
+
+  // ── Context-menu actions (long-press on a chat row) ──
+  const refreshChatData = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/spaces"] });
+  };
+  const doRenameChat = () => {
+    const m = chatMenu;
+    const title = m?.draft.trim();
+    if (!m || !title) return;
+    setMenuBusy(true);
+    renameAiConversation(m.convo.id, title).then(() => {
+      refreshChatData();
+      setMenuBusy(false);
+      setChatMenu(null);
+    });
+  };
+  const doMoveChat = (spaceId: string | null) => {
+    const m = chatMenu;
+    if (!m) return;
+    setMenuBusy(true);
+    moveAiConversation(m.convo.id, spaceId).then(() => {
+      refreshChatData();
+      setMenuBusy(false);
+      setChatMenu(null);
+    });
+  };
+  const doCreateSpaceAndMove = () => {
+    const m = chatMenu;
+    const name = m?.draft.trim();
+    if (!m || !name) return;
+    setMenuBusy(true);
+    createAiSpace(name).then((created) => {
+      if (!created) {
+        setMenuBusy(false);
+        return;
+      }
+      moveAiConversation(m.convo.id, created.id).then(() => {
+        refreshChatData();
+        setMenuBusy(false);
+        setChatMenu(null);
+        setActiveSpace(created.id);
+      });
+    });
+  };
+  const doDeleteChat = () => {
+    const m = chatMenu;
+    if (!m) return;
+    removeConversation(m.convo.id);
+    setChatMenu(null);
   };
 
   // Voice capture — Web Speech API where it works, record-then-transcribe on
@@ -577,7 +639,8 @@ export default function AssistantOverlay({
   });
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, pending]);
 
   // While dictating, keep the box scrolled to the newest words so you can
@@ -594,12 +657,15 @@ export default function AssistantOverlay({
     if (!open) cancelVoice();
   }, [open, cancelVoice]);
 
-  // Closing Gibbs also closes the stacked history sheet — reopening should
-  // always land on the chat.
+  // Closing Gibbs also closes the stacked history sheet and any context
+  // menus — reopening should always land on the chat.
   useEffect(() => {
     if (!open) {
       setHistoryOpen(false);
       setHistorySearch("");
+      setChatMenu(null);
+      setSpaceMenu(null);
+      setNewSpaceOpen(false);
     }
   }, [open]);
 
@@ -610,6 +676,8 @@ export default function AssistantOverlay({
     const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
     // Where the answer will land — that message, and only it, animates in.
     const assistantIndex = messages.length + 1;
+    // Sending always re-engages follow-the-conversation scrolling.
+    stickRef.current = true;
     setMessages((prev) => [...prev, { role: "user", content: question, attachments: photos.length > 0 ? photos : undefined }]);
     setInput("");
     setAttachments([]);
@@ -846,10 +914,12 @@ export default function AssistantOverlay({
 
   if (!open) return null;
 
+  const spaceFiltered = activeSpace ? pastConversations.filter((c) => c.spaceId === activeSpace) : pastConversations;
   const visibleConversations = historySearch.trim()
-    ? pastConversations.filter((c) => (c.title || "Conversation").toLowerCase().includes(historySearch.trim().toLowerCase()))
-    : pastConversations;
+    ? spaceFiltered.filter((c) => (c.title || "Conversation").toLowerCase().includes(historySearch.trim().toLowerCase()))
+    : spaceFiltered;
   const groupedConversations = groupAiConversations(visibleConversations);
+  const spaceName = (id: string | null | undefined) => (id ? spaces.find((s) => s.id === id)?.name ?? null : null);
 
   return createPortal(
     <div className="fixed inset-0 z-[120]" data-testid="assistant-overlay">
@@ -869,17 +939,12 @@ export default function AssistantOverlay({
           "absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
           historyOpen && "scale-[0.96]",
         )}
-        style={{ top: "calc(44px + env(safe-area-inset-top))" }}
+        style={{ top: "env(safe-area-inset-top)" }}
       >
-        {/* Chat page — drifts right (about a third of the panel width) as
-            the panel slides in ON TOP of it, so the panel overlaps the chat
-            without pushing it off screen. Swipe right anywhere here to pull
-            the panel in. */}
+        {/* Chat page */}
         <div
-          ref={mainRef}
           className="relative flex min-h-0 flex-1 flex-col"
           style={{ touchAction: "pan-y" }}
-          onClickCapture={guardClick}
         >
         {/* Drag handle — swipe down anywhere on the handle/header to dismiss */}
         <div
@@ -935,13 +1000,17 @@ export default function AssistantOverlay({
         {/* Conversation — overflow-x-hidden is load-bearing: overflow-y-auto
             alone lets one long unbroken string (a URL, an address) widen the
             pane and drag the whole chat sideways off screen */}
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16">
+        <div
+          ref={chatScrollRef}
+          onScroll={onChatScroll}
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16"
+        >
           {messages.length === 0 && !pending ? (
-            <div className="flex h-full flex-col items-center pt-[7vh] text-center">
+            <div className="flex min-h-[calc(100%+1px)] flex-col items-center pt-[7vh] text-center">
               {/* Persona block — the badge already sits in the header, so the
                   empty state is just the name */}
               <button
-                onClick={() => setPanelOpen(true)}
+                onClick={() => setHistoryOpen(true)}
                 className="text-lg font-semibold tracking-tight text-slate-900 transition-opacity active:opacity-60"
                 aria-label="Gibbs — history and spaces"
                 data-testid="assistant-persona-pill"
@@ -970,7 +1039,7 @@ export default function AssistantOverlay({
               )}
             </div>
           ) : (
-            <div className="mx-auto w-full max-w-2xl space-y-4 pb-2">
+            <div className="mx-auto min-h-[calc(100%+1px)] w-full max-w-2xl space-y-4 pb-2">
               {messages.map((msg, i) => {
                 if (msg.role === "user") {
                   return (
@@ -1002,12 +1071,12 @@ export default function AssistantOverlay({
                         <TypewriterText
                           text={stripMarkdown(msg.content)}
                           animate={i === freshIndex}
-                          onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                          onProgress={() => scrollToBottom()}
                           onComplete={
                             i === freshIndex
                               ? () => {
                                   setTypedOut(true);
-                                  requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+                                  requestAnimationFrame(() => scrollToBottom());
                                 }
                               : undefined
                           }
@@ -1253,7 +1322,7 @@ export default function AssistantOverlay({
                       text={stripMarkdown(streamText)}
                       animate
                       streaming
-                      onProgress={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                      onProgress={() => scrollToBottom()}
                     />
                   </div>
                 ) : (
@@ -1461,9 +1530,11 @@ export default function AssistantOverlay({
           </div>
         )}
       </div>
-      {/* ── History — a second sheet stacked over the chat (iOS-modal style).
-          List + search; the search bar is docked at the BOTTOM with New chat
-          on its right, which turns into an X while searching. ── */}
+      {/* ── History — a TRUE bottom sheet that rises over and fully covers
+          the chat sheet (which shrinks beneath for depth). Drag the handle to
+          dismiss. Spaces live here as a chip rail; hold a chat to rename,
+          move, or delete it. The search bar stays docked at the BOTTOM with
+          New chat on its right, which turns into an X while searching. ── */}
       <div className={cn("absolute inset-0 z-30", historyOpen ? "" : "pointer-events-none")}>
         <div
           className={cn("absolute inset-0 bg-black/35 transition-opacity duration-300", historyOpen ? "opacity-100" : "opacity-0")}
@@ -1471,50 +1542,129 @@ export default function AssistantOverlay({
           onClick={() => setHistoryOpen(false)}
         />
         <div
+          ref={histSheetRef}
           className={cn(
             "absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out",
             historyOpen ? "translate-y-0" : "translate-y-full",
           )}
-          style={{ top: "calc(72px + env(safe-area-inset-top))" }}
+          style={{ top: "env(safe-area-inset-top)" }}
           data-testid="assistant-history-sheet"
         >
-          <div className="flex shrink-0 justify-center pb-2 pt-2" onClick={() => setHistoryOpen(false)}>
+          <div
+            className="flex shrink-0 cursor-grab touch-none justify-center pb-2 pt-2 active:cursor-grabbing"
+            onPointerDown={onHistDragDown}
+            onPointerMove={onHistDragMove}
+            onPointerUp={onHistDragEnd}
+            onPointerCancel={onHistDragEnd}
+            data-testid="assistant-history-drag-handle"
+          >
             <span className="h-1 w-10 rounded-full bg-slate-300" />
           </div>
-          <p className="shrink-0 px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">History</p>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+          <div className="flex shrink-0 items-baseline justify-between px-4 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">History</p>
+            <p className="text-[10px] text-slate-300">Hold a chat for options</p>
+          </div>
+
+          {/* Spaces — chip rail; the pick filters the list AND files new
+              chats. Hold a space chip to delete it. */}
+          <div className="scrollbar-none flex shrink-0 items-center gap-1.5 overflow-x-auto px-4 pb-2.5">
+            <button
+              onClick={() => setActiveSpace(null)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                !activeSpace ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300/70 bg-white text-slate-600",
+              )}
+              data-testid="assistant-space-all"
+            >
+              All chats
+            </button>
+            {spaces.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => {
+                  if (pressFired()) return;
+                  setActiveSpace(s.id);
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+                onPointerDown={(e) => startPress(e, () => setSpaceMenu(s))}
+                onPointerMove={movePress}
+                onPointerUp={endPress}
+                onPointerCancel={endPress}
+                className={cn(
+                  "flex shrink-0 select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                  activeSpace === s.id ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300/70 bg-white text-slate-600",
+                )}
+                style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+                data-testid={`assistant-space-${s.id}`}
+              >
+                <Folder className="h-3.5 w-3.5" />
+                {s.name}
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                setNewSpaceName("");
+                setNewSpaceOpen(true);
+              }}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500"
+              data-testid="assistant-space-new"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New space
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3" style={{ touchAction: "pan-y" }}>
             {groupedConversations.length === 0 ? (
-              <p className="px-2 py-8 text-center text-xs text-slate-400">
-                {historySearch.trim() ? "No chats match that search." : "No conversations yet — ask something and it'll be saved here."}
+              <p className="px-2 py-10 text-center text-sm text-slate-400">
+                {historySearch.trim()
+                  ? "No chats match that search."
+                  : activeSpace
+                    ? "Nothing in this space yet — hold a chat to move it here, or start a new one."
+                    : "No conversations yet — ask something and it'll be saved here."}
               </p>
             ) : (
-              groupedConversations.map((group) => (
-                <div key={group.label} className="mb-2">
-                  <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
-                  {group.items.map((c) => (
-                    <div key={c.id} className={cn("flex items-center gap-1 rounded-[4px] px-2 py-1.5", c.id === conversationId ? "bg-[#711419]/10" : "")}>
-                      <button
-                        onClick={() => openConversationFromPanel(c.id)}
-                        className="min-w-0 flex-1 text-left"
-                        data-testid={`assistant-conversation-${c.id}`}
-                      >
-                        <p className={cn("truncate text-[13px]", c.id === conversationId ? "font-semibold text-[#711419]" : "font-medium text-slate-700")}>
-                          {c.title || "Conversation"}
-                        </p>
-                        <p className="text-[11px] text-slate-400">{formatConversationWhen(c.updatedAt)}</p>
-                      </button>
-                      <button
-                        onClick={() => removeConversation(c.id)}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-slate-400 transition-colors active:text-red-500"
-                        aria-label="Delete conversation"
-                        data-testid={`assistant-conversation-delete-${c.id}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+              <div className="min-h-[calc(100%+1px)]">
+                {groupedConversations.map((group) => (
+                  <div key={group.label} className="mb-3">
+                    <p className="px-1 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
+                    <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                      {group.items.map((c, i) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            if (pressFired()) return;
+                            openConversationFromPanel(c.id);
+                          }}
+                          onContextMenu={(e) => e.preventDefault()}
+                          onPointerDown={(e) => startPress(e, () => setChatMenu({ convo: c, view: "menu", draft: c.title || "" }))}
+                          onPointerMove={movePress}
+                          onPointerUp={endPress}
+                          onPointerCancel={endPress}
+                          className={cn(
+                            "flex w-full select-none items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50",
+                            i > 0 && "border-t border-slate-200/80",
+                            c.id === conversationId && "bg-[#711419]/[0.04]",
+                          )}
+                          style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+                          data-testid={`assistant-conversation-${c.id}`}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className={cn("block truncate text-[15px]", c.id === conversationId ? "font-semibold text-[#711419]" : "font-medium text-slate-800")}>
+                              {c.title || "Conversation"}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-slate-400">
+                              {formatConversationWhen(c.updatedAt)}
+                              {!activeSpace && spaceName(c.spaceId) ? ` · ${spaceName(c.spaceId)}` : ""}
+                            </span>
+                          </span>
+                          {c.id === conversationId && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#711419]" />}
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ))
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           {/* Docked search bar + New chat / clear */}
@@ -1557,6 +1707,204 @@ export default function AssistantOverlay({
         </div>
       </div>
 
+      {/* ── Context menu — long-press actions, floating iOS-style card over
+          the history sheet. Renames and moves talk to the same PATCH the
+          desktop uses; deletes go through the existing delete flow. ── */}
+      {(chatMenu || spaceMenu || newSpaceOpen) && (
+        <div className="absolute inset-0 z-40" data-testid="assistant-context-menu">
+          <div
+            className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
+            style={{ touchAction: "none" }}
+            onClick={() => {
+              if (menuBusy) return;
+              setChatMenu(null);
+              setSpaceMenu(null);
+              setNewSpaceOpen(false);
+            }}
+          />
+          <div
+            className="absolute inset-x-3 overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-3 duration-200"
+            style={{
+              bottom: kbInset > 0 ? `${kbInset + 12}px` : "calc(16px + env(safe-area-inset-bottom))",
+              transition: "bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
+          >
+            {chatMenu && (
+              <>
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-slate-900">{chatMenu.convo.title || "Conversation"}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {formatConversationWhen(chatMenu.convo.updatedAt)}
+                    {spaceName(chatMenu.convo.spaceId) ? ` · ${spaceName(chatMenu.convo.spaceId)}` : ""}
+                  </p>
+                </div>
+                {chatMenu.view === "menu" && (
+                  <div>
+                    <button
+                      onClick={() => setChatMenu({ ...chatMenu, view: "rename", draft: chatMenu.convo.title || "" })}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium text-slate-800 active:bg-slate-50"
+                      data-testid="assistant-chat-rename"
+                    >
+                      <Pencil className="h-[18px] w-[18px] text-slate-400" />
+                      Rename
+                    </button>
+                    <button
+                      onClick={() => setChatMenu({ ...chatMenu, view: "move", draft: "" })}
+                      className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3.5 text-left text-[15px] font-medium text-slate-800 active:bg-slate-50"
+                      data-testid="assistant-chat-move"
+                    >
+                      <Folder className="h-[18px] w-[18px] text-slate-400" />
+                      Move to space
+                    </button>
+                    <button
+                      onClick={doDeleteChat}
+                      className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3.5 text-left text-[15px] font-semibold text-red-600 active:bg-red-50"
+                      data-testid="assistant-chat-delete"
+                    >
+                      <Trash2 className="h-[18px] w-[18px]" />
+                      Delete chat
+                    </button>
+                  </div>
+                )}
+                {chatMenu.view === "rename" && (
+                  <div className="p-4">
+                    <input
+                      value={chatMenu.draft}
+                      onChange={(e) => setChatMenu({ ...chatMenu, draft: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") doRenameChat();
+                      }}
+                      placeholder="Chat name"
+                      maxLength={80}
+                      className="h-11 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+                      data-testid="assistant-chat-rename-input"
+                    />
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button
+                        onClick={() => setChatMenu({ ...chatMenu, view: "menu" })}
+                        className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={doRenameChat}
+                        disabled={!chatMenu.draft.trim() || menuBusy}
+                        className="flex items-center gap-1.5 rounded-full bg-[#711419] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        data-testid="assistant-chat-rename-save"
+                      >
+                        {menuBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {chatMenu.view === "move" && (
+                  <div className="max-h-[45vh] overflow-y-auto overscroll-contain">
+                    <button
+                      onClick={() => doMoveChat(null)}
+                      disabled={menuBusy}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium text-slate-800 active:bg-slate-50"
+                      data-testid="assistant-chat-move-none"
+                    >
+                      <span className="min-w-0 flex-1">No space</span>
+                      {!chatMenu.convo.spaceId && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+                    </button>
+                    {spaces.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => doMoveChat(s.id)}
+                        disabled={menuBusy}
+                        className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3.5 text-left text-[15px] font-medium text-slate-800 active:bg-slate-50"
+                        data-testid={`assistant-chat-move-${s.id}`}
+                      >
+                        <Folder className="h-[18px] w-[18px] shrink-0 text-slate-400" />
+                        <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                        {chatMenu.convo.spaceId === s.id && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-2 border-t border-slate-100 p-3">
+                      <input
+                        value={chatMenu.draft}
+                        onChange={(e) => setChatMenu({ ...chatMenu, draft: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") doCreateSpaceAndMove();
+                        }}
+                        placeholder="New space…"
+                        maxLength={60}
+                        className="h-10 min-w-0 flex-1 rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+                        data-testid="assistant-chat-move-newspace-input"
+                      />
+                      <button
+                        onClick={doCreateSpaceAndMove}
+                        disabled={!chatMenu.draft.trim() || menuBusy}
+                        className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#711419] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                        data-testid="assistant-chat-move-newspace-create"
+                      >
+                        {menuBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                        Create
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {spaceMenu && !chatMenu && (
+              <>
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="flex items-center gap-2 truncate text-sm font-semibold text-slate-900">
+                    <Folder className="h-4 w-4 shrink-0 text-slate-400" />
+                    {spaceMenu.name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Chats stay when a space is deleted — they just come out unfiled.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    removeSpace(spaceMenu.id);
+                    setSpaceMenu(null);
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-semibold text-red-600 active:bg-red-50"
+                  data-testid="assistant-space-delete"
+                >
+                  <Trash2 className="h-[18px] w-[18px]" />
+                  Delete space
+                </button>
+              </>
+            )}
+            {newSpaceOpen && !chatMenu && !spaceMenu && (
+              <div className="p-4">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">New space</p>
+                <input
+                  value={newSpaceName}
+                  onChange={(e) => setNewSpaceName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addSpace();
+                  }}
+                  placeholder="e.g. Marketing ideas"
+                  maxLength={60}
+                  className="h-11 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+                  data-testid="assistant-newspace-input"
+                />
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    onClick={() => setNewSpaceOpen(false)}
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={addSpace}
+                    disabled={!newSpaceName.trim()}
+                    className="rounded-full bg-[#711419] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    data-testid="assistant-newspace-create"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>,
     document.body,
   );

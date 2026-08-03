@@ -205,6 +205,7 @@ export async function sendCrmInvoiceEmail(
       to: [recipientEmail],
       subject,
       html,
+      text,
     });
 
     console.log("CRM Invoice email sent via Gmail, thread:", gmailThreadId);

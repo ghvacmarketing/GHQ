@@ -594,13 +594,18 @@ select.dark-input option {
   100% { transform: translateX(460%); }
 }
 
-/* Mobile page transitions — job detail slides in like an iOS push */
+/* Mobile page transitions — sub-pages push in like an iOS card: they slide
+   in from the right wearing rounded left corners that square off as the
+   card settles. Back-swipes re-apply the curve inline while dragging. */
 @keyframes page-slide-in-right {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from { transform: translateX(100%); border-radius: 24px 0 0 24px; }
+  80%  { border-radius: 24px 0 0 24px; }
+  to   { transform: translateX(0); border-radius: 0; }
 }
 .page-slide-in {
-  animation: page-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0.34, 1);
+  animation: page-slide-in-right 0.3s cubic-bezier(0.32, 0.72, 0.34, 1);
+  /* Clips content to the curved corners while the card is in motion */
+  overflow: hidden;
 }
 
 /* No overscroll rubber-banding: horizontal kills the browser history swipe,

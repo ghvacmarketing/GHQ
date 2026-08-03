@@ -267,6 +267,20 @@ export async function deleteAiSpace(id: string): Promise<boolean> {
   }
 }
 
+export async function renameAiConversation(id: string, title: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/crm/ai/conversations/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function moveAiConversation(id: string, spaceId: string | null): Promise<boolean> {
   try {
     const res = await fetch(`/api/crm/ai/conversations/${id}`, {

@@ -310,7 +310,7 @@ function buildTextBody(
   lines.push("");
   lines.push("----------------------------------------");
   lines.push("");
-  lines.push("YOUR QUOTE IS READY!");
+  lines.push("Your quote is ready");
   lines.push("");
   lines.push(`Prepared For: ${quote.customerName || "Valued Customer"}`);
   if (quote.serviceAddress) {
@@ -333,8 +333,12 @@ function buildTextBody(
 
   lines.push("----------------------------------------");
   lines.push("");
-  lines.push("Questions? Contact us at (706) 826-0644 or reply to this email.");
+  lines.push("Questions? Call us at (706) 826-0644 or just reply to this email.");
   lines.push("");
+  if (signatureText) {
+    lines.push(signatureText);
+    lines.push("");
+  }
   lines.push("Giesbrecht HVAC");
   lines.push("(706) 826-0644");
   lines.push("1530 Crescent Ct, Augusta, GA");
@@ -367,15 +371,6 @@ function buildHtmlBody(
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
 
-  const personalMessageHtml = personalMessage
-    ? `
-      <tr>
-        <td class="px-24" style="padding:0 20px 16px 20px;">
-          <div style="font-size:15px;color:#374151;font-family:Arial,sans-serif;line-height:1.6;">${esc(personalMessage)}</div>
-        </td>
-      </tr>`
-    : "";
-
   const serviceType = formatQuoteType(quote.quoteType);
   const quoteDate = formatDate(quote.createdAt);
   const validUntilDate = quote.validUntil ? formatDate(quote.validUntil) : null;
@@ -386,10 +381,18 @@ function buildHtmlBody(
     body { margin:0; padding:0; }
     table { border-collapse:collapse; }
     @media only screen and (max-width: 600px) {
-      .container { width:100% !important; border-radius:0 !important; }
-      .px-24 { padding-left:14px !important; padding-right:14px !important; }
+      .container { width:100% !important; border-left:none !important; border-right:none !important; }
+      .px-24 { padding-left:16px !important; padding-right:16px !important; }
+      .stack { display:block !important; width:100% !important; padding:0 0 10px 0 !important; }
     }
   `;
+
+  // Industrial GHQ style: squared 4px corners, hairline slate borders, the
+  // maroon reserved for the accent bar, tag, and button. Calm sentence-case
+  // copy (no shouting) reads better and scores better with spam filters.
+  const label = `margin:0 0 4px 0;color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;font-family:Arial,Helvetica,sans-serif;`;
+  const value = `margin:0;color:#0f172a;font-size:15px;font-weight:700;font-family:Arial,Helvetica,sans-serif;`;
+  const card = `background:#f8fafc;border:1px solid #cbd5e1;border-radius:4px;`;
 
   return `<!doctype html>
 <html>
@@ -399,51 +402,63 @@ function buildHtmlBody(
   <title>Quote from ${esc(brandName)}</title>
   <style type="text/css">${headCss}</style>
 </head>
-<body style="margin:0;padding:0;font-family:Arial,Segoe UI,Roboto,Helvetica,sans-serif;background-color:#f3f4f6;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;">
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background-color:#eef1f4;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef1f4;">
     <tr>
-      <td align="center" style="padding:20px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" class="container" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(16,24,40,0.08);">
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" class="container" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #cbd5e1;border-radius:4px;overflow:hidden;">
 
-          <!-- Header with text branding -->
+          <!-- Maroon accent bar -->
           <tr>
-            <td style="background:${brandColor};padding:28px 20px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:0.5px;">${esc(brandName)}</h1>
-              <p style="margin:6px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Professional Heating & Cooling Solutions</p>
+            <td style="height:4px;background:${brandColor};font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- Header — brand left, squared QUOTE tag right -->
+          <tr>
+            <td class="px-24" style="padding:22px 24px 18px 24px;border-bottom:1px solid #e2e8f0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;color:#0f172a;font-size:20px;font-weight:800;letter-spacing:-0.2px;font-family:Arial,Helvetica,sans-serif;">${esc(brandName)}</p>
+                    <p style="margin:5px 0 0 0;color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;font-family:Arial,Helvetica,sans-serif;">Heating &amp; Cooling &middot; Wrens, GA</p>
+                  </td>
+                  <td style="vertical-align:middle;text-align:right;">
+                    <span style="display:inline-block;border:1px solid ${brandColor};color:${brandColor};padding:6px 12px;border-radius:3px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;font-family:Arial,Helvetica,sans-serif;">Quote</span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
-          <!-- Quote Reference Header -->
+          <!-- Reference block -->
           <tr>
-            <td class="px-24" style="padding:20px 20px 0 20px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border-radius:8px;padding:16px;">
+            <td class="px-24" style="padding:20px 24px 0 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${card}">
                 <tr>
-                  <td style="padding:16px;">
+                  <td style="padding:14px 16px;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="width:50%;vertical-align:top;">
-                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Quote Number</p>
-                          <p style="margin:0;color:#1e293b;font-size:15px;font-weight:700;">${esc(quote.quoteNumber || "")}</p>
+                          <p style="${label}">Quote number</p>
+                          <p style="${value}">${esc(quote.quoteNumber || "")}</p>
                         </td>
                         <td style="width:50%;vertical-align:top;text-align:right;">
-                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Date Prepared</p>
-                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(quoteDate)}</p>
+                          <p style="${label}">Date prepared</p>
+                          <p style="${value}font-size:14px;">${esc(quoteDate)}</p>
                         </td>
                       </tr>
                       <tr>
-                        <td colspan="2" style="padding-top:12px;">
-                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Service Type</p>
-                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(serviceType)}</p>
+                        <td style="padding-top:12px;vertical-align:top;">
+                          <p style="${label}">Service type</p>
+                          <p style="${value}font-size:14px;">${esc(serviceType)}</p>
                         </td>
-                      </tr>
-                      ${validUntilDate ? `
-                      <tr>
-                        <td colspan="2" style="padding-top:12px;">
-                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Valid Until</p>
-                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(validUntilDate)}</p>
+                        ${validUntilDate ? `
+                        <td style="padding-top:12px;vertical-align:top;text-align:right;">
+                          <p style="${label}">Valid until</p>
+                          <p style="${value}font-size:14px;">${esc(validUntilDate)}</p>
                         </td>
+                        ` : "<td></td>"}
                       </tr>
-                      ` : ""}
                     </table>
                   </td>
                 </tr>
@@ -453,30 +468,30 @@ function buildHtmlBody(
 
           <!-- Greeting -->
           <tr>
-            <td class="px-24" style="padding:20px 20px 16px 20px;">
-              <h2 style="margin:0;color:#111827;font-size:20px;font-weight:600;">Your Quote is Ready!</h2>
-              <p style="margin:10px 0 0 0;color:#6b7280;font-size:14px;line-height:1.5;">
+            <td class="px-24" style="padding:22px 24px 4px 24px;">
+              <h2 style="margin:0;color:#0f172a;font-size:19px;font-weight:700;letter-spacing:-0.2px;font-family:Arial,Helvetica,sans-serif;">Your quote is ready</h2>
+              <p style="margin:9px 0 0 0;color:#475569;font-size:14px;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">
                 ${esc(introText || "Thank you for considering " + brandName + " for your HVAC needs. We've prepared a detailed quote for you to review.")}
               </p>
             </td>
           </tr>
 
-          <!-- Customer and Service Location -->
+          <!-- Customer and service location -->
           <tr>
-            <td class="px-24" style="padding:0 20px 16px 20px;">
+            <td class="px-24" style="padding:16px 24px 0 24px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="width:${serviceAddress ? '50%' : '100%'};vertical-align:top;padding-right:${serviceAddress ? '8px' : '0'};">
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:100%;">
-                      <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Prepared For</p>
-                      <p style="margin:0;color:#1e293b;font-size:16px;font-weight:600;">${esc(quote.customerName || "Valued Customer")}</p>
+                  <td class="stack" style="width:${serviceAddress ? '50%' : '100%'};vertical-align:top;padding-right:${serviceAddress ? '6px' : '0'};">
+                    <div style="${card}padding:13px 16px;">
+                      <p style="${label}">Prepared for</p>
+                      <p style="${value}font-size:15px;">${esc(quote.customerName || "Valued Customer")}</p>
                     </div>
                   </td>
                   ${serviceAddress ? `
-                  <td style="width:50%;vertical-align:top;padding-left:8px;">
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:100%;">
-                      <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Service Location</p>
-                      <p style="margin:0;color:#1e293b;font-size:14px;font-weight:500;line-height:1.4;">${esc(serviceAddress)}</p>
+                  <td class="stack" style="width:50%;vertical-align:top;padding-left:6px;">
+                    <div style="${card}padding:13px 16px;">
+                      <p style="${label}">Service location</p>
+                      <p style="margin:0;color:#0f172a;font-size:13px;font-weight:600;line-height:1.45;font-family:Arial,Helvetica,sans-serif;">${esc(serviceAddress)}</p>
                     </div>
                   </td>
                   ` : ""}
@@ -485,37 +500,49 @@ function buildHtmlBody(
             </td>
           </tr>
 
-          ${personalMessageHtml}
-
-          <!-- View Quote Button -->
+          ${personalMessage ? `
+          <!-- Personal note from the sender -->
           <tr>
-            <td class="px-24" style="padding:8px 20px 24px 20px;text-align:center;">
+            <td class="px-24" style="padding:16px 24px 0 24px;">
+              <div style="border-left:3px solid ${brandColor};background:#f8fafc;padding:12px 14px;">
+                <p style="margin:0;color:#334155;font-size:14px;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">${esc(personalMessage)}</p>
+              </div>
+            </td>
+          </tr>
+          ` : ""}
+
+          <!-- View quote button -->
+          <tr>
+            <td class="px-24" style="padding:24px 24px 8px 24px;text-align:center;">
               ${quoteViewUrl ? `
-              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 48px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;box-shadow:0 2px 4px rgba(113,20,25,0.3);">View Your Quote</a>
+              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:15px 52px;border-radius:4px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.02em;font-family:Arial,Helvetica,sans-serif;">View your quote</a>
+              <p style="margin:10px 0 0 0;color:#94a3b8;font-size:12px;font-family:Arial,Helvetica,sans-serif;">Opens your quote in the browser — no account needed.</p>
               ` : `
-              <a href="tel:+17068260644" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (706) 826-0644</a>
+              <a href="tel:+17068260644" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 36px;border-radius:4px;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,Helvetica,sans-serif;">Call us: (706) 826-0644</a>
               `}
             </td>
           </tr>
 
-          <!-- Info section -->
+          <!-- Questions -->
           <tr>
-            <td class="px-24" style="padding:0 20px 24px 20px;">
-              <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;">
-                <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5;">
-                  <strong>Questions?</strong> We're here to help! Call us at <a href="tel:+17068260644" style="color:#92400e;font-weight:600;">(706) 826-0644</a> or reply to this email.
+            <td class="px-24" style="padding:16px 24px 24px 24px;">
+              <div style="border:1px solid #cbd5e1;border-radius:4px;padding:13px 16px;">
+                <p style="margin:0;color:#475569;font-size:13px;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">
+                  <strong style="color:#0f172a;">Questions?</strong> Call us at <a href="tel:+17068260644" style="color:${brandColor};font-weight:700;text-decoration:none;">(706)&nbsp;826-0644</a> or just reply to this email &mdash; it comes straight to us.
                 </p>
               </div>
+              ${signatureText ? `
+              <p style="margin:16px 0 0 0;color:#475569;font-size:13px;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">${esc(signatureText)}</p>
+              ` : ""}
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background:#f3f4f6;padding:24px 20px;text-align:center;border-top:1px solid #e5e7eb;">
-              <p style="margin:0;font-weight:700;color:#111827;font-size:15px;">${esc(brandName)}</p>
-              <p style="margin:8px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
-              <p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">1530 Crescent Ct, Augusta, GA</p>
-              <p style="margin:12px 0 0 0;font-size:11px;color:#9ca3af;">Licensed &amp; Insured | Serving Augusta, GA and surrounding areas</p>
+            <td style="background:#f8fafc;padding:18px 24px;text-align:center;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-weight:700;color:#0f172a;font-size:13px;font-family:Arial,Helvetica,sans-serif;">${esc(brandName)}</p>
+              <p style="margin:6px 0 0 0;font-size:12px;color:#64748b;font-family:Arial,Helvetica,sans-serif;">(706) 826-0644 &middot; 1530 Crescent Ct, Augusta, GA</p>
+              <p style="margin:8px 0 0 0;font-size:11px;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;">Licensed &amp; insured &middot; Serving Augusta, GA and surrounding areas</p>
             </td>
           </tr>
 

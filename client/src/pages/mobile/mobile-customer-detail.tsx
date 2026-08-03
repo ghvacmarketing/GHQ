@@ -181,6 +181,7 @@ export default function MobileCustomerDetail() {
     setShowUnderlay(true);
     requestAnimationFrame(() => {
       el.style.animation = "none";
+      el.style.borderRadius = "24px 0 0 24px";
       el.style.transition = `transform ${dur}ms ease-in`;
       el.style.transform = "translateX(100%)";
       for (const btn of [backRef.current, editBtnRef.current]) {
@@ -222,6 +223,8 @@ export default function MobileCustomerDetail() {
         st.engaged = true;
         el.style.transition = "none";
         el.style.animation = "none";
+        // iOS-card curve while the page rides the finger
+        el.style.borderRadius = "24px 0 0 24px";
       } else if (dy > 14) { st.active = false; setShowUnderlay(false); return; }
     }
     if (st.engaged) {
@@ -256,7 +259,10 @@ export default function MobileCustomerDetail() {
         { duration: 260, easing: "linear", fill: "forwards" },
       );
       setTimeout(() => {
-        if (el) el.style.transition = "";
+        if (el) {
+          el.style.transition = "";
+          el.style.borderRadius = "";
+        }
         setShowUnderlay(false);
       }, 320);
     }

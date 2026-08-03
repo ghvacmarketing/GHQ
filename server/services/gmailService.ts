@@ -309,6 +309,10 @@ interface SendOpts {
   bcc?: string[];
   subject: string;
   html: string;
+  /** Plain-text alternative. When present the body goes out as
+   *  multipart/alternative — spam filters score text+html far better than
+   *  HTML-only, so templated sends (quotes, invoices) should always pass it. */
+  text?: string;
   gmailThreadId?: string | null; // reply within this thread
   inReplyTo?: string | null; // Message-ID header of the message being replied to
   references?: string | null;
@@ -326,25 +330,39 @@ function buildMime(from: string, o: SendOpts): string {
     "MIME-Version: 1.0",
   ];
 
-  const atts = (o.attachments || []).filter((a) => a && a.contentBase64);
-  if (atts.length === 0) {
+  // The message body: bare HTML, or text+HTML as multipart/alternative.
+  const bodyLines = (): string[] => {
+    if (!o.text) {
+      return ['Content-Type: text/html; charset="UTF-8"', "Content-Transfer-Encoding: 7bit", "", o.html];
+    }
+    const alt = `ghq_alt_${randomBytes(12).toString("hex")}`;
     return [
-      ...headers,
+      `Content-Type: multipart/alternative; boundary="${alt}"`,
+      "",
+      `--${alt}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: 7bit",
+      "",
+      o.text,
+      `--${alt}`,
       'Content-Type: text/html; charset="UTF-8"',
       "Content-Transfer-Encoding: 7bit",
       "",
       o.html,
-    ].join("\r\n");
+      `--${alt}--`,
+    ];
+  };
+
+  const atts = (o.attachments || []).filter((a) => a && a.contentBase64);
+  if (atts.length === 0) {
+    return [...headers, ...bodyLines()].join("\r\n");
   }
 
-  // multipart/mixed: HTML body first, then each file as a base64 attachment
+  // multipart/mixed: the body first, then each file as a base64 attachment
   const boundary = `ghq_${randomBytes(12).toString("hex")}`;
   const parts: string[] = [];
   parts.push(`--${boundary}`);
-  parts.push('Content-Type: text/html; charset="UTF-8"');
-  parts.push("Content-Transfer-Encoding: 7bit");
-  parts.push("");
-  parts.push(o.html);
+  parts.push(...bodyLines());
   for (const a of atts) {
     const name = a.filename.replace(/["\r\n]/g, "");
     const b64 = a.contentBase64.replace(/^data:[^;]+;base64,/, "").replace(/[\r\n]/g, "");

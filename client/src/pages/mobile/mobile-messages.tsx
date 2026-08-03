@@ -133,6 +133,7 @@ export default function MobileMessages() {
     const startP = Math.max(0, Math.min(1, fromDx / w));
     const dur = 200 * (1 - startP) + 40;
     el.style.animation = "none";
+    el.style.borderRadius = "24px 0 0 24px";
     el.style.transition = `transform ${dur}ms ease-in`;
     el.style.transform = "translateX(100%)";
     setTimeout(() => setSelectedConversationId(null), dur - 10);
@@ -154,6 +155,8 @@ export default function MobileMessages() {
         st.engaged = true;
         el.style.transition = "none";
         el.style.animation = "none";
+        // iOS-card curve while the panel rides the finger
+        el.style.borderRadius = "24px 0 0 24px";
         // Typing mid-swipe: drop the keyboard the moment the back-swipe
         // engages so the panel and keys leave together.
         (document.activeElement as HTMLElement | null)?.blur?.();
@@ -172,7 +175,12 @@ export default function MobileMessages() {
     } else {
       el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateX(0)";
-      setTimeout(() => { if (el) el.style.transition = ""; }, 290);
+      setTimeout(() => {
+        if (el) {
+          el.style.transition = "";
+          el.style.borderRadius = "";
+        }
+      }, 290);
     }
   };
 
@@ -510,7 +518,7 @@ export default function MobileMessages() {
       {selectedConversationId && (
         <div
           ref={threadRef}
-          className="fixed inset-0 z-[60] flex flex-col bg-slate-900 shadow-[-14px_0_32px_rgba(0,0,0,0.12)] animate-in slide-in-from-right duration-200"
+          className="page-slide-in fixed inset-0 z-[60] flex flex-col bg-slate-900 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
           style={{
             touchAction: "pan-y",
             backgroundImage: `url(${chatBg})`,

@@ -2533,7 +2533,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Move a conversation into a space (or out with spaceId: null).
+  // Edit a conversation: rename (title) and/or file it into a space
+  // (spaceId — explicit null moves it out). Only provided keys change.
   app.patch("/api/crm/ai/conversations/:id", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -2543,20 +2544,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(aiConversations)
         .where(and(eq(aiConversations.id, req.params.id), eq(aiConversations.userId, user.id)));
       if (!convo) return res.status(404).json({ message: "Conversation not found" });
-      let spaceId: string | null = null;
-      if (req.body?.spaceId != null) {
-        const [space] = await db
-          .select({ id: aiSpaces.id })
-          .from(aiSpaces)
-          .where(and(eq(aiSpaces.id, String(req.body.spaceId)), eq(aiSpaces.userId, user.id)));
-        if (!space) return res.status(404).json({ message: "Space not found" });
-        spaceId = space.id;
+      const updates: { title?: string; spaceId?: string | null } = {};
+      if (typeof req.body?.title === "string") {
+        const title = req.body.title.trim();
+        if (!title || title.length > 80) {
+          return res.status(400).json({ message: "Title must be 1–80 characters." });
+        }
+        updates.title = title;
       }
-      await db.update(aiConversations).set({ spaceId }).where(eq(aiConversations.id, convo.id));
+      if (req.body && "spaceId" in req.body) {
+        if (req.body.spaceId != null) {
+          const [space] = await db
+            .select({ id: aiSpaces.id })
+            .from(aiSpaces)
+            .where(and(eq(aiSpaces.id, String(req.body.spaceId)), eq(aiSpaces.userId, user.id)));
+          if (!space) return res.status(404).json({ message: "Space not found" });
+          updates.spaceId = space.id;
+        } else {
+          updates.spaceId = null;
+        }
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "Nothing to update" });
+      }
+      await db.update(aiConversations).set(updates).where(eq(aiConversations.id, convo.id));
       res.json({ ok: true });
     } catch (error) {
-      console.error("Error moving AI conversation:", error);
-      res.status(500).json({ message: "Error moving conversation" });
+      console.error("Error updating AI conversation:", error);
+      res.status(500).json({ message: "Error updating conversation" });
     }
   });
 
@@ -3056,7 +3071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1e293b;">${esc(action.params.body).replace(/\n/g, "<br>")}</div>`;
         try {
           const { sendEmail } = await import("./services/gmailService");
-          await sendEmail(user, { to: [toAddress], subject: action.params.subject, html });
+          await sendEmail(user, { to: [toAddress], subject: action.params.subject, html, text: action.params.body });
         } catch (e: any) {
           const detail = e?.message === "gmail_not_connected"
             ? "Connect your Gmail on the Mail page first — Gibbs sends email through your own account."
@@ -22759,7 +22774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const content = await buildQuoteEmailContent(quote, lineItems, personalMessage, sentByName, { quoteViewUrl });
               const { sendEmail: sendGmail } = await import("./services/gmailService");
-              const { gmailThreadId } = await sendGmail(user, { to: [email], subject: content.subject, html: content.html });
+              const { gmailThreadId } = await sendGmail(user, { to: [email], subject: content.subject, html: content.html, text: content.text });
               result = {
                 success: true,
                 messageId: gmailThreadId,
