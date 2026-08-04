@@ -191,8 +191,9 @@ export function DraggableSheet({
       open={radixOpen}
       onOpenChange={(o) => {
         // Radix-internal closes (scrim tap, Esc) route through the parent's
-        // state, which loops back through the mirrored-open effect above.
-        if (!o && sheetRef.current) sheetRef.current.style.animation = "";
+        // state, which loops back through the mirrored-open effect above —
+        // same manual slide-down as every other close path. (Restoring the
+        // animation here re-armed the ENTRANCE keyframes and flashed.)
         onOpenChange(o);
       }}
     >

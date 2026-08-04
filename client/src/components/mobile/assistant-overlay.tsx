@@ -204,6 +204,27 @@ export default function AssistantOverlay({
       }, 260);
     }
   };
+  // Mode sheet closes with a slide (scrim fading in step) — tap-off and a
+  // mode pick both ride it; an instant unmount read as a flash.
+  const closeModeAnimated = () => {
+    const el = modeSheetRef.current;
+    const s = modeScrimRef.current;
+    if (s) {
+      s.style.transition = "opacity 0.18s ease-in";
+      s.style.opacity = "0";
+    }
+    if (el) {
+      el.style.transition = "transform 0.2s ease-in";
+      el.style.transform = "translateY(100%)";
+    }
+    setTimeout(() => {
+      setModeSheetOpen(false);
+      if (el) {
+        el.style.transition = "";
+        el.style.transform = "";
+      }
+    }, 180);
+  };
   const pickMode = (m: GibbsMode) => {
     setMode(m);
     try {
@@ -211,7 +232,7 @@ export default function AssistantOverlay({
     } catch {
       // private-mode storage failure — the mode still applies this session
     }
-    setModeSheetOpen(false);
+    closeModeAnimated();
   };
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
@@ -278,6 +299,20 @@ export default function AssistantOverlay({
       b.style.transition = "opacity 0.24s ease-in";
       b.style.opacity = "0";
     }
+  };
+  // Tap-off (and any programmatic close) rides the same slide-down as a
+  // drag commit — never an instant unmount.
+  const closeSheetAnimated = () => {
+    const el = sheetRef.current;
+    if (!el) return onClose();
+    fadeBackdrop();
+    el.style.transition = "transform 0.25s ease-in";
+    el.style.transform = "translateY(100%)";
+    setTimeout(() => {
+      onClose();
+      el.style.transition = "";
+      el.style.transform = "";
+    }, 240);
   };
   // Finger-tracked dimming: only the BLACK fades with drag progress — the
   // blur stays constant (backgroundColor, not element opacity).
@@ -1332,7 +1367,7 @@ export default function AssistantOverlay({
         ref={backdropRef}
         className="absolute inset-x-0 -bottom-40 -top-40 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300"
         style={{ touchAction: "none" }}
-        onClick={onClose}
+        onClick={closeSheetAnimated}
       />
       {/* Bleed guard — a bounce lifts the whole view, including fixed
           elements; this strip sits just below the viewport so what slides up
@@ -1940,7 +1975,7 @@ export default function AssistantOverlay({
             Sets how Gibbs behaves; the pick persists across sessions. */}
         {modeSheetOpen && (
           <div className="absolute inset-0 z-40" data-testid="assistant-mode-sheet">
-            <div ref={modeScrimRef} className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" onClick={() => setModeSheetOpen(false)} />
+            <div ref={modeScrimRef} className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" onClick={closeModeAnimated} />
             <div
               ref={modeSheetRef}
               className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-4 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
