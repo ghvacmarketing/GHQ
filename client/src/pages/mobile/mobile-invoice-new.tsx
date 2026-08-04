@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, subDays } from "date-fns";
-import { Search, X, ChevronRight, Plus, Loader2 } from "lucide-react";
+import { Search, X, ChevronRight, Loader2 } from "lucide-react";
 import { visitTypeBadge } from "@/pages/mobile/mobile-work-orders";
 import { LineItemsEditor, type CatalogPick } from "@/components/mobile/line-items-editor";
 import { customerTypeBadge } from "./mobile-quote-new";
@@ -203,9 +203,6 @@ export default function MobileInvoiceNew() {
     <MobileCreatePage
       title="New invoice"
       dirty={dirty}
-      onSave={handleCreateInvoice}
-      saveDisabled={!canSubmit}
-      saving={createInvoiceMutation.isPending}
       testid="mobile-invoice-new-page"
     >
       <div className="space-y-4">
@@ -386,7 +383,7 @@ export default function MobileInvoiceNew() {
           disabled={!canSubmit}
           data-testid="button-create-invoice"
         >
-          {createInvoiceMutation.isPending ? <Loader2 className="mr-1.5 h-5 w-5 animate-spin" /> : <Plus className="mr-1.5 h-5 w-5" />}
+          {createInvoiceMutation.isPending && <Loader2 className="mr-1.5 h-5 w-5 animate-spin" />}
           Create invoice
         </Button>
         )}

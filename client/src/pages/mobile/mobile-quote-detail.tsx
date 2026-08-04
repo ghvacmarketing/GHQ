@@ -3,15 +3,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
 import { generateQuotePdf } from "@/lib/quote-pdf";
-import { 
-  ArrowLeft, 
-  FileText, 
-  MapPin, 
-  Phone, 
-  User,
+import {
+  ArrowLeft,
+  ChevronRight,
+  MapPin,
+  Phone,
   Send,
   Loader2,
-  DollarSign,
   Tag,
   Download,
   Eye,
@@ -21,9 +19,9 @@ import {
   Monitor,
   MessageSquare
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -257,200 +255,209 @@ export default function MobileQuoteDetail() {
           variant="ghost"
           size="sm"
           onClick={handleBack}
-          className="min-h-[44px]"
+          className="-ml-2 min-h-[44px] text-slate-600"
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-blue-600" />
+        {/* Header — the quote speaks for itself: no icon chip, and a fresh
+            draft carries no status pill (the dot appears once it's sent). */}
+        <div data-testid="quote-header">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="quote-number">
+            {quote.title || `Quote ${quote.quoteNumber}`}
+          </h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {[
+              quote.title ? quote.quoteNumber : null,
+              quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : null,
+            ].filter(Boolean).join(" · ")}
+          </p>
+          {quote.status !== "draft" && (
+            <div className="mt-1.5">
+              <StatusDot pill={statusInfo.className} data-testid="quote-status">
+                {statusInfo.label}
+              </StatusDot>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold" data-testid="quote-number">{quote.quoteNumber}</h1>
-              {quote.title && <p className="text-sm text-slate-500">{quote.title}</p>}
-            </div>
-          </div>
-          <Badge variant="outline" className={statusInfo.className} data-testid="quote-status">
-            {statusInfo.label}
-          </Badge>
+          )}
         </div>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setShowPreview(true)}
-            className="flex-1 min-h-[44px]"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
             data-testid="button-preview"
           >
-            <Eye className="h-4 w-4 mr-2" />
+            <Eye className="h-4 w-4" />
             Preview
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          </button>
+          <button
             onClick={handleDownloadPDF}
-            className="flex-1 min-h-[44px]"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
             data-testid="button-download"
           >
-            <Download className="h-4 w-4 mr-2" />
+            <Download className="h-4 w-4" />
             Download
-          </Button>
+          </button>
         </div>
 
-        <Card data-testid="customer-info-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="h-4 w-4 text-slate-600" />
-              Customer Info
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium" data-testid="customer-name">{quote.customerName}</p>
-            {quote.customerPhone && (
-              <a 
-                href={`tel:${quote.customerPhone}`}
-                className="flex items-center text-blue-600 hover:underline min-h-[44px]"
-                data-testid="customer-phone"
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                {quote.customerPhone}
-              </a>
-            )}
-            {quote.serviceAddress && (
-              <div className="flex items-start text-slate-600 min-h-[44px]">
-                <MapPin className="h-4 w-4 mr-2 mt-0.5 shrink-0" />
-                <span data-testid="service-address">{quote.serviceAddress}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="line-items-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-green-600" />
-              Line Items ({lineItems.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {lineItems.length === 0 ? (
-              <p className="text-sm text-slate-400 italic" data-testid="no-line-items">No line items</p>
-            ) : (
-              <div className="space-y-2">
-                {lineItems.map((item) => {
-                  const isDiscount = item.isDiscountLine || item.lineType === "discount";
-                  return (
-                    <div
-                      key={item.id}
-                      className={`border rounded-lg p-3 ${isDiscount ? "bg-amber-50 border-amber-200" : ""}`}
-                      data-testid={`line-item-${item.id}`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            {isDiscount && <Tag className="h-3 w-3 text-amber-600" />}
-                            <p className="text-sm font-medium text-slate-800">{item.description}</p>
-                          </div>
-                          <p className="text-xs text-slate-500">
-                            {item.quantity} × {formatCurrency(item.unitPrice)}
-                          </p>
-                        </div>
-                        <span className={`text-sm font-medium ${isDiscount ? "text-amber-700" : "text-slate-700"}`}>
-                          {formatCurrency(item.lineTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="totals-card">
-          <CardContent className="pt-4 space-y-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-slate-600">Subtotal</span>
-              <span className="font-medium" data-testid="subtotal">{formatCurrency(quote.subtotal)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between items-center">
-              <span className="font-semibold">Total</span>
-              <span className="font-bold text-lg text-green-700" data-testid="total">{formatCurrency(quote.total)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {quote.createdAt && (
-          <p className="text-xs text-slate-400 text-center" data-testid="created-date">
-            Created {format(new Date(quote.createdAt), "MMM d, yyyy 'at' h:mm a")}
+        {/* Customer — name up top, then real tappable rows: call and map */}
+        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-info-card">
+          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Customer
           </p>
-        )}
+          <div className="px-3.5 py-3">
+            <p className="font-semibold text-slate-900" data-testid="customer-name">{quote.customerName}</p>
+            {quote.customerEmail && (
+              <p className="mt-0.5 truncate text-xs text-slate-500">{quote.customerEmail}</p>
+            )}
+          </div>
+          {quote.customerPhone && (
+            <a
+              href={`tel:${quote.customerPhone}`}
+              className="flex items-center gap-3 border-t border-slate-200/80 px-3.5 py-3 transition-colors active:bg-slate-50"
+              data-testid="customer-phone"
+            >
+              <span className="shrink-0 rounded-[3px] bg-[#711419]/[0.08] p-2">
+                <Phone className="h-4 w-4 text-[#711419]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-900">{quote.customerPhone}</span>
+                <span className="block text-xs text-slate-500">Tap to call</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+            </a>
+          )}
+          {quote.serviceAddress && (
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(quote.serviceAddress)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 border-t border-slate-200/80 px-3.5 py-3 transition-colors active:bg-slate-50"
+              data-testid="service-address"
+            >
+              <span className="shrink-0 rounded-[3px] bg-[#711419]/[0.08] p-2">
+                <MapPin className="h-4 w-4 text-[#711419]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium leading-snug text-slate-900">{quote.serviceAddress}</span>
+                <span className="block text-xs text-slate-500">Open in Maps</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+            </a>
+          )}
+        </div>
+
+        {/* Line items — one card, totals docked as its footer */}
+        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="line-items-card">
+          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Line items{lineItems.length > 0 ? ` (${lineItems.length})` : ""}
+          </p>
+          {lineItems.length === 0 ? (
+            <p className="px-3.5 py-4 text-sm italic text-slate-400" data-testid="no-line-items">No line items</p>
+          ) : (
+            <div>
+              {lineItems.map((item, i) => {
+                const isDiscount = item.isDiscountLine || item.lineType === "discount";
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-start justify-between gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                    data-testid={`line-item-${item.id}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {isDiscount && <Tag className="h-3 w-3 shrink-0 text-amber-600" />}
+                        <p className="text-sm font-medium text-slate-900">{item.description}</p>
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {item.quantity} × {formatCurrency(item.unitPrice)}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${isDiscount ? "text-amber-700" : "text-slate-900"}`}>
+                      {formatCurrency(item.lineTotal)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="space-y-1.5 border-t border-slate-200/80 bg-slate-50 px-3.5 py-3" data-testid="totals-card">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">Subtotal</span>
+              <span className="font-medium tabular-nums" data-testid="subtotal">{formatCurrency(quote.subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-slate-900">Total</span>
+              <span className="text-lg font-bold tabular-nums text-[#711419]" data-testid="total">{formatCurrency(quote.total)}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Present to Client button - available for draft, sent, viewed quotes */}
-        {(quote.status === "draft" || quote.status === "sent" || quote.status === "viewed") && (
-          <Button
-            className="w-full min-h-[48px]"
-            style={{ backgroundColor: '#711419' }}
+        {(["draft", "sent", "viewed"] as string[]).includes(quote.status) && (
+          <button
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
             onClick={() => navigate(`/mobile/quotes/${id}/present`)}
             data-testid="button-present-quote"
           >
-            <Monitor className="h-4 w-4 mr-2" />
+            <Monitor className="h-4 w-4" />
             Present to Client
-          </Button>
+          </button>
         )}
 
         {quote.status === "draft" && (
-          <Button
-            className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700"
+          <button
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] border border-[#711419]/30 bg-white text-base font-semibold text-[#711419] transition-transform active:scale-[0.98] disabled:opacity-60"
             onClick={openEmailDialog}
             disabled={sendQuoteEmailMutation.isPending}
             data-testid="button-send-quote"
           >
             {sendQuoteEmailMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Mail className="h-4 w-4 mr-2" />
+              <Mail className="h-4 w-4" />
             )}
-            Send Email
-          </Button>
+            Send to Customer
+          </button>
         )}
 
         {quote.status === "sent" && (
           <div className="flex gap-2">
-            <Button
-              className="flex-1 min-h-[48px] bg-green-600 hover:bg-green-700"
+            <button
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[4px] bg-green-600 text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
               onClick={() => acceptMutation.mutate()}
               disabled={acceptMutation.isPending || declineMutation.isPending}
               data-testid="button-accept-quote"
             >
               {acceptMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <CheckCircle className="h-4 w-4 mr-2" />
+                <CheckCircle className="h-4 w-4" />
               )}
               Accept
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1 min-h-[48px]"
+            </button>
+            <button
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[4px] border border-red-200 bg-white text-base font-semibold text-red-600 transition-transform active:scale-[0.98] disabled:opacity-60"
               onClick={() => declineMutation.mutate()}
               disabled={acceptMutation.isPending || declineMutation.isPending}
               data-testid="button-decline-quote"
             >
               {declineMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <XCircle className="h-4 w-4 mr-2" />
+                <XCircle className="h-4 w-4" />
               )}
               Decline
-            </Button>
+            </button>
           </div>
+        )}
+
+        {quote.createdAt && (
+          <p className="text-center text-xs text-slate-400" data-testid="created-date">
+            Created {format(new Date(quote.createdAt), "MMM d, yyyy 'at' h:mm a")}
+          </p>
         )}
       </div>
 

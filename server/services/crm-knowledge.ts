@@ -693,6 +693,11 @@ The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" 
 ### Mobile Work Orders directory
 - Mobile → More → Work Orders (/mobile/work-orders): search EVERY work order company-wide by job title or customer name, filter by visit type (Service / Maintenance / Install / Sales — metal badge pills), tap through to the job's detail page
 
+### Mobile Quotes & Invoices directories
+- Mobile → More → Quotes (/mobile/quotes): every quote company-wide, newest first — filter by status, floating search (quote number / customer / title), tap through to the quote detail page (preview, PDF, send by email/SMS, Present to Client, accept/decline)
+- Mobile → More → Invoices (/mobile/invoices): billing across the company — filter by status and source (created in GHQ vs imported FieldEdge history), floating search, tap through to the invoice detail page (send, record cash/check, Take Card Payment via QR the customer scans and pays with Apple Pay/Google Pay/card)
+- ALL roles including techs can create quick quotes from the mobile "+" button (New Quote); New Invoice / New Customer / New Job stay supervisor-and-above
+
 ### Mobile Guide
 - Mobile → More → Guide (/mobile/guide): a built-in guide to the mobile app (tabs, the + create button, Gibbs, back-swipe and hold gestures) plus a badge reference explaining every metal badge — roles, visit types, time-clock categories, customer types, message contacts, and the avatar-with-role-badge composition
 

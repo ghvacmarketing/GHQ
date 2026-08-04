@@ -474,11 +474,13 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
           <div className="grid grid-cols-4 gap-3">
             <SheetTile icon={CheckSquare} img={createTask} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
             <SheetTile icon={Camera} img={createPhoto} label="Add Media" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
+            {/* Techs quote in the field too — quick quotes are for everyone;
+                the rest of the create actions stay supervisor-only. */}
+            <SheetTile icon={FileText} img={plateQuote} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
             {isSupervisor && (
               <>
                 <SheetTile icon={UserRoundPlus} img={createCustomer} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
                 <SheetTile icon={Briefcase} img={createJob} label="New Job" onClick={() => go("/mobile/job/new")} testid="create-new-job" />
-                <SheetTile icon={FileText} img={plateQuote} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
                 <SheetTile icon={Receipt} img={plateInvoice} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
               </>
             )}
