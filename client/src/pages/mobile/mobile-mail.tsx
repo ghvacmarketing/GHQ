@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { usePushEntrance } from "@/lib/page-transitions";
 import { useKeyboardInset } from "@/lib/native";
 import { useScrollHide } from "@/hooks/use-scroll-hide";
 import { compressImage } from "@/lib/compress-image";
@@ -214,6 +215,7 @@ export default function MobileMail() {
 
   // iOS-style tracked swipe-back for the open thread (same feel as jobs)
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const threadEntered = usePushEntrance(openThreadId);
   const threadDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
   const closeThreadAnimated = (fromDx = 0) => {
     const el = threadRef.current;
@@ -491,7 +493,7 @@ export default function MobileMail() {
       {openThreadId && (
         <div
           ref={threadRef}
-          className="page-slide-in fixed inset-0 z-[60] flex flex-col bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+          className={`${threadEntered ? "page-slide-in" : "translate-x-full"} fixed inset-0 z-[60] flex flex-col bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
           style={{ touchAction: "pan-y" }}
           data-testid="mail-thread-view"
           onPointerDown={onThreadSwipeStart}

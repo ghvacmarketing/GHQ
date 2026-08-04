@@ -65,7 +65,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
-import { markSkipEntrance } from "@/lib/page-transitions";
+import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
@@ -3997,6 +3997,7 @@ function InvoiceTab({
 
 export default function MobileJobDetail() {
   useRequireCrmAuth();
+  const entered = usePushEntrance();
   const params = useParams<{ id: string }>();
   const workOrderId = parseInt(params.id || "0", 10);
   const [, navigate] = useLocation();
@@ -4765,7 +4766,7 @@ export default function MobileJobDetail() {
       )}
       <div
         ref={pageRef}
-        className="page-slide-in relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+        className={`${entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
         style={{ touchAction: "pan-y" }}
         onPointerDown={onSwipeStart}
         onPointerMove={onSwipeMove}

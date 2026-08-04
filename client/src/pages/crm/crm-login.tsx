@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { setCrmToken, crmFetch } from "@/lib/crmAuth";
 import { isNativeApp, useKeyboardInset } from "@/lib/native";
-import { AlertCircle, ChevronLeft, Lock, Mail, Loader2 } from "lucide-react";
+import { AlertCircle, Lock, Mail, Loader2 } from "lucide-react";
 import redlogo from "@assets/redlogo.webp";
 import { WhatsNewPanel } from "@/components/crm/whats-new-panel";
 import type { CrmUser } from "@shared/schema";
@@ -163,19 +163,13 @@ export default function CrmLogin() {
         }}
       >
         <div
-          className="flex min-h-[calc(100%+1px)] flex-col justify-center px-5 py-10 sm:px-10 lg:px-16"
+          className="flex min-h-[calc(100%+1px)] flex-col justify-start pb-10 pt-[12vh] px-5 sm:px-10 lg:justify-center lg:px-16 lg:py-10"
           style={{
             paddingBottom: `calc(2.5rem + ${kbInset}px)`,
             transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
         <div className="mx-auto w-full max-w-sm animate-in fade-in duration-300">
-          {/* Phones arrive from the two-door welcome page — give them the
-              way back. Desktop never shows this. */}
-          <a href="/" className="mb-6 inline-flex items-center gap-0.5 text-[13px] font-semibold text-slate-500 lg:hidden" data-testid="login-back">
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </a>
           <img src={redlogo} alt="Giesbrecht HVAC" className="mx-auto mb-6 h-11 lg:mx-0 lg:mb-8 lg:h-12" />
           <h1 className="text-center text-[26px] font-semibold tracking-tight text-slate-900 lg:text-left lg:text-2xl lg:text-foreground">Sign in to GHQ</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground lg:block">Giesbrecht HVAC Headquarters</p>

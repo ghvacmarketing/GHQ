@@ -1,3 +1,30 @@
+import { useEffect, useState } from "react";
+
+/** Entrance driver for push-style pages (profile, guide, detail sheets,
+ *  threads). Heavy pages used to burn the whole CSS slide-in during their
+ *  first render/commit — by the first painted frame the animation was over
+ *  and the page just appeared, no slide, whenever there was load time.
+ *  Returns false until two animation frames after mount (i.e., the browser
+ *  has actually painted); park the page off-screen (translate-x-full) while
+ *  false, apply page-slide-in when true. Pass a key (e.g. an open-thread id)
+ *  to re-run the entrance each time it changes. */
+export function usePushEntrance(active: unknown = true): boolean {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    setEntered(false);
+    if (!active) return;
+    let r2 = 0;
+    const r1 = requestAnimationFrame(() => {
+      r2 = requestAnimationFrame(() => setEntered(true));
+    });
+    return () => {
+      cancelAnimationFrame(r1);
+      cancelAnimationFrame(r2);
+    };
+  }, [active]);
+  return entered;
+}
+
 /** One-shot entrance suppression for swipe-back navigation.
  *
  *  The tracked back-swipe reveals the REAL destination page as an underlay at

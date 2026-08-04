@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePushEntrance } from "@/lib/page-transitions";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import badgeMessaging from "@/assets/badge-messaging.png";
 import chatBg from "@/assets/chat-bg.webp";
@@ -125,6 +126,7 @@ export default function MobileMessages() {
   // ── iOS-style tracked swipe-back for the open thread: the panel follows
   // the finger and slides off on commit — same feel as leaving a job. ──
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const threadEntered = usePushEntrance(selectedConversationId);
   const threadDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
   const closeThreadAnimated = (fromDx = 0) => {
     const el = threadRef.current;
@@ -519,7 +521,7 @@ export default function MobileMessages() {
       {selectedConversationId && (
         <div
           ref={threadRef}
-          className="page-slide-in fixed inset-0 z-[60] flex flex-col bg-slate-900 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+          className={`${threadEntered ? "page-slide-in" : "translate-x-full"} fixed inset-0 z-[60] flex flex-col bg-slate-900 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
           style={{
             touchAction: "pan-y",
             backgroundImage: `url(${chatBg})`,

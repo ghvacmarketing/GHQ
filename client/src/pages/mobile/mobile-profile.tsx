@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
-import { markSkipEntrance } from "@/lib/page-transitions";
+import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { userAvatarSrc } from "@/components/user-avatar-badge";
 import { roleBadgeSrc } from "@/components/mobile/role-badge";
@@ -39,6 +39,7 @@ const fmtHours = (mins: number) => {
 export default function MobileProfile() {
   const [, navigate] = useLocation();
   useRequireCrmAuth();
+  const entered = usePushEntrance();
 
   // ── iOS-style tracked back-swipe with the REAL home page revealed
   // beneath (parallax + scrim), exactly like leaving a customer. The
@@ -226,7 +227,7 @@ export default function MobileProfile() {
 
       <div
         ref={pageRef}
-        className="page-slide-in relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+        className={`${entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
         style={{ touchAction: "pan-y" }}
         onPointerDown={onSwipeStart}
         onPointerMove={onSwipeMove}

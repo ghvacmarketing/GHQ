@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
-import { markSkipEntrance } from "@/lib/page-transitions";
+import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { AvatarWithRole } from "@/components/user-avatar-badge";
 import MobileMore from "./mobile-more";
@@ -68,6 +68,7 @@ function HowRow({ title, text }: { title: string; text: string }) {
 export default function MobileGuide() {
   const [, navigate] = useLocation();
   useRequireCrmAuth();
+  const entered = usePushEntrance();
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -187,7 +188,7 @@ export default function MobileGuide() {
 
       <div
         ref={pageRef}
-        className="page-slide-in relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+        className={`${entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
         style={{ touchAction: "pan-y" }}
         onPointerDown={onSwipeStart}
         onPointerMove={onSwipeMove}
