@@ -23,10 +23,13 @@ if (typeof document !== "undefined" && Capacitor.isNativePlatform()) {
   // CRM, the apps launcher, and the other web apps stay web-only — the shell
   // is a focused native tool, not a portal into the whole suite (App Review
   // guideline 4.2). Login stays reachable; everything else lands on /mobile.
+  // "/" is allowed because on phones it renders the two-door WELCOME chooser
+  // (customer vs team), never the desktop launcher — pinning it away made
+  // "Back to welcome page" bounce straight back to the sign-in screen.
   {
     const path = window.location.pathname;
-    const allowed = ["/mobile", "/crm/login", "/portal", "/objects"];
-    if (!allowed.some((p) => path === p || path.startsWith(`${p}/`))) {
+    const allowed = ["/", "/mobile", "/crm/login", "/portal", "/objects"];
+    if (!allowed.some((p) => path === p || (p !== "/" && path.startsWith(`${p}/`)))) {
       window.location.replace("/mobile");
     }
   }
