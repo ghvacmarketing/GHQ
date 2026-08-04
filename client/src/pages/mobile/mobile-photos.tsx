@@ -111,6 +111,9 @@ export default function MobilePhotos() {
   });
 
   const chooseCustomer = (c: { id: string; name: string; phone?: string | null; customerType?: string | null }) => {
+    // A different customer starts a fresh session — last session's shots
+    // belong to who they were saved to.
+    if (c.id !== pickedCustomer?.id) setPendingShots([]);
     setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null, customerType: c.customerType ?? null });
     setCustomerSearch("");
     // The sheet STAYS — search swaps for the capture actions in place;
@@ -373,6 +376,9 @@ export default function MobilePhotos() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraOpen(false);
+    // Land back on the sheet with the session's shots laid out — the recap
+    // (and tap-to-edit) lives there, not somewhere off in the page.
+    if (pendingShots.length > 0) setSearchActive(true);
   };
 
   const capturePhoto = () => {
@@ -549,6 +555,7 @@ export default function MobilePhotos() {
                     key={job.id}
                     onClick={() => {
                       if (!job.customerId) return;
+                      if (job.customerId !== pickedCustomer?.id) setPendingShots([]);
                       setPickedCustomer({ id: job.customerId, name: job.customerName || "Customer", phone: null });
                       // Straight into OUR camera — the tap IS the intent.
                       openCamera();
@@ -833,6 +840,35 @@ export default function MobilePhotos() {
                   </button>
                 )}
               </div>
+              {pendingShots.length > 0 && (
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">This session</p>
+                  <div className="grid grid-cols-4 gap-2" data-testid="sheet-session-shots">
+                    {pendingShots.map((ps) => (
+                      <button
+                        key={ps.id}
+                        onClick={() => setEditShot({ id: ps.id, url: ps.url, file: ps.file, serverId: ps.serverId })}
+                        className="relative aspect-square overflow-hidden rounded-[6px] border border-slate-300/70 bg-slate-100 transition-transform active:scale-95"
+                        data-testid={`sheet-shot-${ps.id}`}
+                        aria-label="Edit this shot"
+                      >
+                        <img src={ps.url} alt="" className="h-full w-full object-cover" />
+                        {ps.status === "uploading" && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                          </span>
+                        )}
+                        {ps.status === "error" && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-red-600/60 text-[10px] font-bold text-white">!</span>
+                        )}
+                        <span className="absolute bottom-1 right-1 flex h-[18px] w-[18px] items-center justify-center rounded-[4px] bg-black/55">
+                          <Pencil className="h-3 w-3 text-white" />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button
                 onClick={() => {
                   closeSearch();
@@ -849,10 +885,15 @@ export default function MobilePhotos() {
                 onClick={async () => {
                   closeSearch();
                   // Native shell: the photo LIBRARY directly — never the iOS
-                  // "Photo Library / Take Photo / Choose File" menu.
+                  // "Photo Library / Take Photo / Choose File" menu. Picks
+                  // ride the same background pipeline as camera shots, then
+                  // the sheet comes back with them laid out.
                   if (isNativeApp()) {
                     const files = await pickNativeLibraryPhotos();
-                    if (files && files.length) await handleUpload(files);
+                    if (files && files.length) {
+                      files.forEach((f) => startShotUpload(f));
+                      setSearchActive(true);
+                    }
                     return;
                   }
                   fileInputRef.current?.click();
@@ -1043,7 +1084,8 @@ export default function MobilePhotos() {
         </div>
       )}
 
-      {/* Fullscreen in-app camera — every shutter press auto-saves to the account */}
+      {/* Fullscreen in-app camera — house chrome: frosted industrial chips,
+          uppercase micro-labels, maroon-ringed shutter. Every press saves. */}
       {cameraOpen && (
         <div className="fixed inset-0 z-[60] flex flex-col bg-black" data-testid="camera-overlay">
           <video
@@ -1054,26 +1096,43 @@ export default function MobilePhotos() {
             className="min-h-0 flex-1 object-cover"
           />
           {flash && <div className="pointer-events-none absolute inset-0 bg-white/80" />}
-          <button
-            onClick={closeCamera}
-            className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur"
-            style={{ top: "calc(12px + env(safe-area-inset-top))" }}
-            data-testid="button-close-camera"
-            aria-label="Close camera"
-          >
-            <X className="h-5 w-5" />
-          </button>
+
+          {/* Top chrome: close · target chip · session count */}
           <div
-            className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 bg-gradient-to-t from-black via-black/80 to-transparent pt-10"
-            style={{ paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
+            className="absolute inset-x-0 flex items-center gap-2 px-3"
+            style={{ top: "calc(10px + env(safe-area-inset-top))" }}
+          >
+            <button
+              onClick={closeCamera}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white backdrop-blur transition-transform active:scale-95"
+              data-testid="button-close-camera"
+              aria-label="Close camera"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 backdrop-blur">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Saving to</p>
+              <p className="truncate text-sm font-semibold leading-tight text-white">{activeCustomer?.name || "Customer"}</p>
+            </div>
+            {pendingShots.length > 0 && (
+              <div className="shrink-0 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 text-center backdrop-blur" data-testid="camera-shot-count">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Shots</p>
+                <p className="text-sm font-semibold leading-tight text-white tabular-nums">{pendingShots.length}</p>
+              </div>
+            )}
+          </div>
+
+          <div
+            className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black via-black/80 to-transparent pt-12"
+            style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
           >
             {pendingShots.length > 0 && (
-              <div className="flex w-full items-center gap-2 overflow-x-auto px-4 pb-1" data-testid="camera-session-strip">
+              <div className="flex w-full items-center gap-2 overflow-x-auto px-4 pb-0.5" data-testid="camera-session-strip">
                 {pendingShots.map((ps) => (
                   <button
                     key={ps.id}
                     onClick={() => setEditShot({ id: ps.id, url: ps.url, file: ps.file, serverId: ps.serverId })}
-                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/25 transition-transform active:scale-95"
+                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[6px] border border-white/30 transition-transform active:scale-95"
                     data-testid={`camera-shot-${ps.id}`}
                     aria-label="Edit this shot"
                   >
@@ -1086,26 +1145,34 @@ export default function MobilePhotos() {
                     {ps.status === "error" && (
                       <span className="absolute inset-0 flex items-center justify-center bg-red-600/60 text-[10px] font-bold text-white">!</span>
                     )}
-                    <Pencil className="absolute bottom-1 right-1 h-3 w-3 text-white drop-shadow" />
+                    <span className="absolute bottom-0.5 right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-[4px] bg-black/60">
+                      <Pencil className="h-3 w-3 text-white" />
+                    </span>
                   </button>
                 ))}
-                <span className="ml-1 shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
-                  {pendingShots.length} this session
-                </span>
               </div>
             )}
-            <p className="text-xs font-medium text-white/70">
-              Auto-saves to {activeCustomer?.name || "the customer"}
-              {pendingShots.length > 0 ? " · tap a shot to edit" : ""}
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">
+              {pendingShots.length > 0 ? "Tap a shot to edit · auto-saves" : "Every shot auto-saves"}
             </p>
-            <button
-              onClick={capturePhoto}
-              className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white transition-transform active:scale-90"
-              data-testid="button-shutter"
-              aria-label="Take photo"
-            >
-              <span className="h-[58px] w-[58px] rounded-full bg-white" />
-            </button>
+            <div className="grid w-full grid-cols-3 items-center px-6">
+              <span aria-hidden />
+              <button
+                onClick={capturePhoto}
+                className="mx-auto flex h-[74px] w-[74px] items-center justify-center rounded-full border-[3.5px] border-white transition-transform active:scale-90"
+                data-testid="button-shutter"
+                aria-label="Take photo"
+              >
+                <span className="h-[58px] w-[58px] rounded-full bg-white shadow-[inset_0_0_0_3px_#711419]" />
+              </button>
+              <button
+                onClick={closeCamera}
+                className="ml-auto flex h-11 items-center justify-center rounded-full bg-[#711419] px-5 text-sm font-semibold text-white shadow-lg transition-transform active:scale-95"
+                data-testid="button-camera-done"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

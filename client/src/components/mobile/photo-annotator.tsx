@@ -198,24 +198,24 @@ export function PhotoAnnotator({
 
   return (
     <div className="fixed inset-0 z-[95] flex flex-col bg-slate-950" data-testid="photo-annotator">
-      {/* Top bar */}
+      {/* Top bar — house chrome: frosted circles, uppercase strip title */}
       <div
         className="flex items-center justify-between px-3"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)" }}
       >
         <button
           onClick={onCancel}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-transform active:scale-95"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition-transform active:scale-95"
           aria-label="Cancel"
           data-testid="annotator-cancel"
         >
           <X className="h-5 w-5" strokeWidth={2.25} />
         </button>
-        <span className="text-sm font-semibold text-white/80">Markup</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">Edit photo</span>
         <button
           onClick={() => setOps((prev) => prev.slice(0, -1))}
           disabled={ops.length === 0}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-transform active:scale-95 disabled:opacity-30"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition-transform active:scale-95 disabled:opacity-30"
           aria-label="Undo"
           data-testid="annotator-undo"
         >
@@ -228,7 +228,7 @@ export function PhotoAnnotator({
         {!ready && <Loader2 className="h-8 w-8 animate-spin text-white/60" />}
         <canvas
           ref={canvasRef}
-          className={`max-h-full max-w-full rounded-lg shadow-2xl ${ready ? "" : "hidden"}`}
+          className={`max-h-full max-w-full rounded-[6px] shadow-2xl ${ready ? "" : "hidden"}`}
           style={{ touchAction: "none" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -246,21 +246,22 @@ export function PhotoAnnotator({
               if (e.key === "Enter") commitText();
             }}
             placeholder="Type…"
-            className="absolute z-10 w-44 rounded-md border-2 bg-black/60 px-2 py-1.5 text-base font-bold outline-none backdrop-blur placeholder:text-white/40"
+            className="absolute z-10 w-44 rounded-[6px] border-2 bg-black/60 px-2 py-1.5 text-base font-bold outline-none backdrop-blur placeholder:text-white/40"
             style={{ left: Math.min(textDraft.left, (wrapRef.current?.clientWidth || 300) - 180), top: textDraft.top, color, borderColor: color }}
             data-testid="annotator-text-input"
           />
         )}
       </div>
 
-      {/* Toolbar */}
+      {/* Toolbar — industrial: squared swatches, hairline segmented tools
+          with the maroon carrying the selected state, create-style Save */}
       <div className="px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 14px)" }}>
         <div className="mb-3 flex items-center justify-center gap-2">
           {COLORS.map((c) => (
             <button
               key={c}
               onClick={() => setColor(c)}
-              className={`h-8 w-8 rounded-full border-2 transition-transform active:scale-90 ${
+              className={`h-8 w-8 rounded-[6px] border-2 transition-transform active:scale-90 ${
                 color === c ? "scale-110 border-white" : "border-white/25"
               }`}
               style={{ background: c }}
@@ -270,13 +271,13 @@ export function PhotoAnnotator({
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex flex-1 items-center gap-1 rounded-full bg-white/10 p-1 backdrop-blur">
+          <div className="flex flex-1 items-center gap-1 rounded-[8px] border border-white/10 bg-white/10 p-1 backdrop-blur">
             {TOOLS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 onClick={() => setTool(key)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold transition-colors ${
-                  tool === key ? "bg-white text-slate-900" : "text-white/75"
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-[6px] py-2 text-sm font-semibold transition-colors ${
+                  tool === key ? "bg-[#711419] text-white shadow-sm" : "text-white/75"
                 }`}
                 data-testid={`annotator-tool-${key}`}
               >
@@ -288,11 +289,11 @@ export function PhotoAnnotator({
           <button
             onClick={save}
             disabled={!ready || saving}
-            className="flex h-11 items-center gap-1.5 rounded-full bg-[#711419] px-5 text-sm font-semibold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-60"
+            className="flex h-11 items-center gap-1.5 rounded-xl bg-[#711419] px-5 text-sm font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
             data-testid="annotator-save"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
-            Upload
+            Save
           </button>
         </div>
       </div>

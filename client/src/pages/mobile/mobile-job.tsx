@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import MobileShell from "./mobile-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -839,8 +840,12 @@ export default function MobileJob() {
         );
       })()}
 
-      {/* Floating history search pill — sits above the nav, left of the "+" */}
-      {jobsView === "history" && !historySearchOpen && (
+      {/* Floating history search pill — sits above the nav, left of the "+".
+          PORTALED to body: inside the shell's main, pull-to-refresh's
+          translate turned this "fixed" pill into a passenger that rode the
+          pull down and snapped back. */}
+      {jobsView === "history" && !historySearchOpen &&
+        createPortal(
         <button
           onClick={() => setHistorySearchOpen(true)}
           className={`fixed left-4 right-[84px] z-40 flex h-12 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg ${pillHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100"}`}
@@ -854,12 +859,14 @@ export default function MobileJob() {
           <span className="truncate text-[16px] text-slate-400">
             {historySearch.trim() ? historySearch : "Search past jobs"}
           </span>
-        </button>
+        </button>,
+        document.body,
       )}
 
       {/* Fullscreen history search — results fill from the top, input docked
-          at the bottom above the keyboard. */}
-      {historySearchOpen && (
+          at the bottom above the keyboard. Portaled for the same reason. */}
+      {historySearchOpen &&
+        createPortal(
         <div
           className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
             historySearchClosing
@@ -941,7 +948,8 @@ export default function MobileJob() {
               <X className="h-5 w-5" />
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* History filters — dropdown rows; each opens its own option sheet */}

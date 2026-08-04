@@ -145,18 +145,37 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
     const main = ptrMainRef.current;
     if (!main) return;
     let startY = 0;
+    let startX = 0;
     let tracking = false;
+    let engaged = false; // claimed as a PULL — only then transform/preventDefault
     let dist = 0;
     const wrapEl = () => ptrWrapRef.current;
     const spinEl = () => ptrSpinRef.current;
     const onStart = (e: TouchEvent) => {
-      tracking = main.scrollTop <= 0 && !ptrRefreshingRef.current;
-      if (tracking) startY = e.touches[0].clientY;
+      tracking = e.touches.length === 1 && main.scrollTop <= 0 && !ptrRefreshingRef.current;
+      engaged = false;
+      if (tracking) {
+        startY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
+      }
       dist = 0;
     };
     const onMove = (e: TouchEvent) => {
       if (!tracking || ptrRefreshingRef.current) return;
       const dy = e.touches[0].clientY - startY;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      if (!engaged) {
+        // Horizontal intent (media rails, chip rows) must NEVER read as a
+        // pull — a sideways swipe with a little downward sag used to hijack
+        // the scroll and drag the whole page down.
+        if (dx > 10 && dx > dy) {
+          tracking = false;
+          return;
+        }
+        // Only a clearly vertical, deliberate drag becomes a refresh
+        if (!(dy > 14 && dy > dx * 1.2)) return;
+        engaged = true;
+      }
       if (dy <= 0 || main.scrollTop > 0) {
         if (dist > 0) {
           const w = wrapEl();
@@ -172,7 +191,7 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
       }
       // Ours now — stop the native rubber-band/scroll for this gesture
       e.preventDefault();
-      dist = Math.min(120, dy * 0.45);
+      dist = Math.max(0, Math.min(120, (dy - 14) * 0.45));
       const w = wrapEl();
       if (w) {
         w.style.transition = "none";
