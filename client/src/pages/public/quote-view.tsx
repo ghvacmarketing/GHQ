@@ -780,7 +780,7 @@ export default function PublicQuoteView() {
                             <div className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</div>
                             {monthlyFinancing(option.total) > 0 && (
                               <div className="text-xs font-medium text-slate-500" data-testid={`option-monthly-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}>
-                                or about ${monthlyFinancing(option.total).toLocaleString()}/mo with financing
+                                or ~${monthlyFinancing(option.total).toLocaleString()}/mo with financing
                               </div>
                             )}
                           </div>
@@ -938,7 +938,7 @@ export default function PublicQuoteView() {
                     <div className="border-t border-slate-200 pt-2">
                       <div className="flex justify-between items-baseline text-sm font-medium text-slate-600">
                         <span>Or with approved financing</span>
-                        <span data-testid="text-quote-monthly">about ${monthlyFinancing(quoteData.total).toLocaleString()}/mo</span>
+                        <span data-testid="text-quote-monthly">~${monthlyFinancing(quoteData.total).toLocaleString()}/mo</span>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400">
                         Estimate only — your exact payment depends on the plan and credit approval.

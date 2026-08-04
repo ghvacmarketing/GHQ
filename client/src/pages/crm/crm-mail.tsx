@@ -607,7 +607,9 @@ export default function CrmMail() {
         {/* Right: thread detail */}
         <div className={`${selectedId ? "flex" : "hidden lg:flex"} min-h-0 flex-1 flex-col bg-slate-50`}>
           {/* Switcher row — thread actions live up here, level with Messages | Mail */}
-          <div className="relative flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white px-4 pb-2.5 pt-3">
+          {/* Transparent like Messaging's switcher row — no white band, just
+              the hairline under it */}
+          <div className="relative flex shrink-0 items-center justify-center border-b border-slate-200/80 px-4 pb-2.5 pt-3">
             <CommsSwitcher active="mail" bare />
             {selectedId && !detailLoading && threadDetail && (
               <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
