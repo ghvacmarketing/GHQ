@@ -2334,6 +2334,15 @@ export default function MobileJobDetail() {
     if (overviewRef.current) overviewRef.current.style.transform = "";
     if (scrimRef.current) scrimRef.current.style.opacity = "0";
   };
+  // Filled (fill:"forwards") animations OUTLIVE their transition and keep
+  // overriding inline styles forever — a leftover spring-back fill later
+  // resurfaced and pinned the overview off the page. Every settle point
+  // must cancel whatever is still attached to the layers.
+  const cancelLayerAnimations = () => {
+    for (const el of [overviewRef.current, scrimRef.current, sectionsRef.current]) {
+      el?.getAnimations().forEach((a) => a.cancel());
+    }
+  };
 
   // Animate the section layer away (from an optional drag offset) and land
   // on the Overview — used by swipe commit, the back button, and the nav pill.
@@ -2346,23 +2355,30 @@ export default function MobileJobDetail() {
     const w = sec.clientWidth || window.innerWidth;
     const startP = Math.max(0, Math.min(1, fromDx / w));
     const dur = 180 * (1 - startP) + 40;
+    // fill:"forwards" holds every layer at its END state through the React
+    // re-render — without it the animations released a frame before the
+    // timeout and layers snapped to stale drag transforms.
     sec.animate(
       [{ transform: `translateX(${fromDx}px)` }, { transform: "translateX(100%)" }],
-      { duration: dur, easing: "ease-in" },
+      { duration: dur, easing: "ease-in", fill: "forwards" },
     );
     ov?.animate(
       [{ transform: `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
-      { duration: dur, easing: "ease-out" },
+      { duration: dur, easing: "ease-out", fill: "forwards" },
     );
     scrim?.animate(
       [{ opacity: String(0.18 * (1 - startP)) }, { opacity: "0" }],
-      { duration: dur, easing: "linear" },
+      { duration: dur, easing: "linear", fill: "forwards" },
     );
     setTimeout(() => {
+      // Order matters: write the closed inline state, flip the tab (the
+      // fills keep holding through the render), THEN cancel every animation
+      // so no filled frame can resurface later.
       setClosedLayerStyles();
       if (sectionsRef.current) sectionsRef.current.style.transform = "";
       setActiveTab("overview");
-    }, dur - 10);
+      requestAnimationFrame(() => cancelLayerAnimations());
+    }, dur);
   };
 
   // The floating back (and the edge swipe) walk the tab trail: on
@@ -2426,13 +2442,16 @@ export default function MobileJobDetail() {
     if (fromOverview) {
       overviewRef.current?.animate(
         [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
-        { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+        { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)", fill: "forwards" },
       );
       scrimRef.current?.animate(
         [{ opacity: "0" }, { opacity: "0.18" }],
-        { duration: 240, easing: "linear" },
+        { duration: 240, easing: "linear", fill: "forwards" },
       );
-      setTimeout(setOpenLayerStyles, 230);
+      setTimeout(() => {
+        setOpenLayerStyles();
+        requestAnimationFrame(() => cancelLayerAnimations());
+      }, 240);
     }
   };
 
@@ -2487,6 +2506,9 @@ export default function MobileJobDetail() {
           el.style.animation = "none";
           // Full-height iOS card while it rides the finger
           el.style.borderRadius = "24px 0 0 24px";
+          // Any filled animation still attached would MASK the per-frame
+          // inline writes below — start every drag clean.
+          cancelLayerAnimations();
           // Reveal the ACTUAL destination beneath: another section mounts
           // as a parked under-layer; the overview reveal stays for the
           // trail's end.
@@ -2584,6 +2606,9 @@ export default function MobileJobDetail() {
           restoreChrome();
           if (overviewRef.current) overviewRef.current.style.transform = "translateX(-25%)";
           if (scrimRef.current) scrimRef.current.style.opacity = "0.18";
+          // Drop the filled spring-back animations so they can't mask (or
+          // later resurface over) the inline layer states.
+          cancelLayerAnimations();
           // The card is fully back over the page — the under copy can go
           setSectionUnderRef.current(null);
         }, 300);
