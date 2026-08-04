@@ -72,18 +72,15 @@ export function MobileCreatePage({
     else if (exitTo) navigate(exitTo);
     else window.history.back();
   };
-  const doExit = (fromDy = 0) => {
+  const doExit = () => {
     // Slide the sheet down with an eased glide — it closes like it opened.
     const el = rootRef.current;
     if (el) {
-      const h = el.clientHeight || window.innerHeight;
-      const startP = Math.max(0, Math.min(1, fromDy / h));
-      const dur = Math.round(300 * (1 - startP)) + 40;
       el.style.animation = "none";
-      el.style.transition = `transform ${dur}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${dur}ms ease-out`;
+      el.style.transition = "transform 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 340ms ease-out";
       el.style.transform = "translateY(100%)";
       el.style.opacity = "0.6";
-      setTimeout(leave, dur - 20);
+      setTimeout(leave, 320);
       return;
     }
     setClosing(true);
@@ -95,71 +92,10 @@ export function MobileCreatePage({
     else doExit();
   };
 
-  // True bottom sheet: hold and drag DOWN from anywhere to dismiss — not
-  // just the handle. A drag inside the form only counts when the form is
-  // scrolled to its top and the motion is clearly vertical-down, so plain
-  // scrolling can't be mistaken for a pull-down.
-  const drag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
-  const onSheetPointerDown = (e: React.PointerEvent) => {
-    // Sheets opened from inside this page (pickers, filters) portal outside
-    // this DOM but still bubble through the React tree — ignore them, or a
-    // drag on the child sheet would drag this page too.
-    if (!rootRef.current?.contains(e.target as Node)) { drag.current = null; return; }
-    const wrap = scrollRef.current;
-    const inScroll = !!wrap && wrap.contains(e.target as Node);
-    drag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroll || wrap!.scrollTop <= 0 };
-  };
-  const onSheetPointerMove = (e: React.PointerEvent) => {
-    const st = drag.current;
-    const el = rootRef.current;
-    if (!st || !el) return;
-    const dy = e.clientY - st.y;
-    const dx = Math.abs(e.clientX - st.x);
-    if (!st.engaged) {
-      if (!st.eligible) return;
-      if (dy > 14 && dy > dx * 1.3) {
-        st.engaged = true;
-        el.style.animation = "none";
-        el.style.transition = "none";
-        el.setPointerCapture?.(e.pointerId);
-      } else if (dy < -10 || dx > 16) {
-        st.eligible = false;
-        return;
-      }
-    }
-    if (st.engaged) el.style.transform = `translateY(${Math.max(0, dy)}px)`;
-  };
-  const onSheetPointerUp = (e: React.PointerEvent) => {
-    const st = drag.current;
-    drag.current = null;
-    const el = rootRef.current;
-    if (!st?.engaged || !el) return;
-    const dy = e.clientY - st.y;
-    if (dy > 120) {
-      if (dirty) {
-        // Don't silently discard a half-filled form: spring back and ask.
-        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-        el.style.transform = "translateY(0)";
-        setTimeout(() => { if (el) el.style.transition = ""; }, 260);
-        setConfirmOpen(true);
-      } else {
-        doExit(Math.max(0, dy));
-      }
-    } else {
-      el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
-      el.style.transform = "translateY(0)";
-      setTimeout(() => { if (el) el.style.transition = ""; }, 290);
-    }
-  };
-
   return (
     <div
       ref={rootRef}
       className={`fixed inset-0 z-[70] flex flex-col bg-slate-50 ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`}
-      onPointerDown={onSheetPointerDown}
-      onPointerMove={onSheetPointerMove}
-      onPointerUp={onSheetPointerUp}
-      onPointerCancel={onSheetPointerUp}
       data-testid={testid}
     >
       {/* Content scrolling under the floating controls fades out into the
@@ -168,15 +104,9 @@ export function MobileCreatePage({
         className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
         style={{ height: "calc(env(safe-area-inset-top) + 64px)" }}
       />
-      {/* Grab handle — top middle, like every bottom sheet */}
-      <div
-        className="pointer-events-none absolute inset-x-0 z-10 flex justify-center"
-        style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
-      >
-        <div className="h-1.5 w-12 rounded-full bg-slate-300" />
-      </div>
-      {/* Full-page sheet: slides up over everything, no backdrop, no header
-          bar — just a floating X (left) and Gibbs (right) over the content. */}
+      {/* A PAGE that arrives and leaves like a bottom sheet: no grab handle,
+          no drag-to-dismiss — the X is the only way out (with the discard
+          guard when the form is dirty). */}
       <button
         onClick={handleClose}
         className="absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur transition-transform active:scale-95"

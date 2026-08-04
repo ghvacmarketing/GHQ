@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
+import { createPortal } from "react-dom";
+import { MapPin, Maximize2, X } from "lucide-react";
 
 /** Google Places address input + optional map preview.
  *
@@ -128,10 +129,12 @@ export function AddressAutocomplete({
  *  pinch zoom — gestureHandling "greedy"), no "view larger map" link, no
  *  default UI chrome. Falls back to the iframe embed when the key/script
  *  is unavailable. Google's small logo is contractually required and can't
- *  be removed. */
-export function MapView({ query, className = "h-56" }: { query: string; className?: string }) {
+ *  be removed. Map gestures never leak to the page (stopPropagation +
+ *  touch-action none), and an expand button opens a fullscreen view. */
+export function MapView({ query, className = "h-56", expandable = true }: { query: string; className?: string; expandable?: boolean }) {
   const holderRef = useRef<HTMLDivElement | null>(null);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,12 +175,46 @@ export function MapView({ query, className = "h-56" }: { query: string; classNam
 
   if (!KEY || failed) return <MapEmbed query={query} className={className} />;
   return (
-    <div
-      ref={holderRef}
-      className={`${className} w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm`}
-      style={{ touchAction: "none" }}
-      data-testid="interactive-map"
-    />
+    <>
+      <div className={`relative ${className.includes("h-full") ? "h-full" : ""}`}>
+        <div
+          ref={holderRef}
+          className={`${className} w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm`}
+          // touch-action none keeps map pans off the page's scroll;
+          // stopPropagation keeps them out of page-level swipe gestures.
+          style={{ touchAction: "none" }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerMove={(e) => e.stopPropagation()}
+          data-testid="interactive-map"
+        />
+        {expandable && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-md backdrop-blur transition-transform active:scale-95"
+            aria-label="Expand map"
+            data-testid="map-expand"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {expanded &&
+        createPortal(
+          <div className="fixed inset-0 z-[130] bg-slate-900 animate-in fade-in duration-200" data-testid="map-fullscreen">
+            <MapView query={query} className="h-full rounded-none border-0 shadow-none" expandable={false} />
+            <button
+              onClick={() => setExpanded(false)}
+              className="absolute right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-700 shadow-md transition-transform active:scale-95"
+              style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+              aria-label="Close map"
+              data-testid="map-fullscreen-close"
+            >
+              <X className="h-5 w-5" strokeWidth={2.25} />
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
