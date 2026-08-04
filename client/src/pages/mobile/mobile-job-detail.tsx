@@ -2440,6 +2440,127 @@ export default function MobileJobDetail() {
     }
   };
 
+  // ── Section back-swipe — NATIVE touch drag on the section layer itself.
+  // Pointer events die (pointercancel) the instant the section's scroller
+  // claims a touch, which is why the pointer-driven version felt dead. The
+  // touch stream keeps reporting, so the full-screen section card tracks
+  // the finger with iOS corners, then commits along the tab trail. ──
+  const activeTabRef = useRef<TabType>(activeTab);
+  activeTabRef.current = activeTab;
+  const closeSectionAnimatedRef = useRef(closeSectionAnimated);
+  closeSectionAnimatedRef.current = closeSectionAnimated;
+  const switchTabRef = useRef(switchTab);
+  switchTabRef.current = switchTab;
+  const popPrevTabRef = useRef(popPrevTab);
+  popPrevTabRef.current = popPrevTab;
+  const sectionSwipe = useRef<{ id: number; x: number; y: number; engaged: boolean } | null>(null);
+  const attachSectionSwipe = () => {
+    const el = sectionsRef.current;
+    if (!el) return;
+    const tracked = (list: TouchList) => {
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].identifier === sectionSwipe.current?.id) return list[i];
+      }
+      return null;
+    };
+    const restoreChrome = () => {
+      el.style.borderRadius = "";
+    };
+    const onStart = (e: TouchEvent) => {
+      if (sectionSwipe.current || e.touches.length !== 1) return;
+      if (activeTabRef.current === "overview") return;
+      const t = e.touches[0];
+      if (t.clientX > 48) return;
+      sectionSwipe.current = { id: t.identifier, x: t.clientX, y: t.clientY, engaged: false };
+    };
+    const onMove = (e: TouchEvent) => {
+      const st = sectionSwipe.current;
+      if (!st) return;
+      const t = tracked(e.touches);
+      if (!t) return;
+      const dx = t.clientX - st.x;
+      const dy = Math.abs(t.clientY - st.y);
+      if (!st.engaged) {
+        if (dx > 8 && dx > dy) {
+          st.engaged = true;
+          el.style.transition = "none";
+          el.style.animation = "none";
+          // Full-height iOS card while it rides the finger
+          el.style.borderRadius = "24px 0 0 24px";
+        } else if (dy > 14) {
+          sectionSwipe.current = null;
+          return;
+        }
+      }
+      if (st.engaged) {
+        if (e.cancelable) e.preventDefault();
+        const off = Math.max(0, dx);
+        el.style.transform = `translateX(${off}px)`;
+        const w = el.clientWidth || window.innerWidth;
+        const pr = Math.max(0, Math.min(1, off / w));
+        if (overviewRef.current) overviewRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+        if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      const st = sectionSwipe.current;
+      if (!st) return;
+      const t = tracked(e.changedTouches);
+      if (!t) return; // only the tracked finger ends it
+      sectionSwipe.current = null;
+      if (!st.engaged) return;
+      const dx = t.clientX - st.x;
+      if (dx > Math.min(140, window.innerWidth * 0.33)) {
+        const prev = popPrevTabRef.current();
+        if (prev === "overview") {
+          closeSectionAnimatedRef.current(Math.max(0, dx));
+          window.setTimeout(restoreChrome, 260);
+        } else {
+          // Section-to-section: slide this card off, then swap the tab in
+          el.style.transition = "transform 0.22s ease-in";
+          el.style.transform = "translateX(100%)";
+          window.setTimeout(() => {
+            tabBackPop.current = true;
+            switchTabRef.current(prev);
+            el.style.transition = "none";
+            el.style.transform = "";
+            restoreChrome();
+            requestAnimationFrame(() => {
+              el.style.transition = "";
+            });
+          }, 210);
+        }
+      } else {
+        el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
+        el.style.transform = "translateX(0)";
+        overviewRef.current?.animate(
+          [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+          { duration: 260, easing: "ease-out", fill: "forwards" },
+        );
+        scrimRef.current?.animate(
+          [{ opacity: scrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
+          { duration: 260, easing: "linear", fill: "forwards" },
+        );
+        window.setTimeout(() => {
+          el.style.transition = "";
+          restoreChrome();
+          if (overviewRef.current) overviewRef.current.style.transform = "translateX(-25%)";
+          if (scrimRef.current) scrimRef.current.style.opacity = "0.18";
+        }, 300);
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  };
+
   const springBack = () => {
     const el = pageRef.current;
     if (!el) return;
@@ -2467,19 +2588,19 @@ export default function MobileJobDetail() {
   const onSwipeStart = (e: React.PointerEvent) => {
     // A second finger mid-swipe must not hijack or wipe the gesture
     if (swipeDrag.current) return;
+    // Sections have their OWN native-touch back-swipe (pointer events die
+    // to pointercancel inside their scroller) — this pointer drag is the
+    // Overview's whole-page exit only.
+    if (activeTab !== "overview") return;
     // Wider start zone — Android's system gesture owns the outermost edge,
     // so fingers landing "near the left" must still catch our drag.
     if (e.clientX > 48) return;
-    // The edge swipe mirrors the floating back: on a section it walks the
-    // tab trail; on the Overview it leaves the job (whole screen slides).
-    const onSection = activeTab !== "overview";
-    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true, section: onSection };
+    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true, section: false };
     // Mount the Jobs page underneath NOW, while the finger is still parked —
     // mounting it mid-drag left the first exposed frames empty (the "weird
     // vertical strip" on a fresh open). If this turns out to be a tap or a
-    // vertical scroll, onSwipeEnd unmounts it again. Section swipes reveal
-    // the overview layer instead — no jobs underlay needed.
-    if (!onSection) setShowUnderlay(true);
+    // vertical scroll, onSwipeEnd unmounts it again.
+    setShowUnderlay(true);
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onSwipeMove = (e: React.PointerEvent) => {
@@ -2490,16 +2611,6 @@ export default function MobileJobDetail() {
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
       if (dx > 8 && dx > dy) {
-        if (st.section) {
-          // Sections: the swipe IS the back button — fire the same proven
-          // trail walk once and hand the visuals to closeSectionAnimated /
-          // the tab switch (finger-tracking the layer fought its scroller
-          // and could strand it mid-transform).
-          st.active = false;
-          swipeDrag.current = null;
-          handleFloatingBack();
-          return;
-        }
         st.engaged = true;
         el.style.transition = "none";
         // The mount-time slide-in animation outranks inline transforms —
@@ -2575,6 +2686,11 @@ export default function MobileJobDetail() {
     refetchInterval: isOnline ? 10 * 1000 : false, // Auto-refresh every 10 seconds when online
     refetchOnWindowFocus: true, // Refresh when app comes back to foreground
   });
+
+  // Attach the section touch-swipe once the layers actually render — the
+  // loading skeleton mounts first, without the section layer.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(attachSectionSwipe, [!!workOrder]);
 
   const { data: checklistResponse } = useQuery<ChecklistResponseData>({
     queryKey: ["/api/crm/work-orders", params.id, "checklist-response"],
@@ -3102,36 +3218,44 @@ export default function MobileJobDetail() {
             />
           </div>
           <div ref={scrimRef} className="pointer-events-none absolute inset-0 z-10 bg-black" style={{ opacity: 0 }} />
-          {/* Section layer: slides over the Overview; stays mounted so entered
-              data and scroll positions survive round trips */}
-          <div
-            ref={sectionsRef}
-            className="job-section-enter absolute inset-0 z-20 overflow-auto overscroll-y-contain bg-slate-50 px-4 pb-28 pt-14 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
-            style={{ display: activeTab === "overview" ? "none" : undefined }}
-          >
-            {/* 1px over-height keeps short tabs scrollable, so every section
-                rubber-bands under your thumb instead of feeling pinned. */}
-            <div className="min-h-[calc(100%+1px)]">
-            <div className={activeTab === "work" ? "job-tab-enter block" : "hidden"}>
-              <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
-            </div>
-            <div className={activeTab === "quote" ? "job-tab-enter block" : "hidden"}>
-              <QuoteTab workOrder={workOrder} />
-            </div>
-            <div className={activeTab === "invoice" ? "job-tab-enter block" : "hidden"}>
-              <InvoiceTab
-                workOrder={workOrder}
-                renewalInfo={renewalInfo}
-                onCollectRenewal={() => setShowCollectRenewalDialog(true)}
-                onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
-              />
-            </div>
-            </div>
-          </div>
         </div>
 
       </div>
       </MobileShell>
+
+      {/* Section layer — a FULL-SCREEN card over the shell (status bar
+          included) so the back-swipe rides a complete iOS card instead of a
+          panel cut off at the top. The tab bar (z-40, inside the shell) and
+          the floating back (fixed, outside the panel) stay above it. Stays
+          mounted so entered data and scroll positions survive round trips. */}
+      <div
+        ref={sectionsRef}
+        className="job-section-enter absolute inset-0 z-30 overflow-auto overscroll-y-contain bg-slate-50 px-4 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+        style={{
+          display: activeTab === "overview" ? "none" : undefined,
+          paddingTop: "calc(env(safe-area-inset-top) + 56px)",
+          paddingBottom: "calc(112px + env(safe-area-inset-bottom))",
+        }}
+      >
+        {/* 1px over-height keeps short tabs scrollable, so every section
+            rubber-bands under your thumb instead of feeling pinned. */}
+        <div className="min-h-[calc(100%+1px)]">
+          <div className={activeTab === "work" ? "job-tab-enter block" : "hidden"}>
+            <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
+          </div>
+          <div className={activeTab === "quote" ? "job-tab-enter block" : "hidden"}>
+            <QuoteTab workOrder={workOrder} />
+          </div>
+          <div className={activeTab === "invoice" ? "job-tab-enter block" : "hidden"}>
+            <InvoiceTab
+              workOrder={workOrder}
+              renewalInfo={renewalInfo}
+              onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+              onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+            />
+          </div>
+        </div>
+      </div>
       </div>
 
       <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>

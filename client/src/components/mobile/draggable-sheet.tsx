@@ -21,6 +21,7 @@ export function DraggableSheet({
   full = false,
   glass = false,
   nested = false,
+  keepHeight = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,6 +38,9 @@ export function DraggableSheet({
    *  sheet dims behind it — without this, both sheets share a z-index and the
    *  picker reads as part of the parent while the page behind goes double-dark. */
   nested?: boolean;
+  /** Don't grow to full height when the keyboard opens — the sheet keeps
+   *  its natural size and only the content scrolls above the keys. */
+  keepHeight?: boolean;
 }) {
   // Resting transition — the drag handlers swap transitions in and out and
   // must restore THIS one so keyboard padding keeps animating afterwards.
@@ -261,7 +265,8 @@ export function DraggableSheet({
           // While the keyboard is up, a scrollable sheet goes FULL height —
           // otherwise the max-h cap left a slice of the keyboard padding
           // poking out as an empty white "container" above the keys.
-          ...(!full && scrollable && keyboardInset > 0
+          // keepHeight opts out: the sheet holds its size over the keys.
+          ...(!full && scrollable && keyboardInset > 0 && !keepHeight
             ? { height: "calc(100dvh - env(safe-area-inset-top) - 10px)", maxHeight: "none" }
             : {}),
           // No padding animation while closing — the keyboard drops at the
