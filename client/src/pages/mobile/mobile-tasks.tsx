@@ -7,7 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardInset } from "@/lib/native";
 import {
-  ArrowLeft, ArrowUp, Calendar, Check, CheckCircle2, ClipboardList, ListPlus,
+  ArrowLeft, ArrowUp, Calendar, Check, ClipboardList, ListPlus,
   Loader2, Plus, Trash2,
 } from "lucide-react";
 import { AssigneeSheet } from "@/components/mobile/assignee-sheet";
@@ -120,7 +120,7 @@ export default function MobileTasks() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium capitalize transition-all ${
+                className={`flex h-9 flex-1 items-center justify-center rounded-md px-2 text-sm font-semibold capitalize transition-all ${
                   view === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
                 }`}
                 data-testid={`tasks-view-${v}`}
@@ -131,7 +131,7 @@ export default function MobileTasks() {
           </div>
           <button
             onClick={() => navigate("/mobile/tasks/new")}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white transition-transform active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white shadow-sm transition-transform active:scale-95"
             aria-label="New task"
             data-testid="button-new-task"
           >
@@ -156,7 +156,6 @@ export default function MobileTasks() {
           <div className="rounded-[4px] border border-slate-300/70 bg-white py-10 text-center">
             {view === "open" ? (
               <>
-                <CheckCircle2 className="mx-auto mb-2 h-10 w-10 text-green-500" />
                 <p className="text-sm font-medium text-slate-600">Nothing on your list</p>
                 <p className="mt-0.5 text-xs text-slate-400">Tap + to add a task.</p>
               </>
