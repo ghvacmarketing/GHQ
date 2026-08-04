@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Loader2, X } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useKeyboardInset } from "@/lib/native";
+import { markSkipEntrance } from "@/lib/page-transitions";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 
 const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
@@ -73,15 +74,26 @@ export function MobileCreatePage({
     else window.history.back();
   };
   const doExit = () => {
-    // Slower, ease-in glide down: a beat of hesitation, then the page
-    // accelerates away — reads deliberately animated instead of snapping.
+    // Bottom-sheet exit with the REAL page beneath: clone the sheet as a
+    // static ghost, navigate immediately (destination paints under it right
+    // away, entrance fade suppressed), then glide the ghost down over it —
+    // slow ease-in with a beat of hesitation.
     const el = rootRef.current;
     if (el) {
-      el.style.animation = "none";
-      el.style.transition = "transform 460ms cubic-bezier(0.5, 0.05, 0.7, 0.25), opacity 460ms ease-in";
-      el.style.transform = "translateY(100%)";
-      el.style.opacity = "0.7";
-      setTimeout(leave, 440);
+      const ghost = el.cloneNode(true) as HTMLElement;
+      ghost.style.animation = "none";
+      ghost.style.transition = "transform 460ms cubic-bezier(0.5, 0.05, 0.7, 0.25), opacity 460ms ease-in";
+      ghost.style.pointerEvents = "none";
+      ghost.setAttribute("aria-hidden", "true");
+      document.body.appendChild(ghost);
+      el.style.visibility = "hidden";
+      markSkipEntrance();
+      leave();
+      requestAnimationFrame(() => {
+        ghost.style.transform = "translateY(100%)";
+        ghost.style.opacity = "0.7";
+      });
+      setTimeout(() => ghost.remove(), 480);
       return;
     }
     setClosing(true);
