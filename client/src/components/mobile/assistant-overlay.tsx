@@ -718,11 +718,23 @@ export default function AssistantOverlay({
     };
   }, [open]);
 
-  // When the keyboard claims its space, keep the newest messages in view —
-  // unless the user has scrolled up on purpose.
+  // Keyboard rise, two behaviors: if the bottom of the chat was in view,
+  // the last message GLIDES up pinned right above the composer (scrollTop
+  // pinned every frame through the spacer's height transition — one
+  // scrollIntoView landed late and jumpy). If the user was reading earlier
+  // messages, nothing moves — they can type and scroll down themselves.
   useEffect(() => {
-    if (kbInset > 0) scrollToBottom();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (kbInset === 0 || !stickRef.current) return;
+    const el = chatScrollRef.current;
+    if (!el) return;
+    let raf = 0;
+    const start = performance.now();
+    const step = (t: number) => {
+      el.scrollTop = el.scrollHeight;
+      if (t - start < 400) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [kbInset]);
 
   // iOS keyboard hangover: focusing the composer can scroll the whole PWA up
