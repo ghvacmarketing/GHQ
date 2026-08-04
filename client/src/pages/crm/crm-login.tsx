@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { setCrmToken, crmFetch } from "@/lib/crmAuth";
 import { isNativeApp, useKeyboardInset } from "@/lib/native";
-import { AlertCircle, Lock, Mail, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronLeft, Lock, Mail, Loader2 } from "lucide-react";
 import redlogo from "@assets/redlogo.webp";
 import { WhatsNewPanel } from "@/components/crm/whats-new-panel";
 import type { CrmUser } from "@shared/schema";
@@ -74,10 +74,10 @@ export default function CrmLogin() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      // Technicians go to the mobile app, others to the CRM — except inside
-      // the App Store shell, where EVERYONE lands on /mobile (the shell is
-      // the field app; the desktop CRM stays web-only).
-      if (currentUser.role === "tech" || isNativeApp()) {
+      // Technicians go to the mobile app, others to the CRM — except on
+      // phones and inside the App Store shell, where EVERYONE lands on
+      // /mobile (the desktop CRM is a desktop thing).
+      if (currentUser.role === "tech" || isNativeApp() || window.innerWidth < 768) {
         window.location.href = "/mobile";
       } else {
         window.location.href = "/crm";
@@ -105,24 +105,19 @@ export default function CrmLogin() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Phones and the native shell land straight in the Field app — sending
+      // them to "/" bounced them back to the mobile welcome page in a loop.
+      // Desktop techs go to /mobile too; everyone else gets the launcher.
+      const dest =
+        data.user?.role === "tech" || isNativeApp() || window.innerWidth < 768 ? "/mobile" : "/";
       if (data.token) {
         setCrmToken(data.token);
         // Small delay to ensure localStorage is flushed before navigation
         setTimeout(() => {
-          // Technicians go directly to mobile app, others go to the selection screen
-          if (data.user?.role === "tech") {
-            window.location.href = "/mobile";
-          } else {
-            window.location.href = "/";
-          }
+          window.location.href = dest;
         }, 100);
       } else {
-        // Fallback if no token returned
-        if (data.user?.role === "tech") {
-          window.location.href = "/mobile";
-        } else {
-          window.location.href = "/";
-        }
+        window.location.href = dest;
       }
     },
     onError: () => {
@@ -151,11 +146,12 @@ export default function CrmLogin() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-[#f4f5f6] lg:bg-background">
       {/* Left — sign in. Scrollable with keyboard clearance so the focused
           field always stays visible on phones. */}
       <div
         className="relative h-full w-full overflow-y-auto lg:w-[46%]"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
         onFocusCapture={(e) => {
           const t = e.target as HTMLElement;
           if (t.tagName === "INPUT") {
@@ -167,16 +163,22 @@ export default function CrmLogin() {
         }}
       >
         <div
-          className="flex min-h-[calc(100%+1px)] flex-col justify-center px-6 py-10 sm:px-10 lg:px-16"
+          className="flex min-h-[calc(100%+1px)] flex-col justify-center px-5 py-10 sm:px-10 lg:px-16"
           style={{
             paddingBottom: `calc(2.5rem + ${kbInset}px)`,
             transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
-        <div className="mx-auto w-full max-w-sm">
-          <img src={redlogo} alt="Giesbrecht HVAC" className="mb-8 h-12" />
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to GHQ</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">Giesbrecht HVAC Headquarters</p>
+        <div className="mx-auto w-full max-w-sm animate-in fade-in duration-300">
+          {/* Phones arrive from the two-door welcome page — give them the
+              way back. Desktop never shows this. */}
+          <a href="/" className="mb-6 inline-flex items-center gap-0.5 text-[13px] font-semibold text-slate-500 lg:hidden" data-testid="login-back">
+            <ChevronLeft className="h-4 w-4" />
+            Back
+          </a>
+          <img src={redlogo} alt="Giesbrecht HVAC" className="mb-6 h-10 lg:mb-8 lg:h-12" />
+          <h1 className="text-[26px] font-semibold tracking-tight text-slate-900 lg:text-2xl lg:text-foreground">Sign in to GHQ</h1>
+          <p className="mt-1 text-sm text-slate-500 lg:text-muted-foreground">Giesbrecht HVAC Headquarters</p>
 
           {googleError && (
             <div className="mt-6 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="banner-google-error">
@@ -195,11 +197,15 @@ export default function CrmLogin() {
             </div>
           )}
 
+          {/* Phones: the form rides an industrial white card on the slate
+              canvas (same language as the rest of the mobile app); desktop
+              keeps the flat pane. */}
+          <div className="mt-6 rounded-[4px] border border-slate-300/70 bg-white p-5 shadow-sm lg:mt-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
           <Button
             type="button"
             variant="outline"
             onClick={handleGoogleSignIn}
-            className="mt-7 h-11 w-full font-medium"
+            className="mt-0 h-12 w-full rounded-[4px] border-slate-300/70 font-medium lg:mt-7"
             data-testid="button-google-signin"
           >
             <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -213,7 +219,7 @@ export default function CrmLogin() {
 
           <div className="relative my-5">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">or with email</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground lg:bg-background">or with email</span></div>
           </div>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -221,7 +227,7 @@ export default function CrmLogin() {
               <Label htmlFor="email" className="text-sm">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="you@company.com" className="h-11 pl-10" {...form.register("email")} data-testid="input-email" />
+                <Input id="email" type="email" placeholder="you@company.com" className="h-12 rounded-[4px] pl-10 text-[16px]" {...form.register("email")} data-testid="input-email" />
               </div>
               {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
             </div>
@@ -229,16 +235,17 @@ export default function CrmLogin() {
               <Label htmlFor="password" className="text-sm">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="password" type="password" placeholder="Enter your password" className="h-11 pl-10" {...form.register("password")} data-testid="input-password" />
+                <Input id="password" type="password" placeholder="Enter your password" className="h-12 rounded-[4px] pl-10 text-[16px]" {...form.register("password")} data-testid="input-password" />
               </div>
               {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
             </div>
-            <Button type="submit" className="h-11 w-full bg-[#711419] text-base hover:bg-[#5a1014]" disabled={loginMutation.isPending} data-testid="button-login">
+            <Button type="submit" className="h-12 w-full rounded-[4px] bg-[#711419] text-base hover:bg-[#5a1014]" disabled={loginMutation.isPending} data-testid="button-login">
               {loginMutation.isPending ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Signing in…</> : "Sign in"}
             </Button>
           </form>
+          </div>
 
-          <div className="mt-8 border-t pt-5 text-center">
+          <div className="mt-6 border-t border-slate-200 pt-5 text-center lg:mt-8">
             <p className="text-sm text-muted-foreground">
               Giesbrecht HVAC customer?{" "}
               <a

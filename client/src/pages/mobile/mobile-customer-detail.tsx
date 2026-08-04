@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CustomerEditSheet } from "@/components/mobile/customer-edit-sheet";
 import { markSkipEntrance } from "@/lib/page-transitions";
+import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import MobileCustomers from "./mobile-customers";
 import type { CrmCustomer, CrmWorkOrder, CrmAgreement } from "@shared/schema";
 
@@ -153,6 +154,7 @@ function AgreementItem({ agreement }: { agreement: CrmAgreement }) {
 
 export default function MobileCustomerDetail() {
   const [, navigate] = useLocation();
+  useRequireCrmAuth();
   const { id } = useParams<{ id: string }>();
   const [viewer, setViewer] = useState<CustomerPhoto | null>(null);
   const [editOpen, setEditOpen] = useState(false);

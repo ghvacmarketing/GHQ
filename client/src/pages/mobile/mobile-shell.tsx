@@ -127,7 +127,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
     return () => document.removeEventListener("touchstart", guard);
   }, []);
 
-  const { data: currentUser } = useQuery<CrmUser | null>({
+  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
       const res = await fetch("/api/crm/auth/me", { credentials: "include" });
@@ -138,6 +138,14 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
     refetchInterval: 30 * 1000, // Poll so role/permission changes propagate in near real-time
     refetchIntervalInBackground: true,
   });
+
+  // No session → straight to sign-in. Without this, every /mobile page
+  // rendered a dead logged-out shell: queries 401'd and screens sat empty.
+  useEffect(() => {
+    if (!authLoading && currentUser === null) {
+      window.location.replace("/crm/login");
+    }
+  }, [authLoading, currentUser]);
 
   // Check if user can access mobile app
   useNativePush(!!currentUser); // iOS shell: register for push once logged in
@@ -159,6 +167,16 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 
   const canAccessMobile = currentUser && MOBILE_ALLOWED_ROLES.includes(currentUser.role);
   const isSupervisor = !!currentUser && SUPERVISOR_ROLES.includes(currentUser.role);
+
+  // Hold a quiet splash while the session resolves (or while the redirect
+  // above is in flight) — never the empty shell.
+  if (authLoading || !currentUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50" data-testid="mobile-auth-splash">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+      </div>
+    );
+  }
 
   // Block admin users from mobile app
   if (currentUser && !canAccessMobile) {

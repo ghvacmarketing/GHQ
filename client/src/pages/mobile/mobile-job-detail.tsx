@@ -66,6 +66,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { markSkipEntrance } from "@/lib/page-transitions";
+import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
 import MobileJob from "./mobile-job";
@@ -3995,6 +3996,7 @@ function InvoiceTab({
 }
 
 export default function MobileJobDetail() {
+  useRequireCrmAuth();
   const params = useParams<{ id: string }>();
   const workOrderId = parseInt(params.id || "0", 10);
   const [, navigate] = useLocation();

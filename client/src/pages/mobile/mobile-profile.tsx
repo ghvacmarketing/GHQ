@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
 import { markSkipEntrance } from "@/lib/page-transitions";
+import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { userAvatarSrc } from "@/components/user-avatar-badge";
 import { roleBadgeSrc } from "@/components/mobile/role-badge";
 import MobileAgenda from "./mobile-agenda";
@@ -37,6 +38,7 @@ const fmtHours = (mins: number) => {
 
 export default function MobileProfile() {
   const [, navigate] = useLocation();
+  useRequireCrmAuth();
 
   // ── iOS-style tracked back-swipe with the REAL home page revealed
   // beneath (parallax + scrim), exactly like leaving a customer. The

@@ -70,6 +70,7 @@ export default function MobileMore() {
       title: "Account",
       items: [
         { label: "My Profile", sub: "Your info and settings", onTap: (n) => n("/mobile/profile"), testid: "more-profile" },
+        { label: "Guide", sub: "How the app works + what the badges mean", onTap: (n) => n("/mobile/guide"), testid: "more-guide" },
         // The App Store shell never links out to the desktop CRM — the app
         // stays a focused field tool (web/PWA users keep the escape hatch).
         ...(currentUser && currentUser.role !== "tech" && !isNativeApp()

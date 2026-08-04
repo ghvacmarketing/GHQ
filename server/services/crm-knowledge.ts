@@ -692,6 +692,9 @@ The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" 
 ### Mobile Work Orders directory
 - Mobile → More → Work Orders (/mobile/work-orders): search EVERY work order company-wide by job title or customer name, filter by visit type (Service / Maintenance / Install / Sales — metal badge pills), tap through to the job's detail page
 
+### Mobile Guide
+- Mobile → More → Guide (/mobile/guide): a built-in guide to the mobile app (tabs, the + create button, Gibbs, back-swipe and hold gestures) plus a badge reference explaining every metal badge — roles, visit types, time-clock categories, customer types, message contacts, and the avatar-with-role-badge composition
+
 ### Mobile media capture & markup
 - On the mobile Media page, tapping one of today's jobs opens the camera immediately (photo or video)
 - Captured photos open in a Markup editor first — draw freehand, arrows, and text stamps in several colors (CompanyCam-style) — then upload; videos upload as-is
