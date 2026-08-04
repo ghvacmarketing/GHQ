@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useKeyboardInset } from "@/lib/native";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
@@ -45,6 +45,26 @@ export function DraggableSheet({
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
   const scrollable = tall || full;
+
+  // The landing handler pins animation:none on the sheet (iOS caret fix) —
+  // but Radix samples that when close begins and, seeing no exit animation,
+  // unmounts INSTANTLY. Closes from a parent's setOpen(false) (a Done
+  // button) bypassed our onOpenChange restore entirely. So Radix gets a
+  // mirrored open state: on close we restore the animation and force a
+  // reflow FIRST, then flip — the slide-out always plays.
+  const [radixOpen, setRadixOpen] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setRadixOpen(true);
+    } else {
+      const el = sheetRef.current;
+      if (el) {
+        el.style.animation = "";
+        void el.offsetHeight;
+      }
+      setRadixOpen(false);
+    }
+  }, [open]);
 
   /** Nearest scrollable ancestor of a touch, up to the sheet itself — the
    *  tall-sheet content wrap or any fixed-height list a child renders. */
@@ -149,10 +169,10 @@ export function DraggableSheet({
 
   return (
     <Sheet
-      open={open}
+      open={radixOpen}
       onOpenChange={(o) => {
-        // The landing handler below pins animation:none on the sheet; give
-        // the exit animation back before Radix flips to data-state=closed.
+        // Radix-internal closes (scrim tap, Esc) route through the parent's
+        // state, which loops back through the mirrored-open effect above.
         if (!o && sheetRef.current) sheetRef.current.style.animation = "";
         onOpenChange(o);
       }}
