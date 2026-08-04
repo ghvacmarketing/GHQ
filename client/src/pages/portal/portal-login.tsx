@@ -554,7 +554,7 @@ export default function PortalLogin() {
 
   return (
     <PortalLayout showLogout={false}>
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center">
         <Card className="w-full max-w-md rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-login">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-semibold" style={{ color: BRAND }} data-testid="text-login-title">
@@ -564,6 +564,13 @@ export default function PortalLogin() {
           </CardHeader>
           <CardContent>{body}</CardContent>
         </Card>
+        {/* The other audience's door — mirrors the CRM login's portal link */}
+        <p className="mt-5 text-center text-sm text-slate-500" data-testid="link-team-signin">
+          Work at Giesbrecht HVAC?{" "}
+          <a href="/crm/login" className="font-medium hover:underline" style={{ color: BRAND }}>
+            Team sign-in
+          </a>
+        </p>
       </div>
     </PortalLayout>
   );
