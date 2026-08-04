@@ -64,6 +64,7 @@ export default function MobileMore() {
         { label: "Invoices", sub: "Billing, payments, and balances", onTap: (n) => n("/mobile/invoices"), testid: "more-invoices" },
         { label: "Media", sub: "Job-site photos and videos", onTap: (n) => n("/mobile/photos"), testid: "more-photos", badge: needPhotos > 0 ? `${needPhotos} need photos` : null },
         { label: "My Tasks", sub: "Your personal to-do list from the CRM", onTap: (n) => n("/mobile/tasks"), testid: "more-tasks" },
+        { label: "Checklist Gallery", sub: "What each job type's checklist covers", onTap: (n) => n("/mobile/checklists"), testid: "more-checklists" },
         { label: "Time & Timesheet", sub: "Clock in and review your hours", onTap: (n) => n("/mobile/time"), testid: "more-time" },
         { label: "Agenda", sub: "Your day at a glance", onTap: (n) => n("/mobile"), testid: "more-agenda" },
       ],

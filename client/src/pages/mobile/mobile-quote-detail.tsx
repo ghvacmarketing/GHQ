@@ -1,13 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
 import { generateQuotePdf } from "@/lib/quote-pdf";
 import {
-  ArrowLeft,
+  ChevronLeft,
   ChevronRight,
-  MapPin,
-  Phone,
   Send,
   Loader2,
   Tag,
@@ -17,31 +15,30 @@ import {
   XCircle,
   Mail,
   Monitor,
-  MessageSquare
+  MessageSquare,
+  X,
 } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import MobileShell from "./mobile-shell";
+import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
+import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
+import MobileQuotes from "./mobile-quotes";
+import ghvacLogo from "@assets/ghvac-logo.png";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 
 type QuoteWithLineItems = Omit<CrmQuote, 'lineItems'> & {
   lineItems?: CrmQuoteLineItem[];
 };
+
+const BRAND_COLOR = "#711419";
 
 const COMPANY_INFO = {
   name: "Giesbrecht HVAC",
@@ -65,16 +62,155 @@ function formatCurrency(amount: number | string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
 }
 
+// Estimated monthly payment with approved financing — same divisor as the
+// public quote page and the proposal builder, so every surface agrees.
+const FINANCING_DIVISOR = 67;
+function monthlyFinancing(value: string | number | null | undefined): number {
+  const num = typeof value === "string" ? parseFloat(value) : value ?? 0;
+  if (!num || isNaN(num) || num <= 0) return 0;
+  return Math.round(num / FINANCING_DIVISOR);
+}
+
 export default function MobileQuoteDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  useRequireCrmAuth();
+  const entered = usePushEntrance();
   const [showPreview, setShowPreview] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [sendViaEmail, setSendViaEmail] = useState(true);
   const [sendViaSms, setSendViaSms] = useState(false);
   const [phoneRecipient, setPhoneRecipient] = useState("");
+
+  // ── iOS-style tracked back-swipe with the REAL quotes list revealed
+  // beneath (parallax + scrim), exactly like leaving a customer. The
+  // floating back arrow lives OUTSIDE the sliding panel: it holds still
+  // while you drag and fades out when the swipe commits. ──
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const underlayRef = useRef<HTMLDivElement | null>(null);
+  const scrimRef = useRef<HTMLDivElement | null>(null);
+  const backRef = useRef<HTMLButtonElement | null>(null);
+  const [showUnderlay, setShowUnderlay] = useState(false);
+  const swipeDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+
+  const goBackAnimated = (fromDx = 0) => {
+    // The quotes list is already on screen as the underlay — its remount
+    // after navigation must not fade in again (the post-swipe "flash").
+    markSkipEntrance();
+    const el = pageRef.current;
+    if (!el) return navigate("/mobile/quotes");
+    const w = el.clientWidth || window.innerWidth;
+    const startP = Math.max(0, Math.min(1, fromDx / w));
+    const dur = 200 * (1 - startP) + 40;
+    setShowUnderlay(true);
+    requestAnimationFrame(() => {
+      el.style.animation = "none";
+      el.style.borderRadius = "24px 0 0 24px";
+      el.style.transition = `transform ${dur}ms ease-in`;
+      el.style.transform = "translateX(100%)";
+      const btn = backRef.current;
+      if (btn) {
+        btn.style.transition = `opacity ${Math.max(120, dur - 40)}ms ease-out`;
+        btn.style.opacity = "0";
+        btn.style.pointerEvents = "none";
+      }
+      underlayRef.current?.animate(
+        [{ transform: `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
+        { duration: dur, easing: "ease-out", fill: "forwards" },
+      );
+      scrimRef.current?.animate(
+        [{ opacity: String(0.18 * (1 - startP)) }, { opacity: "0" }],
+        { duration: dur, easing: "linear", fill: "forwards" },
+      );
+      setTimeout(() => navigate("/mobile/quotes"), dur - 10);
+    });
+  };
+
+  const onSwipeStart = (e: React.PointerEvent) => {
+    // A second finger mid-swipe must not hijack or wipe the gesture
+    if (swipeDrag.current) return;
+    if (e.clientX > 48) return;
+    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true };
+    // Mount the quotes list underneath NOW, while the finger is still
+    // parked — mounting it mid-drag drops frames. If this turns out to be
+    // a tap or a scroll, onSwipeEnd unmounts it again.
+    setShowUnderlay(true);
+    pageRef.current?.setPointerCapture?.(e.pointerId);
+  };
+  const onSwipeMove = (e: React.PointerEvent) => {
+    const st = swipeDrag.current;
+    const el = pageRef.current;
+    if (!st?.active || st.id !== e.pointerId || !el) return;
+    const dx = e.clientX - st.x;
+    const dy = Math.abs(e.clientY - st.y);
+    if (!st.engaged) {
+      if (dx > 8 && dx > dy) {
+        st.engaged = true;
+        el.style.transition = "none";
+        el.style.animation = "none";
+        // iOS-card curve while the page rides the finger
+        el.style.borderRadius = "24px 0 0 24px";
+      } else if (dy > 14) { st.active = false; setShowUnderlay(false); return; }
+    }
+    if (st.engaged) {
+      const off = Math.max(0, dx);
+      el.style.transform = `translateX(${off}px)`;
+      const w = el.clientWidth || window.innerWidth;
+      const pr = Math.max(0, Math.min(1, off / w));
+      if (underlayRef.current) underlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+      if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+      // The floating back holds still but fades WITH the drag
+      const b = backRef.current;
+      if (b) {
+        b.style.transition = "none";
+        b.style.opacity = String(1 - pr);
+      }
+    }
+  };
+  const onSwipeEnd = (e: React.PointerEvent) => {
+    const st = swipeDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
+    swipeDrag.current = null;
+    const el = pageRef.current;
+    if (!st.engaged || !el) {
+      setShowUnderlay(false);
+      return;
+    }
+    const dx = e.clientX - st.x;
+    if (dx > Math.min(140, window.innerWidth * 0.33)) {
+      goBackAnimated(Math.max(0, dx));
+    } else {
+      el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateX(0)";
+      const b = backRef.current;
+      if (b) {
+        b.style.transition = "opacity 0.25s ease-out";
+        b.style.opacity = "1";
+      }
+      underlayRef.current?.animate(
+        [{ transform: underlayRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+        { duration: 260, easing: "ease-out", fill: "forwards" },
+      );
+      scrimRef.current?.animate(
+        [{ opacity: scrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
+        { duration: 260, easing: "linear", fill: "forwards" },
+      );
+      setTimeout(() => {
+        if (el) {
+          el.style.transition = "";
+          el.style.borderRadius = "";
+        }
+        const btn = backRef.current;
+        if (btn) {
+          btn.style.transition = "";
+          btn.style.opacity = "";
+        }
+        setShowUnderlay(false);
+      }, 320);
+    }
+  };
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithLineItems>({
     queryKey: ["/api/crm/quotes", id],
@@ -184,14 +320,6 @@ export default function MobileQuoteDetail() {
     },
   });
 
-  const handleBack = () => {
-    if (quote?.workOrderId) {
-      navigate(`/mobile/job/${quote.workOrderId}?tab=quote`);
-    } else {
-      navigate("/mobile");
-    }
-  };
-
   const handleDownloadPDF = () => {
     if (!quote) return;
     try {
@@ -205,370 +333,382 @@ export default function MobileQuoteDetail() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <MobileShell>
-        <div className="p-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 rounded-full" />
-            <Skeleton className="h-6 w-48" />
-          </div>
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      </MobileShell>
-    );
-  }
-
-  if (error || !quote) {
-    return (
-      <MobileShell>
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="mb-4 min-h-[44px]"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-red-500" data-testid="error-message">Failed to load quote details.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </MobileShell>
-    );
-  }
-
-  const statusInfo = quoteStatusConfig[quote.status] || quoteStatusConfig.draft;
-  const lineItems = quote.lineItems || [];
+  const statusInfo = quote ? (quoteStatusConfig[quote.status] || quoteStatusConfig.draft) : quoteStatusConfig.draft;
+  const lineItems = quote?.lineItems || [];
+  // The customer-facing document never shows internal labor/cost lines, and a
+  // single-line quote displays the SELL price — the same rules as the public
+  // quote page, so the preview matches what the customer will actually see.
+  const clientVisibleItems = lineItems.filter((item) => item.lineType !== "labor" && item.lineType !== "other");
+  const isSingleItem = clientVisibleItems.length === 1;
+  const isInstallQuote = !!quote && ["proposal", "custom_install"].includes(quote.quoteType || "");
 
   return (
-    <MobileShell>
-      <div className="p-4 space-y-4" data-testid="mobile-quote-detail">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleBack}
-          className="-ml-2 min-h-[44px] text-slate-600"
-          data-testid="button-back"
+    <div className="relative h-screen overflow-hidden bg-slate-50">
+      {/* Real quotes list beneath the detail — the whole screen slides over
+          it so the back-swipe reveals where you're headed */}
+      {showUnderlay && (
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+          <div ref={underlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
+            <MobileQuotes />
+          </div>
+          <div ref={scrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
+        </div>
+      )}
+
+      <div
+        ref={pageRef}
+        className={`${entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={onSwipeStart}
+        onPointerMove={onSwipeMove}
+        onPointerUp={onSwipeEnd}
+        onPointerCancel={onSwipeEnd}
+      >
+        {/* Edge gutter: touches born here can NEVER be claimed by the
+            browser as a scroll, so the back-swipe always tracks. */}
+        <div className="absolute inset-y-0 left-0 z-20 w-6" style={{ touchAction: "none" }} aria-hidden />
+        <div
+          className="h-full overflow-y-auto overscroll-y-contain bg-slate-50"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)",
+          }}
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-
-        {/* Header — the quote speaks for itself: no icon chip, and a fresh
-            draft carries no status pill (the dot appears once it's sent). */}
-        <div data-testid="quote-header">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="quote-number">
-            {quote.title || `Quote ${quote.quoteNumber}`}
-          </h1>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {[
-              quote.title ? quote.quoteNumber : null,
-              quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : null,
-            ].filter(Boolean).join(" · ")}
-          </p>
-          {quote.status !== "draft" && (
-            <div className="mt-1.5">
-              <StatusDot pill={statusInfo.className} data-testid="quote-status">
-                {statusInfo.label}
-              </StatusDot>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowPreview(true)}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
-            data-testid="button-preview"
-          >
-            <Eye className="h-4 w-4" />
-            Preview
-          </button>
-          <button
-            onClick={handleDownloadPDF}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
-            data-testid="button-download"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </button>
-        </div>
-
-        {/* Customer — name up top, then real tappable rows: call and map */}
-        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-info-card">
-          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Customer
-          </p>
-          <div className="px-3.5 py-3">
-            <p className="font-semibold text-slate-900" data-testid="customer-name">{quote.customerName}</p>
-            {quote.customerEmail && (
-              <p className="mt-0.5 truncate text-xs text-slate-500">{quote.customerEmail}</p>
-            )}
-          </div>
-          {quote.customerPhone && (
-            <a
-              href={`tel:${quote.customerPhone}`}
-              className="flex items-center gap-3 border-t border-slate-200/80 px-3.5 py-3 transition-colors active:bg-slate-50"
-              data-testid="customer-phone"
-            >
-              <span className="shrink-0 rounded-[3px] bg-[#711419]/[0.08] p-2">
-                <Phone className="h-4 w-4 text-[#711419]" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-slate-900">{quote.customerPhone}</span>
-                <span className="block text-xs text-slate-500">Tap to call</span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-            </a>
-          )}
-          {quote.serviceAddress && (
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(quote.serviceAddress)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-3 border-t border-slate-200/80 px-3.5 py-3 transition-colors active:bg-slate-50"
-              data-testid="service-address"
-            >
-              <span className="shrink-0 rounded-[3px] bg-[#711419]/[0.08] p-2">
-                <MapPin className="h-4 w-4 text-[#711419]" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium leading-snug text-slate-900">{quote.serviceAddress}</span>
-                <span className="block text-xs text-slate-500">Open in Maps</span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-            </a>
-          )}
-        </div>
-
-        {/* Line items — one card, totals docked as its footer */}
-        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="line-items-card">
-          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Line items{lineItems.length > 0 ? ` (${lineItems.length})` : ""}
-          </p>
-          {lineItems.length === 0 ? (
-            <p className="px-3.5 py-4 text-sm italic text-slate-400" data-testid="no-line-items">No line items</p>
-          ) : (
-            <div>
-              {lineItems.map((item, i) => {
-                const isDiscount = item.isDiscountLine || item.lineType === "discount";
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-start justify-between gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-                    data-testid={`line-item-${item.id}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        {isDiscount && <Tag className="h-3 w-3 shrink-0 text-amber-600" />}
-                        <p className="text-sm font-medium text-slate-900">{item.description}</p>
-                      </div>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {item.quantity} × {formatCurrency(item.unitPrice)}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${isDiscount ? "text-amber-700" : "text-slate-900"}`}>
-                      {formatCurrency(item.lineTotal)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div className="space-y-1.5 border-t border-slate-200/80 bg-slate-50 px-3.5 py-3" data-testid="totals-card">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Subtotal</span>
-              <span className="font-medium tabular-nums" data-testid="subtotal">{formatCurrency(quote.subtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900">Total</span>
-              <span className="text-lg font-bold tabular-nums text-[#711419]" data-testid="total">{formatCurrency(quote.total)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Present to Client button - available for draft, sent, viewed quotes */}
-        {(["draft", "sent", "viewed"] as string[]).includes(quote.status) && (
-          <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
-            onClick={() => navigate(`/mobile/quotes/${id}/present`)}
-            data-testid="button-present-quote"
-          >
-            <Monitor className="h-4 w-4" />
-            Present to Client
-          </button>
-        )}
-
-        {quote.status === "draft" && (
-          <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] border border-[#711419]/30 bg-white text-base font-semibold text-[#711419] transition-transform active:scale-[0.98] disabled:opacity-60"
-            onClick={openEmailDialog}
-            disabled={sendQuoteEmailMutation.isPending}
-            data-testid="button-send-quote"
-          >
-            {sendQuoteEmailMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="min-h-[calc(100%+1px)]" data-testid="mobile-quote-detail">
+            {isLoading ? (
+              <div className="space-y-4 p-4 pt-16">
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : error || !quote ? (
+              <div className="p-4 pt-20">
+                <div className="rounded-[4px] border border-slate-300/70 bg-white py-10 text-center">
+                  <p className="text-sm text-red-500" data-testid="error-message">Failed to load quote details.</p>
+                </div>
+              </div>
             ) : (
-              <Mail className="h-4 w-4" />
+              <div className="space-y-4 p-4">
+                {/* Header — clears the floating back arrow; the quote speaks
+                    for itself: no icon chip, and a fresh draft carries no
+                    status pill (the dot appears once it's sent). */}
+                <div className="pt-12" data-testid="quote-header">
+                  <h1 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="quote-number">
+                    {quote.title || `Quote ${quote.quoteNumber}`}
+                  </h1>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    {[
+                      quote.title ? quote.quoteNumber : null,
+                      quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : null,
+                    ].filter(Boolean).join(" · ")}
+                  </p>
+                  {quote.status !== "draft" && (
+                    <div className="mt-1.5">
+                      <StatusDot pill={statusInfo.className} data-testid="quote-status">
+                        {statusInfo.label}
+                      </StatusDot>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowPreview(true)}
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
+                    data-testid="button-preview"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </button>
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
+                    data-testid="button-download"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </button>
+                </div>
+
+                {/* Customer — name up top, then tappable call / map rows */}
+                <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-info-card">
+                  <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Customer
+                  </p>
+                  <div className="px-3.5 py-3">
+                    <p className="font-semibold text-slate-900" data-testid="customer-name">{quote.customerName}</p>
+                    {quote.customerEmail && (
+                      <p className="mt-0.5 truncate text-xs text-slate-500">{quote.customerEmail}</p>
+                    )}
+                  </div>
+                  {quote.customerPhone && (
+                    <a
+                      href={`tel:${quote.customerPhone}`}
+                      className="flex items-center gap-3 border-t border-slate-200/80 px-3.5 py-3 transition-colors active:bg-slate-50"
+                      data-testid="customer-phone"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-slate-900">{quote.customerPhone}</span>
+                        <span className="block text-xs text-slate-500">Tap to call</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                    </a>
+                  )}
+                  {quote.serviceAddress && (
+                    <a
+                      href={`https://maps.google.com/?q=${encodeURIComponent(quote.serviceAddress)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3 border-t border-slate-200/80 px-3.5 py-3 transition-colors active:bg-slate-50"
+                      data-testid="service-address"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium leading-snug text-slate-900">{quote.serviceAddress}</span>
+                        <span className="block text-xs text-slate-500">Open in Maps</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                    </a>
+                  )}
+                </div>
+
+                {/* Line items — one card, totals docked as its footer */}
+                <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="line-items-card">
+                  <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Line items{lineItems.length > 0 ? ` (${lineItems.length})` : ""}
+                  </p>
+                  {lineItems.length === 0 ? (
+                    <p className="px-3.5 py-4 text-sm italic text-slate-400" data-testid="no-line-items">No line items</p>
+                  ) : (
+                    <div>
+                      {lineItems.map((item, i) => {
+                        const isDiscount = item.isDiscountLine || item.lineType === "discount";
+                        return (
+                          <div
+                            key={item.id}
+                            className={`flex items-start justify-between gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                            data-testid={`line-item-${item.id}`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                {isDiscount && <Tag className="h-3 w-3 shrink-0 text-amber-600" />}
+                                <p className="text-sm font-medium text-slate-900">{item.description}</p>
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {item.quantity} × {formatCurrency(item.unitPrice)}
+                              </p>
+                            </div>
+                            <span className={`shrink-0 text-sm font-semibold tabular-nums ${isDiscount ? "text-amber-700" : "text-slate-900"}`}>
+                              {formatCurrency(item.lineTotal)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="space-y-1.5 border-t border-slate-200/80 bg-slate-50 px-3.5 py-3" data-testid="totals-card">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Subtotal</span>
+                      <span className="font-medium tabular-nums" data-testid="subtotal">{formatCurrency(quote.subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-900">Total</span>
+                      <span className="text-lg font-bold tabular-nums text-[#711419]" data-testid="total">{formatCurrency(quote.total)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Present to Client button - available for draft, sent, viewed quotes */}
+                {(["draft", "sent", "viewed"] as string[]).includes(quote.status) && (
+                  <button
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
+                    onClick={() => navigate(`/mobile/quotes/${id}/present`)}
+                    data-testid="button-present-quote"
+                  >
+                    <Monitor className="h-4 w-4" />
+                    Present to Client
+                  </button>
+                )}
+
+                {quote.status === "draft" && (
+                  <button
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] border border-[#711419]/30 bg-white text-base font-semibold text-[#711419] transition-transform active:scale-[0.98] disabled:opacity-60"
+                    onClick={openEmailDialog}
+                    disabled={sendQuoteEmailMutation.isPending}
+                    data-testid="button-send-quote"
+                  >
+                    {sendQuoteEmailMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Mail className="h-4 w-4" />
+                    )}
+                    Send to Customer
+                  </button>
+                )}
+
+                {quote.status === "sent" && (
+                  <div className="flex gap-2">
+                    <button
+                      className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[4px] bg-green-600 text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+                      onClick={() => acceptMutation.mutate()}
+                      disabled={acceptMutation.isPending || declineMutation.isPending}
+                      data-testid="button-accept-quote"
+                    >
+                      {acceptMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4" />
+                      )}
+                      Accept
+                    </button>
+                    <button
+                      className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[4px] border border-red-200 bg-white text-base font-semibold text-red-600 transition-transform active:scale-[0.98] disabled:opacity-60"
+                      onClick={() => declineMutation.mutate()}
+                      disabled={acceptMutation.isPending || declineMutation.isPending}
+                      data-testid="button-decline-quote"
+                    >
+                      {declineMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4" />
+                      )}
+                      Decline
+                    </button>
+                  </div>
+                )}
+
+                {quote.createdAt && (
+                  <p className="text-center text-xs text-slate-400" data-testid="created-date">
+                    Created {format(new Date(quote.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                  </p>
+                )}
+              </div>
             )}
-            Send to Customer
-          </button>
-        )}
-
-        {quote.status === "sent" && (
-          <div className="flex gap-2">
-            <button
-              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[4px] bg-green-600 text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
-              onClick={() => acceptMutation.mutate()}
-              disabled={acceptMutation.isPending || declineMutation.isPending}
-              data-testid="button-accept-quote"
-            >
-              {acceptMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle className="h-4 w-4" />
-              )}
-              Accept
-            </button>
-            <button
-              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[4px] border border-red-200 bg-white text-base font-semibold text-red-600 transition-transform active:scale-[0.98] disabled:opacity-60"
-              onClick={() => declineMutation.mutate()}
-              disabled={acceptMutation.isPending || declineMutation.isPending}
-              data-testid="button-decline-quote"
-            >
-              {declineMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <XCircle className="h-4 w-4" />
-              )}
-              Decline
-            </button>
           </div>
-        )}
-
-        {quote.createdAt && (
-          <p className="text-center text-xs text-slate-400" data-testid="created-date">
-            Created {format(new Date(quote.createdAt), "MMM d, yyyy 'at' h:mm a")}
-          </p>
-        )}
+        </div>
       </div>
 
-      <Sheet open={showPreview} onOpenChange={setShowPreview}>
-        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
-          <SheetHeader className="mb-4">
-            <SheetTitle>Quote Preview</SheetTitle>
-          </SheetHeader>
-          
-          <div className="space-y-4" data-testid="quote-preview">
-            <div 
-              className="rounded-lg p-4 text-white"
-              style={{ backgroundColor: '#711419' }}
-            >
-              <h2 className="text-lg font-bold">{COMPANY_INFO.name}</h2>
-              <p className="text-sm opacity-90">{COMPANY_INFO.address}</p>
-              <div className="mt-2 text-sm opacity-90">
-                <p>{COMPANY_INFO.phone}</p>
-                <p>{COMPANY_INFO.email}</p>
-                <p>{COMPANY_INFO.website}</p>
-              </div>
+      {/* Floating back — OUTSIDE the sliding panel: it holds its spot while
+          the page follows your finger, then fades away as the swipe commits. */}
+      <button
+        ref={backRef}
+        onClick={() => goBackAnimated()}
+        className="fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
+        style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
+        data-testid="button-back"
+        aria-label="Back"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+
+      {/* Preview — a full sheet (create-page look) rendering the SAME
+          industrial document the customer sees on the public quote page:
+          maroon accent bar, Prepared for, items, maroon total + financing. */}
+      <DraggableSheet full open={showPreview} onOpenChange={setShowPreview} title="Quote preview" testid="quote-preview-sheet">
+        <button
+          onClick={() => setShowPreview(false)}
+          className="absolute right-4 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-transform active:scale-90"
+          aria-label="Close preview"
+          data-testid="quote-preview-close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        {quote && (
+          <div className="space-y-4 pb-6" data-testid="quote-preview">
+            <div className="flex justify-center py-2">
+              <img src={ghvacLogo} alt="Giesbrecht HVAC" className="h-14 w-auto object-contain" />
             </div>
 
-            <h3 
-              className="text-2xl font-bold"
-              style={{ color: '#711419' }}
-            >
-              QUOTE
-            </h3>
-
-            <div className="bg-slate-50 rounded-lg p-4">
-              <h4 className="font-semibold text-sm text-slate-600 mb-2">Bill To</h4>
-              <p className="font-medium">{quote.customerName}</p>
-              {quote.customerEmail && <p className="text-sm text-slate-600">{quote.customerEmail}</p>}
-              {quote.customerPhone && <p className="text-sm text-slate-600">{quote.customerPhone}</p>}
-              {quote.serviceAddress && <p className="text-sm text-slate-600">{quote.serviceAddress}</p>}
-            </div>
-
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="font-semibold text-slate-600">Quote #:</span>
-                  <span className="ml-2">{quote.quoteNumber}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-slate-600">Date:</span>
-                  <span className="ml-2">{quote.createdAt ? format(new Date(quote.createdAt), "MM/dd/yyyy") : "N/A"}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="font-semibold text-slate-600">Valid Until:</span>
-                  <span className="ml-2">{quote.validUntil ? format(new Date(quote.validUntil), "MM/dd/yyyy") : "N/A"}</span>
-                </div>
+            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              {/* Maroon accent bar — same industrial language as the public
+                  quote page and the quote email */}
+              <div className="h-1 w-full" style={{ backgroundColor: BRAND_COLOR }} />
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <p className="text-base font-bold tracking-tight text-slate-900">Quote #{quote.quoteNumber}</p>
+                <span className="text-xs text-slate-500">
+                  {quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : ""}
+                </span>
               </div>
-            </div>
-
-            <div className="border rounded-lg overflow-hidden">
-              <div 
-                className="p-3 text-white font-semibold text-sm"
-                style={{ backgroundColor: '#711419' }}
-              >
-                Line Items
-              </div>
-              <div className="divide-y">
-                <div className="grid grid-cols-12 gap-2 p-3 bg-slate-50 text-xs font-semibold text-slate-600">
-                  <div className="col-span-5">Description</div>
-                  <div className="col-span-2 text-center">Qty</div>
-                  <div className="col-span-2 text-right">Unit Price</div>
-                  <div className="col-span-3 text-right">Amount</div>
+              <div className="space-y-4 p-4">
+                <div className="rounded-[4px] border border-slate-300/70 bg-slate-50 p-3.5">
+                  <h3 className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Prepared for</h3>
+                  <p className="font-semibold text-slate-900">{quote.customerName}</p>
+                  {quote.serviceAddress && <p className="text-sm text-slate-600">{quote.serviceAddress}</p>}
+                  {quote.customerEmail && <p className="text-sm text-slate-600">{quote.customerEmail}</p>}
                 </div>
-                {lineItems.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className={`grid grid-cols-12 gap-2 p-3 text-sm ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
-                  >
-                    <div className="col-span-5 text-slate-800">{item.description}</div>
-                    <div className="col-span-2 text-center text-slate-600">{item.quantity}</div>
-                    <div className="col-span-2 text-right text-slate-600">{formatCurrency(item.unitPrice)}</div>
-                    <div className="col-span-3 text-right font-medium">{formatCurrency(item.lineTotal)}</div>
+
+                {quote.title && (
+                  <h3 className="text-base font-semibold text-slate-900">{quote.title}</h3>
+                )}
+
+                <div className="overflow-hidden rounded-[4px] border border-slate-300/70">
+                  <p className="border-b border-slate-200 bg-slate-100 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                    Quote details
+                  </p>
+                  {clientVisibleItems.length === 0 ? (
+                    <p className="px-3.5 py-5 text-center text-sm italic text-slate-400">No items listed</p>
+                  ) : (
+                    clientVisibleItems.map((item, i) => (
+                      <div
+                        key={item.id}
+                        className={`flex items-start justify-between gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-100" : ""}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900">{item.description}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Qty {parseFloat(item.quantity || "1")}</p>
+                        </div>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                          {formatCurrency(isSingleItem ? quote.total : item.lineTotal)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-2 rounded-[4px] border border-slate-300/70 bg-slate-50 p-3.5">
+                  <div className="flex items-center justify-between text-lg font-bold" style={{ color: BRAND_COLOR }}>
+                    <span>Total</span>
+                    <span data-testid="preview-total">{formatCurrency(quote.total)}</span>
                   </div>
-                ))}
+                  {isInstallQuote && monthlyFinancing(quote.total) > 0 && (
+                    <div className="border-t border-slate-200 pt-2">
+                      <div className="flex items-baseline justify-between text-sm font-medium text-slate-600">
+                        <span>Or with approved financing</span>
+                        <span data-testid="preview-monthly">~${monthlyFinancing(quote.total).toLocaleString()}/mo</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Estimate only — the exact payment depends on the plan and credit approval.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {quote.validUntil && (
+                  <p className="text-center text-sm text-slate-500">
+                    This quote is valid until {format(new Date(quote.validUntil), "MMMM d, yyyy")}.
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="flex flex-col items-end space-y-2 pt-4">
-              <div className="flex justify-between w-48 text-sm">
-                <span className="text-slate-600">Subtotal:</span>
-                <span className="font-medium">{formatCurrency(quote.subtotal)}</span>
-              </div>
-              <Separator className="w-48" />
-              <div className="flex justify-between w-48">
-                <span className="font-bold" style={{ color: '#711419' }}>Total:</span>
-                <span className="font-bold text-lg" style={{ color: '#711419' }}>{formatCurrency(quote.total)}</span>
-              </div>
-            </div>
+            <p className="text-center text-xs text-slate-400">
+              {COMPANY_INFO.name} · {COMPANY_INFO.phone} · {COMPANY_INFO.website}
+            </p>
 
-            <div className="pt-4">
-              <Button
-                className="w-full min-h-[48px]"
-                onClick={() => {
-                  setShowPreview(false);
-                  handleDownloadPDF();
-                }}
-                data-testid="button-download-from-preview"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-            </div>
+            <button
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
+              onClick={() => {
+                setShowPreview(false);
+                handleDownloadPDF();
+              }}
+              data-testid="button-download-from-preview"
+            >
+              <Download className="h-4 w-4" />
+              Download PDF
+            </button>
           </div>
-        </SheetContent>
-      </Sheet>
+        )}
+      </DraggableSheet>
 
       {/* Send Quote Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); setPhoneRecipient(""); setSendViaEmail(true); setSendViaSms(false); } }}>
@@ -638,15 +778,15 @@ export default function MobileQuoteDetail() {
             )}
           </div>
           <DialogFooter className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); setPhoneRecipient(""); setSendViaEmail(true); setSendViaSms(false); }}
               className="min-h-[44px]"
             >
               Cancel
             </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
+            <Button
+              className="min-h-[44px] bg-[#711419] hover:bg-[#8a1a1f]"
               onClick={handleSendEmail}
               disabled={sendQuoteEmailMutation.isPending || (!sendViaEmail && !sendViaSms) || (sendViaEmail && !emailRecipient.trim()) || (sendViaSms && !phoneRecipient.trim())}
               data-testid="button-confirm-send-quote"
@@ -666,6 +806,6 @@ export default function MobileQuoteDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </MobileShell>
+    </div>
   );
 }

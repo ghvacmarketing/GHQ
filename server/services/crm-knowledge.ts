@@ -697,6 +697,11 @@ The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" 
 - Mobile → More → Quotes (/mobile/quotes): every quote company-wide, newest first — filter by status, floating search (quote number / customer / title), tap through to the quote detail page (preview, PDF, send by email/SMS, Present to Client, accept/decline)
 - Mobile → More → Invoices (/mobile/invoices): billing across the company — filter by status and source (created in GHQ vs imported FieldEdge history), floating search, tap through to the invoice detail page (send, record cash/check, Take Card Payment via QR the customer scans and pays with Apple Pay/Google Pay/card)
 - ALL roles including techs can create quick quotes from the mobile "+" button (New Quote); New Invoice / New Customer / New Job stay supervisor-and-above
+- Creating a quote or invoice from INSIDE a job (the job's Quote/Invoice tabs) opens the exact same full create page as the "+" button with the job pre-selected — no customer/work-order picking
+- The mobile quote detail page is a back-swipe page (floating back arrow, edge-swipe returns to the Quotes list) with a Preview sheet that renders the same industrial document the customer sees on the public quote page (maroon accent bar, Prepared for, ~$/mo financing estimate on install quotes)
+
+### Mobile Checklist Gallery
+- Mobile → More → Checklist Gallery (/mobile/checklists): a READ-ONLY viewer of every checklist template, grouped by visit type (Service / Maintenance / Install / Sales metal badges) — each shows its work-order subtype, step-by-step questions (with section phases, answer types, required markers, help text) and required photo steps. Editing still happens only in CRM Settings → Checklists.
 
 ### Mobile Guide
 - Mobile → More → Guide (/mobile/guide): a built-in guide to the mobile app (tabs, the + create button, Gibbs, back-swipe and hold gestures) plus a badge reference explaining every metal badge — roles, visit types, time-clock categories, customer types, message contacts, and the avatar-with-role-badge composition

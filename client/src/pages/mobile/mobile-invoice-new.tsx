@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { format, subDays } from "date-fns";
 import { Search, X, ChevronRight, Loader2 } from "lucide-react";
 import { visitTypeBadge } from "@/pages/mobile/mobile-work-orders";
@@ -61,6 +61,27 @@ export default function MobileInvoiceNew() {
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [pickedCustomer, setPickedCustomer] = useState<CrmCustomer | null>(null);
   const [pickedWorkOrder, setPickedWorkOrder] = useState<WorkOrderWithRelations | null>(null);
+
+  // Launched from inside a job (?job=<id>): the work order is already known,
+  // so the picker never shows — the exact same form, minus the selection.
+  const presetJobId = new URLSearchParams(useSearch()).get("job");
+  const { data: presetJob, isLoading: presetLoading } = useQuery<WorkOrderWithRelations | null>({
+    queryKey: ["/api/crm/work-orders", "create-preset", presetJobId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/work-orders/${presetJobId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!presetJobId,
+  });
+  useEffect(() => {
+    if (presetJob && !pickedWorkOrder) {
+      setPickedWorkOrder(presetJob);
+      setPickedCustomer(presetJob.customer ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetJob]);
+  const waitingOnPreset = !!presetJobId && !pickedWorkOrder && presetLoading;
 
   // --- Invoice form state (mirrors in-job InvoiceTab) ---
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([]);
@@ -207,7 +228,13 @@ export default function MobileInvoiceNew() {
     >
       <div className="space-y-4">
         {/* --- Job picker --- */}
-        {pickedWorkOrder ? (
+        {waitingOnPreset ? (
+          <div className="space-y-2 rounded-[4px] border border-slate-300/70 bg-white px-4 py-3">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-3 w-56" />
+          </div>
+        ) : pickedWorkOrder ? (
           <div
             className="flex items-center justify-between gap-3 rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.05] px-4 py-3"
             data-testid="picked-job"

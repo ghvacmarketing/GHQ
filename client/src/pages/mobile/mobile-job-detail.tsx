@@ -1672,11 +1672,13 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           {!showQuickQuote ? (
             <>
               <p className="text-sm text-slate-600">
-                Create a simple quote with line items directly from here.
+                Create a simple quote with line items for this job.
               </p>
+              {/* Same full create page as the "+" button — the job is
+                  pre-selected so there's nothing to pick. */}
               <Button
                 className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => setShowQuickQuote(true)}
+                onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
                 data-testid="button-start-quick-quote"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -3109,9 +3111,11 @@ function InvoiceTab({
                 Create an invoice for work completed on this job.
               </p>
               <div className="flex flex-col gap-2">
+                {/* Same full create page as the "+" button — the job is
+                    pre-selected so there's nothing to pick. */}
                 <Button
                   className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                  onClick={() => setShowCreateForm(true)}
+                  onClick={() => navigate(`/mobile/invoices/new?job=${workOrder.id}`)}
                   data-testid="button-show-create-invoice-form"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -4111,9 +4115,31 @@ export default function MobileJobDetail() {
     }, dur - 10);
   };
 
+  // The floating back walks the tab trail: on Work/Quote/Invoice it returns
+  // to whichever tab you were on LAST; on Overview it always leaves the job.
+  const tabHistory = useRef<TabType[]>([]);
+  const tabBackPop = useRef(false);
+  const handleFloatingBack = () => {
+    if (activeTab === "overview") {
+      goBackAnimated();
+      return;
+    }
+    const hist = tabHistory.current;
+    let prev: TabType = "overview";
+    while (hist.length) {
+      const t = hist.pop()!;
+      if (t !== activeTab) { prev = t; break; }
+    }
+    tabBackPop.current = true;
+    switchTab(prev);
+  };
+
   // Switch tabs preserving each section's scroll position.
   const switchTab = (next: TabType) => {
     if (next === activeTab) return;
+    // Remember where you came FROM — unless this switch IS a back-pop
+    if (!tabBackPop.current) tabHistory.current.push(activeTab);
+    tabBackPop.current = false;
     if (next === "overview") { closeSectionAnimated(); return; }
     const sec = sectionsRef.current;
     const fromOverview = activeTab === "overview";
@@ -4736,14 +4762,12 @@ export default function MobileJobDetail() {
       )}
       {/* Floating back — OUTSIDE the sliding panel: it holds its spot while
           the page follows your finger, then fades away as the swipe commits.
-          Overview-only (sections navigate via the tab bar), styled exactly
-          like the customer detail page's back button. */}
+          On every tab: sections walk back to the tab you were on last, the
+          Overview leaves the job. Styled like the customer detail's back. */}
       <button
         ref={backRef}
-        onClick={() => goBackAnimated()}
-        className={`fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-opacity active:scale-95 ${
-          activeTab === "overview" ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        onClick={handleFloatingBack}
+        className="fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-opacity active:scale-95"
         style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
         data-testid="button-back"
         aria-label="Back"
@@ -4828,7 +4852,7 @@ export default function MobileJobDetail() {
               data and scroll positions survive round trips */}
           <div
             ref={sectionsRef}
-            className="job-section-enter absolute inset-0 z-20 overflow-auto bg-slate-50 px-4 pb-28 pt-4 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+            className="job-section-enter absolute inset-0 z-20 overflow-auto bg-slate-50 px-4 pb-28 pt-14 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
             style={{ display: activeTab === "overview" ? "none" : undefined }}
           >
             <div className={activeTab === "work" ? "job-tab-enter block" : "hidden"}>
