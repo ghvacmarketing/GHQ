@@ -7,6 +7,7 @@ import avatarCg from "@/assets/avatar-cg.png";
 import avatarBl from "@/assets/avatar-bl.png";
 import avatarKp from "@/assets/avatar-kp.png";
 import avatarGj from "@/assets/avatar-gj.png";
+import avatarCj from "@/assets/avatar-cj.png";
 
 /** Metal initials avatars, keyed by FIRST name (unique across the roster).
  *  Used for the signed-in user's chip in the mobile header and the CRM
@@ -16,16 +17,27 @@ const BY_FIRST: Record<string, string> = {
   ryo: avatarRm,
   darren: avatarDo,
   deandre: avatarDs,
+  dandre: avatarDs, // "D'andre" — apostrophe stripped by the lookup
   earnest: avatarEt,
   chandler: avatarCg,
   brian: avatarBl,
   kylee: avatarKp,
   geoffrey: avatarGj,
+  christopher: avatarCj,
+  chris: avatarCj,
 };
 
 export function userAvatarSrc(name?: string | null): string | null {
-  const first = (name || "").trim().toLowerCase().split(/\s+/)[0] || "";
+  // Letters only: "D'andre" → "dandre", so punctuation in a stored name
+  // never orphans someone's badge.
+  const first = ((name || "").trim().toLowerCase().split(/\s+/)[0] || "").replace(/[^a-z]/g, "");
   return BY_FIRST[first] ?? null;
+}
+
+/** Display rule: team members go by FIRST NAME across the mobile app and
+ *  the CRM (the badge keys off the same first name, so they always match). */
+export function firstNameOf(name?: string | null): string {
+  return (name || "").trim().split(/\s+/)[0] || "";
 }
 
 /** The profile-hero composition everywhere a person appears: the metal

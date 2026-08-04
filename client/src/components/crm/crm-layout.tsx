@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { userAvatarSrc } from "@/components/user-avatar-badge";
+import { firstNameOf, userAvatarSrc } from "@/components/user-avatar-badge";
 import { cn } from "@/lib/utils";
 
 // Persisted across route changes (the module stays loaded even though CrmLayout
@@ -387,7 +387,7 @@ function SidebarContent({
               <img
                 src={userAvatarSrc(currentUser?.name)!}
                 alt=""
-                title={currentUser?.name || "User"}
+                title={firstNameOf(currentUser?.name) || "User"}
                 className="h-9 w-9 select-none"
                 draggable={false}
                 data-testid="text-sidebar-user-name"
@@ -395,7 +395,7 @@ function SidebarContent({
             ) : (
               <div
                 className="h-9 w-9 rounded-md bg-[#711419] flex items-center justify-center text-white text-xs font-semibold"
-                title={currentUser?.name || "User"}
+                title={firstNameOf(currentUser?.name) || "User"}
                 data-testid="text-sidebar-user-name"
               >
                 {currentUser?.name
@@ -431,7 +431,7 @@ function SidebarContent({
             )}
             <div className="min-w-0 flex-1 leading-tight">
               <p className="truncate text-[13px] font-medium text-white" data-testid="text-sidebar-user-name">
-                {currentUser?.name || "User"}
+                {firstNameOf(currentUser?.name) || "User"}
               </p>
               <p className="truncate text-[11px] capitalize text-slate-400" data-testid="text-sidebar-user-role">
                 {currentUser?.role || "User"}
@@ -625,7 +625,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
             )}
           </Button>
           <div className="ml-1 flex items-center border-l border-border pl-3">
-            <span className="text-sm font-medium text-slate-600">{currentUser?.name || "User"}</span>
+            <span className="text-sm font-medium text-slate-600">{firstNameOf(currentUser?.name) || "User"}</span>
           </div>
           <Button
             variant="ghost"

@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { MoreIcon } from "@/components/crm/more-icon";
@@ -2198,7 +2199,7 @@ export default function CrmWorkOrderDetail() {
                           <SelectItem value="unassigned">Unassigned</SelectItem>
                           {technicians.map((tech) => (
                             <SelectItem key={tech.id} value={tech.id}>
-                              {tech.name}
+                              {firstNameOf(tech.name)}
                             </SelectItem>
                           ))}
                         </SelectContent>

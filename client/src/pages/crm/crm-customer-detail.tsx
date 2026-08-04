@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useState, useEffect, useRef } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, useSearch, Link } from "wouter";
@@ -5817,7 +5818,7 @@ export default function CrmCustomerDetail() {
                       </SelectItem>
                       {technicians.map((tech) => (
                         <SelectItem key={tech.id} value={tech.id} data-testid={`tech-${tech.id}`}>
-                          {tech.name}
+                          {firstNameOf(tech.name)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -6164,7 +6165,7 @@ export default function CrmCustomerDetail() {
                     </SelectItem>
                     {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id} data-testid={`wo-tech-${tech.id}`}>
-                        {tech.name}
+                        {firstNameOf(tech.name)}
                       </SelectItem>
                     ))}
                   </SelectContent>

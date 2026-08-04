@@ -57,17 +57,18 @@ export function DraggableSheet({
     return null;
   };
 
+  /** The Radix overlay renders as the sheet's previous sibling. */
+  const overlayOf = () => (sheetRef.current?.previousElementSibling as HTMLElement | null);
+
   const dismissAnimated = () => {
     const el = sheetRef.current;
     if (!el) return onOpenChange(false);
-    // Root sheets lighten the page gradually WITH the slide-down (nested
-    // pickers keep their quick scrim so the parent sheet pops back fast).
-    if (!nested) {
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) {
-        overlay.style.transition = "opacity 0.24s ease-in";
-        overlay.style.opacity = "0";
-      }
+    // The page lightens WITH the slide-down (continuing whatever dimming
+    // level the drag already tracked to).
+    const overlay = overlayOf();
+    if (overlay) {
+      overlay.style.transition = "opacity 0.24s ease-in";
+      overlay.style.opacity = "0";
     }
     el.style.transition = "transform 0.22s ease-in";
     el.style.transform = "translateY(100%)";
@@ -104,7 +105,17 @@ export function DraggableSheet({
         return;
       }
     }
-    if (st.engaged) el.style.transform = `translateY(${Math.max(0, dy)}px)`;
+    if (st.engaged) {
+      const dyc = Math.max(0, dy);
+      el.style.transform = `translateY(${dyc}px)`;
+      // The backdrop lightens in step with the finger — drag down and the
+      // page brightens, pull back up and it darkens again.
+      const ov = overlayOf();
+      if (ov) {
+        ov.style.transition = "none";
+        ov.style.opacity = String(Math.max(0, 1 - dyc / (el.clientHeight || window.innerHeight)));
+      }
+    }
   };
   const onPointerUp = (e: React.PointerEvent) => {
     const st = drag.current;
@@ -117,7 +128,18 @@ export function DraggableSheet({
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
-      setTimeout(() => { if (el) el.style.transition = BASE_TRANSITION; }, 260);
+      const ov = overlayOf();
+      if (ov) {
+        ov.style.transition = "opacity 0.25s ease-out";
+        ov.style.opacity = "1";
+      }
+      setTimeout(() => {
+        if (el) el.style.transition = BASE_TRANSITION;
+        if (ov) {
+          ov.style.transition = "";
+          ov.style.opacity = "";
+        }
+      }, 260);
     }
   };
 

@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useEffect, useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
@@ -343,7 +344,7 @@ export default function CrmSettingsFleet() {
             <SelectItem value="unassigned">Unassigned</SelectItem>
             {technicians.map((tech) => (
               <SelectItem key={tech.id} value={tech.id}>
-                {tech.name}
+                {firstNameOf(tech.name)}
               </SelectItem>
             ))}
           </SelectContent>

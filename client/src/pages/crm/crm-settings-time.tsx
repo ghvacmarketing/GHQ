@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useState, useEffect, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
@@ -777,7 +778,7 @@ export default function CrmSettingsTime() {
                   <SelectContent>
                     <SelectItem value="all">All Technicians</SelectItem>
                     {technicians.map((tech) => (
-                      <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                      <SelectItem key={tech.id} value={tech.id}>{firstNameOf(tech.name)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

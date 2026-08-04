@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
@@ -1791,7 +1792,7 @@ export default function CrmWorkOrders() {
                         <SelectItem value="unassigned">Unassigned</SelectItem>
                         {technicians.map((tech) => (
                           <SelectItem key={tech.id} value={tech.id}>
-                            {tech.name}
+                            {firstNameOf(tech.name)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -2309,7 +2310,7 @@ export default function CrmWorkOrders() {
                     <SelectItem value="unassigned">Unassigned</SelectItem>
                     {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
-                        {tech.name}
+                        {firstNameOf(tech.name)}
                       </SelectItem>
                     ))}
                   </SelectContent>

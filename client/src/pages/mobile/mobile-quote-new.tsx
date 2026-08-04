@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -362,7 +363,7 @@ export default function MobileQuoteNew() {
               label="Assign to"
               placeholder="Pick an admin…"
               value={selectedAssigneeId}
-              options={(adminUsers ?? []).map((u) => ({ key: u.id, label: u.name, img: roleBadgeSrc(u.role) }))}
+              options={(adminUsers ?? []).map((u) => ({ key: u.id, label: firstNameOf(u.name), img: roleBadgeSrc(u.role) }))}
               onChange={setSelectedAssigneeId}
               testid="select-quote-assignee"
             />

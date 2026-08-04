@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, ChevronDown, UserRound } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { AvatarWithRole } from "@/components/user-avatar-badge";
+import { AvatarWithRole, firstNameOf } from "@/components/user-avatar-badge";
 import type { CrmUser } from "@shared/schema";
 
 /** Teammate picker as a tile grid instead of a long row list: the whole
@@ -68,7 +68,7 @@ export function AssigneeSheet({
               <UserRound className="h-5 w-5 shrink-0 text-slate-400" />
             )}
             <span className={`truncate text-base ${current ? "text-slate-900" : "text-muted-foreground"}`}>
-              {current ? `${current.name}${current.id === meId ? " (me)" : ""}` : placeholder}
+              {current ? `${firstNameOf(current.name)}${current.id === meId ? " (me)" : ""}` : placeholder}
             </span>
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
@@ -84,7 +84,7 @@ export function AssigneeSheet({
           ) : (
             <UserRound className="ml-1 h-4 w-4 shrink-0 text-slate-400" />
           )}
-          <span className="truncate">{current?.name || "Unassigned"}</span>
+          <span className="truncate">{current ? firstNameOf(current.name) : "Unassigned"}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
         </button>
       )}

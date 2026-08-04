@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useEffect } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
@@ -374,7 +375,7 @@ export default function CrmGoalsTracker() {
                             <div className="p-1.5 bg-slate-100 rounded-full">
                               <User className="h-4 w-4 text-slate-500" />
                             </div>
-                            <span className="font-medium text-slate-900">{tech.name}</span>
+                            <span className="font-medium text-slate-900">{firstNameOf(tech.name)}</span>
                           </div>
                         </td>
                         <td className="text-right py-3 px-2">

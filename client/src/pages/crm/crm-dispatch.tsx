@@ -1,3 +1,4 @@
+import { firstNameOf } from "@/components/user-avatar-badge";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
@@ -875,7 +876,7 @@ function TechsDayView({
           <img src={roleBadgeSrc(a.role)} alt="" className="h-10 w-10 shrink-0 select-none" draggable={false} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate font-semibold text-slate-900">{a.name}</span>
+              <span className="truncate font-semibold text-slate-900">{firstNameOf(a.name)}</span>
               <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{fmtClockMins(a.total)}</span>
             </div>
             {a.active && cat ? (
@@ -1363,7 +1364,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
                       <User className="w-5 h-5 text-slate-500" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-slate-800 truncate">{tech.name}</p>
+                      <p className="text-xs font-medium text-slate-800 truncate">{firstNameOf(tech.name)}</p>
                     </div>
                   </div>
                 </td>
@@ -2141,7 +2142,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                         <User className="w-6 h-6 text-slate-500" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
+                        <p className="text-sm font-medium text-slate-800 truncate">{firstNameOf(tech.name)}</p>
                         <p className="text-xs text-slate-400">{techWorkOrders.length} work orders</p>
                       </div>
                     </div>
@@ -2685,7 +2686,7 @@ function DroppableTechnicianRow({ tech, workOrders, onResize, activeId, onWorkOr
           </svg>
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
+          <p className="text-sm font-medium text-slate-800 truncate">{firstNameOf(tech.name)}</p>
           <p className="text-xs text-slate-400">{workOrders.length} work orders</p>
         </div>
       </div>

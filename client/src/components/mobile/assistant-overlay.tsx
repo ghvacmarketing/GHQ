@@ -122,6 +122,7 @@ export default function AssistantOverlay({
   // Drag-to-dismiss for the mode sheet — same feel as DraggableSheet: follow
   // the finger, commit past ~90px, spring back otherwise.
   const modeSheetRef = useRef<HTMLDivElement>(null);
+  const modeScrimRef = useRef<HTMLDivElement>(null);
   const modeDragY = useRef<number | null>(null);
   const onModeDragDown = (e: React.PointerEvent) => {
     modeDragY.current = e.clientY;
@@ -132,7 +133,14 @@ export default function AssistantOverlay({
     if (modeDragY.current == null) return;
     const dy = e.clientY - modeDragY.current;
     const el = modeSheetRef.current;
-    if (el) el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+    if (el) {
+      el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+      const s = modeScrimRef.current;
+      if (s) {
+        s.style.transition = "none";
+        s.style.opacity = String(Math.max(0, 1 - Math.max(0, dy) / (el.clientHeight || window.innerHeight)));
+      }
+    }
   };
   const onModeDragEnd = (e: React.PointerEvent) => {
     if (modeDragY.current == null) return;
@@ -140,7 +148,12 @@ export default function AssistantOverlay({
     modeDragY.current = null;
     const el = modeSheetRef.current;
     if (!el) return;
+    const scrim = modeScrimRef.current;
     if (dy > 90) {
+      if (scrim) {
+        scrim.style.transition = "opacity 0.18s ease-in";
+        scrim.style.opacity = "0";
+      }
       el.style.transition = "transform 0.2s ease-in";
       el.style.transform = "translateY(100%)";
       setTimeout(() => {
@@ -151,8 +164,16 @@ export default function AssistantOverlay({
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
+      if (scrim) {
+        scrim.style.transition = "opacity 0.25s ease-out";
+        scrim.style.opacity = "1";
+      }
       setTimeout(() => {
         if (el) el.style.transition = "";
+        if (scrim) {
+          scrim.style.transition = "";
+          scrim.style.opacity = "";
+        }
       }, 260);
     }
   };
@@ -231,6 +252,60 @@ export default function AssistantOverlay({
       b.style.opacity = "0";
     }
   };
+  // Finger-tracked dimming: only the BLACK fades with drag progress — the
+  // blur stays constant (backgroundColor, not element opacity).
+  const trackBackdrop = (p: number) => {
+    const b = backdropRef.current;
+    if (b) {
+      b.style.transition = "none";
+      b.style.backgroundColor = `rgba(0,0,0,${(0.5 * Math.max(0, 1 - p)).toFixed(3)})`;
+    }
+  };
+  const restoreBackdrop = () => {
+    const b = backdropRef.current;
+    if (!b) return;
+    b.style.transition = "background-color 0.25s ease-out";
+    b.style.backgroundColor = "rgba(0,0,0,0.5)";
+    window.setTimeout(() => {
+      b.style.transition = "";
+      b.style.backgroundColor = "";
+    }, 260);
+  };
+
+  // History sheet scrim — same finger-tracked dimming; inline styles are
+  // always cleared on settle/close so the class-driven fade stays in charge.
+  const histScrimRef = useRef<HTMLDivElement>(null);
+  const trackHistScrim = (p: number) => {
+    const s = histScrimRef.current;
+    if (s) {
+      s.style.transition = "none";
+      s.style.opacity = String(Math.max(0, 1 - p));
+    }
+  };
+  const restoreHistScrim = () => {
+    const s = histScrimRef.current;
+    if (!s) return;
+    s.style.transition = "opacity 0.25s ease-out";
+    s.style.opacity = "1";
+    window.setTimeout(() => {
+      s.style.transition = "";
+      s.style.opacity = "";
+    }, 260);
+  };
+  const fadeHistScrimOut = () => {
+    const s = histScrimRef.current;
+    if (s) {
+      s.style.transition = "opacity 0.22s ease-in";
+      s.style.opacity = "0";
+    }
+  };
+  const clearHistScrim = () => {
+    const s = histScrimRef.current;
+    if (s) {
+      s.style.transition = "";
+      s.style.opacity = "";
+    }
+  };
 
   // Swipe down on the handle/header to dismiss — live drag follow, commit
   // past ~110px, spring back otherwise (same feel as DraggableSheet).
@@ -245,6 +320,7 @@ export default function AssistantOverlay({
     st.dy = Math.max(0, e.clientY - st.y);
     el.style.transition = "none";
     el.style.transform = `translateY(${st.dy}px)`;
+    trackBackdrop(st.dy / (el.clientHeight || window.innerHeight));
   };
   const onDragEnd = () => {
     const st = dragRef.current;
@@ -263,6 +339,7 @@ export default function AssistantOverlay({
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
+      restoreBackdrop();
       setTimeout(() => {
         if (el) el.style.transition = "";
       }, 260);
@@ -282,7 +359,10 @@ export default function AssistantOverlay({
     if (histDragY.current == null) return;
     const dy = e.clientY - histDragY.current;
     const el = histSheetRef.current;
-    if (el) el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+    if (el) {
+      el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+      trackHistScrim(Math.max(0, dy) / (el.clientHeight || window.innerHeight));
+    }
   };
   const onHistDragEnd = (e: React.PointerEvent) => {
     if (histDragY.current == null) return;
@@ -291,16 +371,19 @@ export default function AssistantOverlay({
     const el = histSheetRef.current;
     if (!el) return;
     if (dy > 110) {
+      fadeHistScrimOut();
       el.style.transition = "transform 0.22s ease-in";
       el.style.transform = "translateY(100%)";
       setTimeout(() => {
         setHistoryOpen(false);
+        clearHistScrim();
         el.style.transition = "";
         el.style.transform = "";
       }, 200);
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
+      restoreHistScrim();
       setTimeout(() => {
         if (el) {
           el.style.transition = "";
@@ -363,8 +446,10 @@ export default function AssistantOverlay({
     stRef: React.MutableRefObject<HoldSt>,
     getEl: () => HTMLDivElement | null,
     commit: () => void,
-    onCommitStart?: () => void,
+    hooks?: { onCommitStart?: () => void; onProgress?: (p: number) => void; onSpringBack?: () => void; holdMs?: number },
   ) => {
+    const onCommitStart = hooks?.onCommitStart;
+    const holdMs = hooks?.holdMs ?? 240;
     const release = (st: HoldSt) => {
       window.clearTimeout(st.timer);
       if (st.scroller && st.stop) st.scroller.removeEventListener("touchmove", st.stop);
@@ -393,6 +478,7 @@ export default function AssistantOverlay({
       } else {
         el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
         el.style.transform = "translateY(0)";
+        hooks?.onSpringBack?.();
         window.setTimeout(() => {
           el.style.transition = "";
           el.style.transform = "";
@@ -422,7 +508,7 @@ export default function AssistantOverlay({
           st.stop = stop;
           const el = getEl();
           if (el) el.style.transition = "none";
-        }, 240);
+        }, holdMs);
       },
       onPointerMove: (e: React.PointerEvent) => {
         const st = stRef.current;
@@ -434,7 +520,10 @@ export default function AssistantOverlay({
           return;
         }
         const el = getEl();
-        if (el) el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+        if (el) {
+          el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+          hooks?.onProgress?.(Math.max(0, dy) / (el.clientHeight || window.innerHeight));
+        }
       },
       onPointerUp: end,
       onPointerCancel: end,
@@ -1049,10 +1138,13 @@ export default function AssistantOverlay({
       <div
         ref={sheetRef}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
+          "absolute inset-x-0 bottom-0 flex select-none flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
           historyOpen && "scale-[0.96]",
         )}
-        style={{ top: "env(safe-area-inset-top)" }}
+        // select-none sheet-wide: holding empty space (the drag gesture) must
+        // never pop iOS's blue text selection on nearby bubbles. The composer
+        // opts back in below.
+        style={{ top: "env(safe-area-inset-top)", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
       >
         {/* Chat page */}
         <div
@@ -1061,7 +1153,7 @@ export default function AssistantOverlay({
         >
         {/* Drag handle — swipe down anywhere on the handle/header to dismiss */}
         <div
-          className="flex shrink-0 justify-center pb-2 pt-2"
+          className="relative z-10 flex shrink-0 justify-center pb-2 pt-2"
           style={{ touchAction: "none" }}
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
@@ -1072,6 +1164,12 @@ export default function AssistantOverlay({
         >
           <span className="h-1 w-10 rounded-full bg-slate-300" />
         </div>
+        {/* Chat scrolling under the floating controls fades out into the top
+            edge instead of colliding with them — same as the create pages. */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-20 bg-gradient-to-b from-white via-white/85 to-transparent"
+          aria-hidden
+        />
         {/* Floating corner controls — glassy, no header strip, so the chat
             runs all the way to the top and just blurs underneath them.
             History left, Gibbs (mode) center, new chat right. */}
@@ -1116,7 +1214,11 @@ export default function AssistantOverlay({
         <div
           ref={chatScrollRef}
           onScroll={onChatScroll}
-          {...holdDragHandlers(chatHoldSt, () => sheetRef.current, onClose, fadeBackdrop)}
+          {...holdDragHandlers(chatHoldSt, () => sheetRef.current, onClose, {
+            onCommitStart: fadeBackdrop,
+            onProgress: trackBackdrop,
+            onSpringBack: restoreBackdrop,
+          })}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16"
         >
           {messages.length === 0 && !pending ? (
@@ -1513,7 +1615,7 @@ export default function AssistantOverlay({
                       ? "Tell me the details — I'll fill the form…"
                       : "Ask Gibbs anything…"
               }
-              className="max-h-32 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:outline-none focus-visible:ring-0"
+              className="max-h-32 min-h-[28px] w-full select-text resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400 focus:outline-none focus-visible:ring-0"
               data-testid="assistant-input"
             />
             <div className="mt-1.5 flex items-center gap-0.5">
@@ -1589,7 +1691,7 @@ export default function AssistantOverlay({
             Sets how Gibbs behaves; the pick persists across sessions. */}
         {modeSheetOpen && (
           <div className="absolute inset-0 z-40" data-testid="assistant-mode-sheet">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setModeSheetOpen(false)} />
+            <div ref={modeScrimRef} className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" onClick={() => setModeSheetOpen(false)} />
             <div
               ref={modeSheetRef}
               className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-4 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
@@ -1651,6 +1753,7 @@ export default function AssistantOverlay({
           New chat on its right, which turns into an X while searching. ── */}
       <div className={cn("absolute inset-0 z-30", historyOpen ? "" : "pointer-events-none")}>
         <div
+          ref={histScrimRef}
           className={cn("absolute inset-0 bg-black/35 transition-opacity duration-300", historyOpen ? "opacity-100" : "opacity-0")}
           style={{ touchAction: "none" }}
           onClick={() => setHistoryOpen(false)}
@@ -1695,7 +1798,15 @@ export default function AssistantOverlay({
           <div
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
             style={{ touchAction: "pan-y", paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
-            {...holdDragHandlers(histHoldSt, () => histSheetRef.current, () => setHistoryOpen(false))}
+            {...holdDragHandlers(
+              histHoldSt,
+              () => histSheetRef.current,
+              () => {
+                setHistoryOpen(false);
+                clearHistScrim();
+              },
+              { onCommitStart: fadeHistScrimOut, onProgress: trackHistScrim, onSpringBack: restoreHistScrim, holdMs: 150 },
+            )}
           >
             {/* Inside a space — its header; new chats file here */}
             {activeSpaceObj && !historySearch.trim() && (
