@@ -80,6 +80,13 @@ export default function LandingSelect() {
   const [isMobileView] = useState(
     () => typeof window !== "undefined" && (isNativeApp() || window.innerWidth < 768),
   );
+  // "Back to welcome page" from a sign-in screen: show the two doors NO
+  // MATTER WHAT the session state says. Without this, a half-alive session
+  // (stale token, mismatched cookie) auto-routed right back to a login and
+  // the button looked dead.
+  const [forceChooser] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("choose") === "1",
+  );
 
   const { data: crmUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -111,22 +118,26 @@ export default function LandingSelect() {
     if (isMobileView) {
       // The industry rule for dual-audience apps: signed-in users NEVER see
       // an audience chooser — their session routes them. The two doors are
-      // only for the signed-out.
+      // only for the signed-out — EXCEPT when a sign-in page explicitly
+      // sent the user back here (?choose=1).
+      if (forceChooser) return;
       if (ready && isAuthenticated) window.location.replace("/mobile");
       else if (portalMe?.account) window.location.replace("/portal/dashboard");
       return;
     }
     // Desktop: the launcher is staff-only, so no session → CRM login.
-    if (ready && !isAuthenticated) navigate("/crm/login");
-  }, [ready, isAuthenticated, isMobileView, portalMe, navigate]);
+    // (Never while the chooser is forced — that would loop right back.)
+    if (ready && !isAuthenticated && !forceChooser) navigate("/crm/login");
+  }, [ready, isAuthenticated, isMobileView, portalMe, navigate, forceChooser]);
 
   if (entryHold) {
     return <AppLoader />;
   }
 
-  if (isMobileView) {
+  if (isMobileView || forceChooser) {
     // Session found → the redirect above is in flight; hold the loader.
-    if (!ready || isAuthenticated || portalMe?.account) {
+    // A forced chooser shows the doors immediately — no session gating.
+    if (!forceChooser && (!ready || isAuthenticated || portalMe?.account)) {
       return <AppLoader />;
     }
     return (

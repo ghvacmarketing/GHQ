@@ -246,7 +246,10 @@ export default function CrmLogin() {
               <button
                 type="button"
                 onClick={() => {
-                  window.location.href = "/";
+                  // ?choose=1 forces the two-door chooser past any session
+                  // auto-routing — without it a half-alive session bounced
+                  // straight back to a login.
+                  window.location.href = "/?choose=1";
                 }}
                 className="text-sm font-medium text-[#711419]"
                 data-testid="link-customer-portal"
