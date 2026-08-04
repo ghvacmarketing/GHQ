@@ -99,6 +99,10 @@ export function DraggableSheet({
         st.engaged = true;
         el.style.transition = "none";
         el.setPointerCapture?.(e.pointerId);
+        // Typing mid-drag (customer/address search): drop the caret and
+        // keyboard the moment the sheet starts moving — a focused input
+        // inside a translating layer draws its cursor all over the place.
+        (document.activeElement as HTMLElement | null)?.blur?.();
       } else if (dy < -10 || dx > 16) {
         // Clearly a scroll-up or horizontal move — never becomes a sheet drag
         st.eligible = false;
