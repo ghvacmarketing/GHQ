@@ -176,9 +176,9 @@ export default function CrmLogin() {
             <ChevronLeft className="h-4 w-4" />
             Back
           </a>
-          <img src={redlogo} alt="Giesbrecht HVAC" className="mb-6 h-10 lg:mb-8 lg:h-12" />
-          <h1 className="text-[26px] font-semibold tracking-tight text-slate-900 lg:text-2xl lg:text-foreground">Sign in to GHQ</h1>
-          <p className="mt-1 text-sm text-slate-500 lg:text-muted-foreground">Giesbrecht HVAC Headquarters</p>
+          <img src={redlogo} alt="Giesbrecht HVAC" className="mx-auto mb-6 h-11 lg:mx-0 lg:mb-8 lg:h-12" />
+          <h1 className="text-center text-[26px] font-semibold tracking-tight text-slate-900 lg:text-left lg:text-2xl lg:text-foreground">Sign in to GHQ</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground lg:block">Giesbrecht HVAC Headquarters</p>
 
           {googleError && (
             <div className="mt-6 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="banner-google-error">
@@ -197,15 +197,11 @@ export default function CrmLogin() {
             </div>
           )}
 
-          {/* Phones: the form rides an industrial white card on the slate
-              canvas (same language as the rest of the mobile app); desktop
-              keeps the flat pane. */}
-          <div className="mt-6 rounded-[4px] border border-slate-300/70 bg-white p-5 shadow-sm lg:mt-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
           <Button
             type="button"
             variant="outline"
             onClick={handleGoogleSignIn}
-            className="mt-0 h-12 w-full rounded-[4px] border-slate-300/70 font-medium lg:mt-7"
+            className="mt-7 h-12 w-full rounded-[4px] border-slate-300/70 bg-white font-medium"
             data-testid="button-google-signin"
           >
             <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -219,7 +215,7 @@ export default function CrmLogin() {
 
           <div className="relative my-5">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground lg:bg-background">or with email</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#f4f5f6] px-2 text-muted-foreground lg:bg-background">or with email</span></div>
           </div>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -243,9 +239,8 @@ export default function CrmLogin() {
               {loginMutation.isPending ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Signing in…</> : "Sign in"}
             </Button>
           </form>
-          </div>
 
-          <div className="mt-6 border-t border-slate-200 pt-5 text-center lg:mt-8">
+          <div className="mt-8 border-t border-slate-200 pt-5 text-center">
             <p className="text-sm text-muted-foreground">
               Giesbrecht HVAC customer?{" "}
               <a

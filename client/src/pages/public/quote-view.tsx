@@ -709,20 +709,22 @@ export default function PublicQuoteView() {
           <BrandLogo />
         </div>
 
-        <Card className="shadow-lg mb-6 bg-slate-50 border-0">
-          <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
-            <div className="flex items-center justify-between text-white">
+        <Card className="mb-6 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+          {/* Maroon accent bar — same industrial language as the quote email */}
+          <div className="h-1 w-full" style={{ backgroundColor: BRAND_COLOR }} />
+          <CardHeader className="border-b border-slate-200 bg-white">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                <CardTitle className="text-xl">Quote #{quoteData.quoteNumber}</CardTitle>
+                <FileText className="h-5 w-5" style={{ color: BRAND_COLOR }} />
+                <CardTitle className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">Quote #{quoteData.quoteNumber}</CardTitle>
               </div>
-              <span className="text-sm opacity-90">{formatDate(quoteData.createdAt)}</span>
+              <span className="text-sm text-slate-500">{formatDate(quoteData.createdAt)}</span>
             </div>
           </CardHeader>
-          <CardContent className="py-6 space-y-6 bg-slate-50">
-            <div className="bg-slate-100 rounded-lg p-4">
-              <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
-              <p className="font-medium text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
+          <CardContent className="space-y-6 bg-white py-6">
+            <div className="rounded-[4px] border border-slate-300/70 bg-slate-50 p-4">
+              <h3 className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Prepared for</h3>
+              <p className="font-semibold text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
               {quoteData.serviceAddress && (
                 <p className="text-slate-600 text-sm" data-testid="text-service-address">{quoteData.serviceAddress}</p>
               )}
@@ -758,10 +760,10 @@ export default function PublicQuoteView() {
                       <div 
                         key={option.tag} 
                         onClick={() => setSelectedOption(option.tag)}
-                        className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                          isSelected 
-                            ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
-                            : "border-slate-200 hover:border-slate-400"
+                        className={`border-2 rounded-[4px] overflow-hidden cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md"
+                            : "border-slate-300/70 hover:border-slate-400"
                         }`}
                         data-testid={`option-card-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}
                       >
@@ -778,7 +780,7 @@ export default function PublicQuoteView() {
                             <div className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</div>
                             {monthlyFinancing(option.total) > 0 && (
                               <div className="text-xs font-medium text-slate-500" data-testid={`option-monthly-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}>
-                                or {formatCurrency(monthlyFinancing(option.total))}/mo financing
+                                or about ${monthlyFinancing(option.total).toLocaleString()}/mo with financing
                               </div>
                             )}
                           </div>
@@ -927,15 +929,20 @@ export default function PublicQuoteView() {
                   </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <div className="rounded-[4px] border border-slate-300/70 bg-slate-50 p-4 space-y-2">
                   <div className="flex justify-between text-xl font-bold" style={{ color: BRAND_COLOR }}>
                     <span>Total</span>
                     <span data-testid="text-quote-total">{formatCurrency(quoteData.total)}</span>
                   </div>
                   {isInstallQuote && monthlyFinancing(quoteData.total) > 0 && (
-                    <div className="flex justify-between items-baseline text-sm font-medium text-slate-600 border-t border-slate-200 pt-2">
-                      <span>Or with approved financing</span>
-                      <span data-testid="text-quote-monthly">{formatCurrency(monthlyFinancing(quoteData.total))}/mo</span>
+                    <div className="border-t border-slate-200 pt-2">
+                      <div className="flex justify-between items-baseline text-sm font-medium text-slate-600">
+                        <span>Or with approved financing</span>
+                        <span data-testid="text-quote-monthly">about ${monthlyFinancing(quoteData.total).toLocaleString()}/mo</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Estimate only — your exact payment depends on the plan and credit approval.
+                      </p>
                     </div>
                   )}
                   {isInstallQuote && effectiveTotal > 0 && (
@@ -966,7 +973,7 @@ export default function PublicQuoteView() {
 
         {/* Only show Terms & Conditions for install quotes (proposal and custom_install) */}
         {quoteData.quoteType !== "quick" && quoteData.quoteType !== "custom_service" && (
-          <Card className="shadow-lg mb-6">
+          <Card className="mb-6 rounded-[4px] border border-slate-300/70 shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Terms & Conditions</CardTitle>
             </CardHeader>
@@ -982,7 +989,7 @@ export default function PublicQuoteView() {
           </Card>
         )}
 
-        <Card className="shadow-lg">
+        <Card className="overflow-hidden rounded-[4px] border border-slate-300/70 shadow-sm">
           <CardHeader style={{ backgroundColor: BRAND_COLOR }}>
             <CardTitle className="text-lg text-white">Accept & Sign</CardTitle>
           </CardHeader>
