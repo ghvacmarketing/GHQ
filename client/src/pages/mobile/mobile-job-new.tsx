@@ -578,6 +578,7 @@ export default function MobileJobNew() {
               disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
               numberOfMonths={1}
               className="w-full p-0"
+              fixedWeeks
               classNames={SCHEDULE_CAL_CLASSNAMES}
             />
           </div>

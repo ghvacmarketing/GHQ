@@ -123,6 +123,7 @@ export function DateRangeSheet({
             }}
             month={month}
             onMonthChange={setMonth}
+            fixedWeeks
             numberOfMonths={1}
             className="w-full p-0"
             classNames={RANGE_CLASSNAMES}
@@ -218,12 +219,14 @@ export function DateSheet({
             mode="single"
             selected={selected}
             onSelect={(d) => {
+              // Picking a day only sets it — the sheet stays up until Done,
+              // so a stray tap never commits-and-vanishes.
               onChange(d ? format(d, "yyyy-MM-dd") : "");
-              if (d) setTimeout(() => setOpen(false), 180);
             }}
             month={month}
             onMonthChange={setMonth}
             numberOfMonths={1}
+            fixedWeeks
             disabled={minToday ? { before: startOfToday() } : undefined}
             className="w-full p-0"
             classNames={SINGLE_CLASSNAMES}
@@ -241,7 +244,8 @@ export function DateSheet({
           </button>
           <button
             onClick={() => setOpen(false)}
-            className="h-12 flex-1 rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98]"
+            disabled={!value}
+            className="h-12 flex-1 rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400"
             data-testid={testid ? `${testid}-done` : undefined}
           >
             Done
