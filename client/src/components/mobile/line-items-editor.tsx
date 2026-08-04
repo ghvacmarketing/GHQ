@@ -179,13 +179,13 @@ export function LineItemsEditor({
               <h2 className="text-lg font-semibold text-slate-900">Price book</h2>
               <button
                 onClick={() => setCatalogFilterOpen(true)}
-                className="relative flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+                className="flex h-10 max-w-[55%] items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
                 aria-label="Filter by category"
                 data-testid="catalog-filter-open"
               >
-                <ListFilter className="h-4 w-4" />
-                {catalogCat === "all" ? "Filters" : categoryLabel(catalogCat)}
-                {catalogCat !== "all" && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+                <ListFilter className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 truncate">{catalogCat === "all" ? "Filters" : categoryLabel(catalogCat)}</span>
+                {catalogCat !== "all" && <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
               </button>
             </div>
             <div className="mt-3 flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
@@ -201,7 +201,7 @@ export function LineItemsEditor({
 
             <div
               className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
-              style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
+              style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 44 }}
             >
               {catalogLoading ? (
                 <p className="py-8 text-center text-sm text-slate-400">Loading the catalog…</p>
@@ -243,9 +243,9 @@ export function LineItemsEditor({
           </div>
 
           {/* Category filter — its own nested sheet, checkable rows */}
-          <DraggableSheet nested open={catalogFilterOpen} onOpenChange={setCatalogFilterOpen} title="Filter by category" testid="catalog-filter-sheet">
+          <DraggableSheet nested tall open={catalogFilterOpen} onOpenChange={setCatalogFilterOpen} title="Filter by category" testid="catalog-filter-sheet">
             <h2 className="text-lg font-semibold text-slate-900">Category</h2>
-            <div className="mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white pb-0">
+            <div className="mb-2 mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
               {["all", ...catalogCats].map((c, i) => (
                 <button
                   key={c}

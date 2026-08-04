@@ -125,22 +125,23 @@ export function MobileCreatePage({
   return (
     <div
       ref={rootRef}
-      className={`fixed inset-0 z-[70] flex flex-col bg-slate-50 ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`}
+      className={`fixed inset-x-0 bottom-0 z-[70] flex flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`}
+      style={{ top: "env(safe-area-inset-top)" }}
       data-testid={testid}
     >
       {/* Content scrolling under the floating controls fades out into the
           top edge instead of colliding with them. */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
-        style={{ height: "calc(env(safe-area-inset-top) + 64px)" }}
+        style={{ height: "64px" }}
       />
-      {/* A PAGE that arrives and leaves like a bottom sheet: no grab handle,
-          no drag-to-dismiss — the X is the only way out (with the discard
-          guard when the form is dirty). */}
+      {/* A true-looking SHEET: rounded 24px top corners below the status
+          bar, so the border shows rising in and riding down on close. No
+          grab handle, no drag-to-dismiss — the X is the only way out (with
+          the discard guard when the form is dirty). */}
       <button
         onClick={handleClose}
-        className="absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur transition-transform active:scale-95"
-        style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+        className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur transition-transform active:scale-95"
         aria-label="Close"
         data-testid="create-page-close"
       >
@@ -148,8 +149,7 @@ export function MobileCreatePage({
       </button>
       <button
         onClick={() => setAssistantOpen(true)}
-        className="absolute right-3 z-10 rounded-full shadow-md transition-transform active:scale-95"
-        style={{ top: "calc(env(safe-area-inset-top) + 10px)" }}
+        className="absolute right-3 top-3 z-10 rounded-full shadow-md transition-transform active:scale-95"
         aria-label="Ask Gibbs for help"
         data-testid="create-page-gibbs"
       >
@@ -159,7 +159,7 @@ export function MobileCreatePage({
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4"
         style={{
-          paddingTop: "calc(env(safe-area-inset-top) + 60px)",
+          paddingTop: "64px",
           paddingBottom: `calc(env(safe-area-inset-bottom) + 32px + ${keyboardInset}px)`,
           transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
