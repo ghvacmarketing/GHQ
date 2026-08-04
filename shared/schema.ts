@@ -4700,6 +4700,9 @@ export const aiConversations = pgTable("ai_conversations", {
   userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
   spaceId: varchar("space_id"), // nullable — conversation can live outside any space
   title: text("title"), // first question, trimmed for the history list
+  // Create-copilot sessions (form helpers) — kept for the audit trail but
+  // hidden from the history list and never resumed as "latest".
+  isCopilot: boolean("is_copilot").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

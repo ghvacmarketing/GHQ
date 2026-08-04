@@ -2301,7 +2301,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : undefined;
 
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question, history, images, mode, onDelta, createContext);
+      // Copilot sessions are locked to the full (general) brain — the saved
+      // mode preference belongs to the standalone chat, and conversation-only
+      // mode would strip the fill_form behavior the copilot exists for.
+      const effectiveMode = createContext ? "general" : mode;
+      const result = await askCrmHelp(question, history, images, effectiveMode, onDelta, createContext);
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
@@ -2322,7 +2326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           const [created] = await db
             .insert(aiConversations)
-            .values({ userId: user.id, title: question.trim().slice(0, 80), spaceId })
+            .values({ userId: user.id, title: question.trim().slice(0, 80), spaceId, isCopilot: !!createContext })
             .returning({ id: aiConversations.id });
           convoId = created.id;
         } else {
@@ -2468,7 +2472,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const convos = await db
         .select({ id: aiConversations.id, title: aiConversations.title, spaceId: aiConversations.spaceId, updatedAt: aiConversations.updatedAt })
         .from(aiConversations)
-        .where(eq(aiConversations.userId, targetUserId))
+        // Copilot form-helper sessions stay out of the history list
+        .where(and(eq(aiConversations.userId, targetUserId), eq(aiConversations.isCopilot, false)))
         .orderBy(desc(aiConversations.updatedAt))
         .limit(50);
       res.json(convos);
@@ -2600,7 +2605,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [convo] = await db
         .select()
         .from(aiConversations)
-        .where(eq(aiConversations.userId, user.id))
+        // Never resume a copilot form-helper fragment as "the latest chat"
+        .where(and(eq(aiConversations.userId, user.id), eq(aiConversations.isCopilot, false)))
         .orderBy(desc(aiConversations.updatedAt))
         .limit(1);
       if (!convo) return res.json(null);

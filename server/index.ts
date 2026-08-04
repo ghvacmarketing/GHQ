@@ -405,6 +405,7 @@ async function runAiConversationMigrations() {
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_conversations_user_updated_idx ON ai_conversations(user_id, updated_at)`);
+    await db.execute(sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS is_copilot boolean NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_messages_conversation_idx ON ai_messages(conversation_id, created_at)`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS ai_spaces (

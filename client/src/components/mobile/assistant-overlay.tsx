@@ -7,7 +7,7 @@ import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-acti
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { useKeyboardInset } from "@/lib/native";
-import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, RotateCcw, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
@@ -49,6 +49,22 @@ const STARTERS = [
   "Create a work order",
   "Add a task for tomorrow",
 ];
+
+// Copilot starters — matched to the form Gibbs is anchored to, voice-first.
+const COPILOT_STARTERS: Record<string, string[]> = {
+  customer: [
+    "I'll dictate the customer — fill it in as I talk",
+    "I'll paste a text — pull the details out",
+    "What do you need to finish this customer?",
+  ],
+  "work order (job)": [
+    "Schedule it for tomorrow morning",
+    "Make it a service call for no cooling",
+    "What's missing before I can create this job?",
+  ],
+};
+const copilotStarters = (kind: string): string[] =>
+  COPILOT_STARTERS[kind] || ["I'll dictate the details — fill it in as I talk", "What do you need from me to finish this?"];
 
 /** Behavior modes for Gibbs, picked from the floating Gibbs button. The mode
  *  rides every /api/crm/help call; conversation-only is also hard-enforced
@@ -881,7 +897,7 @@ export default function AssistantOverlay({
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: open && historyOpen,
+    enabled: open && historyOpen && !copilot,
   });
 
   const { data: spaces = [] } = useQuery<AiSpace[]>({
@@ -891,7 +907,7 @@ export default function AssistantOverlay({
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: open && historyOpen,
+    enabled: open && historyOpen && !copilot,
   });
 
   const addSpace = () => {
@@ -1067,7 +1083,9 @@ export default function AssistantOverlay({
       images: photos.length > 0 ? photos : undefined,
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
-      mode,
+      // Copilot is locked to the full brain — the saved mode belongs to the
+      // standalone chat (the server enforces this too).
+      mode: copilot ? "general" : mode,
       // Copilot: ship the live form draft with every ask.
       createContext: copilot ? { kind: copilot.kind, fields: copilot.getDraft() } : undefined,
     };
@@ -1368,41 +1386,57 @@ export default function AssistantOverlay({
         />
         {/* Floating corner controls — glassy, no header strip, so the chat
             runs all the way to the top and just blurs underneath them.
-            History left, Gibbs (mode) center, new chat right. */}
-        <div className="pointer-events-none absolute inset-x-0 top-5 z-10 flex items-center justify-between px-3">
-          <button
-            onClick={() => setHistoryOpen(true)}
-            className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
-            aria-label="History and spaces"
-            data-testid="assistant-panel-open"
-          >
-            <History className="h-6 w-6" />
-          </button>
-          <button
-            onClick={() => setModeSheetOpen(true)}
-            className="pointer-events-auto rounded-full shadow-md transition-transform active:scale-95"
-            aria-label="Gibbs mode"
-            data-testid="assistant-mode-open"
-          >
-            <img src={badgeGibbs} alt="" className="h-11 w-11 select-none" draggable={false} />
-          </button>
-          <button
-            onClick={startNewChat}
-            className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
-            aria-label="New conversation"
-            data-testid="assistant-new-conversation"
-          >
-            <SquarePen className="h-6 w-6" />
-          </button>
+            Full Gibbs: History left, Gibbs (mode) center, new chat right.
+            COPILOT is locked: no history, no modes — just the badge with
+            the form's name in bare type beneath it, and a restart. */}
+        <div className="pointer-events-none absolute inset-x-0 top-5 z-10 flex items-start justify-between px-3">
+          {copilot ? (
+            <span className="h-11 w-11" aria-hidden />
+          ) : (
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
+              aria-label="History and spaces"
+              data-testid="assistant-panel-open"
+            >
+              <History className="h-6 w-6" />
+            </button>
+          )}
+          {copilot ? (
+            <div className="pointer-events-none flex flex-col items-center" data-testid="assistant-copilot-identity">
+              <img src={badgeGibbs} alt="" className="h-11 w-11 select-none" draggable={false} />
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{copilot.label}</p>
+            </div>
+          ) : (
+            <button
+              onClick={() => setModeSheetOpen(true)}
+              className="pointer-events-auto rounded-full shadow-md transition-transform active:scale-95"
+              aria-label="Gibbs mode"
+              data-testid="assistant-mode-open"
+            >
+              <img src={badgeGibbs} alt="" className="h-11 w-11 select-none" draggable={false} />
+            </button>
+          )}
+          {copilot ? (
+            <button
+              onClick={startNewChat}
+              className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
+              aria-label="Start over"
+              data-testid="assistant-copilot-restart"
+            >
+              <RotateCcw className="h-5 w-5" />
+            </button>
+          ) : (
+            <button
+              onClick={startNewChat}
+              className="liquid-glass pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition-colors active:bg-white/80"
+              aria-label="New conversation"
+              data-testid="assistant-new-conversation"
+            >
+              <SquarePen className="h-6 w-6" />
+            </button>
+          )}
         </div>
-        {/* Copilot anchor chip — Gibbs is working THIS form */}
-        {copilot && (
-          <div className="pointer-events-none absolute inset-x-0 top-[72px] z-10 flex justify-center">
-            <span className="rounded-full bg-[#711419]/10 px-3 py-1 text-[11px] font-semibold text-[#711419]" data-testid="assistant-copilot-chip">
-              Helping with: {copilot.label}
-            </span>
-          </div>
-        )}
 
         {/* Conversation — overflow-x-hidden is load-bearing: overflow-y-auto
             alone lets one long unbroken string (a URL, an address) widen the
@@ -1440,19 +1474,27 @@ export default function AssistantOverlay({
             <div data-sheet-bg="" className="flex min-h-[calc(100%+1px)] flex-col items-center pt-[7vh] text-center">
               {/* Persona block — the badge already sits in the header, so the
                   empty state is just the name */}
-              <button
-                onClick={() => setHistoryOpen(true)}
-                className="text-lg font-semibold tracking-tight text-slate-900 transition-opacity active:opacity-60"
-                aria-label="Gibbs — history and spaces"
-                data-testid="assistant-persona-pill"
-              >
-                Gibbs
-              </button>
+              {copilot ? (
+                <p className="text-lg font-semibold tracking-tight text-slate-900" data-testid="assistant-persona-pill">
+                  Gibbs
+                </p>
+              ) : (
+                <button
+                  onClick={() => setHistoryOpen(true)}
+                  className="text-lg font-semibold tracking-tight text-slate-900 transition-opacity active:opacity-60"
+                  aria-label="Gibbs — history and spaces"
+                  data-testid="assistant-persona-pill"
+                >
+                  Gibbs
+                </button>
+              )}
               <p className="mt-3 max-w-[260px] text-sm text-slate-500">
-                {firstName ? `What can I get done, ${firstName}?` : "What can I get done?"} Anything I set up waits for your approval.
+                {copilot
+                  ? `Tell me about the ${copilot.label.toLowerCase()} — I'll fill the form as you talk. Nothing saves until you hit Create.`
+                  : `${firstName ? `What can I get done, ${firstName}?` : "What can I get done?"} Anything I set up waits for your approval.`}
               </p>
               <div data-sheet-bg="" className="mt-7 flex w-full max-w-sm flex-col gap-2">
-                {STARTERS.map((s) => (
+                {(copilot ? copilotStarters(copilot.kind) : STARTERS).map((s) => (
                   <button
                     key={s}
                     onClick={() => sendQuestion(s)}
@@ -1918,31 +1960,22 @@ export default function AssistantOverlay({
               <p className="mb-3 mt-0.5 text-sm font-semibold text-slate-900">How should Gibbs work right now?</p>
               <div className="space-y-2">
                 {GIBBS_MODES.map((m) => {
-                  const Icon = m.icon;
                   const active = mode === m.value;
                   return (
                     <button
                       key={m.value}
                       onClick={() => pickMode(m.value)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-[4px] border p-3 text-left transition-all active:scale-[0.98]",
+                        "flex w-full items-center gap-3 rounded-[4px] border p-3.5 text-left transition-all active:scale-[0.98]",
                         active ? "border-[#711419] bg-[#711419]/[0.05]" : "border-slate-200 bg-white",
                       )}
                       data-testid={`assistant-mode-${m.value}`}
                     >
-                      <span
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-                          active ? "bg-[#711419] text-white" : "bg-slate-100 text-slate-600",
-                        )}
-                      >
-                        <Icon className="h-[18px] w-[18px]" />
-                      </span>
                       <span className="min-w-0 flex-1">
                         <span className={cn("block text-sm font-semibold", active ? "text-[#711419]" : "text-slate-900")}>
                           {m.label}
                         </span>
-                        <span className="block text-xs leading-snug text-slate-500">{m.description}</span>
+                        <span className="mt-0.5 block text-xs leading-snug text-slate-500">{m.description}</span>
                       </span>
                       {active && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
                     </button>

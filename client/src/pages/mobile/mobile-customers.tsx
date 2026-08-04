@@ -297,19 +297,22 @@ export default function MobileCustomers() {
                 <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   <CalendarClock className="h-3.5 w-3.5" /> On today&rsquo;s schedule
                 </h3>
-                <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                {/* Horizontal card rail — squared industrial cards, name over
+                    time, no initial bubble */}
+                <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
                   {todayCustomers.map((c) => (
                     <button
                       key={c.id}
                       onClick={() => navigate(`/mobile/customers/${c.id}`)}
-                      className="flex shrink-0 items-center gap-2 rounded-full border border-slate-300/70 bg-white py-1.5 pl-1.5 pr-3.5 shadow-sm transition-transform active:scale-95"
+                      className="w-40 shrink-0 rounded-[4px] border border-slate-300/70 bg-white p-3 text-left transition-transform active:scale-[0.97]"
                       data-testid={`today-customer-${c.id}`}
                     >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#711419]/10 text-[11px] font-bold text-[#711419]">
-                        {c.name.trim().charAt(0).toUpperCase()}
+                      <span className="block truncate text-sm font-semibold text-slate-900">
+                        {c.name.split(/\s+/).slice(0, 2).join(" ")}
                       </span>
-                      <span className="text-sm font-medium text-slate-800">{c.name.split(/\s+/).slice(0, 2).join(" ")}</span>
-                      {c.time && <span className="text-xs tabular-nums text-slate-400">{c.time}</span>}
+                      <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400 tabular-nums">
+                        {c.time || "Today"}
+                      </span>
                     </button>
                   ))}
                 </div>
