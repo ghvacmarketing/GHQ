@@ -103,16 +103,34 @@ reads the live version whenever voice matters.
 
 const POLICY_SEED = `# Payments & fees policy
 
-## Quote deposits
-- Standard deposit on an accepted quote is 50% of the quote total.
-- The remaining balance is due on completion.
+## Quote deposits — how they actually work
+- Online payment (through the live quote page) exists for THREE quote
+  types: Custom Install, Proposal, and Custom Service. Quick/service
+  quotes have no online payment — collect those by invoice or in person.
+- The online flow is sign-then-pay: the customer signs the quote first
+  (name + signature), then gets a secure Stripe link for the DEPOSIT —
+  not the full total.
+- The deposit percentage is a company setting: CRM → Settings → Payments →
+  "Default Deposit Percentage". It defaults to 50% when nothing else is
+  saved there — but it is a setting, not a rule. Never tell anyone "all
+  quotes require 50% down"; the accurate answer is "deposits apply to the
+  three payable quote types at whatever Settings → Payments is set to."
+- On a multi-option quote the deposit is calculated from the option the
+  customer selected (plus shared items), never the sum of all options.
+- The remaining balance is billed by invoice; invoices always collect the
+  FULL balance due (no deposit splitting on invoices).
+- A quote accepted verbally or in person takes no deposit through the
+  system — deposits belong to the online Stripe flow.
+- E-signature documents are separate: each e-sign document can request its
+  own deposit — a percent of the total OR an exact dollar amount — chosen
+  when the document is built.
 
 ## Credit card convenience fee — 3%
 - When a customer pays by credit/debit card, a 3% convenience fee is added
   to the amount being charged to the card.
 - On a quote deposit that means 3% of the deposit, not of the full quote:
-  a $10,000 quote takes a $5,000 deposit; paid by card the charge is
-  $5,000 + 3% = $5,150.
+  with the deposit set at 50%, a $10,000 quote takes a $5,000 deposit;
+  paid by card the charge is $5,000 + 3% = $5,150.
 - Bank transfer (ACH), cash, and check have NO fee — offer bank transfer to
   customers who want to avoid the fee.
 - Online payments add the fee automatically as its own line item; for

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Check, ChevronDown, UserRound } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { userAvatarSrc } from "@/components/user-avatar-badge";
-import { roleBadgeSrc } from "@/components/mobile/role-badge";
+import { AvatarWithRole } from "@/components/user-avatar-badge";
 import type { CrmUser } from "@shared/schema";
 
 /** Teammate picker as a tile grid instead of a long row list: the whole
- *  roster fits one screen, everyone wears their metal initials avatar, you
- *  are pinned first, then seniority, then alphabetical. Used wherever a
- *  task (or anything else) gets assigned to a person. */
+ *  roster fits one screen, everyone wears their metal initials avatar with
+ *  the role badge on its shoulder (the profile-hero composition), you are
+ *  pinned first, then seniority, then alphabetical. Used wherever a task
+ *  (or anything else) gets assigned to a person. */
 
 const ROLE_RANK: Record<string, number> = { owner: 0, admin: 1, supervisor: 2, sales: 3, tech: 4 };
 const ROLE_LABELS: Record<string, string> = {
@@ -52,7 +52,6 @@ export function AssigneeSheet({
       return (a.name || "").localeCompare(b.name || "");
     });
   const current = users.find((u) => u.id === value);
-  const currentAvatar = current ? userAvatarSrc(current.name) || roleBadgeSrc(current.role) : null;
 
   return (
     <>
@@ -63,8 +62,8 @@ export function AssigneeSheet({
           data-testid={testid}
         >
           <span className="flex min-w-0 items-center gap-2.5">
-            {currentAvatar ? (
-              <img src={currentAvatar} alt="" className="h-7 w-7 shrink-0 select-none" draggable={false} />
+            {current ? (
+              <AvatarWithRole name={current.name} role={current.role} size={26} />
             ) : (
               <UserRound className="h-5 w-5 shrink-0 text-slate-400" />
             )}
@@ -80,8 +79,8 @@ export function AssigneeSheet({
           className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white py-1 pl-1.5 pr-3 text-sm font-medium text-slate-700 transition-transform active:scale-95"
           data-testid={testid}
         >
-          {currentAvatar ? (
-            <img src={currentAvatar} alt="" className="h-6 w-6 shrink-0 select-none" draggable={false} />
+          {current ? (
+            <AvatarWithRole name={current.name} role={current.role} size={24} />
           ) : (
             <UserRound className="ml-1 h-4 w-4 shrink-0 text-slate-400" />
           )}
@@ -94,7 +93,6 @@ export function AssigneeSheet({
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
         <div className="mt-3 grid grid-cols-3 gap-2 pb-1">
           {team.map((u) => {
-            const avatar = userAvatarSrc(u.name) || roleBadgeSrc(u.role);
             const selected = u.id === value;
             const firstName = (u.name || "").trim().split(/\s+/)[0] || "—";
             return (
@@ -114,7 +112,7 @@ export function AssigneeSheet({
                     <Check className="h-3 w-3" />
                   </span>
                 )}
-                <img src={avatar} alt="" className="h-14 w-14 select-none" draggable={false} />
+                <AvatarWithRole name={u.name} role={u.role} size={56} />
                 <span className="mt-1.5 w-full truncate text-center text-xs font-semibold text-slate-900">{firstName}</span>
                 <span className="w-full truncate text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
                   {u.id === meId ? "You" : ROLE_LABELS[u.role] || u.role}

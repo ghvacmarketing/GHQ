@@ -176,10 +176,10 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - **Converted**: Quote has been converted into an invoice or project
 
 ### Quote Types
-- **Custom Install**: High-value installation proposals ($5k+), deposit required
-- **Service Quote**: Repair proposals
-- **Proposal**: Formal project proposals
-- **Custom Service**: Non-standard service work
+- **Custom Install**: High-value installation proposals ($5k+); takes an online deposit (see Online payment & deposits)
+- **Service Quote** (quick quote): Repair proposals — NO online payment/deposit; collected by invoice or in person
+- **Proposal**: Formal project proposals; takes an online deposit
+- **Custom Service**: Non-standard service work; takes an online deposit
 
 ### Internal costs vs customer line items
 - A quote's line items are split: CUSTOMER line items (what the customer sees) and INTERNAL COSTS (labor, warranty reserve, worksheet cost build-up) shown in a separate amber "Internal costs" card on the quote detail page with a gross-margin readout
@@ -209,12 +209,36 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
   2. Apply for financing (GreenSky link)
 - Financing link is configurable in CRM Settings > Payment Settings
 
-### Deposits & card convenience fee (COMPANY POLICY)
-- Standard deposit on an accepted quote is 50% of the quote total
+### Online payment & deposits (HOW IT ACTUALLY WORKS — be precise)
+- Online payment through the live quote page exists for THREE quote types
+  only: Custom Install, Proposal, and Custom Service. Quick/service quotes
+  have NO online payment — those are collected by invoice or in person.
+- The online flow is sign-then-pay: the customer signs on the quote page
+  (name + signature) FIRST, then gets a secure Stripe link for the
+  DEPOSIT — never the full total up front.
+- The deposit percentage is a COMPANY SETTING, not a fixed rule: CRM →
+  Settings → Payments → "Default Deposit Percentage". 50% is only the
+  default when nothing has been saved there. NEVER say "all quotes require
+  a 50% deposit" — the accurate answer is "deposits apply to the three
+  payable quote types at whatever percentage Settings → Payments is set to
+  (currently defaulting to 50%)."
+- On a multi-option quote the deposit is calculated from the option the
+  customer selected (plus shared items), never the sum of all options.
+- The remaining balance is billed by invoice afterwards; invoices always
+  collect the FULL balance due — there is no deposit splitting on invoices.
+- A quote accepted verbally or in person takes no deposit through the
+  system — deposits belong to the online Stripe flow.
+- E-signature documents are their own thing: each e-sign document can
+  request its own deposit — a percent of the total OR an exact dollar
+  amount — chosen when the document is built. Independent of the quote
+  deposit setting.
+
+### Card convenience fee (COMPANY POLICY)
 - Credit card payments carry a 3% convenience fee ON THE AMOUNT CHARGED to
-  the card (e.g. $10,000 quote → $5,000 deposit; by card that's $5,000 +
-  3% = $5,150). Bank transfer (ACH), cash, and check have NO fee — steer
-  customers to bank transfer when they ask how to avoid the fee.
+  the card (e.g. with the deposit set at 50%, a $10,000 quote takes a
+  $5,000 deposit; by card that's $5,000 + 3% = $5,150). Bank transfer
+  (ACH), cash, and check have NO fee — steer customers to bank transfer
+  when they ask how to avoid the fee.
 - Online payments (invoice pay page + quote deposits) offer both methods,
   disclose the fee up front, and automatically add the fee as its own line
   item on the invoice so totals match the Stripe charge exactly. For

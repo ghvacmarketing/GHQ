@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Wrench, MapPin, Clock, ChevronRight, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, ListFilter, X } from "lucide-react";
-import { RoleBadge } from "@/components/mobile/role-badge";
+import { AvatarWithRole } from "@/components/user-avatar-badge";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { isNativeApp } from "@/lib/native";
@@ -785,7 +785,7 @@ export default function MobileJob() {
                     }`}
                     data-testid={`jobs-tech-${tech.id}`}
                   >
-                    <RoleBadge role={tech.role} className="h-11 w-11" />
+                    <AvatarWithRole name={tech.name} role={tech.role} size={44} />
                     <span className="max-w-full truncate text-sm font-semibold text-slate-800">{tech.name}</span>
                     <span className="text-xs text-slate-400">{techJobs.length} job{techJobs.length !== 1 ? "s" : ""} today</span>
                   </button>
@@ -814,7 +814,7 @@ export default function MobileJob() {
           >
             {tech && (
               <div className="mb-3 flex items-center gap-2.5">
-                <RoleBadge role={tech.role} className="h-9 w-9" />
+                <AvatarWithRole name={tech.name} role={tech.role} size={36} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-bold text-slate-900">{tech.name}</p>
                   <p className="text-xs text-slate-500">
