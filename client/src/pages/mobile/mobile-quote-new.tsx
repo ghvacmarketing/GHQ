@@ -197,7 +197,10 @@ export default function MobileQuoteNew() {
       toast({ title: "Quote Created", description: "Your quick quote has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      if (quote?.id) navigate(`/mobile/quotes/${quote.id}`);
+      // In-job creation lands back on the job's Quote tab; the "+" flow
+      // opens the new quote itself.
+      if (presetJobId) navigate(`/mobile/job/${presetJobId}?tab=quote`);
+      else if (quote?.id) navigate(`/mobile/quotes/${quote.id}`);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to create quote", variant: "destructive" });
@@ -221,7 +224,12 @@ export default function MobileQuoteNew() {
 
   const validItems = lineItems.filter((item) => item.description.trim() && item.unitPrice !== 0);
   const canSubmit = !!pickedWorkOrder && validItems.length > 0 && !!selectedAssigneeId && !createQuoteMutation.isPending;
-  const dirty = !!pickedCustomer || !!pickedWorkOrder || quoteTitle.trim().length > 0 || lineItems.length > 0 || !!selectedAssigneeId;
+  // Launched from a job, the pre-selected work order doesn't count as
+  // "your work" — only typed/added fields do. The "+" flow counts the
+  // manual customer/job picking too.
+  const dirty = presetJobId
+    ? quoteTitle.trim().length > 0 || lineItems.length > 0 || !!selectedAssigneeId
+    : !!pickedCustomer || !!pickedWorkOrder || quoteTitle.trim().length > 0 || lineItems.length > 0 || !!selectedAssigneeId;
 
   const handleCreateQuote = () => {
     if (!canSubmit) return;
@@ -257,6 +265,7 @@ export default function MobileQuoteNew() {
     <MobileCreatePage
       title="New quote"
       dirty={dirty}
+      exitTo={presetJobId ? `/mobile/job/${presetJobId}?tab=quote` : undefined}
       onSave={pickedWorkOrder ? handleCreateQuote : undefined}
       saveLabel="Create quote"
       saveDisabled={!canSubmit}

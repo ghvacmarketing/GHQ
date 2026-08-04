@@ -29553,6 +29553,29 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // DELETE /api/mobile/messaging/conversations/:id — swipe-to-delete from
+  // the mobile inbox. Removes the LOCAL thread only (messages cascade);
+  // Textline keeps its provider-side copy, and a new inbound text from the
+  // same number simply starts a fresh conversation.
+  app.delete("/api/mobile/messaging/conversations/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      const { id } = req.params;
+      const conversation = await storage.getMessagingConversationById(id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      await db.delete(crmMessagingConversations).where(eq(crmMessagingConversations.id, id));
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting mobile conversation:", error);
+      return res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
   app.get("/api/mobile/messaging/contacts", requireCrmTechOrAbove, async (req, res) => {
     try {
       const { search } = req.query;

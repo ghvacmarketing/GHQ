@@ -49,6 +49,7 @@ export default function MobileMore() {
       items: [
         { label: "Customers", sub: "Search every customer and their history", onTap: (n) => n("/mobile/customers"), testid: "more-customers" },
         { label: "Inbox", sub: "Texts and email in one place", onTap: (n) => n("/mobile/messages"), testid: "more-inbox" },
+        { label: "Call Log", sub: "Log office calls and browse the history", onTap: (n) => n("/mobile/call-log"), testid: "more-call-log" },
         {
           label: "Ask Gibbs", sub: "AI help — lookups, drafts, and actions",
           onTap: () => window.dispatchEvent(new Event("ghq-mobile-open-assistant")), testid: "more-assistant",

@@ -6,7 +6,7 @@ import chatBg from "@/assets/chat-bg.webp";
 import badgeContactKnown from "@/assets/badge-contact-known.png";
 import badgeContactUnknown from "@/assets/badge-contact-unknown.png";
 import {
-  MessageSquare, Search, ArrowUp, Loader2, ArrowLeft, User, Plus, X, Phone,
+  MessageSquare, Search, ArrowUp, Loader2, ArrowLeft, User, Plus, X, Phone, Trash2,
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -24,6 +24,107 @@ import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from 
  *  shell; an open thread is a FULLSCREEN layer (no tab bar, no floating
  *  containers): warm chat canvas, tailed bubbles, day chips, composer pinned
  *  to the true bottom above the keyboard/safe area. */
+
+/** iMessage-style swipe-to-delete: the row rides the finger left, a red
+ *  delete panel shows behind, and letting go PAST HALFWAY commits — the row
+ *  slides off, collapses, and the thread is deleted. Short of halfway it
+ *  springs back. Only the tracked finger can move or end the drag. */
+function SwipeDeleteRow({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const iconRef = useRef<HTMLSpanElement | null>(null);
+  const drag = useRef<{ pid: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const [removing, setRemoving] = useState(false);
+
+  const onDown = (e: React.PointerEvent) => {
+    if (drag.current) return; // a second finger must not hijack the drag
+    drag.current = { pid: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true };
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const st = drag.current;
+    const el = rowRef.current;
+    if (!st?.active || st.pid !== e.pointerId || !el) return;
+    const dx = e.clientX - st.x;
+    const dy = Math.abs(e.clientY - st.y);
+    if (!st.engaged) {
+      if (dx < -8 && Math.abs(dx) > dy) {
+        st.engaged = true;
+        el.style.transition = "none";
+        el.setPointerCapture?.(e.pointerId);
+      } else if (dy > 12 || dx > 12) {
+        st.active = false;
+        return;
+      }
+    }
+    if (st.engaged) {
+      const off = Math.min(0, dx);
+      el.style.transform = `translateX(${off}px)`;
+      const w = el.clientWidth || window.innerWidth;
+      // The trash pops slightly once you're past the point of no return
+      const icon = iconRef.current;
+      if (icon) icon.style.transform = Math.abs(off) > w / 2 ? "scale(1.2)" : "scale(1)";
+    }
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const st = drag.current;
+    if (!st || st.pid !== e.pointerId) return; // only the tracked finger ends it
+    drag.current = null;
+    const el = rowRef.current;
+    if (!st.engaged || !el) return;
+    suppressClick.current = true;
+    window.setTimeout(() => {
+      suppressClick.current = false;
+    }, 250);
+    const dx = e.clientX - st.x;
+    const w = el.clientWidth || window.innerWidth;
+    if (-dx > w / 2) {
+      el.style.transition = "transform 0.18s ease-in";
+      el.style.transform = "translateX(-100%)";
+      setRemoving(true);
+      window.setTimeout(onDelete, 210);
+    } else {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateX(0)";
+      window.setTimeout(() => {
+        if (el) el.style.transition = "";
+      }, 260);
+    }
+  };
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={
+        removing
+          ? { maxHeight: 0, opacity: 0, transition: "max-height 0.25s ease-in, opacity 0.2s ease-in" }
+          : { maxHeight: "96px" }
+      }
+      onClickCapture={(e) => {
+        if (suppressClick.current) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
+      <div className="absolute inset-y-0 right-0 flex w-full items-center justify-end bg-red-500 pr-6" aria-hidden>
+        <span ref={iconRef} className="text-white transition-transform duration-150">
+          <Trash2 className="h-5 w-5" />
+        </span>
+      </div>
+      <div
+        ref={rowRef}
+        className="relative bg-slate-50"
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 interface ConversationWithCustomer extends CrmMessagingConversation {
   customerPhone?: string | null;
@@ -330,6 +431,32 @@ export default function MobileMessages() {
     return out;
   }, [messages]);
 
+  // Swipe-to-delete commits here: optimistic removal from every cached
+  // list, then the server delete (messages cascade with the conversation).
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/mobile/messaging/conversations/${id}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to delete conversation");
+      }
+      return res.json();
+    },
+    onMutate: async (id: string) => {
+      queryClient.setQueriesData(
+        { queryKey: ["/api/mobile/messaging/conversations"], exact: false },
+        (old: any) => (Array.isArray(old) ? old.filter((c: any) => c.id !== id) : old),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations"] });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations"] });
+    },
+  });
+
   const openConversation = (conversation: ConversationWithCustomer, fromSearch = false) => {
     if (fromSearch) closeSearch();
     setSelectedConversationId(conversation.id);
@@ -421,7 +548,11 @@ export default function MobileMessages() {
             </div>
           ) : conversations && conversations.length > 0 ? (
             <div className="divide-y divide-slate-100">
-              {conversations.map((conversation) => renderConversation(conversation))}
+              {conversations.map((conversation) => (
+                <SwipeDeleteRow key={conversation.id} onDelete={() => deleteConversationMutation.mutate(conversation.id)}>
+                  {renderConversation(conversation)}
+                </SwipeDeleteRow>
+              ))}
             </div>
           ) : (
             <div className="py-12 text-center text-slate-500">

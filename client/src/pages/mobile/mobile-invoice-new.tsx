@@ -257,7 +257,10 @@ export default function MobileInvoiceNew() {
       toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      if (invoice?.id) navigate(`/mobile/invoices/${invoice.id}`);
+      // In-job creation lands back on the job's Invoice tab; the "+" flow
+      // opens the new invoice itself.
+      if (presetJobId) navigate(`/mobile/job/${presetJobId}?tab=invoice`);
+      else if (invoice?.id) navigate(`/mobile/invoices/${invoice.id}`);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to create invoice", variant: "destructive" });
@@ -308,7 +311,12 @@ export default function MobileInvoiceNew() {
   const validItems = lineItems.filter((item) => item.description.trim());
   const hasPositiveTotal = validItems.some((item) => calculateLineTotal(item) > 0);
   const canSubmit = !!pickedWorkOrder && validItems.length > 0 && hasPositiveTotal && !createInvoiceMutation.isPending;
-  const dirty = !!pickedCustomer || !!pickedWorkOrder || lineItems.length > 0;
+  // Launched from a job, the pre-selected work order doesn't count as
+  // "your work" — only touched line items do. The "+" flow counts the
+  // manual customer/job picking too.
+  const dirty = presetJobId
+    ? lineItems.length > 0
+    : !!pickedCustomer || !!pickedWorkOrder || lineItems.length > 0;
 
   const handleCreateInvoice = () => {
     if (!canSubmit) return;
@@ -329,6 +337,7 @@ export default function MobileInvoiceNew() {
     <MobileCreatePage
       title="New invoice"
       dirty={dirty}
+      exitTo={presetJobId ? `/mobile/job/${presetJobId}?tab=invoice` : undefined}
       testid="mobile-invoice-new-page"
     >
       <div className="space-y-4">

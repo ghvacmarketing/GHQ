@@ -3,6 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Home } from "lucide-react";
+import { isNativeApp } from "@/lib/native";
 import redlogo from "@assets/redlogo.webp";
 
 type View =
@@ -317,7 +318,8 @@ export default function PortalLogin() {
       break;
 
     case "login":
-      description = "Log in with your phone number or email";
+      // The GHQ sign-in look: logo, one bold line, no subtext.
+      title = "Sign in to your portal";
       body = (
         <form onSubmit={handleLogin} className="space-y-4">
           {alerts}
@@ -579,11 +581,16 @@ export default function PortalLogin() {
         )}
         <div className="mt-7">{body}</div>
 
-        {/* The other audience's door — mirrors the CRM login's portal link */}
+        {/* Phones go back to the welcome chooser (both doors), not straight
+            into the other login. Desktop has no chooser. */}
         <p className="mt-10 border-t border-slate-200 pt-5 text-center text-sm text-slate-500" data-testid="link-team-signin">
           Work at Giesbrecht HVAC?{" "}
-          <a href="/crm/login" className="font-semibold" style={{ color: BRAND }}>
-            Team sign-in
+          <a
+            href={isNativeApp() || window.innerWidth < 768 ? "/" : "/crm/login"}
+            className="font-semibold"
+            style={{ color: BRAND }}
+          >
+            {isNativeApp() || window.innerWidth < 768 ? "Choose a different sign-in" : "Team sign-in"}
           </a>
         </p>
       </div>

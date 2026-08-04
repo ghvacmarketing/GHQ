@@ -1302,12 +1302,13 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   return (
     <div className="space-y-4">
-      {/* Existing Quotes Section */}
+      {/* Quotes — the list and the create action live in ONE card; the
+          button matches the bottom-sheet create buttons. */}
       <Card data-testid="existing-quotes-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Existing Quotes</CardTitle>
+          <CardTitle className="text-base">Quotes</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {quotesLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-16 w-full" />
@@ -1388,31 +1389,16 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Quote Creation */}
-      <Card data-testid="quick-quote-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <DollarSign className="h-4 w-4 text-green-600" />
-            Quick Quote
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Create a simple quote with line items for this job.
-          </p>
-          {/* Same full create page as the "+" button — the job is
-              pre-selected so there's nothing to pick. */}
-          <Button
-            className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+          {/* Create sits right under the list (or empty state) — same full
+              create page as the "+" button with the job pre-selected. */}
+          <button
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
             onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
             data-testid="button-start-quick-quote"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Create Quick Quote
-          </Button>
+          </button>
         </CardContent>
       </Card>
 
@@ -2422,39 +2408,6 @@ export default function MobileJobDetail() {
     switchTab(prev);
   };
 
-  // Swipe-commit to a PREVIOUS SECTION: slide this layer off to the right,
-  // then bring the prior tab in fresh — the overview stays parked beneath
-  // the whole time (open-state parallax + scrim).
-  const goSectionBackTo = (prev: TabType, fromDx = 0) => {
-    const sec = sectionsRef.current;
-    if (!sec) return;
-    tabScroll.current[activeTab] = sec.scrollTop;
-    const w = sec.clientWidth || window.innerWidth;
-    const startP = Math.max(0, Math.min(1, fromDx / w));
-    const dur = 180 * (1 - startP) + 40;
-    const anim = sec.animate(
-      [{ transform: `translateX(${fromDx}px)` }, { transform: "translateX(100%)" }],
-      { duration: dur, easing: "ease-in", fill: "forwards" },
-    );
-    overviewRef.current?.animate(
-      [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
-      { duration: dur, easing: "ease-out" },
-    );
-    scrimRef.current?.animate(
-      [{ opacity: scrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
-      { duration: dur, easing: "linear" },
-    );
-    setTimeout(() => {
-      tabBackPop.current = true;
-      switchTab(prev);
-      requestAnimationFrame(() => {
-        anim.cancel();
-        if (sectionsRef.current) sectionsRef.current.style.transform = "";
-        setOpenLayerStyles();
-      });
-    }, dur - 10);
-  };
-
   // Switch tabs preserving each section's scroll position.
   const switchTab = (next: TabType) => {
     if (next === activeTab) return;
@@ -2537,44 +2490,40 @@ export default function MobileJobDetail() {
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
       if (dx > 8 && dx > dy) {
+        if (st.section) {
+          // Sections: the swipe IS the back button — fire the same proven
+          // trail walk once and hand the visuals to closeSectionAnimated /
+          // the tab switch (finger-tracking the layer fought its scroller
+          // and could strand it mid-transform).
+          st.active = false;
+          swipeDrag.current = null;
+          handleFloatingBack();
+          return;
+        }
         st.engaged = true;
-        const target = st.section ? sectionsRef.current : el;
-        if (target) {
-          target.style.transition = "none";
-          // The mount-time slide-in animation outranks inline transforms —
-          // if it's still running, the page ignores the finger and then
-          // jumps. Kill it before dragging.
-          target.style.animation = "none";
-        }
-        if (!st.section) {
-          setShowUnderlay(true);
-          // iOS-card curve while the page rides the finger
-          el.style.borderRadius = "24px 0 0 24px";
-        }
+        el.style.transition = "none";
+        // The mount-time slide-in animation outranks inline transforms —
+        // if it's still running, the page ignores the finger and then
+        // jumps. Kill it before dragging.
+        el.style.animation = "none";
+        setShowUnderlay(true);
+        // iOS-card curve while the page rides the finger
+        el.style.borderRadius = "24px 0 0 24px";
       }
       else if (dy > 14) { st.active = false; setShowUnderlay(false); return; }
     }
     if (st.engaged) {
       const off = Math.max(0, dx);
-      if (st.section) {
-        const sec = sectionsRef.current;
-        const w = sec?.clientWidth || window.innerWidth;
-        const pr = Math.max(0, Math.min(1, off / w));
-        if (sec) sec.style.transform = `translateX(${off}px)`;
-        if (overviewRef.current) overviewRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
-        if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
-      } else {
-        el.style.transform = `translateX(${off}px)`;
-        const w = el.clientWidth || window.innerWidth;
-        const pr = Math.max(0, Math.min(1, off / w));
-        if (pageUnderlayRef.current) pageUnderlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
-        if (pageScrimRef.current) pageScrimRef.current.style.opacity = String(0.18 * (1 - pr));
-        // The floating controls hold still but fade WITH the drag
-        for (const b of [backRef.current, actionsRef.current]) {
-          if (b) {
-            b.style.transition = "none";
-            b.style.opacity = String(1 - pr);
-          }
+      el.style.transform = `translateX(${off}px)`;
+      const w = el.clientWidth || window.innerWidth;
+      const pr = Math.max(0, Math.min(1, off / w));
+      if (pageUnderlayRef.current) pageUnderlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+      if (pageScrimRef.current) pageScrimRef.current.style.opacity = String(0.18 * (1 - pr));
+      // The floating controls hold still but fade WITH the drag
+      for (const b of [backRef.current, actionsRef.current]) {
+        if (b) {
+          b.style.transition = "none";
+          b.style.opacity = String(1 - pr);
         }
       }
     }
@@ -2591,33 +2540,7 @@ export default function MobileJobDetail() {
     }
     const dx = e.clientX - st.x;
     const commit = dx > Math.min(140, window.innerWidth * 0.33);
-    if (st.section) {
-      const sec = sectionsRef.current;
-      if (!sec) return;
-      const dxNow = e.clientX - st.x;
-      if (commit) {
-        // Same trail the floating back walks: land on the last tab you
-        // were on — the overview close animation when that's the overview,
-        // a section-to-section handoff otherwise.
-        const prev = popPrevTab();
-        if (prev === "overview") {
-          closeSectionAnimated(Math.max(0, dxNow));
-        } else {
-          goSectionBackTo(prev, Math.max(0, dxNow));
-        }
-      } else {
-        sec.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-        sec.style.transform = "translateX(0)";
-        overviewRef.current?.animate(
-          [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
-          { duration: 250, easing: "ease-out" },
-        );
-        setTimeout(() => {
-          if (sec) sec.style.transition = "";
-          setOpenLayerStyles();
-        }, 260);
-      }
-    } else if (commit) {
+    if (commit) {
       goBackAnimated(Math.max(0, e.clientX - st.x));
     } else {
       springBack();
@@ -3183,9 +3106,12 @@ export default function MobileJobDetail() {
               data and scroll positions survive round trips */}
           <div
             ref={sectionsRef}
-            className="job-section-enter absolute inset-0 z-20 overflow-auto bg-slate-50 px-4 pb-28 pt-14 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+            className="job-section-enter absolute inset-0 z-20 overflow-auto overscroll-y-contain bg-slate-50 px-4 pb-28 pt-14 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
             style={{ display: activeTab === "overview" ? "none" : undefined }}
           >
+            {/* 1px over-height keeps short tabs scrollable, so every section
+                rubber-bands under your thumb instead of feeling pinned. */}
+            <div className="min-h-[calc(100%+1px)]">
             <div className={activeTab === "work" ? "job-tab-enter block" : "hidden"}>
               <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
             </div>
@@ -3199,6 +3125,7 @@ export default function MobileJobDetail() {
                 onCollectRenewal={() => setShowCollectRenewalDialog(true)}
                 onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
               />
+            </div>
             </div>
           </div>
         </div>

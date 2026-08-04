@@ -1,14 +1,17 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { getQueryFn } from "@/lib/queryClient";
 import { crmFetch, crmApiRequest } from "@/lib/crmAuth";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { ArrowLeft, Globe, RefreshCw, Users, KeyRound, Activity } from "lucide-react";
+import { ArrowLeft, Globe, RefreshCw, Users, KeyRound, Activity, Search } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { SectionCard } from "@/components/crm/ui-kit";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
 
@@ -20,6 +23,27 @@ interface PortalSettings {
     activeLast30d: number;
     portalEnabledCustomers: number;
   };
+}
+
+interface PortalCustomerRow {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  portalEnabled: boolean;
+  hasAccount: boolean;
+  hasPassword: boolean;
+  lastLoginAt: string | null;
+  accountCreatedAt: string | null;
+}
+
+type AccessBucket = "all" | "logged_in" | "never" | "no_account";
+
+/** Which access bucket a customer falls in. */
+function bucketOf(row: PortalCustomerRow): Exclude<AccessBucket, "all"> {
+  if (row.hasAccount && row.lastLoginAt) return "logged_in";
+  if (row.hasAccount) return "never";
+  return "no_account";
 }
 
 export default function CrmSettingsCustomerPortal() {
@@ -41,6 +65,36 @@ export default function CrmSettingsCustomerPortal() {
       return res.json();
     },
     enabled: !!currentUser,
+  });
+
+  // Access monitor — every customer with their portal login state
+  const [accessBucket, setAccessBucket] = useState<AccessBucket>("all");
+  const [accessSearch, setAccessSearch] = useState("");
+  const { data: portalCustomers, isLoading: customersLoading } = useQuery<{ customers: PortalCustomerRow[] }>({
+    queryKey: ["/api/admin/settings/customer-portal/customers"],
+    queryFn: async () => {
+      const res = await crmFetch("/api/admin/settings/customer-portal/customers");
+      if (!res.ok) throw new Error("Failed to load portal customers");
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+  const allPortalRows = portalCustomers?.customers || [];
+  const bucketCounts = {
+    all: allPortalRows.length,
+    logged_in: allPortalRows.filter((r) => bucketOf(r) === "logged_in").length,
+    never: allPortalRows.filter((r) => bucketOf(r) === "never").length,
+    no_account: allPortalRows.filter((r) => bucketOf(r) === "no_account").length,
+  };
+  const q = accessSearch.trim().toLowerCase();
+  const visibleRows = allPortalRows
+    .filter((r) => accessBucket === "all" || bucketOf(r) === accessBucket)
+    .filter((r) => !q || [r.name, r.phone, r.email].some((v) => (v || "").toLowerCase().includes(q)));
+  // Most recent logins first inside the list; account-less customers last
+  const sortedRows = [...visibleRows].sort((a, b) => {
+    const at = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : a.hasAccount ? 1 : 0;
+    const bt = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : b.hasAccount ? 1 : 0;
+    return bt - at;
   });
 
   const updateSync = useMutation({
@@ -153,6 +207,103 @@ export default function CrmSettingsCustomerPortal() {
                 </p>
               </div>
             ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Portal access monitor"
+          description="Every customer and where they stand with the portal: who's logged in (and when), who has an account but never signed in, and who has no account yet."
+        >
+          <div className="space-y-3">
+            {/* Bucket chips */}
+            <div className="flex flex-wrap gap-2">
+              {([
+                { key: "all", label: "All" },
+                { key: "logged_in", label: "Logged in" },
+                { key: "never", label: "Never logged in" },
+                { key: "no_account", label: "No account" },
+              ] as Array<{ key: AccessBucket; label: string }>).map((b) => (
+                <button
+                  key={b.key}
+                  onClick={() => setAccessBucket(b.key)}
+                  className={`rounded-[4px] border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    accessBucket === b.key
+                      ? "border-[#711419] bg-[#711419]/[0.06] text-[#711419]"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid={`portal-access-bucket-${b.key}`}
+                >
+                  {b.label}
+                  <span className="ml-1.5 tabular-nums opacity-70">{customersLoading ? "…" : bucketCounts[b.key]}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={accessSearch}
+                onChange={(e) => setAccessSearch(e.target.value)}
+                placeholder="Search by name, phone, or email"
+                className="pl-9"
+                data-testid="portal-access-search"
+              />
+            </div>
+
+            {/* The list */}
+            {customersLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
+            ) : sortedRows.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground" data-testid="portal-access-empty">
+                No customers match.
+              </p>
+            ) : (
+              <div className="max-h-[26rem] overflow-y-auto rounded-lg border border-border" data-testid="portal-access-list">
+                {sortedRows.map((row, i) => {
+                  const bucket = bucketOf(row);
+                  return (
+                    <button
+                      key={row.id}
+                      onClick={() => navigate(`/crm/customers/${row.id}`)}
+                      className={`flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-muted/50 ${i > 0 ? "border-t border-border" : ""}`}
+                      data-testid={`portal-access-row-${row.id}`}
+                    >
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          bucket === "logged_in" ? "bg-emerald-500" : bucket === "never" ? "bg-amber-500" : "bg-slate-300"
+                        }`}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-foreground">{row.name || "Unnamed customer"}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {[row.phone, row.email].filter(Boolean).join(" · ") || "No contact info"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className={`block text-xs font-semibold ${
+                          bucket === "logged_in" ? "text-emerald-600" : bucket === "never" ? "text-amber-600" : "text-muted-foreground"
+                        }`}>
+                          {bucket === "logged_in" ? "Logged in" : bucket === "never" ? "Never logged in" : "No account"}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {row.lastLoginAt
+                            ? `Last: ${format(new Date(row.lastLoginAt), "MMM d, yyyy")}`
+                            : row.hasAccount && row.accountCreatedAt
+                              ? `Invited ${format(new Date(row.accountCreatedAt), "MMM d, yyyy")}`
+                              : ""}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </SectionCard>
       </div>

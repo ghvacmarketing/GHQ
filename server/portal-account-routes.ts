@@ -1214,6 +1214,44 @@ export function registerPortalAccountRoutes(app: Express) {
     }
   });
 
+  // GET /api/admin/settings/customer-portal/customers — the access monitor:
+  // every customer joined with their portal account + login state, so the
+  // office can see exactly who has (and hasn't) logged into the portal.
+  app.get("/api/admin/settings/customer-portal/customers", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    try {
+      const rows = await db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        phone: crmCustomers.phone,
+        email: crmCustomers.email,
+        portalEnabled: crmCustomers.portalEnabled,
+        accountId: customerPortalAccounts.id,
+        hasPassword: sql<boolean>`(${customerPortalAccounts.passwordHash} IS NOT NULL)`,
+        lastLoginAt: customerPortalAccounts.lastLoginAt,
+        accountCreatedAt: customerPortalAccounts.createdAt,
+      })
+        .from(crmCustomers)
+        .leftJoin(customerPortalAccounts, eq(customerPortalAccounts.customerId, crmCustomers.id))
+        .orderBy(asc(crmCustomers.name));
+      res.json({
+        customers: rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          email: r.email,
+          portalEnabled: !!r.portalEnabled,
+          hasAccount: !!r.accountId,
+          hasPassword: !!r.hasPassword,
+          lastLoginAt: r.lastLoginAt,
+          accountCreatedAt: r.accountCreatedAt,
+        })),
+      });
+    } catch (error) {
+      console.error("Portal customers list error:", error);
+      res.status(500).json({ message: "Failed to load portal customers" });
+    }
+  });
+
   // PUT /api/admin/settings/customer-portal - update sync toggle
   app.put("/api/admin/settings/customer-portal", requireCrmAuth, requireCrmAdmin, async (req: any, res) => {
     try {

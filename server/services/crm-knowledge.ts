@@ -701,6 +701,10 @@ The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" 
 - On the invoice create page, picking "Preventative Maintenance" from the price book opens the maintenance-agreement setup (systems count with tiered $229/-$10 pricing, contract date, billing preference, auto-renew, pay-now) instead of adding a plain line item
 - The mobile quote detail page is a back-swipe page (floating back arrow, edge-swipe returns to the Quotes list) with a Preview sheet that renders the same industrial document the customer sees on the public quote page (maroon accent bar, Prepared for, ~$/mo financing estimate on install quotes)
 
+### Mobile Call Log
+- Mobile → More → Call Log (/mobile/call-log): the SAME office phone log as the CRM's Phone console — browse recent days (collapsible, entry counts) and "Log a Call" from a bottom sheet: caller name, phone, what it was about, tag (Service/Maintenance/Install/Sales metal badges), billable toggle
+- Mobile Inbox conversations support iMessage-style swipe-to-delete: swipe a conversation left past halfway (red trash reveals) to delete the local thread; Textline keeps its provider copy, and a new inbound text starts a fresh conversation
+
 ### Mobile Checklist Gallery
 - Mobile → More → Checklist Gallery (/mobile/checklists): a READ-ONLY viewer of every checklist template, grouped by visit type (Service / Maintenance / Install / Sales metal badges) — each shows its work-order subtype, step-by-step questions (with section phases, answer types, required markers, help text) and required photo steps. Editing still happens only in CRM Settings → Checklists.
 
@@ -780,7 +784,7 @@ The Settings page at /crm/settings contains these sub-sections:
 - **Fleet Tracking** — Bouncie GPS vehicle tracking integration
 - **CompanyCam** — address-matched CompanyCam project/photo sync (two-way references)
 - **Salesbook Directory** — manage the table of contents entries for the digital salesbook
-- **Customer Portal** — control whether portal profile edits sync straight into the CRM or wait for review
+- **Customer Portal** — control whether portal profile edits sync straight into the CRM or wait for review; includes the Portal Access Monitor: every customer bucketed by Logged in / Never logged in / No account (with last-login dates, search, and tap-through to the customer)
 - **Appearance** — light/dark theme for the CRM
 - **System Tools** — system-level configuration and utilities
 

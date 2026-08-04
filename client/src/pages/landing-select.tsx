@@ -183,7 +183,7 @@ export default function LandingSelect() {
 
           <div className="mt-8 border-t border-slate-200 pt-4 text-center">
             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-              Giesbrecht HVAC · Wrens, GA
+              Giesbrecht HVAC · Augusta, GA
             </span>
           </div>
         </div>

@@ -240,12 +240,14 @@ export default function CrmLogin() {
           <div className="mt-8 border-t border-slate-200 pt-5 text-center">
             <p className="text-sm text-muted-foreground">
               Giesbrecht HVAC customer?{" "}
+              {/* Phones go back to the welcome chooser (both doors), not
+                  straight into the other login. Desktop has no chooser. */}
               <a
-                href="/portal/login"
+                href={isNativeApp() || window.innerWidth < 768 ? "/" : "/portal/login"}
                 className="font-medium text-[#711419] hover:underline"
                 data-testid="link-customer-portal"
               >
-                Sign in to the Customer Portal
+                {isNativeApp() || window.innerWidth < 768 ? "Choose a different sign-in" : "Sign in to the Customer Portal"}
               </a>
             </p>
           </div>
