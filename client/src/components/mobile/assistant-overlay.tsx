@@ -325,14 +325,14 @@ export default function AssistantOverlay({
     const el = sheetRef.current;
     if (el) {
       el.style.transition = "none";
-      el.style.transform = `scale(${(0.96 + 0.04 * Math.min(1, Math.max(0, p))).toFixed(4)})`;
+      el.style.transform = `scale(${(0.93 + 0.07 * Math.min(1, Math.max(0, p))).toFixed(4)})`;
     }
   };
   const restoreChatScale = () => {
     const el = sheetRef.current;
     if (!el) return;
     el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
-    el.style.transform = "scale(0.96)";
+    el.style.transform = "scale(0.93)";
     window.setTimeout(() => {
       el.style.transition = "";
       el.style.transform = "";
@@ -1274,7 +1274,7 @@ export default function AssistantOverlay({
         ref={sheetRef}
         className={cn(
           "absolute inset-x-0 bottom-0 flex select-none flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
-          historyOpen && "scale-[0.96]",
+          historyOpen && "scale-[0.93]",
         )}
         // select-none sheet-wide: holding empty space (the drag gesture) must
         // never pop iOS's blue text selection on nearby bubbles. The composer
