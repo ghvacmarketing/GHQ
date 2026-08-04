@@ -65,7 +65,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
-import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
+import { markSkipEntrance, skipEntranceOnce, usePushEntrance } from "@/lib/page-transitions";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
@@ -2252,6 +2252,10 @@ function InvoiceTab({
 export default function MobileJobDetail() {
   useRequireCrmAuth();
   const entered = usePushEntrance();
+  // Arriving as the tail end of a sheet-close (create quote/invoice ghost
+  // sliding down): the page beneath must land STATIC — no entrance slide
+  // playing under the descending sheet.
+  const [skipEnter] = useState(() => skipEntranceOnce());
   const params = useParams<{ id: string }>();
   const workOrderId = parseInt(params.id || "0", 10);
   const [, navigate] = useLocation();
@@ -2381,6 +2385,25 @@ export default function MobileJobDetail() {
     }, dur);
   };
 
+  // Tab-bar switches land on the Overview with a shell-style CROSSFADE —
+  // the section fades away over a static overview (same feel as switching
+  // agenda → media). The iOS card slide stays exclusive to the edge swipe.
+  const closeSectionFaded = () => {
+    const sec = sectionsRef.current;
+    if (!sec || activeTab === "overview") { setActiveTab("overview"); return; }
+    tabScroll.current[activeTab] = sec.scrollTop;
+    cancelLayerAnimations();
+    if (overviewRef.current) overviewRef.current.style.transform = "";
+    if (scrimRef.current) scrimRef.current.style.opacity = "0";
+    sec.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease", fill: "forwards" });
+    setTimeout(() => {
+      setClosedLayerStyles();
+      if (sectionsRef.current) sectionsRef.current.style.transform = "";
+      setActiveTab("overview");
+      requestAnimationFrame(() => cancelLayerAnimations());
+    }, 210);
+  };
+
   // The floating back (and the edge swipe) walk the tab trail: on
   // Work/Quote/Invoice they return to whichever tab you were on LAST; on
   // Overview they always leave the job.
@@ -2420,38 +2443,34 @@ export default function MobileJobDetail() {
     switchTab(prev);
   };
 
-  // Switch tabs preserving each section's scroll position.
+  // Switch tabs preserving each section's scroll position. Every tab-bar
+  // switch is a shell-style crossfade: the incoming layer fades in over a
+  // static page (the inner wrappers carry the same 0.2s fade via CSS).
   const switchTab = (next: TabType) => {
     if (next === activeTab) return;
     // Remember where you came FROM — unless this switch IS a back-pop
     if (!tabBackPop.current) tabHistory.current.push(activeTab);
     tabBackPop.current = false;
-    if (next === "overview") { closeSectionAnimated(); return; }
+    if (next === "overview") { closeSectionFaded(); return; }
     const sec = sectionsRef.current;
     const fromOverview = activeTab === "overview";
     if (sec && !fromOverview) tabScroll.current[activeTab] = sec.scrollTop;
-    // Enter animations are pure CSS keyed off display toggling (the section
-    // container flips display:none→block, each tab wrapper flips hidden→block)
-    // — CSS animations restart synchronously with the reveal paint, so the
-    // incoming tab can never flash fully-rendered before its animation.
     setActiveTab(next);
     requestAnimationFrame(() => {
       const sec2 = sectionsRef.current;
       if (sec2) sec2.scrollTop = tabScroll.current[next] || 0;
     });
-    if (fromOverview) {
-      overviewRef.current?.animate(
-        [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
-        { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)", fill: "forwards" },
-      );
-      scrimRef.current?.animate(
-        [{ opacity: "0" }, { opacity: "0.18" }],
-        { duration: 240, easing: "linear", fill: "forwards" },
-      );
+    if (fromOverview && sec) {
+      // Fade the section in over the STATIC overview, then park the
+      // overview beneath (parallax position) for the back gestures.
+      cancelLayerAnimations();
+      if (overviewRef.current) overviewRef.current.style.transform = "";
+      if (scrimRef.current) scrimRef.current.style.opacity = "0";
+      sec.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease", fill: "forwards" });
       setTimeout(() => {
         setOpenLayerStyles();
         requestAnimationFrame(() => cancelLayerAnimations());
-      }, 240);
+      }, 210);
     }
   };
 
@@ -3247,7 +3266,7 @@ export default function MobileJobDetail() {
       )}
       <div
         ref={pageRef}
-        className={`${entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
+        className={`${skipEnter ? "" : entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
         style={{ touchAction: "pan-y" }}
         onPointerDown={onSwipeStart}
         onPointerMove={onSwipeMove}
@@ -3326,7 +3345,7 @@ export default function MobileJobDetail() {
           mounted so entered data and scroll positions survive round trips. */}
       <div
         ref={sectionsRef}
-        className="job-section-enter absolute inset-0 z-30 overflow-auto overscroll-y-contain bg-slate-50 px-4 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+        className="absolute inset-0 z-30 overflow-auto overscroll-y-contain bg-slate-50 px-4 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
         style={{
           display: activeTab === "overview" ? "none" : undefined,
           paddingTop: "calc(env(safe-area-inset-top) + 56px)",
