@@ -708,20 +708,22 @@ export default function AssistantOverlay({
     };
   }, [open]);
 
-  // Keyboard rise, two behaviors: if the bottom of the chat was in view,
-  // the last message GLIDES up pinned right above the composer (scrollTop
-  // pinned every frame through the spacer's height transition — one
-  // scrollIntoView landed late and jumpy). If the user was reading earlier
-  // messages, nothing moves — they can type and scroll down themselves.
+  // Keyboard rise AND fall: if the bottom of the chat is in view, the last
+  // message stays PINNED right above the composer through the whole padding
+  // transition — pinned every frame, both directions. On open that means
+  // the thread glides up with the keys; on close it glides back down in
+  // sync (without this, the shrinking padding clamped scrollTop instantly —
+  // a jump — then the transition played out over a band of white space).
+  // Reading earlier messages? Nothing moves either way.
   useEffect(() => {
-    if (kbInset === 0 || !stickRef.current) return;
+    if (!stickRef.current) return;
     const el = chatScrollRef.current;
     if (!el) return;
     let raf = 0;
     const start = performance.now();
     const step = (t: number) => {
       el.scrollTop = el.scrollHeight;
-      if (t - start < 400) raf = requestAnimationFrame(step);
+      if (t - start < 420) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
