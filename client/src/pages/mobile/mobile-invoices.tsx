@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { ChevronRight, ListFilter, Search, X } from "lucide-react";
+import { Check, ChevronRight, ListFilter, Search, X } from "lucide-react";
 import MobileShell from "./mobile-shell";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { SheetSelect } from "@/components/mobile/sheet-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isNativeApp } from "@/lib/native";
 import { useScrollHide } from "@/hooks/use-scroll-hide";
@@ -14,15 +13,6 @@ import { useScrollHide } from "@/hooks/use-scroll-hide";
  *  over the resting list, and the same floating search pill that opens the
  *  fullscreen bottom-input search overlay. Defaults to CRM-created invoices
  *  (the imported FieldEdge history is behind the Source filter). */
-
-const STATUS_CHIPS: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
-  sent: { label: "Sent", className: "bg-blue-100 text-blue-700" },
-  viewed: { label: "Viewed", className: "bg-sky-100 text-sky-700" },
-  partial: { label: "Partial", className: "bg-amber-100 text-amber-700" },
-  paid: { label: "Paid", className: "bg-green-100 text-green-700" },
-  void: { label: "Void", className: "bg-red-100 text-red-700" },
-};
 
 type InvoiceRow = {
   id: string;
@@ -79,14 +69,24 @@ export default function MobileInvoices() {
     };
   }, [searchActive]);
 
+  // Search enters/exits like the Gibbs history search: nothing pops — the
+  // results UNFOLD from the top (grid-rows + fade) and fold back away.
+  const [searchEntered, setSearchEntered] = useState(false);
+  useEffect(() => {
+    if (!searchActive) return;
+    const raf = requestAnimationFrame(() => setSearchEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [searchActive]);
+
   const closeSearch = () => {
     searchInputRef.current?.blur();
     setSearchClosing(true);
+    setSearchEntered(false);
     setTimeout(() => {
       setSearchActive(false);
       setSearchClosing(false);
       setSearchQuery("");
-    }, 190);
+    }, 340);
   };
 
   // ── Filters ──
@@ -132,7 +132,6 @@ export default function MobileInvoices() {
   );
 
   const invoiceRow = (invoice: InvoiceRow, i: number) => {
-    const chip = STATUS_CHIPS[invoice.status] || STATUS_CHIPS.draft;
     const balance = parseFloat(invoice.balanceDue || "0");
     const showBalance = balance > 0 && invoice.status !== "void" && invoice.status !== "draft";
     return (
@@ -163,9 +162,6 @@ export default function MobileInvoices() {
             </span>
           )}
         </span>
-        <span className={`shrink-0 rounded-[3px] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${chip.className}`}>
-          {chip.label}
-        </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
     );
@@ -173,6 +169,12 @@ export default function MobileInvoices() {
 
   return (
     <MobileShell>
+      {/* Content scrolling under the top edge fades out instead of clipping */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
+        style={{ height: "calc(env(safe-area-inset-top) + 40px)" }}
+        aria-hidden
+      />
       <div className="space-y-5 p-4 pb-6" data-testid="mobile-invoices-page">
         <h2 className="pt-1 text-2xl font-bold tracking-tight text-slate-900">Invoices</h2>
 
@@ -238,32 +240,46 @@ export default function MobileInvoices() {
             </button>
           )}
         </div>
-        <div className="mt-2 min-h-[45vh] divide-y divide-slate-200/80 pb-2">
-          <SheetSelect
-            label="Status"
-            value={fStatus}
-            onChange={(k) => setFStatus(k as typeof fStatus)}
-            options={[
-              { key: "all", label: "All" },
-              { key: "draft", label: "Draft" },
-              { key: "sent", label: "Sent" },
-              { key: "partial", label: "Partially paid" },
-              { key: "paid", label: "Paid" },
-              { key: "void", label: "Void" },
-            ]}
-            testid="invoices-filter-status"
-          />
-          <SheetSelect
-            label="Source"
-            value={fSource}
-            onChange={(k) => setFSource(k as typeof fSource)}
-            options={[
-              { key: "crm", label: "Created in GHQ" },
-              { key: "imported", label: "Imported history" },
-              { key: "all", label: "Everything" },
-            ]}
-            testid="invoices-filter-source"
-          />
+        {/* Already inside a sheet — the options list inline, one tap picks
+            (no sheet-in-a-sheet). */}
+        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Status</p>
+        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+          {([
+            { key: "all", label: "All statuses" },
+            { key: "draft", label: "Draft" },
+            { key: "sent", label: "Sent" },
+            { key: "partial", label: "Partially paid" },
+            { key: "paid", label: "Paid" },
+            { key: "void", label: "Void" },
+          ] as const).map((opt, i) => (
+            <button
+              key={opt.key}
+              onClick={() => setFStatus(opt.key)}
+              className={`flex w-full items-center justify-between px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+              data-testid={`invoices-filter-status-${opt.key}`}
+            >
+              <span className={`text-sm ${fStatus === opt.key ? "font-semibold text-slate-900" : "text-slate-700"}`}>{opt.label}</span>
+              {fStatus === opt.key && <Check className="h-4 w-4 text-[#711419]" />}
+            </button>
+          ))}
+        </div>
+        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Source</p>
+        <div className="mb-2 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+          {([
+            { key: "crm", label: "Created in GHQ" },
+            { key: "imported", label: "Imported history" },
+            { key: "all", label: "Everything" },
+          ] as const).map((opt, i) => (
+            <button
+              key={opt.key}
+              onClick={() => setFSource(opt.key)}
+              className={`flex w-full items-center justify-between px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+              data-testid={`invoices-filter-source-${opt.key}`}
+            >
+              <span className={`text-sm ${fSource === opt.key ? "font-semibold text-slate-900" : "text-slate-700"}`}>{opt.label}</span>
+              {fSource === opt.key && <Check className="h-4 w-4 text-[#711419]" />}
+            </button>
+          ))}
         </div>
       </DraggableSheet>
 
@@ -287,34 +303,47 @@ export default function MobileInvoices() {
           bottom riding eased above the keyboard. */}
       {searchActive && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
-            searchClosing
-              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
-              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
-          }`}
+          className="fixed inset-0 z-50 flex flex-col bg-slate-50"
+          style={{
+            opacity: searchEntered && !searchClosing ? 1 : 0,
+            transition: "opacity 300ms ease",
+          }}
           data-testid="invoices-search-overlay"
         >
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${(q.length < 2 ? rows.length === 0 : results.length === 0) ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
-            {q.length < 2 ? (
-              rows.length > 0 ? (
-                <div className="pb-2">
-                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
-                    {rows.slice(0, 5).map((invoice, i) => invoiceRow(invoice, i))}
+            {/* Same fold the Gibbs history search uses — the content
+                unfolds in from the top and folds away on exit. */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: searchEntered && !searchClosing ? "1fr" : "0fr",
+                opacity: searchEntered && !searchClosing ? 1 : 0,
+                transition: "grid-template-rows 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease",
+              }}
+            >
+              <div className="overflow-hidden">
+                {q.length < 2 ? (
+                  rows.length > 0 ? (
+                    <div className="pb-2">
+                      <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                        {rows.map((invoice, i) => invoiceRow(invoice, i))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="pb-6 text-center text-sm text-slate-400">Type an invoice number or customer name.</p>
+                  )
+                ) : results.length === 0 ? (
+                  <p className="pb-6 text-center text-sm text-slate-400">No invoices match &ldquo;{searchQuery.trim()}&rdquo;.</p>
+                ) : (
+                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="invoices-search-results">
+                    {results.map((invoice, i) => invoiceRow(invoice, i))}
                   </div>
-                </div>
-              ) : (
-                <p className="pb-6 text-center text-sm text-slate-400">Type an invoice number or customer name.</p>
-              )
-            ) : results.length === 0 ? (
-              <p className="pb-6 text-center text-sm text-slate-400">No invoices match &ldquo;{searchQuery.trim()}&rdquo;.</p>
-            ) : (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="invoices-search-results">
-                {results.map((invoice, i) => invoiceRow(invoice, i))}
+                )}
               </div>
-            )}
+            </div>
           </div>
           <div
             ref={searchBarRef}

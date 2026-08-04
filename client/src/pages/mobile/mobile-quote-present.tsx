@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import MobileShell from "./mobile-shell";
+import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import ghvacLogo from "@assets/ghvac-logo.png";
 import {
   BRAND_COLOR,
@@ -46,6 +46,12 @@ export default function MobileQuotePresent() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  useRequireCrmAuth();
+  // Presentation rides in as a SHEET (create-page look): rounded top below
+  // the status bar, X closes it with a slide-down back to the quote.
+  const [sheetClosing, setSheetClosing] = useState(false);
+  const sheetChrome = (closing: boolean) =>
+    `fixed inset-x-0 bottom-0 z-[70] flex flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`;
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [signature, setSignature] = useState("");
@@ -232,12 +238,11 @@ export default function MobileQuotePresent() {
   };
 
   const handleBack = () => {
-    navigate(`/mobile/quotes/${id}`);
+    setSheetClosing(true);
+    setTimeout(() => navigate(`/mobile/quotes/${id}`), 190);
   };
 
-  const handleExit = () => {
-    navigate(`/mobile/quotes/${id}`);
-  };
+  const handleExit = handleBack;
 
   const handlePayDeposit = async () => {
     if (!quote?.id) return;
@@ -306,8 +311,8 @@ export default function MobileQuotePresent() {
 
   if (isLoading) {
     return (
-      <MobileShell>
-        <div className="min-h-screen bg-white p-4">
+      <div className={sheetChrome(false)} style={{ top: "env(safe-area-inset-top)" }}>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="flex items-center justify-between mb-4">
             <Skeleton className="h-10 w-24" />
             <Skeleton className="h-10 w-20" />
@@ -317,39 +322,38 @@ export default function MobileQuotePresent() {
           <Skeleton className="h-64 w-full mb-4" />
           <Skeleton className="h-48 w-full" />
         </div>
-      </MobileShell>
+      </div>
     );
   }
 
   if (error || !quote) {
     return (
-      <MobileShell>
-        <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
+      <div className={sheetChrome(false)} style={{ top: "env(safe-area-inset-top)" }}>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-4">
           <p className="text-slate-600 mb-4">Unable to load quote</p>
           <Button onClick={handleBack} data-testid="button-back-error">
             Go Back
           </Button>
         </div>
-      </MobileShell>
+      </div>
     );
   }
 
   const isAlreadyAccepted = quote.status === "accepted";
 
   return (
-    <MobileShell>
-      <div className="min-h-screen bg-white" data-testid="mobile-quote-present">
+    <div className={sheetChrome(sheetClosing)} style={{ top: "env(safe-area-inset-top)" }} data-testid="mobile-quote-present">
+      <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
+          {/* X top-left — the only way out, like the create pages */}
+          <button
             onClick={handleBack}
-            className="min-h-[44px] -ml-2"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-transform active:scale-90"
+            aria-label="Close"
             data-testid="button-back"
           >
-            <ArrowLeft className="h-5 w-5 mr-1" />
-            Back
-          </Button>
+            <X className="h-5 w-5" />
+          </button>
           <div className="flex items-center gap-1.5">
             {internalLineItems.length > 0 && (
               <Button
@@ -363,16 +367,6 @@ export default function MobileQuotePresent() {
                 Internal
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExit}
-              className="min-h-[44px]"
-              data-testid="button-exit"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Exit
-            </Button>
           </div>
         </div>
 
@@ -771,6 +765,6 @@ export default function MobileQuotePresent() {
           </div>
         </div>
       </div>
-    </MobileShell>
+    </div>
   );
 }

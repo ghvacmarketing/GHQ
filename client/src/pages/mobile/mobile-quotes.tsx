@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { ChevronRight, ListFilter, Search, X } from "lucide-react";
+import { Check, ChevronRight, ListFilter, Search, X } from "lucide-react";
 import MobileShell from "./mobile-shell";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { SheetSelect } from "@/components/mobile/sheet-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isNativeApp } from "@/lib/native";
 import { useScrollHide } from "@/hooks/use-scroll-hide";
@@ -13,16 +12,6 @@ import { useScrollHide } from "@/hooks/use-scroll-hide";
 /** Quotes directory — the Work Orders page's twin for quotes: a Filters
  *  pill + sheet over the resting list, and the same floating search pill
  *  that opens the fullscreen bottom-input search overlay. */
-
-const STATUS_CHIPS: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
-  sent: { label: "Sent", className: "bg-blue-100 text-blue-700" },
-  viewed: { label: "Viewed", className: "bg-sky-100 text-sky-700" },
-  accepted: { label: "Accepted", className: "bg-green-100 text-green-700" },
-  declined: { label: "Declined", className: "bg-red-100 text-red-700" },
-  expired: { label: "Expired", className: "bg-amber-100 text-amber-700" },
-  converted: { label: "Converted", className: "bg-purple-100 text-purple-700" },
-};
 
 type QuoteRow = {
   id: string;
@@ -79,14 +68,24 @@ export default function MobileQuotes() {
     };
   }, [searchActive]);
 
+  // Search enters/exits like the Gibbs history search: nothing pops — the
+  // results UNFOLD from the top (grid-rows + fade) and fold back away.
+  const [searchEntered, setSearchEntered] = useState(false);
+  useEffect(() => {
+    if (!searchActive) return;
+    const raf = requestAnimationFrame(() => setSearchEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [searchActive]);
+
   const closeSearch = () => {
     searchInputRef.current?.blur();
     setSearchClosing(true);
+    setSearchEntered(false);
     setTimeout(() => {
       setSearchActive(false);
       setSearchClosing(false);
       setSearchQuery("");
-    }, 190);
+    }, 340);
   };
 
   // ── Filters ──
@@ -126,7 +125,6 @@ export default function MobileQuotes() {
   );
 
   const quoteRow = (quote: QuoteRow, i: number) => {
-    const chip = STATUS_CHIPS[quote.status] || STATUS_CHIPS.draft;
     return (
       <button
         key={quote.id}
@@ -148,9 +146,6 @@ export default function MobileQuotes() {
         <span className="shrink-0 text-sm font-bold tabular-nums text-slate-900">
           {formatCurrency(quote.total)}
         </span>
-        <span className={`shrink-0 rounded-[3px] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${chip.className}`}>
-          {chip.label}
-        </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
     );
@@ -158,6 +153,12 @@ export default function MobileQuotes() {
 
   return (
     <MobileShell>
+      {/* Content scrolling under the top edge fades out instead of clipping */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
+        style={{ height: "calc(env(safe-area-inset-top) + 40px)" }}
+        aria-hidden
+      />
       <div className="space-y-5 p-4 pb-6" data-testid="mobile-quotes-page">
         <h2 className="pt-1 text-2xl font-bold tracking-tight text-slate-900">Quotes</h2>
 
@@ -221,22 +222,29 @@ export default function MobileQuotes() {
             </button>
           )}
         </div>
-        <div className="mt-2 min-h-[40vh] divide-y divide-slate-200/80 pb-2">
-          <SheetSelect
-            label="Status"
-            value={fStatus}
-            onChange={(k) => setFStatus(k as typeof fStatus)}
-            options={[
-              { key: "all", label: "All" },
-              { key: "draft", label: "Draft" },
-              { key: "sent", label: "Sent" },
-              { key: "accepted", label: "Accepted" },
-              { key: "declined", label: "Declined" },
-              { key: "expired", label: "Expired" },
-              { key: "converted", label: "Converted" },
-            ]}
-            testid="quotes-filter-status"
-          />
+        {/* Already inside a sheet — the status options list inline, one tap
+            picks and closes (no sheet-in-a-sheet). */}
+        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Status</p>
+        <div className="mb-2 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+          {([
+            { key: "all", label: "All statuses" },
+            { key: "draft", label: "Draft" },
+            { key: "sent", label: "Sent" },
+            { key: "accepted", label: "Accepted" },
+            { key: "declined", label: "Declined" },
+            { key: "expired", label: "Expired" },
+            { key: "converted", label: "Converted" },
+          ] as const).map((opt, i) => (
+            <button
+              key={opt.key}
+              onClick={() => { setFStatus(opt.key); setFilterOpen(false); }}
+              className={`flex w-full items-center justify-between px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+              data-testid={`quotes-filter-status-${opt.key}`}
+            >
+              <span className={`text-sm ${fStatus === opt.key ? "font-semibold text-slate-900" : "text-slate-700"}`}>{opt.label}</span>
+              {fStatus === opt.key && <Check className="h-4 w-4 text-[#711419]" />}
+            </button>
+          ))}
         </div>
       </DraggableSheet>
 
@@ -260,34 +268,47 @@ export default function MobileQuotes() {
           bottom riding eased above the keyboard. */}
       {searchActive && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
-            searchClosing
-              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
-              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
-          }`}
+          className="fixed inset-0 z-50 flex flex-col bg-slate-50"
+          style={{
+            opacity: searchEntered && !searchClosing ? 1 : 0,
+            transition: "opacity 300ms ease",
+          }}
           data-testid="quotes-search-overlay"
         >
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${(q.length < 2 ? rows.length === 0 : results.length === 0) ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
-            {q.length < 2 ? (
-              rows.length > 0 ? (
-                <div className="pb-2">
-                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
-                    {rows.slice(0, 5).map((quote, i) => quoteRow(quote, i))}
+            {/* Same fold the Gibbs history search uses — the content
+                unfolds in from the top and folds away on exit. */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: searchEntered && !searchClosing ? "1fr" : "0fr",
+                opacity: searchEntered && !searchClosing ? 1 : 0,
+                transition: "grid-template-rows 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease",
+              }}
+            >
+              <div className="overflow-hidden">
+                {q.length < 2 ? (
+                  rows.length > 0 ? (
+                    <div className="pb-2">
+                      <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                        {rows.map((quote, i) => quoteRow(quote, i))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="pb-6 text-center text-sm text-slate-400">Type a quote number, customer, or title.</p>
+                  )
+                ) : results.length === 0 ? (
+                  <p className="pb-6 text-center text-sm text-slate-400">No quotes match &ldquo;{searchQuery.trim()}&rdquo;.</p>
+                ) : (
+                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="quotes-search-results">
+                    {results.map((quote, i) => quoteRow(quote, i))}
                   </div>
-                </div>
-              ) : (
-                <p className="pb-6 text-center text-sm text-slate-400">Type a quote number, customer, or title.</p>
-              )
-            ) : results.length === 0 ? (
-              <p className="pb-6 text-center text-sm text-slate-400">No quotes match &ldquo;{searchQuery.trim()}&rdquo;.</p>
-            ) : (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="quotes-search-results">
-                {results.map((quote, i) => quoteRow(quote, i))}
+                )}
               </div>
-            )}
+            </div>
           </div>
           <div
             ref={searchBarRef}

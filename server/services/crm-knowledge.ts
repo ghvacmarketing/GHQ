@@ -697,7 +697,8 @@ The Documents app has a "Gibbs" folder: a readable "Gibbs knowledge & policies" 
 - Mobile → More → Quotes (/mobile/quotes): every quote company-wide, newest first — filter by status, floating search (quote number / customer / title), tap through to the quote detail page (preview, PDF, send by email/SMS, Present to Client, accept/decline)
 - Mobile → More → Invoices (/mobile/invoices): billing across the company — filter by status and source (created in GHQ vs imported FieldEdge history), floating search, tap through to the invoice detail page (send, record cash/check, Take Card Payment via QR the customer scans and pays with Apple Pay/Google Pay/card)
 - ALL roles including techs can create quick quotes from the mobile "+" button (New Quote); New Invoice / New Customer / New Job stay supervisor-and-above
-- Creating a quote or invoice from INSIDE a job (the job's Quote/Invoice tabs) opens the exact same full create page as the "+" button with the job pre-selected — no customer/work-order picking
+- Creating a quote or invoice from INSIDE a job (the job's Quote/Invoice tabs) opens the exact same full create page as the "+" button with the job pre-selected — no customer/work-order picking. "Create from Quote" pre-fills the invoice's line items from an accepted quote.
+- On the invoice create page, picking "Preventative Maintenance" from the price book opens the maintenance-agreement setup (systems count with tiered $229/-$10 pricing, contract date, billing preference, auto-renew, pay-now) instead of adding a plain line item
 - The mobile quote detail page is a back-swipe page (floating back arrow, edge-swipe returns to the Quotes list) with a Preview sheet that renders the same industrial document the customer sees on the public quote page (maroon accent bar, Prepared for, ~$/mo financing estimate on install quotes)
 
 ### Mobile Checklist Gallery

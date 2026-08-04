@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -211,6 +211,30 @@ export default function MobileQuoteDetail() {
       }, 320);
     }
   };
+
+  // The push-entrance rides in OVER the real quotes list (parallax + scrim
+  // darkening), exactly like the back-swipe in reverse — without this the
+  // panel slid over a blank white screen and the entrance read as a flash.
+  useEffect(() => {
+    setShowUnderlay(true);
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const raf = requestAnimationFrame(() => {
+      underlayRef.current?.animate(
+        [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
+        { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" },
+      );
+      scrimRef.current?.animate(
+        [{ opacity: "0" }, { opacity: "0.18" }],
+        { duration: 420, easing: "linear", fill: "forwards" },
+      );
+      t = setTimeout(() => setShowUnderlay(false), 480);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (t) clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithLineItems>({
     queryKey: ["/api/crm/quotes", id],

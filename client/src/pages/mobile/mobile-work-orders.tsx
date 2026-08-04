@@ -100,16 +100,26 @@ export default function MobileWorkOrders() {
     };
   }, [searchActive]);
 
+  // Search enters/exits like the Gibbs history search: nothing pops — the
+  // results UNFOLD from the top (grid-rows + fade) and fold back away.
+  const [searchEntered, setSearchEntered] = useState(false);
+  useEffect(() => {
+    if (!searchActive) return;
+    const raf = requestAnimationFrame(() => setSearchEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [searchActive]);
+
   const closeSearch = () => {
-    // Blur first so the keyboard drops while the overlay slides away —
+    // Blur first so the keyboard drops while the overlay folds away —
     // one motion out, mirroring the way in.
     searchInputRef.current?.blur();
     setSearchClosing(true);
+    setSearchEntered(false);
     setTimeout(() => {
       setSearchActive(false);
       setSearchClosing(false);
       setSearchQuery("");
-    }, 190);
+    }, 340);
   };
 
   // ── Filters (same sheet pattern as Customers) ──
@@ -191,6 +201,12 @@ export default function MobileWorkOrders() {
 
   return (
     <MobileShell>
+      {/* Content scrolling under the top edge fades out instead of clipping */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
+        style={{ height: "calc(env(safe-area-inset-top) + 40px)" }}
+        aria-hidden
+      />
       <div className="space-y-5 p-4 pb-6" data-testid="mobile-work-orders-page">
         <h2 className="pt-1 text-2xl font-bold tracking-tight text-slate-900">Work orders</h2>
 
@@ -318,34 +334,47 @@ export default function MobileWorkOrders() {
           bottom riding eased above the keyboard (same feel as Customers). */}
       {searchActive && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
-            searchClosing
-              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
-              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
-          }`}
+          className="fixed inset-0 z-50 flex flex-col bg-slate-50"
+          style={{
+            opacity: searchEntered && !searchClosing ? 1 : 0,
+            transition: "opacity 300ms ease",
+          }}
           data-testid="wo-search-overlay"
         >
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${(searchQuery.trim().length < 2 ? rows.length === 0 : results.length === 0) ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
-            {searchQuery.trim().length < 2 ? (
-              rows.length > 0 ? (
-                <div className="pb-2">
-                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
-                    {rows.slice(0, 5).map((wo, i) => woRow(wo, i))}
+            {/* Same fold the Gibbs history search uses — the content
+                unfolds in from the top and folds away on exit. */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: searchEntered && !searchClosing ? "1fr" : "0fr",
+                opacity: searchEntered && !searchClosing ? 1 : 0,
+                transition: "grid-template-rows 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease",
+              }}
+            >
+              <div className="overflow-hidden">
+                {searchQuery.trim().length < 2 ? (
+                  rows.length > 0 ? (
+                    <div className="pb-2">
+                      <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+                        {rows.map((wo, i) => woRow(wo, i))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="pb-6 text-center text-sm text-slate-400">Type a job title or customer name.</p>
+                  )
+                ) : results.length === 0 ? (
+                  <p className="pb-6 text-center text-sm text-slate-400">No work orders match &ldquo;{searchQuery.trim()}&rdquo;.</p>
+                ) : (
+                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="wo-search-results">
+                    {results.map((wo, i) => woRow(wo, i))}
                   </div>
-                </div>
-              ) : (
-                <p className="pb-6 text-center text-sm text-slate-400">Type a job title or customer name.</p>
-              )
-            ) : results.length === 0 ? (
-              <p className="pb-6 text-center text-sm text-slate-400">No work orders match &ldquo;{searchQuery.trim()}&rdquo;.</p>
-            ) : (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="wo-search-results">
-                {results.map((wo, i) => woRow(wo, i))}
+                )}
               </div>
-            )}
+            </div>
           </div>
           <div
             ref={searchBarRef}

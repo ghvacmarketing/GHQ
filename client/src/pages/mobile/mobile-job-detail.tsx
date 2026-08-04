@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { format, addYears, addMonths } from "date-fns";
@@ -1239,35 +1239,9 @@ const quoteStatusConfig: Record<string, { label: string; className: string }> = 
 function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [showQuickQuote, setShowQuickQuote] = useState(false);
-  const [lineItems, setLineItems] = useState<QuickQuoteLineItem[]>([]);
-  const [quoteTitle, setQuoteTitle] = useState("");
-  const [showCatalog, setShowCatalog] = useState(false);
-  const [showDiscount, setShowDiscount] = useState(false);
-  const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance" | "field_edge">("service");
-  const [discountSearch, setDiscountSearch] = useState("");
-  const [showManualDiscount, setShowManualDiscount] = useState(false);
-  const [discountDescription, setDiscountDescription] = useState("");
-  const [discountAmount, setDiscountAmount] = useState("");
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
-
-  // Fetch users with admin role only for quote assignee selection
-  const { data: adminUsers } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users", "admin-only"],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/users", { credentials: "include" });
-      if (!res.ok) return [];
-      const users = await res.json();
-      // Filter to only admin role (not owner, not sales, not tech)
-      return users.filter((u: CrmUser) => u.role === 'admin' && u.isActive);
-    },
-    staleTime: 0, // Always get fresh data
-    refetchOnMount: "always",
-  });
 
   // Fetch existing quotes for this work order
   const { data: quotesData, isLoading: quotesLoading, error: quotesError } = useQuery<{ quotes: CrmQuote[] }>({
@@ -1281,129 +1255,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const quotes = quotesData?.quotes || [];
-
-  // Fetch CRM items (for both catalog and discounts)
-  const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
-    queryKey: ["/api/crm/items"],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/items", { credentials: "include" });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.items || data || [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const crmItems = crmItemsData || [];
-  
-  // Filter CRM items for catalog (only service and maintenance for mobile techs)
-  const filteredCatalogItems = crmItems
-    .filter(item => {
-      // Only show service, maintenance, and field edge categories for mobile techs
-      if (item.category !== "service" && item.category !== "maintenance" && item.category !== "field_edge") {
-        return false;
-      }
-      // Apply category filter
-      if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
-        return false;
-      }
-      // Apply search filter
-      if (catalogSearch.trim()) {
-        const search = catalogSearch.toLowerCase();
-        return (
-          item.name?.toLowerCase().includes(search) ||
-          item.description?.toLowerCase().includes(search) ||
-          item.partNumber?.toLowerCase().includes(search)
-        );
-      }
-      return true;
-    })
-    // Sort to put "Service Call" at the top
-    .sort((a, b) => {
-      const aIsServiceCall = a.name?.toLowerCase().includes("service call") ? 0 : 1;
-      const bIsServiceCall = b.name?.toLowerCase().includes("service call") ? 0 : 1;
-      if (aIsServiceCall !== bIsServiceCall) return aIsServiceCall - bIsServiceCall;
-      return (a.name || "").localeCompare(b.name || "");
-    });
-  
-  // Filter discount items from CRM items (only discount category)
-  const filteredDiscountItems = crmItems.filter(item => {
-    // Only show items in the discount category
-    if (item.category !== "discount") {
-      return false;
-    }
-    // Apply search filter
-    if (discountSearch.trim()) {
-      const search = discountSearch.toLowerCase();
-      return (
-        item.name?.toLowerCase().includes(search) ||
-        item.description?.toLowerCase().includes(search) ||
-        item.partNumber?.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
-
-  // Create quote mutation
-  const createQuoteMutation = useMutation({
-    mutationFn: async (data: { 
-      title: string; 
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>; 
-      subtotal: number;
-      total: number;
-    }) => {
-      const customerName = workOrder.customer?.name || "Unknown Customer";
-      const customerEmail = workOrder.customer?.email || "";
-      const customerPhone = workOrder.customer?.phone || "";
-      const serviceAddress = workOrder.property 
-        ? [workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")
-        : "";
-
-      const formattedLineItems = data.lineItems.map((item, index) => ({
-        description: item.description,
-        quantity: item.quantity.toFixed(2),
-        unitPrice: item.unitPrice.toFixed(2),
-        lineTotal: item.lineTotal.toFixed(2),
-        lineType: item.lineType,
-        sortOrder: index,
-      }));
-
-      const response = await apiRequest("POST", "/api/crm/quotes", {
-        scope: "work_order",
-        workOrderId: workOrder.id,
-        customerId: workOrder.customerId,
-        propertyId: workOrder.propertyId,
-        customerName,
-        customerEmail,
-        customerPhone,
-        serviceAddress,
-        title: data.title || `Quick Quote for WO-${workOrder.id.slice(-6)}`,
-        lineItems: formattedLineItems,
-        subtotal: data.subtotal.toFixed(2),
-        laborTotal: "0",
-        taxRate: "0.0825",
-        taxAmount: "0",
-        taxTotal: "0",
-        total: data.total.toFixed(2),
-        status: "draft",
-        quoteType: "quick",
-        assignedToId: selectedAssigneeId || undefined,
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Quote Created", description: "Your quick quote has been created as a draft." });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      setShowQuickQuote(false);
-      setLineItems([]);
-      setQuoteTitle("");
-      setSelectedAssigneeId("");
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to create quote", variant: "destructive" });
-    },
-  });
 
   // Send quote email mutation
   const sendQuoteEmailMutation = useMutation({
@@ -1442,126 +1293,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return;
     }
     sendQuoteEmailMutation.mutate({ quoteId: emailQuoteId, recipientEmail: emailRecipient.trim() });
-  };
-
-  const addLineItem = () => {
-    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
-  };
-
-  const addCatalogItem = (item: CrmItem) => {
-    let price = parseFloat(item.rate || "0") || 0;
-    const isMaintenance = item.category === "maintenance";
-    
-    // Multi-system tiered pricing ONLY applies to standard "Preventative Maintenance"
-    // Custom maintenance items (Crawlspace, etc.) use their catalog price
-    const isPreventativeMaintenance = isMaintenance && 
-      (item.name?.toLowerCase().includes("preventative") || item.name?.toLowerCase().includes("preventive"));
-    
-    if (isPreventativeMaintenance) {
-      const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
-      // Base price $229, each additional system -$10
-      price = 229 - (existingMaintenanceCount * 10);
-      if (price < 0) price = 0;
-    }
-    // For custom maintenance items, use the catalog price (already set above)
-    
-    // Map category to lineType
-    const getLineType = (): QuickQuoteLineItem["lineType"] => {
-      if (isMaintenance) return "maintenance";
-      if (item.category === "service") return "service";
-      return "part";
-    };
-    
-    const discountApplied = isPreventativeMaintenance && price < 229;
-    
-    setLineItems([...lineItems, { 
-      id: Date.now().toString(), 
-      description: item.name, 
-      quantity: 1, 
-      unitPrice: price,
-      lineType: getLineType(),
-      fromCatalog: true,
-      isMaintenanceItem: isPreventativeMaintenance // Only standard PM gets tiered pricing
-    }]);
-    setShowCatalog(false);
-    setCatalogSearch("");
-    setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name + (discountApplied ? ` (Multi-system discount: $${price})` : "") });
-  };
-
-  // Add discount from catalogue
-  const addCatalogDiscount = (item: CrmItem) => {
-    const rate = parseFloat(item.rate || "0") || 0;
-    setLineItems([...lineItems, { 
-      id: Date.now().toString(), 
-      description: item.name + (item.description ? ` - ${item.description}` : ""), 
-      quantity: 1, 
-      unitPrice: -Math.abs(rate),
-      lineType: "discount",
-      fromCatalog: true
-    }]);
-    setShowDiscount(false);
-    setDiscountSearch("");
-    toast({ title: "Discount Added", description: item.name });
-  };
-
-  // Add manual discount entry
-  const addManualDiscountItem = () => {
-    const amount = parseFloat(discountAmount) || 0;
-    if (amount <= 0 || !discountDescription.trim()) {
-      toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
-      return;
-    }
-    setLineItems([...lineItems, { 
-      id: Date.now().toString(), 
-      description: discountDescription.trim(), 
-      quantity: 1, 
-      unitPrice: -Math.abs(amount),
-      lineType: "discount",
-      fromCatalog: false
-    }]);
-    setShowManualDiscount(false);
-    setDiscountDescription("");
-    setDiscountAmount("");
-    toast({ title: "Discount Added", description: discountDescription.trim() });
-  };
-
-  const removeLineItem = (id: string) => {
-    setLineItems(lineItems.filter(item => item.id !== id));
-  };
-
-  const updateLineItem = (id: string, field: keyof QuickQuoteLineItem, value: string | number) => {
-    setLineItems(lineItems.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    ));
-  };
-
-  const subtotal = lineItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
-  const total = subtotal; // No tax for quick quote
-
-  const handleCreateQuote = () => {
-    const validItems = lineItems.filter(item => item.description.trim() && item.unitPrice !== 0);
-    if (validItems.length === 0) {
-      toast({ title: "Error", description: "Please add at least one line item.", variant: "destructive" });
-      return;
-    }
-    if (!selectedAssigneeId) {
-      toast({ title: "Error", description: "Please select an admin to assign this quote to.", variant: "destructive" });
-      return;
-    }
-
-    createQuoteMutation.mutate({
-      title: quoteTitle,
-      lineItems: validItems.map(item => ({
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        lineTotal: calculateLineTotal(item),
-        lineType: item.lineType,
-      })),
-      subtotal,
-      total,
-    });
   };
 
   const formatCurrency = (amount: number | string) => {
@@ -1669,488 +1400,21 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!showQuickQuote ? (
-            <>
-              <p className="text-sm text-slate-600">
-                Create a simple quote with line items for this job.
-              </p>
-              {/* Same full create page as the "+" button — the job is
-                  pre-selected so there's nothing to pick. */}
-              <Button
-                className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
-                data-testid="button-start-quick-quote"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Quick Quote
-              </Button>
-            </>
-          ) : (
-            <div className="space-y-4">
-              {/* Quote Title */}
-              <div>
-                <Label htmlFor="quote-title" className="text-sm font-medium">
-                  Quote Title (optional)
-                </Label>
-                <Input
-                  id="quote-title"
-                  placeholder="e.g., AC Repair Quote"
-                  value={quoteTitle}
-                  onChange={(e) => setQuoteTitle(e.target.value)}
-                  className="min-h-[44px] mt-1"
-                  data-testid="input-quote-title"
-                />
-              </div>
-
-              {/* Assign To Admin Personnel (Required) */}
-              <div>
-                <Label htmlFor="quote-assignee" className="text-sm font-medium">
-                  Assign to Admin Personnel <span className="text-red-500">*</span>
-                </Label>
-                <Select 
-                  value={selectedAssigneeId} 
-                  onValueChange={setSelectedAssigneeId}
-                >
-                  <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-quote-assignee">
-                    <SelectValue placeholder="Select an admin..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {adminUsers?.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!selectedAssigneeId && (
-                  <p className="text-xs text-slate-500 mt-1">Required: Select an admin to handle this quote</p>
-                )}
-              </div>
-
-              {/* Line Items Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Line Items</Label>
-                  <span className="text-xs text-slate-500">{lineItems.length} item{lineItems.length !== 1 ? "s" : ""}</span>
-                </div>
-                
-                {/* Action Buttons - Mobile Friendly */}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] flex-1 min-w-[100px] border-blue-200 text-blue-700 hover:bg-blue-50"
-                    onClick={() => setShowCatalog(true)}
-                    data-testid="button-add-from-catalog"
-                  >
-                    <Package className="h-4 w-4 mr-1" />
-                    Catalog
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] flex-1 min-w-[100px] border-amber-200 text-amber-700 hover:bg-amber-50"
-                    onClick={() => setShowDiscount(true)}
-                    data-testid="button-add-discount"
-                  >
-                    <Tag className="h-4 w-4 mr-1" />
-                    Discount
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] flex-1 min-w-[100px]"
-                    onClick={addLineItem}
-                    data-testid="button-add-line-item"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Manual
-                  </Button>
-                </div>
-
-                {/* Line Items List */}
-                {lineItems.length === 0 ? (
-                  <div className="border border-dashed rounded-lg p-6 text-center text-slate-400">
-                    <p className="text-sm">No items added yet.</p>
-                    <p className="text-xs mt-1">Use the buttons above to add items.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {lineItems.map((item, index) => (
-                      <div 
-                        key={item.id} 
-                        className={`border rounded-lg p-3 space-y-2 ${
-                          item.lineType === "discount" ? "bg-amber-50 border-amber-200" : 
-                          item.lineType === "part" ? "bg-blue-50 border-blue-200" : 
-                          item.lineType === "maintenance" ? "bg-green-50 border-green-200" :
-                          item.lineType === "service" ? "bg-slate-50 border-slate-200" : ""
-                        }`}
-                        data-testid={`line-item-${item.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500 font-medium">
-                              {item.lineType === "discount" ? (
-                                <span className="text-amber-600 flex items-center gap-1"><Tag className="h-3 w-3" />Discount</span>
-                              ) : item.lineType === "part" ? (
-                                <span className="text-blue-600 flex items-center gap-1"><Package className="h-3 w-3" />Part</span>
-                              ) : item.lineType === "maintenance" ? (
-                                <span className="text-green-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Maintenance</span>
-                              ) : item.lineType === "service" ? (
-                                <span className="text-slate-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Service</span>
-                              ) : (
-                                `Item ${index + 1}`
-                              )}
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => removeLineItem(item.id)}
-                            data-testid={`button-remove-item-${item.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        
-                        {item.lineType === "discount" ? (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">{item.description}</span>
-                            <span className="font-medium text-red-600" data-testid={`line-total-${item.id}`}>
-                              {formatCurrency(item.unitPrice)}
-                            </span>
-                          </div>
-                        ) : (
-                          <>
-                            <Input
-                              placeholder="Description (e.g., Labor - AC Repair)"
-                              value={item.description}
-                              onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                              className="min-h-[44px]"
-                              data-testid={`input-description-${item.id}`}
-                            />
-                            <div className="flex gap-2">
-                              <div className="w-20">
-                                <Label className="text-xs text-slate-500">Qty</Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                                  onFocus={(e) => e.target.select()}
-                                  className="min-h-[44px]"
-                                  data-testid={`input-quantity-${item.id}`}
-                                />
-                              </div>
-                              <div className="flex-1">
-                                <Label className="text-xs text-slate-500">Price</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder="0.00"
-                                  value={item.unitPrice || ""}
-                                  onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                                  onFocus={(e) => e.target.select()}
-                                  className={`min-h-[44px] ${item.fromCatalog ? "bg-slate-100 cursor-not-allowed" : ""}`}
-                                  readOnly={item.fromCatalog}
-                                  data-testid={`input-unit-price-${item.id}`}
-                                />
-                              </div>
-                              <div className="w-24 text-right">
-                                <Label className="text-xs text-slate-500">Total</Label>
-                                <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`line-total-${item.id}`}>
-                                  {formatCurrency(calculateLineTotal(item))}
-                                </p>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Totals */}
-              <div className="border-t pt-3 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Subtotal</span>
-                  <span className="font-medium" data-testid="quote-subtotal">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span className={total >= 0 ? "text-green-700" : "text-red-600"} data-testid="quote-total">{formatCurrency(total)}</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 min-h-[48px]"
-                  onClick={() => {
-                    setShowQuickQuote(false);
-                    setLineItems([]);
-                    setQuoteTitle("");
-                  }}
-                  disabled={createQuoteMutation.isPending}
-                  data-testid="button-cancel-quote"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                  onClick={handleCreateQuote}
-                  disabled={createQuoteMutation.isPending}
-                  data-testid="button-create-quote"
-                >
-                  {createQuoteMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
-                  Create Quote
-                </Button>
-              </div>
-            </div>
-          )}
+          <p className="text-sm text-slate-600">
+            Create a simple quote with line items for this job.
+          </p>
+          {/* Same full create page as the "+" button — the job is
+              pre-selected so there's nothing to pick. */}
+          <Button
+            className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
+            onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
+            data-testid="button-start-quick-quote"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Quick Quote
+          </Button>
         </CardContent>
       </Card>
-
-      {/* Items Catalog Dialog */}
-      <Dialog open={showCatalog} onOpenChange={(open) => { setShowCatalog(open); if (!open) { setCatalogSearch(""); setCatalogCategoryFilter("all"); } }}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-600" />
-              Items Catalog
-            </DialogTitle>
-            <DialogDescription>
-              Search and select items from the catalog
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search items..."
-              value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
-              className="pl-10 min-h-[44px]"
-              data-testid="input-catalog-search"
-            />
-          </div>
-
-          {/* Category Filter Tabs - Service & Maintenance only for mobile techs */}
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { key: "all", label: "All" },
-              { key: "service", label: "Service" },
-              { key: "maintenance", label: "Maintenance" },
-              { key: "field_edge", label: "Field Edge" },
-            ].map((cat) => (
-              <Button
-                key={cat.key}
-                variant={catalogCategoryFilter === cat.key ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCatalogCategoryFilter(cat.key as typeof catalogCategoryFilter)}
-                className="min-h-[36px]"
-                data-testid={`filter-catalog-${cat.key}`}
-              >
-                {cat.label}
-              </Button>
-            ))}
-          </div>
-          
-          {/* Items List */}
-          <div className="flex-1 overflow-y-auto max-h-[250px] space-y-2">
-            {itemsLoading ? (
-              <p className="text-sm text-slate-400 text-center py-4">Loading items...</p>
-            ) : filteredCatalogItems.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-4">
-                {catalogSearch ? "No items found" : "No items in this category"}
-              </p>
-            ) : (
-              filteredCatalogItems.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  className="border rounded-lg p-3 hover:bg-blue-50 cursor-pointer min-h-[44px] active:bg-blue-100"
-                  onClick={() => addCatalogItem(item)}
-                  data-testid={`catalog-item-${item.id || idx}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      {item.description && (
-                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                      )}
-                      {item.category && (
-                        <span className="text-xs text-blue-600 capitalize">{item.category}</span>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold text-green-700 ml-2">
-                      {formatCurrency(parseFloat(item.rate || "0") || 0)}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("service"); }}>
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Discount Catalogue Dialog */}
-      <Dialog open={showDiscount} onOpenChange={(open) => { setShowDiscount(open); if (!open) { setDiscountSearch(""); } }}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-amber-600" />
-              Select Discount
-            </DialogTitle>
-            <DialogDescription>
-              Choose a discount from the catalogue or add a custom one
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search discounts..."
-              value={discountSearch}
-              onChange={(e) => setDiscountSearch(e.target.value)}
-              className="pl-10 min-h-[44px]"
-              data-testid="input-discount-search"
-            />
-          </div>
-          
-          {/* Discount Items List */}
-          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {itemsLoading ? (
-              <p className="text-sm text-slate-400 text-center py-4">Loading discounts...</p>
-            ) : filteredDiscountItems.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-sm text-slate-400 mb-3">
-                  {discountSearch ? "No discounts found" : "No discounts in catalogue"}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
-                  className="min-h-[44px]"
-                  data-testid="button-add-manual-discount"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Custom Discount
-                </Button>
-              </div>
-            ) : (
-              filteredDiscountItems.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  className="border rounded-lg p-3 hover:bg-amber-50 cursor-pointer min-h-[44px] active:bg-amber-100"
-                  onClick={() => addCatalogDiscount(item)}
-                  data-testid={`discount-item-${item.id || idx}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      {item.description && (
-                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold text-amber-700 ml-2">
-                      -{formatCurrency(parseFloat(item.rate || "0") || 0)}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <DialogFooter className="flex gap-2 border-t pt-3">
-            <Button 
-              variant="outline" 
-              onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
-              className="min-h-[44px]"
-              data-testid="button-custom-discount"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Custom
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => { setShowDiscount(false); setDiscountSearch(""); }}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Manual Discount Entry Dialog */}
-      <Dialog open={showManualDiscount} onOpenChange={setShowManualDiscount}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-amber-600" />
-              Custom Discount
-            </DialogTitle>
-            <DialogDescription>
-              Enter a custom discount amount
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Discount Description</Label>
-              <Input
-                placeholder="e.g., Senior Discount, Loyalty Discount"
-                value={discountDescription}
-                onChange={(e) => setDiscountDescription(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-manual-discount-description"
-              />
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Amount ($)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-manual-discount-amount"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => { setShowManualDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
-              Cancel
-            </Button>
-            <Button 
-              className="bg-amber-600 hover:bg-amber-700 min-h-[44px]"
-              onClick={addManualDiscountItem}
-              data-testid="button-confirm-manual-discount"
-            >
-              Add Discount
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Send Quote Email Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); } }}>
@@ -2245,16 +1509,6 @@ function InvoiceTab({
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([]);
-  const [showCatalog, setShowCatalog] = useState(false);
-  const [showDiscount, setShowDiscount] = useState(false);
-  const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance" | "field_edge">("service");
-  const [discountSearch, setDiscountSearch] = useState("");
-  const [showManualDiscount, setShowManualDiscount] = useState(false);
-  const [discountDescription, setDiscountDescription] = useState("");
-  const [discountAmount, setDiscountAmount] = useState("");
   const [showQuoteSelection, setShowQuoteSelection] = useState(false);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -2266,27 +1520,6 @@ function InvoiceTab({
   const [generatingPaymentLinkForInvoice, setGeneratingPaymentLinkForInvoice] = useState<string | null>(null);
   const [invoiceEmailRecipient, setInvoiceEmailRecipient] = useState("");
   const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
-  
-  // Agreement creation dialog state
-  const [showAgreementDialog, setShowAgreementDialog] = useState(false);
-  const [agreementNumberOfSystems, setAgreementNumberOfSystems] = useState(1);
-  const [agreementContractDate, setAgreementContractDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [agreementBillingPreference, setAgreementBillingPreference] = useState<"pay_on_visit" | "auto_invoice">("auto_invoice");
-  const [agreementAutoRenew, setAgreementAutoRenew] = useState(true);
-  const [agreementNotes, setAgreementNotes] = useState("");
-  const [agreementPayingNow, setAgreementPayingNow] = useState(false);
-  const [pendingCatalogItem, setPendingCatalogItem] = useState<CrmItem | null>(null);
-
-  // Calculate maintenance price based on number of systems
-  const calculateMaintenancePrice = (numSystems: number): number => {
-    let total = 0;
-    for (let i = 0; i < numSystems; i++) {
-      total += 229 - (10 * i);
-    }
-    return total;
-  };
-
-  const agreementPrice = calculateMaintenancePrice(agreementNumberOfSystems);
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -2344,125 +1577,6 @@ function InvoiceTab({
   
   // Combined: all accepted quotes available for invoice creation (already deduplicated)
   const allAvailableQuotes = [...acceptedQuotes, ...otherCustomerAcceptedQuotes];
-
-  // Fetch CRM items (for both catalog and discounts)
-  const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
-    queryKey: ["/api/crm/items"],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/items", { credentials: "include" });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.items || data || [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const crmItems = crmItemsData || [];
-  
-  // Filter CRM items for catalog (only service and maintenance for mobile techs)
-  const filteredCatalogItems = crmItems
-    .filter(item => {
-      // Only show service, maintenance, and field edge categories for mobile techs
-      if (item.category !== "service" && item.category !== "maintenance" && item.category !== "field_edge") {
-        return false;
-      }
-      // Apply category filter
-      if (catalogCategoryFilter !== "all" && item.category !== catalogCategoryFilter) {
-        return false;
-      }
-      // Apply search filter
-      if (catalogSearch.trim()) {
-        const search = catalogSearch.toLowerCase();
-        return (
-          item.name?.toLowerCase().includes(search) ||
-          item.description?.toLowerCase().includes(search) ||
-          item.partNumber?.toLowerCase().includes(search)
-        );
-      }
-      return true;
-    })
-    // Sort to put "Service Call" at the top
-    .sort((a, b) => {
-      const aIsServiceCall = a.name?.toLowerCase().includes("service call") ? 0 : 1;
-      const bIsServiceCall = b.name?.toLowerCase().includes("service call") ? 0 : 1;
-      if (aIsServiceCall !== bIsServiceCall) return aIsServiceCall - bIsServiceCall;
-      return (a.name || "").localeCompare(b.name || "");
-    });
-  
-  // Filter discount items from CRM items (only discount category)
-  const filteredDiscountItems = crmItems.filter(item => {
-    // Only show items in the discount category
-    if (item.category !== "discount") {
-      return false;
-    }
-    // Apply search filter
-    if (discountSearch.trim()) {
-      const search = discountSearch.toLowerCase();
-      return (
-        item.name?.toLowerCase().includes(search) ||
-        item.description?.toLowerCase().includes(search) ||
-        item.partNumber?.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
-
-  const createInvoiceMutation = useMutation({
-    mutationFn: async (data: {
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>;
-      subtotal: number;
-      total: number;
-    }) => {
-      const formattedLineItems = data.lineItems.map((item, index) => ({
-        description: item.description,
-        quantity: item.quantity.toFixed(2),
-        unitPrice: item.unitPrice.toFixed(2),
-        lineTotal: item.lineTotal.toFixed(2),
-        lineType: item.lineType,
-        isDiscountLine: item.lineType === "discount",
-        discountKind: item.lineType === "discount" ? "fixed" : undefined,
-        sortOrder: index,
-      }));
-
-      const customerName = workOrder.customer?.name || "Unknown Customer";
-      const customerEmail = workOrder.customer?.email || "";
-      const customerPhone = workOrder.customer?.phone || "";
-      const serviceAddress = workOrder.property 
-        ? [workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")
-        : "";
-
-      const response = await apiRequest("POST", "/api/crm/invoices", {
-        workOrderId: workOrder.id,
-        customerId: workOrder.customerId,
-        propertyId: workOrder.propertyId,
-        customerName,
-        customerEmail,
-        customerPhone,
-        serviceAddress,
-        lineItems: formattedLineItems,
-        subtotal: data.subtotal.toFixed(2),
-        laborTotal: "0.00",
-        taxTotal: "0.00",
-        total: data.total.toFixed(2),
-        amountPaid: "0.00",
-        balanceDue: data.total.toFixed(2),
-        status: "draft",
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      // Also invalidate customer quotes in case quote status changes
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", "customer", workOrder.customerId] });
-      setShowCreateForm(false);
-      setLineItems([]);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to create invoice", variant: "destructive" });
-    },
-  });
 
   // Send invoice email mutation
   const sendInvoiceEmailMutation = useMutation({
@@ -2534,63 +1648,6 @@ function InvoiceTab({
     },
   });
 
-  // Create agreement mutation
-  const createAgreementMutation = useMutation({
-    mutationFn: async (data: {
-      numberOfSystems: number;
-      contractDate: string;
-      billingPreference: "pay_on_visit" | "auto_invoice";
-      autoRenew: boolean;
-      notes: string;
-      payingNow: boolean;
-    }) => {
-      const response = await apiRequest("POST", `/api/mobile/work-orders/${workOrder.id}/create-agreement`, data);
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || "Failed to create agreement");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.payingNow) {
-        toast({ title: "Agreement Created", description: "Maintenance agreement has been created and payment recorded." });
-      } else {
-        toast({ title: "Agreement Created", description: "Maintenance agreement has been created. Line item added to invoice." });
-        // Add the maintenance line item to the current invoice form
-        if (data.lineItemData) {
-          setLineItems([...lineItems, {
-            id: Date.now().toString(),
-            description: data.lineItemData.description,
-            quantity: 1,
-            unitPrice: parseFloat(data.lineItemData.unitPrice),
-            lineType: "maintenance",
-            fromCatalog: true,
-            isMaintenanceItem: true
-          }]);
-        }
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      setShowAgreementDialog(false);
-      setPendingCatalogItem(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to create agreement", variant: "destructive" });
-    },
-  });
-
-  const handleCreateAgreement = () => {
-    createAgreementMutation.mutate({
-      numberOfSystems: agreementNumberOfSystems,
-      contractDate: agreementContractDate,
-      billingPreference: agreementBillingPreference,
-      autoRenew: agreementAutoRenew,
-      notes: agreementNotes,
-      payingNow: agreementPayingNow,
-    });
-  };
-
   const openPaymentDialog = (invoice: CrmInvoice) => {
     setPaymentInvoiceId(invoice.id);
     const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
@@ -2651,173 +1708,11 @@ function InvoiceTab({
     });
   };
 
-  const addLineItem = () => {
-    setLineItems([...lineItems, { id: Date.now().toString(), description: "", quantity: 1, unitPrice: 0, lineType: "service" }]);
-  };
-
-  const addCatalogItem = (item: CrmItem) => {
-    let price = parseFloat(item.rate || "0") || 0;
-    const isMaintenance = item.category === "maintenance";
-    
-    // Multi-system tiered pricing ONLY applies to standard "Preventative Maintenance"
-    // Custom maintenance items (Crawlspace, etc.) use their catalog price
-    const isPreventativeMaintenance = isMaintenance && 
-      (item.name?.toLowerCase().includes("preventative") || item.name?.toLowerCase().includes("preventive"));
-    
-    // If Preventative Maintenance is selected, open agreement creation dialog
-    if (isPreventativeMaintenance) {
-      setPendingCatalogItem(item);
-      setAgreementNumberOfSystems(1);
-      setAgreementContractDate(format(new Date(), "yyyy-MM-dd"));
-      setAgreementBillingPreference("auto_invoice");
-      setAgreementAutoRenew(true);
-      setAgreementNotes("");
-      setAgreementPayingNow(false);
-      setShowCatalog(false);
-      setCatalogSearch("");
-      setShowAgreementDialog(true);
-      return;
-    }
-    
-    if (isMaintenance) {
-      // Use catalog price for non-PM maintenance items
-      price = parseFloat(item.rate || "0") || 0;
-    }
-    
-    // Map category to lineType
-    const getLineType = (): InvoiceLineItem["lineType"] => {
-      if (isMaintenance) return "maintenance";
-      if (item.category === "service") return "service";
-      return "part";
-    };
-    
-    setLineItems([...lineItems, { 
-      id: Date.now().toString(), 
-      description: item.name, 
-      quantity: 1, 
-      unitPrice: price,
-      lineType: getLineType(),
-      fromCatalog: true,
-      isMaintenanceItem: false
-    }]);
-    setShowCatalog(false);
-    setCatalogSearch("");
-    setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name });
-  };
-
-  // Add discount from catalogue
-  const addCatalogDiscount = (item: CrmItem) => {
-    const rate = parseFloat(item.rate || "0") || 0;
-    setLineItems([...lineItems, { 
-      id: Date.now().toString(), 
-      description: item.name + (item.description ? ` - ${item.description}` : ""), 
-      quantity: 1, 
-      unitPrice: -Math.abs(rate),
-      lineType: "discount",
-      fromCatalog: true
-    }]);
-    setShowDiscount(false);
-    setDiscountSearch("");
-    toast({ title: "Discount Added", description: item.name });
-  };
-
-  // Create invoice from quote - fetch full quote details and populate line items
-  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
-  
-  const createFromQuote = async (quote: CrmQuote & { lineItems?: CrmQuoteLineItem[] }) => {
-    setIsLoadingQuote(true);
-    try {
-      // Fetch full quote details including line items
-      const res = await fetch(`/api/crm/quotes/${quote.id}`, { credentials: "include" });
-      if (!res.ok) {
-        throw new Error("Failed to fetch quote details");
-      }
-      const fullQuote = await res.json();
-      
-      if (!fullQuote.lineItems || fullQuote.lineItems.length === 0) {
-        toast({ title: "No Line Items", description: "This quote has no line items to convert.", variant: "destructive" });
-        return;
-      }
-      
-      const convertedItems: InvoiceLineItem[] = fullQuote.lineItems.map((item: CrmQuoteLineItem) => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        description: item.description,
-        quantity: parseFloat(item.quantity || "1"),
-        unitPrice: parseFloat(item.unitPrice || "0"),
-        lineType: (item.lineType === "discount" ? "discount" : item.lineType === "part" ? "part" : "service") as "service" | "discount" | "part",
-      }));
-      
-      setLineItems(convertedItems);
-      setShowQuoteSelection(false);
-      setShowCreateForm(true);
-      toast({ title: "Quote Imported", description: `${convertedItems.length} line items imported from quote.` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to load quote details. Please try again.", variant: "destructive" });
-    } finally {
-      setIsLoadingQuote(false);
-    }
-  };
-
-  // Add manual discount entry
-  const addManualDiscountItem = () => {
-    const amount = parseFloat(discountAmount) || 0;
-    if (amount <= 0 || !discountDescription.trim()) {
-      toast({ title: "Error", description: "Please enter a discount description and amount.", variant: "destructive" });
-      return;
-    }
-    setLineItems([...lineItems, { 
-      id: Date.now().toString(), 
-      description: discountDescription.trim(), 
-      quantity: 1, 
-      unitPrice: -Math.abs(amount),
-      lineType: "discount"
-    }]);
-    setShowManualDiscount(false);
-    setDiscountDescription("");
-    setDiscountAmount("");
-    toast({ title: "Discount Added", description: discountDescription.trim() });
-  };
-
-  const removeLineItem = (id: string) => {
-    setLineItems(lineItems.filter(item => item.id !== id));
-  };
-
-  const updateLineItem = (id: string, field: keyof InvoiceLineItem, value: string | number | boolean) => {
-    setLineItems(lineItems.map(item =>
-      item.id === id ? { ...item, [field]: value } : item
-    ));
-  };
-
-  // Calculate subtotal (all items including discounts) with tiered maintenance pricing
-  const subtotal = lineItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
-  const total = subtotal;
-
-  const handleCreateInvoice = () => {
-    // Allow $0 items if they have a description (free services), but filter items with no description
-    const validItems = lineItems.filter(item => item.description.trim());
-    if (validItems.length === 0) {
-      toast({ title: "Error", description: "Please add at least one line item with a description.", variant: "destructive" });
-      return;
-    }
-    // Check if all items have $0 or negative totals (would create useless invoice)
-    const hasPositiveTotal = validItems.some(item => calculateLineTotal(item) > 0);
-    if (!hasPositiveTotal) {
-      toast({ title: "Error", description: "Invoice must have at least one item with a positive amount.", variant: "destructive" });
-      return;
-    }
-
-    createInvoiceMutation.mutate({
-      lineItems: validItems.map(item => ({
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        lineTotal: calculateLineTotal(item),
-        lineType: item.lineType,
-      })),
-      subtotal,
-      total,
-    });
+  // Create invoice from quote — hands off to the full create page with the
+  // job AND the quote pre-selected; the page prefills the line items.
+  const createFromQuote = (quote: CrmQuote & { lineItems?: CrmQuoteLineItem[] }) => {
+    setShowQuoteSelection(false);
+    navigate(`/mobile/invoices/new?job=${workOrder.id}&fromQuote=${quote.id}`);
   };
 
   const formatCurrency = (amount: number | string) => {
@@ -3105,7 +2000,6 @@ function InvoiceTab({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!showCreateForm ? (
             <>
               <p className="text-sm text-slate-600">
                 Create an invoice for work completed on this job.
@@ -3134,437 +2028,8 @@ function InvoiceTab({
                 )}
               </div>
             </>
-          ) : (
-            <div className="space-y-4">
-              {/* Line Items Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Line Items</Label>
-                  <span className="text-xs text-slate-500">{lineItems.length} item{lineItems.length !== 1 ? "s" : ""}</span>
-                </div>
-                
-                {/* Action Buttons - Mobile Friendly */}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] flex-1 min-w-[100px] border-blue-200 text-blue-700 hover:bg-blue-50"
-                    onClick={() => setShowCatalog(true)}
-                    data-testid="button-invoice-add-from-catalog"
-                  >
-                    <Package className="h-4 w-4 mr-1" />
-                    Catalog
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] flex-1 min-w-[100px] border-amber-200 text-amber-700 hover:bg-amber-50"
-                    onClick={() => setShowDiscount(true)}
-                    data-testid="button-invoice-add-discount"
-                  >
-                    <Tag className="h-4 w-4 mr-1" />
-                    Discount
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] flex-1 min-w-[100px]"
-                    onClick={addLineItem}
-                    data-testid="button-invoice-add-line-item"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Manual
-                  </Button>
-                </div>
-
-                {/* Line Items List */}
-                {lineItems.length === 0 ? (
-                  <div className="border border-dashed rounded-lg p-6 text-center text-slate-400">
-                    <p className="text-sm">No items added yet.</p>
-                    <p className="text-xs mt-1">Use the buttons above to add items.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {lineItems.map((item, index) => (
-                      <div 
-                        key={item.id} 
-                        className={`border rounded-lg p-3 space-y-2 ${
-                          item.lineType === "discount" ? "bg-amber-50 border-amber-200" : 
-                          item.lineType === "part" ? "bg-blue-50 border-blue-200" : 
-                          item.lineType === "maintenance" ? "bg-green-50 border-green-200" :
-                          item.lineType === "service" ? "bg-slate-50 border-slate-200" : ""
-                        }`}
-                        data-testid={`invoice-line-item-${item.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500 font-medium">
-                              {item.lineType === "discount" ? (
-                                <span className="text-amber-600 flex items-center gap-1"><Tag className="h-3 w-3" />Discount</span>
-                              ) : item.lineType === "part" ? (
-                                <span className="text-blue-600 flex items-center gap-1"><Package className="h-3 w-3" />Part</span>
-                              ) : item.lineType === "maintenance" ? (
-                                <span className="text-green-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Maintenance</span>
-                              ) : item.lineType === "service" ? (
-                                <span className="text-slate-600 flex items-center gap-1"><Wrench className="h-3 w-3" />Service</span>
-                              ) : (
-                                `Item ${index + 1}`
-                              )}
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => removeLineItem(item.id)}
-                            data-testid={`button-remove-invoice-line-${item.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        
-                        {item.lineType === "discount" ? (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">{item.description}</span>
-                            <span className="font-medium text-red-600" data-testid={`invoice-line-total-${item.id}`}>
-                              {formatCurrency(item.unitPrice)}
-                            </span>
-                          </div>
-                        ) : (
-                          <>
-                            <Input
-                              placeholder="Description (e.g., Labor - AC Repair)"
-                              value={item.description}
-                              onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                              className="min-h-[44px]"
-                              data-testid={`input-invoice-description-${item.id}`}
-                            />
-                            <div className="flex gap-2">
-                              <div className="w-20">
-                                <Label className="text-xs text-slate-500">Qty</Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                                  onFocus={(e) => e.target.select()}
-                                  className="min-h-[44px]"
-                                  data-testid={`input-invoice-quantity-${item.id}`}
-                                />
-                              </div>
-                              <div className="flex-1">
-                                <Label className="text-xs text-slate-500">Price</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder="0.00"
-                                  value={item.unitPrice || ""}
-                                  onChange={(e) => updateLineItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                                  onFocus={(e) => e.target.select()}
-                                  className={`min-h-[44px] ${item.fromCatalog ? "bg-slate-100 cursor-not-allowed" : ""}`}
-                                  readOnly={item.fromCatalog}
-                                  data-testid={`input-invoice-unit-price-${item.id}`}
-                                />
-                              </div>
-                              <div className="w-24 text-right">
-                                <Label className="text-xs text-slate-500">Total</Label>
-                                <p className="min-h-[44px] flex items-center justify-end font-medium" data-testid={`invoice-line-total-${item.id}`}>
-                                  {formatCurrency(calculateLineTotal(item))}
-                                </p>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Totals */}
-              <div className="bg-slate-100 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Subtotal</span>
-                  <span className="text-sm font-medium" data-testid="invoice-form-subtotal">
-                    {formatCurrency(subtotal)}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <span className="text-base font-semibold">Total</span>
-                  <span className={`text-lg font-bold ${total >= 0 ? "text-green-700" : "text-red-600"}`} data-testid="invoice-form-total">
-                    {formatCurrency(total)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1 min-h-[48px]"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setLineItems([]);
-                  }}
-                  disabled={createInvoiceMutation.isPending}
-                  data-testid="button-cancel-invoice"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                  onClick={handleCreateInvoice}
-                  disabled={createInvoiceMutation.isPending}
-                  data-testid="button-create-invoice"
-                >
-                  {createInvoiceMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
-                  Create Invoice
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
-
-      {/* Items Catalog Dialog */}
-      <Dialog open={showCatalog} onOpenChange={(open) => { setShowCatalog(open); if (!open) { setCatalogSearch(""); setCatalogCategoryFilter("all"); } }}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-600" />
-              Items Catalog
-            </DialogTitle>
-            <DialogDescription>
-              Search and select items from the catalog
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search items..."
-              value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
-              className="pl-10 min-h-[44px]"
-              data-testid="input-invoice-catalog-search"
-            />
-          </div>
-
-          {/* Category Filter Tabs */}
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { key: "all", label: "All" },
-              { key: "install", label: "Install" },
-              { key: "service", label: "Service" },
-              { key: "maintenance", label: "Maintenance" },
-              { key: "field_edge", label: "Field Edge" },
-            ].map((cat) => (
-              <Button
-                key={cat.key}
-                variant={catalogCategoryFilter === cat.key ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCatalogCategoryFilter(cat.key as typeof catalogCategoryFilter)}
-                className="min-h-[36px]"
-                data-testid={`filter-invoice-catalog-${cat.key}`}
-              >
-                {cat.label}
-              </Button>
-            ))}
-          </div>
-          
-          {/* Items List */}
-          <div className="flex-1 overflow-y-auto max-h-[250px] space-y-2">
-            {itemsLoading ? (
-              <p className="text-sm text-slate-400 text-center py-4">Loading items...</p>
-            ) : filteredCatalogItems.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-4">
-                {catalogSearch ? "No items found" : "No items in this category"}
-              </p>
-            ) : (
-              filteredCatalogItems.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  className="border rounded-lg p-3 hover:bg-blue-50 cursor-pointer min-h-[44px] active:bg-blue-100"
-                  onClick={() => addCatalogItem(item)}
-                  data-testid={`invoice-catalog-item-${item.id || idx}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      {item.description && (
-                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                      )}
-                      {item.category && (
-                        <span className="text-xs text-blue-600 capitalize">{item.category}</span>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold text-green-700 ml-2">
-                      {formatCurrency(parseFloat(item.rate || "0") || 0)}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCatalog(false); setCatalogSearch(""); setCatalogCategoryFilter("service"); }}>
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Discount Catalogue Dialog */}
-      <Dialog open={showDiscount} onOpenChange={(open) => { setShowDiscount(open); if (!open) { setDiscountSearch(""); } }}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-amber-600" />
-              Select Discount
-            </DialogTitle>
-            <DialogDescription>
-              Choose a discount from the catalogue or add a custom one
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search discounts..."
-              value={discountSearch}
-              onChange={(e) => setDiscountSearch(e.target.value)}
-              className="pl-10 min-h-[44px]"
-              data-testid="input-invoice-discount-search"
-            />
-          </div>
-          
-          {/* Discount Items List */}
-          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {itemsLoading ? (
-              <p className="text-sm text-slate-400 text-center py-4">Loading discounts...</p>
-            ) : filteredDiscountItems.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-sm text-slate-400 mb-3">
-                  {discountSearch ? "No discounts found" : "No discounts in catalogue"}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
-                  className="min-h-[44px]"
-                  data-testid="button-invoice-add-manual-discount"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Custom Discount
-                </Button>
-              </div>
-            ) : (
-              filteredDiscountItems.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  className="border rounded-lg p-3 hover:bg-amber-50 cursor-pointer min-h-[44px] active:bg-amber-100"
-                  onClick={() => addCatalogDiscount(item)}
-                  data-testid={`invoice-discount-item-${item.id || idx}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      {item.description && (
-                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold text-amber-700 ml-2">
-                      -{formatCurrency(parseFloat(item.rate || "0") || 0)}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <DialogFooter className="flex gap-2 border-t pt-3">
-            <Button 
-              variant="outline" 
-              onClick={() => { setShowDiscount(false); setShowManualDiscount(true); }}
-              className="min-h-[44px]"
-              data-testid="button-invoice-custom-discount"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Custom
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => { setShowDiscount(false); setDiscountSearch(""); }}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Manual Discount Entry Dialog */}
-      <Dialog open={showManualDiscount} onOpenChange={setShowManualDiscount}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-amber-600" />
-              Custom Discount
-            </DialogTitle>
-            <DialogDescription>
-              Enter a custom discount amount
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Discount Description</Label>
-              <Input
-                placeholder="e.g., Senior Discount, Loyalty Discount"
-                value={discountDescription}
-                onChange={(e) => setDiscountDescription(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-invoice-manual-discount-description"
-              />
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Amount ($)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-invoice-manual-discount-amount"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => { setShowManualDiscount(false); setDiscountDescription(""); setDiscountAmount(""); }}>
-              Cancel
-            </Button>
-            <Button 
-              className="bg-amber-600 hover:bg-amber-700 min-h-[44px]"
-              onClick={addManualDiscountItem}
-              data-testid="button-confirm-invoice-manual-discount"
-            >
-              Add Discount
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Quote Selection Dialog for Create Invoice from Quote */}
       <Dialog open={showQuoteSelection} onOpenChange={setShowQuoteSelection}>
@@ -3580,7 +2045,7 @@ function InvoiceTab({
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto max-h-[400px] space-y-4">
-            {(isLoadingQuote || customerQuotesLoading) ? (
+            {customerQuotesLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-green-600" />
                 <span className="ml-2 text-sm text-slate-600">Loading quotes...</span>
@@ -3813,188 +2278,6 @@ function InvoiceTab({
         </DialogContent>
       </Dialog>
 
-      {/* Create Agreement Dialog */}
-      <Dialog open={showAgreementDialog} onOpenChange={(open) => { 
-        if (!open) { 
-          setShowAgreementDialog(false); 
-          setPendingCatalogItem(null);
-        } 
-      }}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-[#711419]" />
-              Create Maintenance Agreement
-            </DialogTitle>
-            <DialogDescription>
-              Set up a preventative maintenance agreement for this customer.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-2">
-            {/* Customer Info (Auto-filled) */}
-            <div className="bg-slate-50 rounded-lg p-3 border">
-              <p className="text-xs text-slate-500 mb-1">Customer</p>
-              <p className="font-medium text-sm">{workOrder.customer?.name || "Unknown Customer"}</p>
-              {workOrder.property && (
-                <>
-                  <p className="text-xs text-slate-500 mt-2 mb-1">Property</p>
-                  <p className="text-sm text-slate-700">
-                    {[workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Number of Systems */}
-            <div>
-              <Label className="text-sm font-medium">Number of Systems</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10"
-                  onClick={() => setAgreementNumberOfSystems(prev => Math.max(1, prev - 1))}
-                  disabled={agreementNumberOfSystems <= 1}
-                  data-testid="button-decrease-agreement-systems"
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="number"
-                  min="1"
-                  value={agreementNumberOfSystems}
-                  onChange={(e) => setAgreementNumberOfSystems(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-20 text-center min-h-[44px]"
-                  data-testid="input-agreement-systems"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10"
-                  onClick={() => setAgreementNumberOfSystems(prev => prev + 1)}
-                  data-testid="button-increase-agreement-systems"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                $229 first system, $10 discount per additional
-              </p>
-            </div>
-
-            {/* Price Display */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-green-800">Annual Agreement Price</span>
-                <span className="text-xl font-bold text-green-700">${agreementPrice.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* Contract Date */}
-            <div>
-              <Label className="text-sm font-medium">Contract Date</Label>
-              <Input
-                type="date"
-                value={agreementContractDate}
-                onChange={(e) => setAgreementContractDate(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-agreement-contract-date"
-              />
-            </div>
-
-            {/* Billing Preference */}
-            <div>
-              <Label className="text-sm font-medium">Billing Preference</Label>
-              <Select value={agreementBillingPreference} onValueChange={(v: "pay_on_visit" | "auto_invoice") => setAgreementBillingPreference(v)}>
-                <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-agreement-billing">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto_invoice">Auto Invoice (Bill Immediately)</SelectItem>
-                  <SelectItem value="pay_on_visit">Pay on Visit</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-slate-500 mt-1">
-                {agreementBillingPreference === "auto_invoice" 
-                  ? "Customer will be invoiced when agreement is created" 
-                  : "Customer will pay when technician arrives for first visit"}
-              </p>
-            </div>
-
-            {/* Auto Renew */}
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label className="text-sm font-medium">Auto Renew</Label>
-                <p className="text-xs text-slate-500">Automatically renew agreement each year</p>
-              </div>
-              <Switch
-                checked={agreementAutoRenew}
-                onCheckedChange={setAgreementAutoRenew}
-                data-testid="switch-agreement-auto-renew"
-              />
-            </div>
-
-            {/* Customer Paying Now Toggle */}
-            <div className="flex items-center justify-between py-2 border-t pt-4">
-              <div>
-                <Label className="text-sm font-medium">Customer Paying Now?</Label>
-                <p className="text-xs text-slate-500">Collect payment immediately and activate agreement</p>
-              </div>
-              <Switch
-                checked={agreementPayingNow}
-                onCheckedChange={setAgreementPayingNow}
-                data-testid="switch-agreement-paying-now"
-              />
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label className="text-sm font-medium">Notes (Optional)</Label>
-              <Textarea
-                value={agreementNotes}
-                onChange={(e) => setAgreementNotes(e.target.value)}
-                placeholder="Any additional notes about this agreement..."
-                className="min-h-[80px] mt-1"
-                data-testid="textarea-agreement-notes"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => { 
-                setShowAgreementDialog(false); 
-                setPendingCatalogItem(null);
-              }}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-            <Button 
-              className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
-              onClick={handleCreateAgreement}
-              disabled={createAgreementMutation.isPending}
-              data-testid="button-create-agreement"
-            >
-              {createAgreementMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <FileCheck className="h-4 w-4 mr-2" />
-                  Create Agreement
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -4115,23 +2398,61 @@ export default function MobileJobDetail() {
     }, dur - 10);
   };
 
-  // The floating back walks the tab trail: on Work/Quote/Invoice it returns
-  // to whichever tab you were on LAST; on Overview it always leaves the job.
+  // The floating back (and the edge swipe) walk the tab trail: on
+  // Work/Quote/Invoice they return to whichever tab you were on LAST; on
+  // Overview they always leave the job.
   const tabHistory = useRef<TabType[]>([]);
   const tabBackPop = useRef(false);
-  const handleFloatingBack = () => {
-    if (activeTab === "overview") {
-      goBackAnimated();
-      return;
-    }
+  const popPrevTab = (): TabType => {
     const hist = tabHistory.current;
     let prev: TabType = "overview";
     while (hist.length) {
       const t = hist.pop()!;
       if (t !== activeTab) { prev = t; break; }
     }
+    return prev;
+  };
+  const handleFloatingBack = () => {
+    if (activeTab === "overview") {
+      goBackAnimated();
+      return;
+    }
+    const prev = popPrevTab();
     tabBackPop.current = true;
     switchTab(prev);
+  };
+
+  // Swipe-commit to a PREVIOUS SECTION: slide this layer off to the right,
+  // then bring the prior tab in fresh — the overview stays parked beneath
+  // the whole time (open-state parallax + scrim).
+  const goSectionBackTo = (prev: TabType, fromDx = 0) => {
+    const sec = sectionsRef.current;
+    if (!sec) return;
+    tabScroll.current[activeTab] = sec.scrollTop;
+    const w = sec.clientWidth || window.innerWidth;
+    const startP = Math.max(0, Math.min(1, fromDx / w));
+    const dur = 180 * (1 - startP) + 40;
+    const anim = sec.animate(
+      [{ transform: `translateX(${fromDx}px)` }, { transform: "translateX(100%)" }],
+      { duration: dur, easing: "ease-in", fill: "forwards" },
+    );
+    overviewRef.current?.animate(
+      [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+      { duration: dur, easing: "ease-out" },
+    );
+    scrimRef.current?.animate(
+      [{ opacity: scrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
+      { duration: dur, easing: "linear" },
+    );
+    setTimeout(() => {
+      tabBackPop.current = true;
+      switchTab(prev);
+      requestAnimationFrame(() => {
+        anim.cancel();
+        if (sectionsRef.current) sectionsRef.current.style.transform = "";
+        setOpenLayerStyles();
+      });
+    }, dur - 10);
   };
 
   // Switch tabs preserving each section's scroll position.
@@ -4196,14 +2517,16 @@ export default function MobileJobDetail() {
     // Wider start zone — Android's system gesture owns the outermost edge,
     // so fingers landing "near the left" must still catch our drag.
     if (e.clientX > 48) return;
-    // The edge swipe always leaves the job (whole screen slides, nav
-    // included) no matter which tab is open — Overview is just a tab now.
-    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true, section: false };
+    // The edge swipe mirrors the floating back: on a section it walks the
+    // tab trail; on the Overview it leaves the job (whole screen slides).
+    const onSection = activeTab !== "overview";
+    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true, section: onSection };
     // Mount the Jobs page underneath NOW, while the finger is still parked —
     // mounting it mid-drag left the first exposed frames empty (the "weird
     // vertical strip" on a fresh open). If this turns out to be a tap or a
-    // vertical scroll, onSwipeEnd unmounts it again.
-    setShowUnderlay(true);
+    // vertical scroll, onSwipeEnd unmounts it again. Section swipes reveal
+    // the overview layer instead — no jobs underlay needed.
+    if (!onSection) setShowUnderlay(true);
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onSwipeMove = (e: React.PointerEvent) => {
@@ -4273,7 +2596,15 @@ export default function MobileJobDetail() {
       if (!sec) return;
       const dxNow = e.clientX - st.x;
       if (commit) {
-        closeSectionAnimated(Math.max(0, dxNow));
+        // Same trail the floating back walks: land on the last tab you
+        // were on — the overview close animation when that's the overview,
+        // a section-to-section handoff otherwise.
+        const prev = popPrevTab();
+        if (prev === "overview") {
+          closeSectionAnimated(Math.max(0, dxNow));
+        } else {
+          goSectionBackTo(prev, Math.max(0, dxNow));
+        }
       } else {
         sec.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
         sec.style.transform = "translateX(0)";
