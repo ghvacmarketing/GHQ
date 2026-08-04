@@ -128,6 +128,10 @@ export default function AssistantOverlay({
   // chat button morphs into an X while it's true.
   const [searchFocused, setSearchFocused] = useState(false);
   const histSearchInputRef = useRef<HTMLInputElement | null>(null);
+  // Tapping the search-X blurs the input BEFORE the click lands — with an
+  // empty query that flips `searching` off mid-tap and the click would read
+  // as "new chat" (closing the whole sheet). Snapshot at pointerdown.
+  const searchWasActive = useRef(false);
   // Long-press context menu over the history sheet: rename / move / delete a
   // chat, or delete a space. The first view anchors directly under the held
   // row (iMessage-style); rename/move re-dock to the bottom card for the
@@ -642,136 +646,155 @@ export default function AssistantOverlay({
   };
   const pressFired = () => !!pressRef.current?.fired;
 
-  // Grab-anywhere dismiss for the CHAT sheet — same rule as the history
-  // sheet: press anywhere and move clearly downward (steeper than sideways,
-  // any scroller under the finger at its top) and the sheet rides the finger
-  // immediately. Inputs, the handle, and open layers are excluded; a drag
-  // suppresses the click behind it.
-  const chatAnyDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean; fromBottom: boolean } | null>(null);
-  const onChatAnyDown = (e: React.PointerEvent) => {
-    // A second finger mid-drag must not hijack or wipe the gesture
-    if (chatAnyDrag.current) return;
-    if (historyOpen || modeSheetOpen) return;
-    const t = e.target as HTMLElement;
-    if (t.closest("input, textarea, [data-vdrag]")) return;
-    const sc = chatScrollRef.current;
-    const inScroller = !!sc && sc.contains(t);
-    // On the conversation itself: dismiss only from its very TOP or very
-    // BOTTOM — anywhere mid-history a downward drag is just scrolling.
-    // Everywhere else on the sheet, dismiss from anywhere.
-    const atTop = (sc?.scrollTop ?? 0) <= 0;
-    const atBottom = !!sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 2;
-    chatAnyDrag.current = {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-      engaged: false,
-      eligible: !inScroller || atTop || atBottom,
-      inScroller,
-      fromBottom: inScroller && atBottom && !atTop,
-    };
-  };
-  const onChatAnyMove = (e: React.PointerEvent) => {
-    const st = chatAnyDrag.current;
-    const el = sheetRef.current;
-    if (!st || st.id !== e.pointerId || !el) return;
-    const dy = e.clientY - st.y;
-    const dx = Math.abs(e.clientX - st.x);
-    if (!st.engaged) {
-      if (!st.eligible) {
-        // Mid-gesture handoff: dragging down on the thread scrolls it — the
-        // moment it reaches its top, the SHEET takes over from right here
-        // (fresh baseline so it doesn't jump by the scrolled distance).
-        if (st.inScroller && dy > 0 && (chatScrollRef.current?.scrollTop ?? 1) <= 0) {
-          st.eligible = true;
-          st.y = e.clientY;
-          st.x = e.clientX;
-        }
-        return;
-      }
-      if (dy > 14 && dy > dx * 1.3) {
-        st.engaged = true;
-        el.style.transition = "none";
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-      } else if (dx > 16) {
-        // Clearly horizontal — never becomes a sheet drag (and no handoff)
-        st.eligible = false;
-        st.inScroller = false;
-        return;
-      } else if (dy < -10) {
-        // Scrolling up — stand down, but keep the handoff alive in case the
-        // finger reverses and pulls the thread past its top
-        st.eligible = false;
-        return;
-      }
-    }
-    if (st.engaged) {
-      const off = Math.max(0, dy);
-      el.style.transform = `translateY(${off}px)`;
-      trackBackdrop(off / (el.clientHeight || window.innerHeight));
-      // Engaged from the thread's bottom: hold the scroll pinned there so
-      // the native scroll doesn't ALSO run underneath the sheet drag.
-      if (st.fromBottom) {
-        const sc = chatScrollRef.current;
-        if (sc) sc.scrollTop = sc.scrollHeight;
-      }
-    }
-  };
-  const onChatAnyEnd = (e: React.PointerEvent) => {
-    const st = chatAnyDrag.current;
-    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
-    chatAnyDrag.current = null;
-    const el = sheetRef.current;
-    if (!st.engaged || !el) return;
-    dragTapSuppress.current = true;
-    window.setTimeout(() => {
-      dragTapSuppress.current = false;
-    }, 250);
-    const dy = e.clientY - st.y;
-    if (dy > 110) {
-      fadeBackdrop();
-      el.style.transition = "transform 0.25s ease-in";
-      el.style.transform = "translateY(100%)";
-      setTimeout(() => {
-        onClose();
-        el.style.transition = "";
-        el.style.transform = "";
-      }, 240);
-    } else {
-      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-      el.style.transform = "translateY(0)";
-      restoreBackdrop();
-      setTimeout(() => {
-        if (el) el.style.transition = "";
-      }, 260);
-    }
-  };
-
-  // WebKit hands an eligible drag to the NATIVE scroller the moment the
-  // thread moves — pointercancel fires and the sheet drag dies before it can
-  // engage. These non-passive touchmove guards claim the gesture
-  // (preventDefault) while the sheet owns it, keeping the pointer stream
-  // alive so dragging down from the thread's very top or very bottom
-  // actually rides the sheet instead of scrolling/rubber-banding.
+  // Grab-anywhere dismiss for the CHAT sheet — driven by NATIVE touch
+  // events, not pointer events: the instant the thread starts scrolling
+  // WebKit fires pointercancel and the pointer stream dies, so a
+  // pointer-driven drag could never engage from inside the conversation.
+  // The touch stream keeps reporting through a native scroll, which is
+  // what makes the sheet able to take over the moment the thread hits its
+  // limit. Rules: from the thread's very top or very bottom (or anywhere
+  // off the thread) a downward drag rides the sheet immediately;
+  // mid-history it just scrolls, and when the scroll runs out of room at
+  // the top the sheet takes over from right there (fresh baseline, no
+  // jump). Inputs, the handle, and open layers are excluded; a drag
+  // suppresses the click behind it. Re-attached per open — the sheet
+  // unmounts on close, which orphans a mount-once listener.
   useEffect(() => {
+    if (!open) return;
     const el = sheetRef.current;
     if (!el) return;
-    const guard = (e: TouchEvent) => {
-      const st = chatAnyDrag.current;
-      if (!st) return;
-      if (st.engaged) {
-        e.preventDefault();
-        return;
+    let st: {
+      id: number;
+      x: number;
+      y: number;
+      engaged: boolean;
+      eligible: boolean;
+      inScroller: boolean;
+      fromBottom: boolean;
+    } | null = null;
+    const trackedTouch = (list: TouchList) => {
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].identifier === st?.id) return list[i];
       }
-      if (!st.eligible || e.touches.length !== 1) return;
-      const t = e.touches[0];
+      return null;
+    };
+    const onStart = (e: TouchEvent) => {
+      // One finger owns the gesture — a second must not hijack or wipe it
+      if (st || e.touches.length !== 1) return;
+      if (historyOpen || modeSheetOpen) return;
+      const t0 = e.touches[0];
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [data-vdrag]")) return;
+      const sc = chatScrollRef.current;
+      const inScroller = !!sc && sc.contains(target as Node);
+      const atTop = (sc?.scrollTop ?? 0) <= 0;
+      const atBottom = !!sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 2;
+      st = {
+        id: t0.identifier,
+        x: t0.clientX,
+        y: t0.clientY,
+        engaged: false,
+        eligible: !inScroller || atTop || atBottom,
+        inScroller,
+        fromBottom: inScroller && atBottom && !atTop,
+      };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!st) return;
+      const t = trackedTouch(e.touches);
+      if (!t) return;
       const dy = t.clientY - st.y;
       const dx = Math.abs(t.clientX - st.x);
-      if (dy > 0 && dy >= dx) e.preventDefault();
+      if (!st.engaged) {
+        if (!st.eligible) {
+          // Mid-history: the thread scrolls freely until it hits its top
+          // limit — then the SHEET takes over from right here.
+          if (st.inScroller && dy > 0 && (chatScrollRef.current?.scrollTop ?? 1) <= 0) {
+            st.eligible = true;
+            st.y = t.clientY;
+            st.x = t.clientX;
+          }
+          return;
+        }
+        // Down-leaning from an eligible spot: claim the gesture before the
+        // native scroll can (same trick as the shell's pull-to-refresh).
+        if (dy > 0 && dy >= dx && e.cancelable) e.preventDefault();
+        if (dy > 10 && dy > dx * 1.3) {
+          st.engaged = true;
+          el.style.transition = "none";
+          // Typing mid-drag: drop the caret the moment the sheet moves
+          (document.activeElement as HTMLElement | null)?.blur?.();
+        } else if (dx > 16) {
+          // Clearly horizontal — never becomes a sheet drag (and no handoff)
+          st.eligible = false;
+          st.inScroller = false;
+          return;
+        } else if (dy < -10) {
+          // Scrolling up — stand down, but keep the handoff alive in case
+          // the finger reverses and pulls the thread past its top
+          st.eligible = false;
+          return;
+        }
+      }
+      if (st.engaged) {
+        if (e.cancelable) e.preventDefault();
+        const off = Math.max(0, t.clientY - st.y);
+        el.style.transform = `translateY(${off}px)`;
+        trackBackdrop(off / (el.clientHeight || window.innerHeight));
+        // Engaged from the thread's bottom: hold the scroll pinned there so
+        // a native scroll can't ALSO run underneath the sheet drag.
+        if (st.fromBottom) {
+          const sc = chatScrollRef.current;
+          if (sc) sc.scrollTop = sc.scrollHeight;
+        }
+      }
     };
-    el.addEventListener("touchmove", guard, { passive: false });
-    return () => el.removeEventListener("touchmove", guard);
-  }, []);
+    const onEnd = (e: TouchEvent) => {
+      if (!st) return;
+      const t = trackedTouch(e.changedTouches);
+      if (!t) return; // only the tracked finger ends it
+      const ended = st;
+      st = null;
+      if (!ended.engaged) return;
+      dragTapSuppress.current = true;
+      window.setTimeout(() => {
+        dragTapSuppress.current = false;
+      }, 250);
+      const dy = t.clientY - ended.y;
+      if (dy > 110) {
+        fadeBackdrop();
+        el.style.transition = "transform 0.25s ease-in";
+        el.style.transform = "translateY(100%)";
+        setTimeout(() => {
+          onClose();
+          el.style.transition = "";
+          el.style.transform = "";
+        }, 240);
+      } else {
+        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+        el.style.transform = "translateY(0)";
+        restoreBackdrop();
+        setTimeout(() => {
+          el.style.transition = "";
+        }, 260);
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, historyOpen, modeSheetOpen]);
+
+  // History sheet: with overscroll clamped, an at-edge drag never starts a
+  // native scroll, so its pointer-driven drag survives — this non-passive
+  // guard just keeps the claim while it engages.
   useEffect(() => {
     if (!historyOpen) return;
     const el = histSheetRef.current;
@@ -1431,10 +1454,6 @@ export default function AssistantOverlay({
         // select-none sheet-wide: dragging must never pop iOS's blue text
         // selection on nearby bubbles. The composer opts back in below.
         style={{ top: "env(safe-area-inset-top)", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
-        onPointerDown={onChatAnyDown}
-        onPointerMove={onChatAnyMove}
-        onPointerUp={onChatAnyEnd}
-        onPointerCancel={onChatAnyEnd}
         onClickCapture={(e) => {
           if (dragTapSuppress.current) {
             e.preventDefault();
@@ -1526,7 +1545,7 @@ export default function AssistantOverlay({
         <div
           ref={chatScrollRef}
           onScroll={onChatScroll}
-          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-16"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-none px-4 pt-16"
           // Room to scroll past the floating composer — messages glide
           // beneath the card instead of clipping at a white band above it.
           style={{
@@ -2141,7 +2160,7 @@ export default function AssistantOverlay({
 
           <div
             ref={histScrollRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-y-none px-3"
             style={{ touchAction: "pan-y", paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
           >
             {/* Inside a space — its header; new chats file here. Folds away
@@ -2316,8 +2335,14 @@ export default function AssistantOverlay({
             {/* New chat ⇄ X — one button, the icons crossfade/rotate as
                 search engages instead of hard-swapping */}
             <button
+              onPointerDown={() => {
+                searchWasActive.current = searching;
+              }}
               onClick={() => {
-                if (searching) {
+                // Closing the search must NOT close the sheet — it just
+                // clears the query and folds the top content back in (the
+                // searching flag drives those transitions on its own).
+                if (searchWasActive.current) {
                   setHistorySearch("");
                   histSearchInputRef.current?.blur();
                 } else {
