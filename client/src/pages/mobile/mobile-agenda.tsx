@@ -869,7 +869,7 @@ export default function MobileAgenda() {
   const showCacheWarning = !isOnline || isFromCache;
 
   return (
-    <MobileShell>
+    <MobileShell pullToRefresh>
       <OfflineIndicator />
       
       <div className="p-4 space-y-6" data-testid="mobile-agenda">

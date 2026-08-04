@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useNativePush } from "@/lib/native";
 import { skipEntranceOnce } from "@/lib/page-transitions";
+import { queryClient } from "@/lib/queryClient";
 
 // The AI assistant popup — loaded on first open, then kept mounted so the
 // conversation survives closing and reopening the sheet.
@@ -35,6 +36,10 @@ const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overla
 
 interface MobileShellProps {
   children: ReactNode;
+  /** iOS-style pull-to-refresh on the main scroller — refetches every
+   *  active query. Reserved for the five main tabs (Agenda, Jobs, Media,
+   *  Time, More). */
+  pullToRefresh?: boolean;
   /** Replace the main nav bubbles with page-specific ones (e.g. a job's
    * Overview/Work/Quote/Invoice). Hides the "+" button while active. */
   customNav?: {
@@ -59,7 +64,7 @@ const SUPERVISOR_ROLES = ["supervisor", "owner"];
 // Admin role is desktop-only
 const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
-export default function MobileShell({ children, customNav }: MobileShellProps) {
+export default function MobileShell({ children, customNav, pullToRefresh = false }: MobileShellProps) {
   const [location, navigate] = useLocation();
   // Arriving from a tracked back-swipe: the destination was already fully
   // visible as the swipe underlay, so the mount fade must not blink it.
@@ -126,6 +131,128 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
     document.addEventListener("touchstart", guard, { passive: false });
     return () => document.removeEventListener("touchstart", guard);
   }, []);
+
+  // ── Pull-to-refresh (the five main tabs) — iOS feel: drag down from the
+  // top of the scroller, content follows with damping, a spinner chip rides
+  // in; release past the threshold to refetch every active query. ──
+  const ptrMainRef = useRef<HTMLElement | null>(null);
+  const ptrWrapRef = useRef<HTMLDivElement | null>(null);
+  const ptrSpinRef = useRef<HTMLDivElement | null>(null);
+  const ptrRefreshingRef = useRef(false);
+  const [ptrRefreshing, setPtrRefreshing] = useState(false);
+  useEffect(() => {
+    if (!pullToRefresh) return;
+    const main = ptrMainRef.current;
+    if (!main) return;
+    let startY = 0;
+    let tracking = false;
+    let dist = 0;
+    const wrapEl = () => ptrWrapRef.current;
+    const spinEl = () => ptrSpinRef.current;
+    const onStart = (e: TouchEvent) => {
+      tracking = main.scrollTop <= 0 && !ptrRefreshingRef.current;
+      if (tracking) startY = e.touches[0].clientY;
+      dist = 0;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!tracking || ptrRefreshingRef.current) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0 || main.scrollTop > 0) {
+        if (dist > 0) {
+          const w = wrapEl();
+          if (w) {
+            w.style.transition = "";
+            w.style.transform = "";
+          }
+          const s = spinEl();
+          if (s) s.style.opacity = "0";
+          dist = 0;
+        }
+        return;
+      }
+      // Ours now — stop the native rubber-band/scroll for this gesture
+      e.preventDefault();
+      dist = Math.min(120, dy * 0.45);
+      const w = wrapEl();
+      if (w) {
+        w.style.transition = "none";
+        w.style.transform = `translateY(${dist}px)`;
+      }
+      const s = spinEl();
+      if (s) {
+        s.style.transition = "none";
+        s.style.opacity = String(Math.min(1, dist / 55));
+        s.style.transform = `translateY(${Math.max(0, dist - 40)}px) rotate(${dist * 3}deg)`;
+      }
+    };
+    const onEnd = () => {
+      if (!tracking) return;
+      tracking = false;
+      const w = wrapEl();
+      const s = spinEl();
+      const commit = dist >= 58;
+      dist = 0;
+      if (!commit) {
+        if (w) {
+          w.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+          w.style.transform = "";
+          window.setTimeout(() => {
+            if (w) w.style.transition = "";
+          }, 260);
+        }
+        if (s) {
+          s.style.transition = "opacity 0.15s ease-out";
+          s.style.opacity = "0";
+        }
+        return;
+      }
+      ptrRefreshingRef.current = true;
+      setPtrRefreshing(true);
+      try {
+        navigator.vibrate?.(8);
+      } catch {
+        /* no haptics */
+      }
+      if (w) {
+        w.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
+        w.style.transform = "translateY(48px)";
+      }
+      if (s) {
+        s.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s";
+        s.style.opacity = "1";
+        s.style.transform = "translateY(8px)";
+      }
+      queryClient
+        .refetchQueries({ type: "active" })
+        .catch(() => {})
+        .finally(() => {
+          ptrRefreshingRef.current = false;
+          setPtrRefreshing(false);
+          if (w) {
+            w.style.transition = "transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)";
+            w.style.transform = "";
+            window.setTimeout(() => {
+              if (w) w.style.transition = "";
+            }, 300);
+          }
+          if (s) {
+            s.style.transition = "transform 0.22s ease-in, opacity 0.18s";
+            s.style.opacity = "0";
+            s.style.transform = "translateY(-40px)";
+          }
+        });
+    };
+    main.addEventListener("touchstart", onStart, { passive: true });
+    main.addEventListener("touchmove", onMove, { passive: false });
+    main.addEventListener("touchend", onEnd);
+    main.addEventListener("touchcancel", onEnd);
+    return () => {
+      main.removeEventListener("touchstart", onStart);
+      main.removeEventListener("touchmove", onMove);
+      main.removeEventListener("touchend", onEnd);
+      main.removeEventListener("touchcancel", onEnd);
+    };
+  }, [pullToRefresh]);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -222,7 +349,21 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           nav fill the shell with their own scroll layers and handle their own
           bottom clearance — reserving padding here would end their container
           in a visible band above the tabs. */}
+      {/* Pull-to-refresh spinner chip — floats over the top of the scroller */}
+      {pullToRefresh && (
+        <div
+          ref={ptrSpinRef}
+          className="pointer-events-none absolute left-1/2 z-30 -ml-4 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md"
+          style={{ top: "calc(env(safe-area-inset-top) + 10px)", opacity: 0 }}
+          aria-hidden
+        >
+          <Loader2 className={`h-4 w-4 text-[#711419] ${ptrRefreshing ? "animate-spin" : ""}`} />
+        </div>
+      )}
       <main
+        ref={(el) => {
+          ptrMainRef.current = el;
+        }}
         className={`flex-1 overflow-auto ${skipEntrance ? "" : "animate-in fade-in duration-200"}`}
         style={customNav ? undefined : { paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
@@ -230,7 +371,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
         {/* 1px over-height keeps every page scrollable, so short pages
             (More, Time) rubber-band like the long ones instead of feeling
             pinned. Custom-nav pages own their scroll layers — leave alone. */}
-        {customNav ? children : <div className="min-h-[calc(100%+1px)]">{children}</div>}
+        {customNav ? children : <div ref={ptrWrapRef} className="min-h-[calc(100%+1px)]">{children}</div>}
       </main>
 
       {/* Flat full-width bottom tab bar (icon + label; active = maroon) */}

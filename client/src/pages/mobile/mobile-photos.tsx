@@ -465,7 +465,7 @@ export default function MobilePhotos() {
   };
 
   return (
-    <MobileShell>
+    <MobileShell pullToRefresh>
       {/* min-height a hair past full so the page is always scrollable — that
           keeps the elastic pull/bounce alive even when content is short. */}
       <div

@@ -624,7 +624,7 @@ export default function MobileJob() {
   }
 
   return (
-    <MobileShell>
+    <MobileShell pullToRefresh>
       <div className="p-4 space-y-4" data-testid="mobile-job-page">
         {/* Today | Upcoming | History switcher — full width */}
         <div className="flex w-full items-center gap-1 rounded-lg bg-slate-200/70 p-1">
