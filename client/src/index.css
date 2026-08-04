@@ -611,6 +611,18 @@ select.dark-input option {
   overflow: hidden;
 }
 
+/* Parallax underlays — the live copy of the "previous page" rendered beneath
+   a push entrance or tracked back-swipe — are static backdrops. Left alone,
+   the copy plays its own mount animations (the shell's fade-in above all),
+   so the page behind a swipe started WHITE and faded in: entrances read as
+   "goes white then slides", and quick flicks landed on a brightness pop the
+   instant the real page replaced the still-fading copy. Freeze everything
+   inside a copy so it renders settled from its very first frame. */
+[data-underlay] * {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}
+
 /* Skeleton shimmer — a light band flowing left→right across placeholder
    strips (the classic loading sheen) instead of the flat opacity pulse.
    Stagger rows with --shimmer-delay. */

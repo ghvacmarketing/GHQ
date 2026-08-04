@@ -3262,7 +3262,7 @@ export default function MobileJobDetail() {
           included) slides over it, so the swipe reads as one solid sheet
           with no seam between the page and the nav */}
       {showUnderlay && (
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden data-underlay>
           <div ref={pageUnderlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
             <MobileJob />
           </div>
@@ -3356,17 +3356,22 @@ export default function MobileJobDetail() {
               optimisticPending={optimisticPending}
             />
           </div>
-          <div ref={scrimRef} className="pointer-events-none absolute inset-0 z-10 bg-black" style={{ opacity: 0 }} />
         </div>
 
       </div>
       </MobileShell>
 
+      {/* Scrim over the WHOLE page (status-bar strip included). Parked inside
+          the shell content it started 56px down, so a section back-swipe
+          revealed an undimmed strip above a dimmed overview — a visible seam
+          that only equalized once the scrim finished fading. */}
+      <div ref={scrimRef} className="pointer-events-none absolute inset-0 z-[15] bg-black" style={{ opacity: 0 }} />
+
       {/* Under-layer for section-to-section back-swipes: the tab the trail
           leads to, parked in parallax beneath the sliding card so the swipe
           reveals the ACTUAL destination (not always the Overview). */}
       {sectionUnder && workOrder && (
-        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden>
+        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden data-underlay>
           <div
             ref={sectionUnderRef}
             className="h-full w-full overflow-hidden bg-slate-50 px-4"

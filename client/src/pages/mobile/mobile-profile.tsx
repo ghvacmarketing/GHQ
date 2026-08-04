@@ -253,7 +253,7 @@ export default function MobileProfile() {
       {/* Real home page beneath the profile — the whole screen slides
           over it so the back-swipe reveals where you're headed */}
       {showUnderlay && (
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden data-underlay>
           <div ref={underlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
             <MobileAgenda />
           </div>
