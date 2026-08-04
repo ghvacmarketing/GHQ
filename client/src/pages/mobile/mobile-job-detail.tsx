@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { format, addYears, addMonths } from "date-fns";
@@ -1409,11 +1410,16 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         Create Quick Quote
       </button>
 
-      {createOpen && (
-        <Suspense fallback={null}>
-          <QuoteCreateOverlay jobId={workOrder.id} onClose={() => setCreateOpen(false)} />
-        </Suspense>
-      )}
+      {/* Portaled to body: inside the job page's z-10 stacking context the
+          sheet's z-[70] lost to the floating back button (z-30 at root), so
+          the button painted OVER the open sheet. */}
+      {createOpen &&
+        createPortal(
+          <Suspense fallback={null}>
+            <QuoteCreateOverlay jobId={workOrder.id} onClose={() => setCreateOpen(false)} />
+          </Suspense>,
+          document.body,
+        )}
 
       {/* Send Quote Email Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); } }}>
@@ -2011,15 +2017,18 @@ function InvoiceTab({
         </button>
       )}
 
-      {createOverlay && (
-        <Suspense fallback={null}>
-          <InvoiceCreateOverlay
-            jobId={workOrder.id}
-            fromQuoteId={createOverlay.fromQuote}
-            onClose={() => setCreateOverlay(null)}
-          />
-        </Suspense>
-      )}
+      {/* Portaled to body — same stacking-context escape as the quote sheet */}
+      {createOverlay &&
+        createPortal(
+          <Suspense fallback={null}>
+            <InvoiceCreateOverlay
+              jobId={workOrder.id}
+              fromQuoteId={createOverlay.fromQuote}
+              onClose={() => setCreateOverlay(null)}
+            />
+          </Suspense>,
+          document.body,
+        )}
 
       {/* Quote Selection Dialog for Create Invoice from Quote */}
       <Dialog open={showQuoteSelection} onOpenChange={setShowQuoteSelection}>
@@ -2410,6 +2419,8 @@ export default function MobileJobDetail() {
       setClosedLayerStyles();
       if (sectionsRef.current) sectionsRef.current.style.transform = "";
       setActiveTab("overview");
+      // Landing on the Overview — no under copy may outlive the card
+      setSectionUnder(null);
       requestAnimationFrame(() => {
         cancelLayerAnimations();
         layerBusy.current = false;
@@ -2438,6 +2449,8 @@ export default function MobileJobDetail() {
       setClosedLayerStyles();
       if (sectionsRef.current) sectionsRef.current.style.transform = "";
       setActiveTab("overview");
+      // Landing on the Overview — no under copy may outlive the card
+      setSectionUnder(null);
       requestAnimationFrame(() => {
         cancelLayerAnimations();
         layerBusy.current = false;
@@ -2583,6 +2596,11 @@ export default function MobileJobDetail() {
           // trail's end.
           const prev = peekPrevTabRef.current();
           if (prev !== "overview") setSectionUnderRef.current(prev);
+          // Heading to the Overview: a copy left by a just-finished swipe
+          // (its drop timer still pending) would hijack the reveal, then
+          // vanish mid-drag when the timer fired — the overview jitter on
+          // chained back-swipes. Drop it before the reveal starts.
+          else setSectionUnderRef.current(null);
         } else if (dy > 14) {
           sectionSwipe.current = null;
           return;
@@ -2645,8 +2663,12 @@ export default function MobileJobDetail() {
             requestAnimationFrame(() => {
               el.style.transition = "";
             });
-            // The real tab is painted over the copy now — drop the copy
-            window.setTimeout(() => setSectionUnderRef.current(null), 240);
+            // The real tab is painted over the copy now — drop the copy.
+            // Unless a NEW swipe is already riding it: unmounting mid-drag
+            // swaps the reveal under the finger. Its own settle cleans up.
+            window.setTimeout(() => {
+              if (!sectionSwipe.current) setSectionUnderRef.current(null);
+            }, 240);
           }, dur - 10);
         }
       } else {
@@ -2673,6 +2695,9 @@ export default function MobileJobDetail() {
           );
         }
         window.setTimeout(() => {
+          // A new drag may already be riding the layers — writing parked
+          // styles (or dropping the copy) now would yank them mid-swipe.
+          if (sectionSwipe.current) return;
           el.style.transition = "";
           restoreChrome();
           if (overviewRef.current) overviewRef.current.style.transform = "translateX(-25%)";

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
@@ -304,10 +305,15 @@ type NotificationItem = {
   createdAt: string | null;
 };
 
+// Lazy (dynamic) import — mobile-profile statically imports MobileAgenda for
+// its route-mode underlay, so a static import here would be circular.
+const ProfileOverlay = lazy(() => import("./mobile-profile"));
+
 function ProfileHeader({ user }: { user: CrmUser }) {
   const [, navigate] = useLocation();
   const [now, setNow] = useState(new Date());
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
@@ -374,7 +380,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
         </button>
         <span className="h-6 w-px bg-slate-200 dark:bg-slate-600" aria-hidden />
         <button
-          onClick={() => navigate("/mobile/profile")}
+          onClick={() => setProfileOpen(true)}
           className="flex h-11 w-12 items-center justify-center rounded-r-full outline-none transition-transform focus:outline-none active:scale-95"
           style={{ WebkitTapHighlightColor: "transparent" }}
           data-testid="button-profile-menu"
@@ -394,6 +400,16 @@ function ProfileHeader({ user }: { user: CrmUser }) {
           )}
         </button>
       </div>
+
+      {/* Profile — a horizontal sheet sliding over the LIVE agenda (portaled
+          to body so no shell stacking context can trap it) */}
+      {profileOpen &&
+        createPortal(
+          <Suspense fallback={null}>
+            <ProfileOverlay onClose={() => setProfileOpen(false)} />
+          </Suspense>,
+          document.body,
+        )}
 
       {/* Notifications sheet */}
       <DraggableSheet open={notifOpen} onOpenChange={setNotifOpen} title="Notifications" testid="sheet-notifications">

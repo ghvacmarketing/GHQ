@@ -36,7 +36,12 @@ const fmtHours = (mins: number) => {
   return h > 0 ? `${h}h ${r.toString().padStart(2, "0")}m` : `${r}m`;
 };
 
-export default function MobileProfile() {
+export default function MobileProfile({ onClose }: { onClose?: () => void } = {}) {
+  // Overlay mode (agenda avatar): a horizontal sheet sliding OVER the live
+  // agenda — no navigation, no page copy beneath, so there is nothing to
+  // remount and nothing to flash. Route mode (/mobile/profile) keeps the
+  // classic push page for deep links.
+  const overlay = !!onClose;
   const [, navigate] = useLocation();
   useRequireCrmAuth();
   const entered = usePushEntrance();
@@ -52,9 +57,22 @@ export default function MobileProfile() {
   const [showUnderlay, setShowUnderlay] = useState(false);
   const swipeDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
 
-  // The push-entrance rides in OVER the real agenda (parallax + scrim), so
-  // the slide never crosses a blank white screen.
+  // Overlay: the LIVE agenda stays beneath — just fade the scrim in, then
+  // settle it as inline state (a lingering fill would mask the back-swipe's
+  // per-frame opacity writes). Route mode: the push-entrance rides in OVER a
+  // copy of the agenda (parallax + scrim), so the slide never crosses white.
   useEffect(() => {
+    if (overlay) {
+      const sc = scrimRef.current;
+      sc?.animate([{ opacity: "0" }, { opacity: "0.18" }], { duration: 420, easing: "linear", fill: "forwards" });
+      const t = setTimeout(() => {
+        if (sc) {
+          sc.style.opacity = "0.18";
+          sc.getAnimations().forEach((a) => a.cancel());
+        }
+      }, 460);
+      return () => clearTimeout(t);
+    }
     setShowUnderlay(true);
     let t: ReturnType<typeof setTimeout> | undefined;
     const raf = requestAnimationFrame(() => {
@@ -72,16 +90,19 @@ export default function MobileProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const done = () => (onClose ? onClose() : navigate("/mobile"));
   const goBackAnimated = (fromDx = 0) => {
-    // The home page is already on screen as the underlay — its remount
-    // after navigation must not fade in again (the post-swipe "flash").
-    markSkipEntrance();
+    if (!overlay) {
+      // The home page is already on screen as the underlay — its remount
+      // after navigation must not fade in again (the post-swipe "flash").
+      markSkipEntrance();
+    }
     const el = pageRef.current;
-    if (!el) return navigate("/mobile");
+    if (!el) return done();
     const w = el.clientWidth || window.innerWidth;
     const startP = Math.max(0, Math.min(1, fromDx / w));
     const dur = 200 * (1 - startP) + 40;
-    setShowUnderlay(true);
+    if (!overlay) setShowUnderlay(true);
     requestAnimationFrame(() => {
       el.style.animation = "none";
       el.style.borderRadius = "24px 0 0 24px";
@@ -101,7 +122,7 @@ export default function MobileProfile() {
         [{ opacity: String(0.18 * (1 - startP)) }, { opacity: "0" }],
         { duration: dur, easing: "linear", fill: "forwards" },
       );
-      setTimeout(() => navigate("/mobile"), dur - 10);
+      setTimeout(done, dur - 10);
     });
   };
 
@@ -180,7 +201,17 @@ export default function MobileProfile() {
           backRef.current.style.transition = "";
           backRef.current.style.opacity = "";
         }
-        setShowUnderlay(false);
+        if (overlay) {
+          // The scrim lives on — settle it inline and drop the filled
+          // spring so it can't mask the next drag's opacity writes.
+          const sc = scrimRef.current;
+          if (sc) {
+            sc.style.opacity = "0.18";
+            sc.getAnimations().forEach((a) => a.cancel());
+          }
+        } else {
+          setShowUnderlay(false);
+        }
       }, 320);
     }
   };
@@ -249,16 +280,22 @@ export default function MobileProfile() {
   const onClock = !!clock?.entry;
 
   return (
-    <div className="relative h-screen overflow-hidden bg-slate-50">
-      {/* Real home page beneath the profile — the whole screen slides
-          over it so the back-swipe reveals where you're headed */}
-      {showUnderlay && (
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden data-underlay>
-          <div ref={underlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
-            <MobileAgenda />
+    <div className={overlay ? "fixed inset-0 z-[60] overflow-hidden" : "relative h-screen overflow-hidden bg-slate-50"}>
+      {overlay ? (
+        /* The LIVE agenda is right there beneath the transparent root — a
+           bare scrim dims it while the sheet rides over. No page copy. */
+        <div ref={scrimRef} className="absolute inset-0 z-0 bg-black" style={{ opacity: 0 }} aria-hidden />
+      ) : (
+        /* Real home page beneath the profile — the whole screen slides
+            over it so the back-swipe reveals where you're headed */
+        showUnderlay && (
+          <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden data-underlay>
+            <div ref={underlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
+              <MobileAgenda />
+            </div>
+            <div ref={scrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
           </div>
-          <div ref={scrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
-        </div>
+        )
       )}
 
       <div
