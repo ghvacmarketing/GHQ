@@ -2379,6 +2379,21 @@ export default function MobileJobDetail() {
     }
     return prev;
   };
+  // Non-destructive look at where the trail leads — the swipe needs to know
+  // WHAT to reveal beneath the card before it commits (and pops).
+  const peekPrevTab = (): TabType => {
+    const hist = tabHistory.current;
+    for (let i = hist.length - 1; i >= 0; i--) {
+      if (hist[i] !== activeTab) return hist[i];
+    }
+    return "overview";
+  };
+  // While a section-card swipe is in flight toward ANOTHER section, that
+  // section renders as a parked under-layer so the drag reveals the actual
+  // destination instead of always showing the Overview.
+  const [sectionUnder, setSectionUnder] = useState<TabType | null>(null);
+  const sectionUnderRef = useRef<HTMLDivElement | null>(null);
+  const sectionUnderScrimRef = useRef<HTMLDivElement | null>(null);
   const handleFloatingBack = () => {
     if (activeTab === "overview") {
       goBackAnimated();
@@ -2434,6 +2449,10 @@ export default function MobileJobDetail() {
   switchTabRef.current = switchTab;
   const popPrevTabRef = useRef(popPrevTab);
   popPrevTabRef.current = popPrevTab;
+  const peekPrevTabRef = useRef(peekPrevTab);
+  peekPrevTabRef.current = peekPrevTab;
+  const setSectionUnderRef = useRef(setSectionUnder);
+  setSectionUnderRef.current = setSectionUnder;
   const sectionSwipe = useRef<{ id: number; x: number; y: number; engaged: boolean } | null>(null);
   const attachSectionSwipe = () => {
     const el = sectionsRef.current;
@@ -2468,6 +2487,11 @@ export default function MobileJobDetail() {
           el.style.animation = "none";
           // Full-height iOS card while it rides the finger
           el.style.borderRadius = "24px 0 0 24px";
+          // Reveal the ACTUAL destination beneath: another section mounts
+          // as a parked under-layer; the overview reveal stays for the
+          // trail's end.
+          const prev = peekPrevTabRef.current();
+          if (prev !== "overview") setSectionUnderRef.current(prev);
         } else if (dy > 14) {
           sectionSwipe.current = null;
           return;
@@ -2479,8 +2503,14 @@ export default function MobileJobDetail() {
         el.style.transform = `translateX(${off}px)`;
         const w = el.clientWidth || window.innerWidth;
         const pr = Math.max(0, Math.min(1, off / w));
-        if (overviewRef.current) overviewRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
-        if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+        const underEl = sectionUnderRef.current;
+        if (underEl) {
+          underEl.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+          if (sectionUnderScrimRef.current) sectionUnderScrimRef.current.style.opacity = String(0.18 * (1 - pr));
+        } else {
+          if (overviewRef.current) overviewRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+          if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+        }
       }
     };
     const onEnd = (e: TouchEvent) => {
@@ -2497,9 +2527,22 @@ export default function MobileJobDetail() {
           closeSectionAnimatedRef.current(Math.max(0, dx));
           window.setTimeout(restoreChrome, 260);
         } else {
-          // Section-to-section: slide this card off, then swap the tab in
-          el.style.transition = "transform 0.22s ease-in";
+          // Section-to-section: finish revealing the under-layer, then swap
+          // the real tab in and drop the under copy once it's covered.
+          const underEl = sectionUnderRef.current;
+          const w2 = el.clientWidth || window.innerWidth;
+          const startP = Math.max(0, Math.min(1, Math.max(0, dx) / w2));
+          const dur = 180 * (1 - startP) + 40;
+          el.style.transition = `transform ${dur}ms ease-in`;
           el.style.transform = "translateX(100%)";
+          underEl?.animate(
+            [{ transform: underEl.style.transform || `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
+            { duration: dur, easing: "ease-out", fill: "forwards" },
+          );
+          sectionUnderScrimRef.current?.animate(
+            [{ opacity: sectionUnderScrimRef.current.style.opacity || "0.18" }, { opacity: "0" }],
+            { duration: dur, easing: "linear", fill: "forwards" },
+          );
           window.setTimeout(() => {
             tabBackPop.current = true;
             switchTabRef.current(prev);
@@ -2509,24 +2552,40 @@ export default function MobileJobDetail() {
             requestAnimationFrame(() => {
               el.style.transition = "";
             });
-          }, 210);
+            // The real tab is painted over the copy now — drop the copy
+            window.setTimeout(() => setSectionUnderRef.current(null), 240);
+          }, dur - 10);
         }
       } else {
         el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
         el.style.transform = "translateX(0)";
-        overviewRef.current?.animate(
-          [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
-          { duration: 260, easing: "ease-out", fill: "forwards" },
-        );
-        scrimRef.current?.animate(
-          [{ opacity: scrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
-          { duration: 260, easing: "linear", fill: "forwards" },
-        );
+        const underEl = sectionUnderRef.current;
+        if (underEl) {
+          underEl.animate(
+            [{ transform: underEl.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+            { duration: 260, easing: "ease-out", fill: "forwards" },
+          );
+          sectionUnderScrimRef.current?.animate(
+            [{ opacity: sectionUnderScrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
+            { duration: 260, easing: "linear", fill: "forwards" },
+          );
+        } else {
+          overviewRef.current?.animate(
+            [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+            { duration: 260, easing: "ease-out", fill: "forwards" },
+          );
+          scrimRef.current?.animate(
+            [{ opacity: scrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
+            { duration: 260, easing: "linear", fill: "forwards" },
+          );
+        }
         window.setTimeout(() => {
           el.style.transition = "";
           restoreChrome();
           if (overviewRef.current) overviewRef.current.style.transform = "translateX(-25%)";
           if (scrimRef.current) scrimRef.current.style.opacity = "0.18";
+          // The card is fully back over the page — the under copy can go
+          setSectionUnderRef.current(null);
         }, 300);
       }
     };
@@ -3203,6 +3262,37 @@ export default function MobileJobDetail() {
 
       </div>
       </MobileShell>
+
+      {/* Under-layer for section-to-section back-swipes: the tab the trail
+          leads to, parked in parallax beneath the sliding card so the swipe
+          reveals the ACTUAL destination (not always the Overview). */}
+      {sectionUnder && workOrder && (
+        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden>
+          <div
+            ref={sectionUnderRef}
+            className="h-full w-full overflow-hidden bg-slate-50 px-4"
+            style={{
+              transform: "translateX(-25%)",
+              paddingTop: "calc(env(safe-area-inset-top) + 56px)",
+              paddingBottom: "calc(112px + env(safe-area-inset-bottom))",
+            }}
+          >
+            {sectionUnder === "work" && (
+              <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
+            )}
+            {sectionUnder === "quote" && <QuoteTab workOrder={workOrder} />}
+            {sectionUnder === "invoice" && (
+              <InvoiceTab
+                workOrder={workOrder}
+                renewalInfo={renewalInfo}
+                onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+                onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+              />
+            )}
+          </div>
+          <div ref={sectionUnderScrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
+        </div>
+      )}
 
       {/* Section layer — a FULL-SCREEN card over the shell (status bar
           included) so the back-swipe rides a complete iOS card instead of a
