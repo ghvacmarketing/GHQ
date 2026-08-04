@@ -218,14 +218,7 @@ export function LineItemsEditor({
                       data-testid={`catalog-item-${it.id}`}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1.5">
-                          <span className="min-w-0 truncate text-sm font-semibold text-slate-900">{it.name}</span>
-                          {it.category && (
-                            <span className="shrink-0 rounded-full border border-slate-300/70 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                              {categoryLabel(it.category)}
-                            </span>
-                          )}
-                        </span>
+                        <span className="block truncate text-sm font-semibold text-slate-900">{it.name}</span>
                         {it.description && (
                           <span className="mt-0.5 block truncate text-xs text-slate-500">{it.description}</span>
                         )}
