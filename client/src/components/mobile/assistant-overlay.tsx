@@ -7,7 +7,7 @@ import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-acti
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { useKeyboardInset } from "@/lib/native";
-import { ArrowUp, ArrowUpRight, Check, CheckCircle2, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
@@ -920,6 +920,11 @@ export default function AssistantOverlay({
     : spaceFiltered;
   const groupedConversations = groupAiConversations(visibleConversations);
   const spaceName = (id: string | null | undefined) => (id ? spaces.find((s) => s.id === id)?.name ?? null : null);
+  const activeSpaceObj = activeSpace ? spaces.find((s) => s.id === activeSpace) ?? null : null;
+  const spaceCounts = new Map<string, number>();
+  for (const c of pastConversations) {
+    if (c.spaceId) spaceCounts.set(c.spaceId, (spaceCounts.get(c.spaceId) || 0) + 1);
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[120]" data-testid="assistant-overlay">
@@ -936,7 +941,7 @@ export default function AssistantOverlay({
       <div
         ref={sheetRef}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
+          "absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
           historyOpen && "scale-[0.96]",
         )}
         style={{ top: "env(safe-area-inset-top)" }}
@@ -1478,7 +1483,7 @@ export default function AssistantOverlay({
             <div className="absolute inset-0 bg-black/40" onClick={() => setModeSheetOpen(false)} />
             <div
               ref={modeSheetRef}
-              className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
+              className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-4 shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300"
               style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
             >
               <div
@@ -1544,7 +1549,7 @@ export default function AssistantOverlay({
         <div
           ref={histSheetRef}
           className={cn(
-            "absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out",
+            "absolute inset-x-0 bottom-0 flex flex-col rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out",
             historyOpen ? "translate-y-0" : "translate-y-full",
           )}
           style={{ top: "env(safe-area-inset-top)" }}
@@ -1560,149 +1565,177 @@ export default function AssistantOverlay({
           >
             <span className="h-1 w-10 rounded-full bg-slate-300" />
           </div>
-          <div className="flex shrink-0 items-baseline justify-between px-4 pb-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">History</p>
+          <div className="flex shrink-0 items-center justify-between px-4 pb-2">
+            {activeSpace ? (
+              <button
+                onClick={() => setActiveSpace(null)}
+                className="flex items-center gap-0.5 text-[13px] font-bold text-[#711419] transition-opacity active:opacity-60"
+                data-testid="assistant-space-back"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                All chats
+              </button>
+            ) : (
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">History</p>
+            )}
             <p className="text-[10px] text-slate-300">Hold a chat for options</p>
           </div>
 
-          {/* Spaces — chip rail; the pick filters the list AND files new
-              chats. Hold a space chip to delete it. */}
-          <div className="scrollbar-none flex shrink-0 items-center gap-1.5 overflow-x-auto px-4 pb-2.5">
-            <button
-              onClick={() => setActiveSpace(null)}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                !activeSpace ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300/70 bg-white text-slate-600",
-              )}
-              data-testid="assistant-space-all"
-            >
-              All chats
-            </button>
-            {spaces.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  if (pressFired()) return;
-                  setActiveSpace(s.id);
-                }}
-                onContextMenu={(e) => e.preventDefault()}
-                onPointerDown={(e) => startPress(e, () => setSpaceMenu(s))}
-                onPointerMove={movePress}
-                onPointerUp={endPress}
-                onPointerCancel={endPress}
-                className={cn(
-                  "flex shrink-0 select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                  activeSpace === s.id ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300/70 bg-white text-slate-600",
-                )}
-                style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
-                data-testid={`assistant-space-${s.id}`}
-              >
-                <Folder className="h-3.5 w-3.5" />
-                {s.name}
-              </button>
-            ))}
-            <button
-              onClick={() => {
-                setNewSpaceName("");
-                setNewSpaceOpen(true);
-              }}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500"
-              data-testid="assistant-space-new"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New space
-            </button>
-          </div>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
+            style={{ touchAction: "pan-y", paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
+          >
+            {/* Inside a space — its header; new chats file here */}
+            {activeSpaceObj && !historySearch.trim() && (
+              <div className="mb-2 flex items-center gap-2.5 px-1.5 pt-1">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-slate-50 text-slate-500">
+                  <Folder className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[16px] font-bold text-slate-900">{activeSpaceObj.name}</span>
+                  <span className="block text-xs text-slate-400">
+                    {spaceFiltered.length === 1 ? "1 chat" : `${spaceFiltered.length} chats`} · new chats start in here
+                  </span>
+                </span>
+              </div>
+            )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3" style={{ touchAction: "pan-y" }}>
+            {/* Spaces — folder rows above the chats (tap to open, hold to
+                delete), with New space as the last row */}
+            {!activeSpace && !historySearch.trim() && (
+              <div className="mb-3">
+                <p className="px-1.5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Spaces</p>
+                {spaces.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      if (pressFired()) return;
+                      setActiveSpace(s.id);
+                    }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPointerDown={(e) => startPress(e, () => setSpaceMenu(s))}
+                    onPointerMove={movePress}
+                    onPointerUp={endPress}
+                    onPointerCancel={endPress}
+                    className="flex w-full select-none items-center gap-3 rounded-[6px] px-1.5 py-2 text-left active:bg-slate-100"
+                    style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+                    data-testid={`assistant-space-${s.id}`}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-slate-50 text-slate-500">
+                      <Folder className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-slate-900">{s.name}</span>
+                      <span className="block text-xs text-slate-400">
+                        {(spaceCounts.get(s.id) || 0) === 1 ? "1 chat" : `${spaceCounts.get(s.id) || 0} chats`}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setNewSpaceName("");
+                    setNewSpaceOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-[6px] px-1.5 py-2 text-left active:bg-slate-100"
+                  data-testid="assistant-space-new"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-dashed border-slate-300 text-slate-400">
+                    <Plus className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="text-[15px] font-medium text-slate-500">New space</span>
+                </button>
+              </div>
+            )}
+
             {groupedConversations.length === 0 ? (
               <p className="px-2 py-10 text-center text-sm text-slate-400">
                 {historySearch.trim()
                   ? "No chats match that search."
                   : activeSpace
-                    ? "Nothing in this space yet — hold a chat to move it here, or start a new one."
+                    ? "Nothing in this space yet — hold any chat to move it here, or start a new one."
                     : "No conversations yet — ask something and it'll be saved here."}
               </p>
             ) : (
-              <div className="min-h-[calc(100%+1px)]">
+              <div className="min-h-[1px]">
                 {groupedConversations.map((group) => (
-                  <div key={group.label} className="mb-3">
-                    <p className="px-1 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
-                    <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-                      {group.items.map((c, i) => (
-                        <button
-                          key={c.id}
-                          onClick={() => {
-                            if (pressFired()) return;
-                            openConversationFromPanel(c.id);
-                          }}
-                          onContextMenu={(e) => e.preventDefault()}
-                          onPointerDown={(e) => startPress(e, () => setChatMenu({ convo: c, view: "menu", draft: c.title || "" }))}
-                          onPointerMove={movePress}
-                          onPointerUp={endPress}
-                          onPointerCancel={endPress}
-                          className={cn(
-                            "flex w-full select-none items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50",
-                            i > 0 && "border-t border-slate-200/80",
-                            c.id === conversationId && "bg-[#711419]/[0.04]",
-                          )}
-                          style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
-                          data-testid={`assistant-conversation-${c.id}`}
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className={cn("block truncate text-[15px]", c.id === conversationId ? "font-semibold text-[#711419]" : "font-medium text-slate-800")}>
-                              {c.title || "Conversation"}
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-slate-400">
-                              {formatConversationWhen(c.updatedAt)}
-                              {!activeSpace && spaceName(c.spaceId) ? ` · ${spaceName(c.spaceId)}` : ""}
-                            </span>
+                  <div key={group.label} className="mb-2">
+                    <p className="px-1.5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
+                    {group.items.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          if (pressFired()) return;
+                          openConversationFromPanel(c.id);
+                        }}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onPointerDown={(e) => startPress(e, () => setChatMenu({ convo: c, view: "menu", draft: c.title || "" }))}
+                        onPointerMove={movePress}
+                        onPointerUp={endPress}
+                        onPointerCancel={endPress}
+                        className={cn(
+                          "flex w-full select-none items-center gap-2 rounded-[6px] px-1.5 py-2.5 text-left active:bg-slate-100",
+                          c.id === conversationId && "bg-[#711419]/[0.06]",
+                        )}
+                        style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+                        data-testid={`assistant-conversation-${c.id}`}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className={cn("block truncate text-[15px]", c.id === conversationId ? "font-semibold text-[#711419]" : "font-medium text-slate-800")}>
+                            {c.title || "Conversation"}
                           </span>
-                          {c.id === conversationId && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#711419]" />}
-                        </button>
-                      ))}
-                    </div>
+                          <span className="mt-0.5 block truncate text-xs text-slate-400">
+                            {formatConversationWhen(c.updatedAt)}
+                            {!activeSpace && spaceName(c.spaceId) ? ` · ${spaceName(c.spaceId)}` : ""}
+                          </span>
+                        </span>
+                        {c.id === conversationId && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#711419]" />}
+                      </button>
+                    ))}
                   </div>
                 ))}
               </div>
             )}
           </div>
-          {/* Docked search bar + New chat / clear */}
+          {/* Floating search — hovers over the list (no docked strip), New
+              chat on its right morphing into an X while searching */}
           <div
-            className="shrink-0 border-t border-slate-200 px-3 pt-2"
-            style={{ paddingBottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(12px + env(safe-area-inset-bottom))" }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 px-3"
+            style={{
+              paddingBottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(12px + env(safe-area-inset-bottom))",
+              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
-            <div className="flex items-center gap-2">
-              <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-slate-300/70 bg-slate-50 px-3.5">
-                <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                <input
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  placeholder="Search chats…"
-                  className="h-full w-full min-w-0 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
-                  data-testid="assistant-history-search"
-                />
-              </div>
-              {historySearch ? (
-                <button
-                  onClick={() => setHistorySearch("")}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-transform active:scale-90"
-                  aria-label="Clear search"
-                  data-testid="assistant-history-clear"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => { startNewChat(); setHistoryOpen(false); }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-md transition-transform active:scale-90"
-                  aria-label="New chat"
-                  data-testid="assistant-history-new-chat"
-                >
-                  <SquarePen className="h-5 w-5" />
-                </button>
-              )}
+            <div className="pointer-events-auto flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder={activeSpaceObj ? `Search ${activeSpaceObj.name}…` : "Search chats…"}
+                className="h-full w-full min-w-0 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="assistant-history-search"
+              />
             </div>
+            {historySearch ? (
+              <button
+                onClick={() => setHistorySearch("")}
+                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-300/70 bg-white text-slate-500 shadow-lg transition-transform active:scale-90"
+                aria-label="Clear search"
+                data-testid="assistant-history-clear"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => { startNewChat(); setHistoryOpen(false); }}
+                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-transform active:scale-90"
+                aria-label="New chat"
+                data-testid="assistant-history-new-chat"
+              >
+                <SquarePen className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>

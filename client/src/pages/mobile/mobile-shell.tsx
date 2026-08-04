@@ -220,7 +220,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
           the page and flash white below it */}
       <div className={`absolute inset-x-0 bottom-0 z-40 transition-all duration-150 ${keyboardUp ? "pointer-events-none translate-y-full opacity-0" : ""}`} style={{ touchAction: "none" }} data-testid="mobile-nav">
         <nav
-          className="rounded-t-2xl border-t-2 border-slate-300/80 bg-[#e9ebee]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
+          className="rounded-t-3xl border-t-2 border-slate-300/80 bg-[#e9ebee]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           <div className="flex items-stretch justify-around px-2 pb-2 pt-2.5">
