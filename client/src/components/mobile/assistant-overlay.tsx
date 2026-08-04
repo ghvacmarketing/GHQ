@@ -318,6 +318,37 @@ export default function AssistantOverlay({
     }
   };
 
+  // The chat sheet sits shrunk (scale 0.96) beneath the history sheet —
+  // dragging history down grows it back toward full size in step with the
+  // finger, so the layer beneath visibly comes forward as the top one leaves.
+  const trackChatScale = (p: number) => {
+    const el = sheetRef.current;
+    if (el) {
+      el.style.transition = "none";
+      el.style.transform = `scale(${(0.96 + 0.04 * Math.min(1, Math.max(0, p))).toFixed(4)})`;
+    }
+  };
+  const restoreChatScale = () => {
+    const el = sheetRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
+    el.style.transform = "scale(0.96)";
+    window.setTimeout(() => {
+      el.style.transition = "";
+      el.style.transform = "";
+    }, 260);
+  };
+  const releaseChatScale = () => {
+    const el = sheetRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.22s ease-out";
+    el.style.transform = "scale(1)";
+    window.setTimeout(() => {
+      el.style.transition = "";
+      el.style.transform = "";
+    }, 240);
+  };
+
   // Swipe down on the handle/header to dismiss — live drag follow, commit
   // past ~110px, spring back otherwise (same feel as DraggableSheet).
   const onDragStart = (e: React.PointerEvent) => {
@@ -404,7 +435,9 @@ export default function AssistantOverlay({
     if (st.engaged) {
       const off = Math.max(0, dy);
       el.style.transform = `translateY(${off}px)`;
-      trackHistScrim(off / (el.clientHeight || window.innerHeight));
+      const p = off / (el.clientHeight || window.innerHeight);
+      trackHistScrim(p);
+      trackChatScale(p);
     }
   };
   const onHistAnyEnd = (e: React.PointerEvent) => {
@@ -419,6 +452,7 @@ export default function AssistantOverlay({
     const dy = e.clientY - st.y;
     if (dy > 110) {
       fadeHistScrimOut();
+      releaseChatScale();
       el.style.transition = "transform 0.22s ease-in";
       el.style.transform = "translateY(100%)";
       setTimeout(() => {
@@ -431,6 +465,7 @@ export default function AssistantOverlay({
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
       restoreHistScrim();
+      restoreChatScale();
       setTimeout(() => {
         if (el) {
           el.style.transition = "";
@@ -450,7 +485,9 @@ export default function AssistantOverlay({
     const el = histSheetRef.current;
     if (el) {
       el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
-      trackHistScrim(Math.max(0, dy) / (el.clientHeight || window.innerHeight));
+      const p = Math.max(0, dy) / (el.clientHeight || window.innerHeight);
+      trackHistScrim(p);
+      trackChatScale(p);
     }
   };
   const onHistDragEnd = (e: React.PointerEvent) => {
@@ -461,6 +498,7 @@ export default function AssistantOverlay({
     if (!el) return;
     if (dy > 110) {
       fadeHistScrimOut();
+      releaseChatScale();
       el.style.transition = "transform 0.22s ease-in";
       el.style.transform = "translateY(100%)";
       setTimeout(() => {
@@ -473,6 +511,7 @@ export default function AssistantOverlay({
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateY(0)";
       restoreHistScrim();
+      restoreChatScale();
       setTimeout(() => {
         if (el) {
           el.style.transition = "";
