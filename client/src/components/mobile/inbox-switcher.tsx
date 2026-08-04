@@ -25,7 +25,7 @@ export function InboxSwitcher({
           onClick={() => {
             if (t.key !== active) navigate(t.key === "chat" ? "/mobile/messages" : "/mobile/mail");
           }}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+          className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-4 text-sm font-semibold transition-all ${
             active === t.key ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
           }`}
           data-testid={`inbox-seg-${t.key}`}

@@ -388,11 +388,11 @@ export default function MobileMessages() {
           <InboxSwitcher active="chat" mailCount={mailUnread} chatCount={chatUnread} />
           <button
             onClick={() => setShowNewConversation(true)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
             aria-label="New message"
             data-testid="menu-new-conversation"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-5 w-5" />
           </button>
         </div>
 

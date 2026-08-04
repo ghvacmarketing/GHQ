@@ -361,11 +361,11 @@ export default function MobileMail() {
           <InboxSwitcher active="mail" mailCount={mailUnread} chatCount={chatUnread} />
           <button
             onClick={() => setComposeOpen(true)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
             aria-label="New email"
             data-testid="menu-mail-compose"
           >
-            <PenSquare className="h-4 w-4" />
+            <PenSquare className="h-5 w-5" />
           </button>
         </div>
 

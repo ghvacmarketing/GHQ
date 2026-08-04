@@ -1558,7 +1558,9 @@ export default function AssistantOverlay({
             controls row underneath */}
         <div
           className="shrink-0 px-3 pt-1.5"
-          style={{ paddingBottom: kbInset > 0 ? "10px" : "calc(10px + env(safe-area-inset-bottom))" }}
+          // Keyboard up: the composer card hugs the keys — no slim white band
+          // between the card and the keyboard.
+          style={{ paddingBottom: kbInset > 0 ? "4px" : "calc(10px + env(safe-area-inset-bottom))" }}
         >
           {/* Same centered column as the thread so the bar lines up with the
               messages on wide screens */}
