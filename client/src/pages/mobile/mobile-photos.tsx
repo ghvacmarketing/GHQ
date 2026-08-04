@@ -819,20 +819,12 @@ export default function MobilePhotos() {
         </div>
       </DraggableSheet>
 
-      {/* Customer picker — a full sheet in the create-page mold (rounded top
-          below the status bar, X top-left) whose search works EXACTLY like
-          the address finder: top pill input that mounts once the sheet
-          settles, results beneath padded above the keyboard, customer TYPE
-          metal badges on every row. */}
+      {/* Customer picker — a full sheet in the create-page mold whose search
+          works EXACTLY like the address finder: top pill input that mounts
+          once the sheet settles, results beneath padded above the keyboard,
+          customer TYPE metal badges on every row. No X — the sheet drags
+          shut like every other. */}
       <DraggableSheet full open={searchActive} onOpenChange={(o) => { if (!o) closeSearch(); }} title="Choose customer" testid="photos-customer-sheet">
-        <button
-          onClick={closeSearch}
-          className="absolute left-4 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-transform active:scale-90"
-          aria-label="Close"
-          data-testid="photos-search-close"
-        >
-          <X className="h-5 w-5" />
-        </button>
         <div
           className="flex h-full min-h-0 flex-col"
           onPointerDown={(e) => {
@@ -842,7 +834,7 @@ export default function MobilePhotos() {
             if (e.target !== searchInputRef.current) e.preventDefault();
           }}
         >
-          <h2 className="pl-11 text-lg font-semibold text-slate-900">Save media to…</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Save media to…</h2>
 
           <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
