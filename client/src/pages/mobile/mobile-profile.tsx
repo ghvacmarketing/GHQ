@@ -50,7 +50,7 @@ export default function MobileProfile() {
   const scrimRef = useRef<HTMLDivElement | null>(null);
   const backRef = useRef<HTMLButtonElement | null>(null);
   const [showUnderlay, setShowUnderlay] = useState(false);
-  const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const swipeDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
 
   const goBackAnimated = (fromDx = 0) => {
     // The home page is already on screen as the underlay — its remount
@@ -86,8 +86,10 @@ export default function MobileProfile() {
   };
 
   const onSwipeStart = (e: React.PointerEvent) => {
-    if (e.clientX > 48) { swipeDrag.current = null; return; }
-    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    // A second finger mid-swipe must not hijack or wipe the gesture
+    if (swipeDrag.current) return;
+    if (e.clientX > 48) return;
+    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true };
     // Mount the home page underneath NOW, while the finger is still
     // parked — mounting it mid-drag dropped frames on heavier pages.
     setShowUnderlay(true);
@@ -96,7 +98,7 @@ export default function MobileProfile() {
   const onSwipeMove = (e: React.PointerEvent) => {
     const st = swipeDrag.current;
     const el = pageRef.current;
-    if (!st?.active || !el) return;
+    if (!st?.active || st.id !== e.pointerId || !el) return;
     const dx = e.clientX - st.x;
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
@@ -124,6 +126,7 @@ export default function MobileProfile() {
   };
   const onSwipeEnd = (e: React.PointerEvent) => {
     const st = swipeDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     swipeDrag.current = null;
     const el = pageRef.current;
     if (!st?.engaged || !el) {

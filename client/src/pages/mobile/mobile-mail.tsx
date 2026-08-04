@@ -216,7 +216,7 @@ export default function MobileMail() {
   // iOS-style tracked swipe-back for the open thread (same feel as jobs)
   const threadRef = useRef<HTMLDivElement | null>(null);
   const threadEntered = usePushEntrance(openThreadId);
-  const threadDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const threadDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
   const closeThreadAnimated = (fromDx = 0) => {
     const el = threadRef.current;
     if (!el) return setOpenThreadId(null);
@@ -230,14 +230,16 @@ export default function MobileMail() {
     setTimeout(() => setOpenThreadId(null), dur - 10);
   };
   const onThreadSwipeStart = (e: React.PointerEvent) => {
-    if (e.clientX > 48) { threadDrag.current = null; return; }
-    threadDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    // A second finger mid-swipe must not hijack or wipe the gesture
+    if (threadDrag.current) return;
+    if (e.clientX > 48) return;
+    threadDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true };
     threadRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onThreadSwipeMove = (e: React.PointerEvent) => {
     const st = threadDrag.current;
     const el = threadRef.current;
-    if (!st?.active || !el) return;
+    if (!st?.active || st.id !== e.pointerId || !el) return;
     const dx = e.clientX - st.x;
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
@@ -253,9 +255,10 @@ export default function MobileMail() {
   };
   const onThreadSwipeEnd = (e: React.PointerEvent) => {
     const st = threadDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     threadDrag.current = null;
     const el = threadRef.current;
-    if (!st?.engaged || !el) return;
+    if (!st.engaged || !el) return;
     const dx = e.clientX - st.x;
     if (dx > Math.min(140, window.innerWidth * 0.33)) {
       closeThreadAnimated(Math.max(0, dx));

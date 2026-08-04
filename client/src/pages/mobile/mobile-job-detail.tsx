@@ -4058,7 +4058,7 @@ export default function MobileJobDetail() {
       setTimeout(() => navigate("/mobile/job"), dur - 10);
     });
   };
-  const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean; section: boolean } | null>(null);
+  const swipeDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean; section: boolean } | null>(null);
   const overviewRef = useRef<HTMLDivElement | null>(null);
   const pageUnderlayRef = useRef<HTMLDivElement | null>(null);
   const pageScrimRef = useRef<HTMLDivElement | null>(null);
@@ -4165,12 +4165,14 @@ export default function MobileJobDetail() {
     }, 290);
   };
   const onSwipeStart = (e: React.PointerEvent) => {
+    // A second finger mid-swipe must not hijack or wipe the gesture
+    if (swipeDrag.current) return;
     // Wider start zone — Android's system gesture owns the outermost edge,
     // so fingers landing "near the left" must still catch our drag.
-    if (e.clientX > 48) { swipeDrag.current = null; return; }
+    if (e.clientX > 48) return;
     // The edge swipe always leaves the job (whole screen slides, nav
     // included) no matter which tab is open — Overview is just a tab now.
-    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true, section: false };
+    swipeDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true, section: false };
     // Mount the Jobs page underneath NOW, while the finger is still parked —
     // mounting it mid-drag left the first exposed frames empty (the "weird
     // vertical strip" on a fresh open). If this turns out to be a tap or a
@@ -4181,7 +4183,7 @@ export default function MobileJobDetail() {
   const onSwipeMove = (e: React.PointerEvent) => {
     const st = swipeDrag.current;
     const el = pageRef.current;
-    if (!st?.active || !el) return;
+    if (!st?.active || st.id !== e.pointerId || !el) return;
     const dx = e.clientX - st.x;
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
@@ -4230,11 +4232,12 @@ export default function MobileJobDetail() {
   };
   const onSwipeEnd = (e: React.PointerEvent) => {
     const st = swipeDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     swipeDrag.current = null;
-    if (!st?.engaged) {
+    if (!st.engaged) {
       // Edge touch that never became a back-swipe (tap / vertical scroll) —
       // drop the pre-mounted underlay.
-      if (st) setShowUnderlay(false);
+      setShowUnderlay(false);
       return;
     }
     const dx = e.clientX - st.x;

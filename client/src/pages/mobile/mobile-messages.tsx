@@ -127,7 +127,7 @@ export default function MobileMessages() {
   // the finger and slides off on commit — same feel as leaving a job. ──
   const threadRef = useRef<HTMLDivElement | null>(null);
   const threadEntered = usePushEntrance(selectedConversationId);
-  const threadDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const threadDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
   const closeThreadAnimated = (fromDx = 0) => {
     const el = threadRef.current;
     if (!el) return setSelectedConversationId(null);
@@ -142,14 +142,16 @@ export default function MobileMessages() {
   };
   const onThreadSwipeStart = (e: React.PointerEvent) => {
     // The photo-review screen owns the thread while it's up — no swipe-back.
-    if (e.clientX > 48 || pendingPhotos.length > 0) { threadDrag.current = null; return; }
-    threadDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    // A second finger mid-swipe must not hijack or wipe the gesture
+    if (threadDrag.current) return;
+    if (e.clientX > 48 || pendingPhotos.length > 0) return;
+    threadDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true };
     threadRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onThreadSwipeMove = (e: React.PointerEvent) => {
     const st = threadDrag.current;
     const el = threadRef.current;
-    if (!st?.active || !el) return;
+    if (!st?.active || st.id !== e.pointerId || !el) return;
     const dx = e.clientX - st.x;
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
@@ -168,9 +170,10 @@ export default function MobileMessages() {
   };
   const onThreadSwipeEnd = (e: React.PointerEvent) => {
     const st = threadDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     threadDrag.current = null;
     const el = threadRef.current;
-    if (!st?.engaged || !el) return;
+    if (!st.engaged || !el) return;
     const dx = e.clientX - st.x;
     if (dx > Math.min(140, window.innerWidth * 0.33)) {
       closeThreadAnimated(Math.max(0, dx));

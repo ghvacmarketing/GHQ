@@ -43,7 +43,7 @@ export function DraggableSheet({
   const BASE_TRANSITION = "padding-bottom 0.2s ease-out";
   const keyboardInset = useKeyboardInset();
   const sheetRef = useRef<HTMLDivElement | null>(null);
-  const drag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
+  const drag = useRef<{ id: number; x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
   const scrollable = tall || full;
 
   // Exits are driven MANUALLY, never by Radix's animate-out. The landing
@@ -118,18 +118,20 @@ export function DraggableSheet({
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // A second finger mid-drag must not hijack or wipe the gesture
+    if (drag.current) return;
     // Portaled children (option sheets opened from inside this one) bubble
     // through the REACT tree even though they live outside this sheet's DOM —
     // a drag there must never move this sheet.
-    if (!sheetRef.current?.contains(e.target as Node)) { drag.current = null; return; }
+    if (!sheetRef.current?.contains(e.target as Node)) return;
     // Inside scrolled-down content the gesture belongs to the scroller.
     const scroller = scrollerAt(e.target as Node);
-    drag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !scroller || scroller.scrollTop <= 0 };
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, eligible: !scroller || scroller.scrollTop <= 0 };
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const st = drag.current;
     const el = sheetRef.current;
-    if (!st || !el) return;
+    if (!st || st.id !== e.pointerId || !el) return;
     const dy = e.clientY - st.y;
     const dx = Math.abs(e.clientX - st.x);
     if (!st.engaged) {
@@ -162,9 +164,10 @@ export function DraggableSheet({
   };
   const onPointerUp = (e: React.PointerEvent) => {
     const st = drag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     drag.current = null;
     const el = sheetRef.current;
-    if (!st?.engaged || !el) return;
+    if (!st.engaged || !el) return;
     const dy = e.clientY - st.y;
     if (dy > 90) {
       dismissAnimated();
@@ -185,6 +188,32 @@ export function DraggableSheet({
       }, 260);
     }
   };
+
+  // WebKit hands an eligible drag to the NATIVE scroller the moment tall-
+  // sheet content moves — pointercancel fires and the sheet drag dies before
+  // it can engage. Claim the gesture (preventDefault) while the sheet owns
+  // it so dragging down from a scroller's top rides the sheet instead of
+  // rubber-banding.
+  useEffect(() => {
+    if (!radixOpen) return;
+    const el = sheetRef.current;
+    if (!el) return;
+    const guard = (e: TouchEvent) => {
+      const st = drag.current;
+      if (!st) return;
+      if (st.engaged) {
+        e.preventDefault();
+        return;
+      }
+      if (!st.eligible || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dy = t.clientY - st.y;
+      const dx = Math.abs(t.clientX - st.x);
+      if (dy > 0 && dy >= dx) e.preventDefault();
+    };
+    el.addEventListener("touchmove", guard, { passive: false });
+    return () => el.removeEventListener("touchmove", guard);
+  }, [radixOpen]);
 
   return (
     <Sheet

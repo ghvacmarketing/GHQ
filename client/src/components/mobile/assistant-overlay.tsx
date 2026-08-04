@@ -152,6 +152,7 @@ export default function AssistantOverlay({
   const modeScrimRef = useRef<HTMLDivElement>(null);
   const modeDragY = useRef<number | null>(null);
   const onModeDragDown = (e: React.PointerEvent) => {
+    if (modeDragY.current != null) return; // a second finger must not reset the drag
     modeDragY.current = e.clientY;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     if (modeSheetRef.current) modeSheetRef.current.style.transition = "none";
@@ -403,6 +404,7 @@ export default function AssistantOverlay({
   // Swipe down on the handle/header to dismiss — live drag follow, commit
   // past ~110px, spring back otherwise (same feel as DraggableSheet).
   const onDragStart = (e: React.PointerEvent) => {
+    if (dragRef.current) return; // a second finger must not reset the drag
     if ((e.target as HTMLElement).closest("button")) return;
     dragRef.current = { y: e.clientY, dy: 0, active: true };
   };
@@ -462,22 +464,21 @@ export default function AssistantOverlay({
   // clearly downward (steeper than sideways, list at its top) — the sheet
   // rides the finger immediately, no hold needed. Taps and scrolls are
   // untouched; a drag suppresses the click that follows it.
-  const histAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean } | null>(null);
+  const histAnyDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean } | null>(null);
   const dragTapSuppress = useRef(false);
   const onHistAnyDown = (e: React.PointerEvent) => {
+    // A second finger mid-drag must not hijack or wipe the gesture
+    if (histAnyDrag.current) return;
     const t = e.target as HTMLElement;
-    if (t.closest("input, textarea, [data-hist-handle]")) {
-      histAnyDrag.current = null;
-      return;
-    }
+    if (t.closest("input, textarea, [data-hist-handle]")) return;
     const sc = histScrollRef.current;
     const inScroller = !!sc && sc.contains(t);
-    histAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0, inScroller };
+    histAnyDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0, inScroller };
   };
   const onHistAnyMove = (e: React.PointerEvent) => {
     const st = histAnyDrag.current;
     const el = histSheetRef.current;
-    if (!st || !el) return;
+    if (!st || st.id !== e.pointerId || !el) return;
     if (pressRef.current?.fired) {
       // A long-press already opened the menu — the finger is theirs now
       histAnyDrag.current = null;
@@ -519,9 +520,10 @@ export default function AssistantOverlay({
   };
   const onHistAnyEnd = (e: React.PointerEvent) => {
     const st = histAnyDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     histAnyDrag.current = null;
     const el = histSheetRef.current;
-    if (!st?.engaged || !el) return;
+    if (!st.engaged || !el) return;
     dragTapSuppress.current = true;
     window.setTimeout(() => {
       dragTapSuppress.current = false;
@@ -552,6 +554,7 @@ export default function AssistantOverlay({
     }
   };
   const onHistDragDown = (e: React.PointerEvent) => {
+    if (histDragY.current != null) return; // a second finger must not reset the drag
     histDragY.current = e.clientY;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     if (histSheetRef.current) histSheetRef.current.style.transition = "none";
@@ -644,25 +647,22 @@ export default function AssistantOverlay({
   // any scroller under the finger at its top) and the sheet rides the finger
   // immediately. Inputs, the handle, and open layers are excluded; a drag
   // suppresses the click behind it.
-  const chatAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean; fromBottom: boolean } | null>(null);
+  const chatAnyDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean; fromBottom: boolean } | null>(null);
   const onChatAnyDown = (e: React.PointerEvent) => {
-    if (historyOpen || modeSheetOpen) {
-      chatAnyDrag.current = null;
-      return;
-    }
+    // A second finger mid-drag must not hijack or wipe the gesture
+    if (chatAnyDrag.current) return;
+    if (historyOpen || modeSheetOpen) return;
     const t = e.target as HTMLElement;
-    if (t.closest("input, textarea, [data-vdrag]")) {
-      chatAnyDrag.current = null;
-      return;
-    }
+    if (t.closest("input, textarea, [data-vdrag]")) return;
     const sc = chatScrollRef.current;
     const inScroller = !!sc && sc.contains(t);
     // On the conversation itself: dismiss only from its very TOP or very
     // BOTTOM — anywhere mid-history a downward drag is just scrolling.
     // Everywhere else on the sheet, dismiss from anywhere.
     const atTop = (sc?.scrollTop ?? 0) <= 0;
-    const atBottom = !!sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 1;
+    const atBottom = !!sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 2;
     chatAnyDrag.current = {
+      id: e.pointerId,
       x: e.clientX,
       y: e.clientY,
       engaged: false,
@@ -674,7 +674,7 @@ export default function AssistantOverlay({
   const onChatAnyMove = (e: React.PointerEvent) => {
     const st = chatAnyDrag.current;
     const el = sheetRef.current;
-    if (!st || !el) return;
+    if (!st || st.id !== e.pointerId || !el) return;
     const dy = e.clientY - st.y;
     const dx = Math.abs(e.clientX - st.x);
     if (!st.engaged) {
@@ -719,9 +719,10 @@ export default function AssistantOverlay({
   };
   const onChatAnyEnd = (e: React.PointerEvent) => {
     const st = chatAnyDrag.current;
+    if (!st || st.id !== e.pointerId) return; // only the tracked finger ends it
     chatAnyDrag.current = null;
     const el = sheetRef.current;
-    if (!st?.engaged || !el) return;
+    if (!st.engaged || !el) return;
     dragTapSuppress.current = true;
     window.setTimeout(() => {
       dragTapSuppress.current = false;
@@ -745,6 +746,52 @@ export default function AssistantOverlay({
       }, 260);
     }
   };
+
+  // WebKit hands an eligible drag to the NATIVE scroller the moment the
+  // thread moves — pointercancel fires and the sheet drag dies before it can
+  // engage. These non-passive touchmove guards claim the gesture
+  // (preventDefault) while the sheet owns it, keeping the pointer stream
+  // alive so dragging down from the thread's very top or very bottom
+  // actually rides the sheet instead of scrolling/rubber-banding.
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    const guard = (e: TouchEvent) => {
+      const st = chatAnyDrag.current;
+      if (!st) return;
+      if (st.engaged) {
+        e.preventDefault();
+        return;
+      }
+      if (!st.eligible || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dy = t.clientY - st.y;
+      const dx = Math.abs(t.clientX - st.x);
+      if (dy > 0 && dy >= dx) e.preventDefault();
+    };
+    el.addEventListener("touchmove", guard, { passive: false });
+    return () => el.removeEventListener("touchmove", guard);
+  }, []);
+  useEffect(() => {
+    if (!historyOpen) return;
+    const el = histSheetRef.current;
+    if (!el) return;
+    const guard = (e: TouchEvent) => {
+      const st = histAnyDrag.current;
+      if (!st) return;
+      if (st.engaged) {
+        e.preventDefault();
+        return;
+      }
+      if (!st.eligible || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dy = t.clientY - st.y;
+      const dx = Math.abs(t.clientX - st.x);
+      if (dy > 0 && dy >= dx) e.preventDefault();
+    };
+    el.addEventListener("touchmove", guard, { passive: false });
+    return () => el.removeEventListener("touchmove", guard);
+  }, [historyOpen]);
 
   // Stick-to-bottom scrolling: auto-scroll only while the user is already at
   // (or near) the bottom. Scrolling up to reread never gets yanked back down
