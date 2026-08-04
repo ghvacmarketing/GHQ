@@ -73,14 +73,15 @@ export function MobileCreatePage({
     else window.history.back();
   };
   const doExit = () => {
-    // Slide the sheet down with an eased glide — it closes like it opened.
+    // Slower, ease-in glide down: a beat of hesitation, then the page
+    // accelerates away — reads deliberately animated instead of snapping.
     const el = rootRef.current;
     if (el) {
       el.style.animation = "none";
-      el.style.transition = "transform 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 340ms ease-out";
+      el.style.transition = "transform 460ms cubic-bezier(0.5, 0.05, 0.7, 0.25), opacity 460ms ease-in";
       el.style.transform = "translateY(100%)";
-      el.style.opacity = "0.6";
-      setTimeout(leave, 320);
+      el.style.opacity = "0.7";
+      setTimeout(leave, 440);
       return;
     }
     setClosing(true);
