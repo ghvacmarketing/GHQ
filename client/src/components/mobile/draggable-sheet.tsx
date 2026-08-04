@@ -160,6 +160,10 @@ export function DraggableSheet({
       <SheetContent
         ref={sheetRef}
         side="bottom"
+        // Radix auto-focuses the first focusable child on open — which
+        // painted the first tile (e.g. "New Task" in the create sheet) as
+        // highlighted/pressed. Sheets that need focus set it themselves.
+        onOpenAutoFocus={(e) => e.preventDefault()}
         onAnimationEnd={(e) => {
           // Once the slide-in lands, drop the (fill-mode-forwards) animation
           // entirely. iOS draws text carets at the wrong spot inside layers
