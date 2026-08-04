@@ -46,24 +46,43 @@ export function DraggableSheet({
   const drag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
   const scrollable = tall || full;
 
-  // The landing handler pins animation:none on the sheet (iOS caret fix) —
-  // but Radix samples that when close begins and, seeing no exit animation,
-  // unmounts INSTANTLY. Closes from a parent's setOpen(false) (a Done
-  // button) bypassed our onOpenChange restore entirely. So Radix gets a
-  // mirrored open state: on close we restore the animation and force a
-  // reflow FIRST, then flip — the slide-out always plays.
+  // Exits are driven MANUALLY, never by Radix's animate-out. The landing
+  // handler pins animation:none (iOS caret fix), which made Radix unmount
+  // instantly on programmatic closes; restoring the animation re-armed the
+  // ENTRANCE keyframes for a frame — the sheet rebounded up from the bottom
+  // before the close committed. Instead: slide the sheet down (and fade the
+  // scrim) with inline transitions, then flip the mirrored open state once
+  // it's off-screen — Radix unmounts an already-invisible sheet.
   const [radixOpen, setRadixOpen] = useState(open);
   useEffect(() => {
     if (open) {
-      setRadixOpen(true);
-    } else {
       const el = sheetRef.current;
       if (el) {
-        el.style.animation = "";
-        void el.offsetHeight;
+        // Re-opening mid-close: clear the exit styles so the entrance plays
+        el.style.transition = "";
+        el.style.transform = "";
       }
-      setRadixOpen(false);
+      setRadixOpen(true);
+      return;
     }
+    const el = sheetRef.current;
+    if (!el) {
+      setRadixOpen(false);
+      return;
+    }
+    const overlay = el.previousElementSibling as HTMLElement | null;
+    if (overlay) {
+      overlay.style.transition = "opacity 0.26s ease-in";
+      overlay.style.opacity = "0";
+    }
+    // A drag-dismiss already slid it off-screen; otherwise glide it down now
+    const already = /translateY\(100%\)/.test(el.style.transform);
+    if (!already) {
+      el.style.transition = "transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)";
+      el.style.transform = "translateY(100%)";
+    }
+    const t = window.setTimeout(() => setRadixOpen(false), already ? 40 : 280);
+    return () => window.clearTimeout(t);
   }, [open]);
 
   /** Nearest scrollable ancestor of a touch, up to the sheet itself — the
