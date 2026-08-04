@@ -59,7 +59,10 @@ export default function CrmLogin() {
   }, [location]);
 
   const handleGoogleSignIn = () => {
-    window.location.href = "/api/crm/auth/google";
+    // Phones and the native shell must come back to the Field app — the
+    // server-side OAuth callback can't see the viewport, so tell it now.
+    const wantsMobile = isNativeApp() || window.innerWidth < 768;
+    window.location.href = wantsMobile ? "/api/crm/auth/google?dest=mobile" : "/api/crm/auth/google";
   };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({

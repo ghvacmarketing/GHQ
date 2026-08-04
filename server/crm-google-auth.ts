@@ -50,7 +50,11 @@ export async function startGoogleOAuth(req: Request, res: Response): Promise<voi
     const client = getOAuthClient(req);
     const state = randomBytes(16).toString("hex");
 
-    res.cookie(STATE_COOKIE, state, {
+    // The login page tells us where this device should land afterwards
+    // (phones/native shell → the Field app). Ride it along in the state
+    // cookie — the callback has no other way to know the viewport.
+    const wantsMobile = req.query.dest === "mobile";
+    res.cookie(STATE_COOKIE, `${state}:${wantsMobile ? "mobile" : "desktop"}`, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -76,8 +80,10 @@ export async function handleGoogleOAuthCallback(
   req: Request,
   res: Response
 ): Promise<void> {
-  const cookieState = req.cookies?.[STATE_COOKIE];
+  const rawCookieState = req.cookies?.[STATE_COOKIE] as string | undefined;
   res.clearCookie(STATE_COOKIE, { path: "/" });
+  // Cookie carries "<state>:<dest>" — older cookies without the suffix still parse
+  const [cookieState, wantedDest] = (rawCookieState || "").split(":");
 
   const { code, state, error: oauthError } = req.query as {
     code?: string;
@@ -165,7 +171,11 @@ export async function handleGoogleOAuthCallback(
       req.ip
     );
 
-    const dest = user.role === "tech" ? "/mobile" : "/crm";
+    // Phones and the native shell land in the Field app no matter the role —
+    // same rule as the password login. wantedDest is what the login page
+    // asked for; deviceClass (user-agent) catches anything that lost it.
+    const isMobileDevice = wantedDest === "mobile" || session.deviceClass === "mobile";
+    const dest = user.role === "tech" || isMobileDevice ? "/mobile" : "/crm";
     return res.redirect(dest) as unknown as void;
   } catch (error) {
     console.error("Google OAuth callback error:", error);
