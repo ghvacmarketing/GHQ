@@ -29,8 +29,11 @@ export default function MobilePhotos() {
   const [annotating, setAnnotating] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   // The customer photos get attached to — always chosen via search.
-  const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
+  const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null; customerType?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
+  // Capture actions live in their OWN compact sheet (Take Photo / library),
+  // opened after a customer is chosen — nothing inline on the page.
+  const [actionOpen, setActionOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   // The picker works exactly like the address finder: the input only MOUNTS
@@ -66,7 +69,11 @@ export default function MobilePhotos() {
     const params = new URLSearchParams(window.location.search);
     const cid = params.get("cid");
     const cname = params.get("cname");
-    if (cid) setPickedCustomer({ id: cid, name: cname || "Customer", phone: null });
+    if (cid) {
+      setPickedCustomer({ id: cid, name: cname || "Customer", phone: null });
+      // Straight to the capture sheet — the on-page buttons are gone.
+      setActionOpen(true);
+    }
     if (params.get("pick") === "1") setSearchActive(true);
     if (cid || params.get("pick")) window.history.replaceState({}, "", "/mobile/photos");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,10 +117,13 @@ export default function MobilePhotos() {
     placeholderData: (prev) => prev,
   });
 
-  const chooseCustomer = (c: { id: string; name: string; phone?: string | null }) => {
-    setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null });
+  const chooseCustomer = (c: { id: string; name: string; phone?: string | null; customerType?: string | null }) => {
+    setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null, customerType: c.customerType ?? null });
     setSearchActive(false);
     setCustomerSearch("");
+    // Search sheet slides down, the compact capture sheet slides up — the
+    // same sheet-to-sheet handoff the "+" menu uses.
+    setTimeout(() => setActionOpen(true), 120);
   };
   const closeSearch = () => {
     // Keyboard drops while the sheet slides away — one motion out.
@@ -443,14 +453,9 @@ export default function MobilePhotos() {
     <MobileShell pullToRefresh>
       {/* min-height a hair past full so the page is always scrollable — that
           keeps the elastic pull/bounce alive even when content is short. */}
-      <div
-        className="p-4 space-y-6"
-        style={{
-          minHeight: "calc(100% + 1px)",
-          // The search overlay fully replaces the page — nothing behind it.
-          display: searchActive ? "none" : undefined,
-        }}
-      >
+      {/* The page stays put while sheets ride over it — a TRUE bottom sheet
+          reveals the real page (not a white void) when dragged shut. */}
+      <div className="p-4 space-y-6" style={{ minHeight: "calc(100% + 1px)" }}>
         {/* Filters pill top left; search top right (techs don't get free
             targeting: their photos go to the job they're on site at). */}
         <div className="flex items-center justify-between gap-2">
@@ -506,7 +511,7 @@ export default function MobilePhotos() {
                     key={job.id}
                     onClick={() => {
                       if (!job.customerId) return;
-                      chooseCustomer({ id: job.customerId, name: job.customerName || "Customer" });
+                      setPickedCustomer({ id: job.customerId, name: job.customerName || "Customer", phone: null });
                       // Straight to the camera — the tap IS the intent. Same
                       // user gesture, so iOS allows the programmatic open.
                       captureInputRef.current?.click();
@@ -547,36 +552,6 @@ export default function MobilePhotos() {
           </div>
         )}
 
-        {/* Active target: the customer photos will be saved to */}
-        {activeCustomer ? (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.06] px-4 py-3" data-testid="photo-target">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#711419]/70">Saving photos to</p>
-              <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
-              {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {!isTechRole && (
-              <button
-                onClick={() => { setCustomerSearch(""); setSearchActive(true); }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
-                data-testid="button-change-customer"
-              >
-                Change
-              </button>
-              )}
-              <button
-                onClick={() => setPickedCustomer(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 active:scale-95"
-                data-testid="button-clear-customer"
-                aria-label="Clear customer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         {techBlocked && (
           <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-4 py-4 text-center" data-testid="tech-offsite-banner">
             <p className="text-sm font-semibold text-amber-900">You're not on site at a job</p>
@@ -605,40 +580,17 @@ export default function MobilePhotos() {
           data-testid="input-photo-capture"
         />
 
-        {/* Capture / library */}
-        {activeCustomer && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleUpload(e.target.files)}
-              data-testid="input-photo-file"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={openCamera}
-                disabled={uploading}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#711419] py-3.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
-                data-testid="button-take-photo"
-              >
-                <Camera className="h-5 w-5" />
-                Take Photo
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3.5 font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
-                data-testid="button-add-from-library"
-                aria-label="Add from library"
-              >
-                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-              </button>
-            </div>
-          </>
-        )}
+        {/* Library input — mounted unconditionally so the capture sheet's
+            "Add from Library" can fire it in the same tap gesture. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="hidden"
+          onChange={(e) => handleUpload(e.target.files)}
+          data-testid="input-photo-file"
+        />
 
         {/* Customers with recent photo activity — larger cards, more info */}
         {recentCustomers.length > 0 && (
@@ -887,6 +839,63 @@ export default function MobilePhotos() {
             )}
           </div>
         </div>
+      </DraggableSheet>
+
+      {/* Capture sheet — the ONLY place photos get taken or added from. Shows
+          the chosen customer, then Take Photo / Add from Library; both fire
+          in the tap gesture so iOS allows the camera/picker to open. */}
+      <DraggableSheet open={actionOpen} onOpenChange={setActionOpen} title="Add media" testid="photos-action-sheet">
+        {activeCustomer && (
+          <div className="space-y-3 pb-1">
+            <div className="flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3" data-testid="photo-target">
+              {activeCustomer.customerType && (
+                <img src={customerTypeBadge(activeCustomer.customerType)} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Save media to</p>
+                <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
+                {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
+              </div>
+              {!isTechRole && (
+                <button
+                  onClick={() => {
+                    setActionOpen(false);
+                    setCustomerSearch("");
+                    setTimeout(() => setSearchActive(true), 120);
+                  }}
+                  className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
+                  data-testid="button-change-customer"
+                >
+                  Change
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setActionOpen(false);
+                openCamera();
+              }}
+              disabled={uploading}
+              className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
+              data-testid="button-take-photo"
+            >
+              <Camera className="h-5 w-5" />
+              Take Photo
+            </button>
+            <button
+              onClick={() => {
+                setActionOpen(false);
+                fileInputRef.current?.click();
+              }}
+              disabled={uploading}
+              className="flex h-13 w-full items-center justify-center gap-2 rounded-xl border border-slate-300/70 bg-white py-3.5 text-base font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
+              data-testid="button-add-from-library"
+            >
+              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+              Add from Library
+            </button>
+          </div>
+        )}
       </DraggableSheet>
 
       {/* iOS-style long-press preview: always mounted so the CSS transitions

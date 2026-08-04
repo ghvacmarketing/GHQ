@@ -19,6 +19,14 @@ export function useScrollHide(hideAfter = 64, showAfter = 12) {
         setHidden(false);
         return;
       }
+      // Rubber-banding past the bottom (every page over-scrolls by design):
+      // the bounce flips direction rapidly and the accumulator fired hide
+      // AND show — the pill danced on any pull. Positions in the overscroll
+      // zone are elastic, not intent — freeze there.
+      if (y >= main.scrollHeight - main.clientHeight - 1) {
+        acc = 0;
+        return;
+      }
       // Direction flip resets the accumulator so a small counter-scroll acts fast
       if ((dy > 0) !== (acc > 0)) acc = 0;
       acc += dy;
