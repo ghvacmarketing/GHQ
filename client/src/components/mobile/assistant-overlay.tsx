@@ -108,9 +108,20 @@ export default function AssistantOverlay({
   // History — a true bottom sheet stacked over the chat sheet
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
+  // Searching = focused OR typed: the top content folds away and the New
+  // chat button morphs into an X while it's true.
+  const [searchFocused, setSearchFocused] = useState(false);
+  const histSearchInputRef = useRef<HTMLInputElement | null>(null);
   // Long-press context menu over the history sheet: rename / move / delete a
-  // chat, or delete a space. One overlay, several views.
-  const [chatMenu, setChatMenu] = useState<{ convo: AiConversationSummary; view: "menu" | "rename" | "move"; draft: string } | null>(null);
+  // chat, or delete a space. The first view anchors directly under the held
+  // row (iMessage-style); rename/move re-dock to the bottom card for the
+  // keyboard's sake.
+  const [chatMenu, setChatMenu] = useState<{
+    convo: AiConversationSummary;
+    view: "menu" | "rename" | "move";
+    draft: string;
+    anchor?: { top: number; bottom: number; left: number; width: number };
+  } | null>(null);
   const [spaceMenu, setSpaceMenu] = useState<AiSpace | null>(null);
   const [menuBusy, setMenuBusy] = useState(false);
   // Gibbs behavior mode — survives restarts; picked from the floating icon.
@@ -349,7 +360,85 @@ export default function AssistantOverlay({
   // History sheet drag-to-dismiss — a true bottom sheet: the handle follows
   // the finger, commits past ~110px, springs back otherwise.
   const histSheetRef = useRef<HTMLDivElement>(null);
+  const histScrollRef = useRef<HTMLDivElement>(null);
   const histDragY = useRef<number | null>(null);
+
+  // Grab-anywhere dismiss: press ANYWHERE on the history sheet and move
+  // clearly downward (steeper than sideways, list at its top) — the sheet
+  // rides the finger immediately, no hold needed. Taps and scrolls are
+  // untouched; a drag suppresses the click that follows it.
+  const histAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
+  const dragTapSuppress = useRef(false);
+  const onHistAnyDown = (e: React.PointerEvent) => {
+    const t = e.target as HTMLElement;
+    if (t.closest("input, textarea, [data-hist-handle]")) {
+      histAnyDrag.current = null;
+      return;
+    }
+    const sc = histScrollRef.current;
+    const inScroller = !!sc && sc.contains(t);
+    histAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0 };
+  };
+  const onHistAnyMove = (e: React.PointerEvent) => {
+    const st = histAnyDrag.current;
+    const el = histSheetRef.current;
+    if (!st || !el) return;
+    if (pressRef.current?.fired) {
+      // A long-press already opened the menu — the finger is theirs now
+      histAnyDrag.current = null;
+      return;
+    }
+    const dy = e.clientY - st.y;
+    const dx = Math.abs(e.clientX - st.x);
+    if (!st.engaged) {
+      if (!st.eligible) return;
+      if (dy > 14 && dy > dx * 1.3) {
+        st.engaged = true;
+        el.style.transition = "none";
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      } else if (dy < -10 || dx > 16) {
+        st.eligible = false;
+        return;
+      }
+    }
+    if (st.engaged) {
+      const off = Math.max(0, dy);
+      el.style.transform = `translateY(${off}px)`;
+      trackHistScrim(off / (el.clientHeight || window.innerHeight));
+    }
+  };
+  const onHistAnyEnd = (e: React.PointerEvent) => {
+    const st = histAnyDrag.current;
+    histAnyDrag.current = null;
+    const el = histSheetRef.current;
+    if (!st?.engaged || !el) return;
+    dragTapSuppress.current = true;
+    window.setTimeout(() => {
+      dragTapSuppress.current = false;
+    }, 250);
+    const dy = e.clientY - st.y;
+    if (dy > 110) {
+      fadeHistScrimOut();
+      el.style.transition = "transform 0.22s ease-in";
+      el.style.transform = "translateY(100%)";
+      setTimeout(() => {
+        setHistoryOpen(false);
+        clearHistScrim();
+        el.style.transition = "";
+        el.style.transform = "";
+      }, 200);
+    } else {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateY(0)";
+      restoreHistScrim();
+      setTimeout(() => {
+        if (el) {
+          el.style.transition = "";
+          el.style.transform = "";
+        }
+      }, 260);
+    }
+  };
   const onHistDragDown = (e: React.PointerEvent) => {
     histDragY.current = e.clientY;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -441,7 +530,6 @@ export default function AssistantOverlay({
   // that moves under the finger.
   type HoldSt = { y: number; armed: boolean; timer: number; has: boolean; scroller: HTMLElement | null; stop: ((ev: TouchEvent) => void) | null };
   const chatHoldSt = useRef<HoldSt>({ y: 0, armed: false, timer: 0, has: false, scroller: null, stop: null });
-  const histHoldSt = useRef<HoldSt>({ y: 0, armed: false, timer: 0, has: false, scroller: null, stop: null });
   const holdDragHandlers = (
     stRef: React.MutableRefObject<HoldSt>,
     getEl: () => HTMLDivElement | null,
@@ -854,6 +942,7 @@ export default function AssistantOverlay({
     if (!open) {
       setHistoryOpen(false);
       setHistorySearch("");
+      setSearchFocused(false);
       setChatMenu(null);
       setSpaceMenu(null);
       setNewSpaceOpen(false);
@@ -1116,6 +1205,7 @@ export default function AssistantOverlay({
   for (const c of pastConversations) {
     if (c.spaceId) spaceCounts.set(c.spaceId, (spaceCounts.get(c.spaceId) || 0) + 1);
   }
+  const searching = searchFocused || historySearch.trim().length > 0;
 
   return createPortal(
     <div className="fixed inset-0 z-[120]" data-testid="assistant-overlay">
@@ -1769,6 +1859,16 @@ export default function AssistantOverlay({
           // select-none + no callout: holding a chat row must open OUR menu,
           // never iOS text selection sweeping the whole sheet blue.
           style={{ top: "env(safe-area-inset-top)", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
+          onPointerDown={onHistAnyDown}
+          onPointerMove={onHistAnyMove}
+          onPointerUp={onHistAnyEnd}
+          onPointerCancel={onHistAnyEnd}
+          onClickCapture={(e) => {
+            if (dragTapSuppress.current) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
           data-testid="assistant-history-sheet"
         >
           <div
@@ -1777,11 +1877,20 @@ export default function AssistantOverlay({
             onPointerMove={onHistDragMove}
             onPointerUp={onHistDragEnd}
             onPointerCancel={onHistDragEnd}
+            data-hist-handle=""
             data-testid="assistant-history-drag-handle"
           >
             <span className="h-1 w-10 rounded-full bg-slate-300" />
           </div>
-          <div className="flex shrink-0 items-center justify-between px-4 pb-2">
+          <div
+            className="flex shrink-0 items-center justify-between overflow-hidden px-4"
+            style={{
+              maxHeight: searching ? 0 : 40,
+              opacity: searching ? 0 : 1,
+              paddingBottom: searching ? 0 : 8,
+              transition: "max-height 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease, padding-bottom 0.25s ease",
+            }}
+          >
             {activeSpace ? (
               <button
                 onClick={() => setActiveSpace(null)}
@@ -1798,20 +1907,21 @@ export default function AssistantOverlay({
           </div>
 
           <div
+            ref={histScrollRef}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
             style={{ touchAction: "pan-y", paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
-            {...holdDragHandlers(
-              histHoldSt,
-              () => histSheetRef.current,
-              () => {
-                setHistoryOpen(false);
-                clearHistScrim();
-              },
-              { onCommitStart: fadeHistScrimOut, onProgress: trackHistScrim, onSpringBack: restoreHistScrim, holdMs: 150 },
-            )}
           >
-            {/* Inside a space — its header; new chats file here */}
-            {activeSpaceObj && !historySearch.trim() && (
+            {/* Inside a space — its header; new chats file here. Folds away
+                smoothly while searching. */}
+            {activeSpaceObj && (
+              <div
+                className="overflow-hidden"
+                style={{
+                  maxHeight: searching ? 0 : 72,
+                  opacity: searching ? 0 : 1,
+                  transition: "max-height 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease",
+                }}
+              >
               <div data-sheet-bg="" className="mb-2 flex items-center gap-2.5 px-1.5 pt-1">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-slate-50 text-slate-500">
                   <Folder className="h-5 w-5" />
@@ -1823,11 +1933,21 @@ export default function AssistantOverlay({
                   </span>
                 </span>
               </div>
+              </div>
             )}
 
             {/* Spaces — folder rows above the chats (tap to open, hold to
-                delete), with New space as the last row */}
-            {!activeSpace && !historySearch.trim() && (
+                delete), with New space as the last row. Folds away smoothly
+                while searching — leaving just the chats. */}
+            {!activeSpace && (
+              <div
+                className="overflow-hidden"
+                style={{
+                  maxHeight: searching ? 0 : 520,
+                  opacity: searching ? 0 : 1,
+                  transition: "max-height 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease",
+                }}
+              >
               <div data-sheet-bg="" className="mb-3">
                 <p className="px-1.5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Spaces</p>
                 {spaces.map((s) => (
@@ -1872,6 +1992,7 @@ export default function AssistantOverlay({
                   <span className="text-[15px] font-medium text-slate-500">New space</span>
                 </button>
               </div>
+              </div>
             )}
 
             {groupedConversations.length === 0 ? (
@@ -1895,7 +2016,17 @@ export default function AssistantOverlay({
                           openConversationFromPanel(c.id);
                         }}
                         onContextMenu={(e) => e.preventDefault()}
-                        onPointerDown={(e) => startPress(e, () => setChatMenu({ convo: c, view: "menu", draft: c.title || "" }))}
+                        onPointerDown={(e) => {
+                          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          startPress(e, () =>
+                            setChatMenu({
+                              convo: c,
+                              view: "menu",
+                              draft: c.title || "",
+                              anchor: { top: r.top, bottom: r.bottom, left: r.left, width: r.width },
+                            }),
+                          );
+                        }}
                         onPointerMove={movePress}
                         onPointerUp={endPress}
                         onPointerCancel={endPress}
@@ -1935,32 +2066,42 @@ export default function AssistantOverlay({
             <div className="pointer-events-auto flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
+                ref={histSearchInputRef}
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
                 placeholder={activeSpaceObj ? `Search ${activeSpaceObj.name}…` : "Search chats…"}
-                className="h-full w-full min-w-0 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
+                className="h-full w-full min-w-0 select-text bg-transparent text-[15px] text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400"
                 data-testid="assistant-history-search"
               />
             </div>
-            {historySearch ? (
-              <button
-                onClick={() => setHistorySearch("")}
-                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-300/70 bg-white text-slate-500 shadow-lg transition-transform active:scale-90"
-                aria-label="Clear search"
-                data-testid="assistant-history-clear"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            ) : (
-              <button
-                onClick={() => { startNewChat(); setHistoryOpen(false); }}
-                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-lg transition-transform active:scale-90"
-                aria-label="New chat"
-                data-testid="assistant-history-new-chat"
-              >
-                <SquarePen className="h-5 w-5" />
-              </button>
-            )}
+            {/* New chat ⇄ X — one button, the icons crossfade/rotate as
+                search engages instead of hard-swapping */}
+            <button
+              onClick={() => {
+                if (searching) {
+                  setHistorySearch("");
+                  histSearchInputRef.current?.blur();
+                } else {
+                  startNewChat();
+                  setHistoryOpen(false);
+                }
+              }}
+              className={cn(
+                "pointer-events-auto relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-lg transition-all duration-200 active:scale-90",
+                searching ? "border border-slate-300/70 bg-white text-slate-500" : "bg-[#711419] text-white",
+              )}
+              aria-label={searching ? "Close search" : "New chat"}
+              data-testid={searching ? "assistant-history-clear" : "assistant-history-new-chat"}
+            >
+              <SquarePen
+                className={cn("h-5 w-5 transition-all duration-200", searching ? "rotate-45 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")}
+              />
+              <X
+                className={cn("absolute h-5 w-5 transition-all duration-200", searching ? "rotate-0 scale-100 opacity-100" : "-rotate-45 scale-50 opacity-0")}
+              />
+            </button>
           </div>
         </div>
       </div>
@@ -1980,6 +2121,46 @@ export default function AssistantOverlay({
               setNewSpaceOpen(false);
             }}
           />
+          {chatMenu?.view === "menu" && chatMenu.anchor ? (
+            /* Anchored right under the held row — small, iMessage-style */
+            <div
+              className="absolute w-56 select-none overflow-hidden rounded-xl bg-white shadow-[0_8px_32px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in-95 duration-150"
+              style={{
+                ...(chatMenu.anchor.bottom + 190 > window.innerHeight
+                  ? { bottom: window.innerHeight - chatMenu.anchor.top + 6, transformOrigin: "bottom left" }
+                  : { top: chatMenu.anchor.bottom + 6, transformOrigin: "top left" }),
+                left: Math.min(Math.max(12, chatMenu.anchor.left + 6), window.innerWidth - 236),
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+              } as React.CSSProperties}
+              data-testid="assistant-chat-menu-anchored"
+            >
+              <button
+                onClick={() => setChatMenu({ ...chatMenu, view: "rename", draft: chatMenu.convo.title || "" })}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-medium text-slate-800 active:bg-slate-50"
+                data-testid="assistant-chat-rename"
+              >
+                <Pencil className="h-4 w-4 text-slate-400" />
+                Rename
+              </button>
+              <button
+                onClick={() => setChatMenu({ ...chatMenu, view: "move", draft: "" })}
+                className="flex w-full items-center gap-2.5 border-t border-slate-100 px-3.5 py-2.5 text-left text-[14px] font-medium text-slate-800 active:bg-slate-50"
+                data-testid="assistant-chat-move"
+              >
+                <Folder className="h-4 w-4 text-slate-400" />
+                Move to space
+              </button>
+              <button
+                onClick={doDeleteChat}
+                className="flex w-full items-center gap-2.5 border-t border-slate-100 px-3.5 py-2.5 text-left text-[14px] font-semibold text-red-600 active:bg-red-50"
+                data-testid="assistant-chat-delete"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete chat
+              </button>
+            </div>
+          ) : (
           <div
             className="absolute inset-x-3 select-none overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-3 duration-200"
             style={{
@@ -2163,6 +2344,7 @@ export default function AssistantOverlay({
               </div>
             )}
           </div>
+          )}
         </div>
       )}
     </div>,
