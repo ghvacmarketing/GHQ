@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Plus, Search, X } from "lucide-react";
+import { BookOpen, Check, ListFilter, Plus, Search, X } from "lucide-react";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useKeyboardInset } from "@/lib/native";
 
@@ -51,6 +51,7 @@ export function LineItemsEditor({
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogCat, setCatalogCat] = useState<string>("all");
+  const [catalogFilterOpen, setCatalogFilterOpen] = useState(false);
   const keyboardInset = useKeyboardInset();
   const { data: catalogItems = [], isLoading: catalogLoading } = useQuery<
     Array<{ id: string; name: string; description?: string | null; category?: string | null; rate?: string | null; isActive?: boolean | null }>
@@ -172,7 +173,21 @@ export function LineItemsEditor({
               pads for the keyboard — the list pads itself clear instead, so
               there's no empty white container behind the keys. */}
           <div className="flex h-full min-h-0 flex-col">
-            <h2 className="text-lg font-semibold text-slate-900">Price book</h2>
+            {/* Title left, Filters pill right — the category filter lives in
+                its own sheet instead of a pill rail */}
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-slate-900">Price book</h2>
+              <button
+                onClick={() => setCatalogFilterOpen(true)}
+                className="relative flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+                aria-label="Filter by category"
+                data-testid="catalog-filter-open"
+              >
+                <ListFilter className="h-4 w-4" />
+                {catalogCat === "all" ? "Filters" : categoryLabel(catalogCat)}
+                {catalogCat !== "all" && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+              </button>
+            </div>
             <div className="mt-3 flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
@@ -182,24 +197,6 @@ export function LineItemsEditor({
                 className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
                 data-testid="catalog-search-input"
               />
-            </div>
-
-            {/* Category pills */}
-            <div className="scrollbar-none -mx-5 mt-3 flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-0.5">
-              {["all", ...catalogCats].map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCatalogCat(c)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    catalogCat === c
-                      ? "border-[#711419] bg-[#711419] text-white"
-                      : "border-slate-300/70 bg-white text-slate-600"
-                  }`}
-                  data-testid={`catalog-cat-${c}`}
-                >
-                  {c === "all" ? "All" : categoryLabel(c)}
-                </button>
-              ))}
             </div>
 
             <div
@@ -244,6 +241,29 @@ export function LineItemsEditor({
               )}
             </div>
           </div>
+
+          {/* Category filter — its own nested sheet, checkable rows */}
+          <DraggableSheet nested open={catalogFilterOpen} onOpenChange={setCatalogFilterOpen} title="Filter by category" testid="catalog-filter-sheet">
+            <h2 className="text-lg font-semibold text-slate-900">Category</h2>
+            <div className="mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white pb-0">
+              {["all", ...catalogCats].map((c, i) => (
+                <button
+                  key={c}
+                  onClick={() => {
+                    setCatalogCat(c);
+                    setCatalogFilterOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2.5 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                  data-testid={`catalog-cat-${c}`}
+                >
+                  <span className={`min-w-0 flex-1 text-sm ${catalogCat === c ? "font-semibold text-[#711419]" : "text-slate-800"}`}>
+                    {c === "all" ? "All categories" : categoryLabel(c)}
+                  </span>
+                  {catalogCat === c && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+                </button>
+              ))}
+            </div>
+          </DraggableSheet>
         </DraggableSheet>
       )}
 

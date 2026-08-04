@@ -1,9 +1,8 @@
-import { firstNameOf } from "@/components/user-avatar-badge";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, subDays } from "date-fns";
-import { Search, X, ChevronRight, Briefcase } from "lucide-react";
+import { Search, X, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +11,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { LineItemsEditor, type CatalogPick } from "@/components/mobile/line-items-editor";
-import { SheetSelect } from "@/components/mobile/sheet-select";
-import { roleBadgeSrc } from "@/components/mobile/role-badge";
+import { AssigneeSheet } from "@/components/mobile/assignee-sheet";
+import { visitTypeBadge } from "@/pages/mobile/mobile-work-orders";
 import typeResidential from "@/assets/type-residential.png";
 import typeCommercial from "@/assets/type-commercial.png";
 import typePropertyManager from "@/assets/type-property-manager.png";
@@ -358,13 +357,12 @@ export default function MobileQuoteNew() {
 
           <div>
             <Label className="mb-1.5 block">Assign to *</Label>
-            <SheetSelect
-              boxed
+            <AssigneeSheet
+              users={adminUsers ?? []}
+              value={selectedAssigneeId || null}
+              onChange={setSelectedAssigneeId}
               label="Assign to"
               placeholder="Pick an admin…"
-              value={selectedAssigneeId}
-              options={(adminUsers ?? []).map((u) => ({ key: u.id, label: firstNameOf(u.name), img: roleBadgeSrc(u.role) }))}
-              onChange={setSelectedAssigneeId}
               testid="select-quote-assignee"
             />
           </div>
@@ -412,9 +410,7 @@ export default function MobileQuoteNew() {
                   className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
                   data-testid={`work-order-${wo.id}`}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5">
-                    <Briefcase className="h-4 w-4 text-[#711419]" />
-                  </span>
+                  <img src={visitTypeBadge(wo.visitType)} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-slate-900">{wo.title || "Work order"}</span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">

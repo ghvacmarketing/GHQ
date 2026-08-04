@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, subDays } from "date-fns";
-import { Search, X, ChevronRight, Plus, Loader2, Briefcase } from "lucide-react";
+import { Search, X, ChevronRight, Plus, Loader2 } from "lucide-react";
+import { visitTypeBadge } from "@/pages/mobile/mobile-work-orders";
 import { LineItemsEditor, type CatalogPick } from "@/components/mobile/line-items-editor";
 import { customerTypeBadge } from "./mobile-quote-new";
 import { Button } from "@/components/ui/button";
@@ -270,9 +271,7 @@ export default function MobileInvoiceNew() {
                     className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
                     data-testid={`work-order-${wo.id}`}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-[#711419]/20 bg-[#711419]/5">
-                      <Briefcase className="h-4 w-4 text-[#711419]" />
-                    </span>
+                    <img src={visitTypeBadge(wo.visitType)} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">{wo.title || "Work order"}</span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">
