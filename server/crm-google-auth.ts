@@ -76,6 +76,71 @@ export async function startGoogleOAuth(req: Request, res: Response): Promise<voi
   }
 }
 
+/** Native Google Sign-In (the iOS account sheet): the app sends the ID
+ *  token it got from the on-device Google session; we verify it against our
+ *  client IDs (web + optional iOS) and mint the SAME session the password
+ *  login does — cookie for the webview plus a bearer token for crmFetch. */
+export async function handleNativeGoogleLogin(req: Request, res: Response): Promise<void> {
+  try {
+    const { idToken } = (req.body || {}) as { idToken?: string };
+    if (!idToken) {
+      return res.status(400).json({ message: "idToken is required" }) as unknown as void;
+    }
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ message: "Google sign-in isn't configured" }) as unknown as void;
+    }
+    const audience = [clientId, process.env.GOOGLE_IOS_CLIENT_ID].filter(Boolean) as string[];
+    const client = new OAuth2Client(clientId);
+    const ticket = await client.verifyIdToken({ idToken, audience });
+    const payload = ticket.getPayload();
+
+    if (!payload?.email || !payload.email_verified) {
+      return res.status(401).json({ message: "Google didn't confirm your email address." }) as unknown as void;
+    }
+
+    const email = payload.email.trim().toLowerCase();
+    const user = await getCrmUserByEmail(email);
+
+    if (!user) {
+      await logCrmAudit(null, "login_denied", "user", null, { method: "google_native", email, reason: "not_authorized" }, req.ip);
+      return res.status(403).json({ message: "This Google account isn't authorized for GHQ. Ask an admin to add your email." }) as unknown as void;
+    }
+    if (!user.isActive) {
+      await logCrmAudit(null, "login_denied", "user", user.id, { method: "google_native", email, reason: "inactive" }, req.ip);
+      return res.status(403).json({ message: "This account has been deactivated." }) as unknown as void;
+    }
+
+    const userAgent = req.headers["user-agent"];
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const session = await createCrmSession(user.id, userAgent, ipAddress);
+    const kicked = await revokeOtherCrmSessions(user.id, session.sessionToken, session.deviceClass === "mobile" ? "mobile" : "desktop").catch(() => 0);
+    if (kicked > 0) {
+      await logCrmAudit(user.id, "sessions_displaced", "user", user.id, { count: kicked, method: "google_native", deviceClass: session.deviceClass, ip: ipAddress }, req.ip).catch(() => {});
+    }
+
+    res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 8 * 60 * 60 * 1000,
+    });
+
+    await logCrmAudit(user.id, "login", "user", user.id, { method: "google_native" }, req.ip);
+
+    const { passwordHash, ...userWithoutPassword } = user as any;
+    return res.json({
+      message: "Login successful",
+      user: userWithoutPassword,
+      token: session.sessionToken,
+    }) as unknown as void;
+  } catch (error) {
+    console.error("Native Google login error:", error);
+    return res.status(401).json({ message: "Google sign-in failed. Please try again." }) as unknown as void;
+  }
+}
+
 export async function handleGoogleOAuthCallback(
   req: Request,
   res: Response

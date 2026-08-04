@@ -58,7 +58,45 @@ export default function CrmLogin() {
     return new URLSearchParams(window.location.search).get("reason") === "session-replaced";
   }, [location]);
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
+    // Native shell: the on-device Google ACCOUNT SHEET — one tap on the
+    // account already on the phone, no web forms. Falls back to the web
+    // OAuth redirect when the plugin or iOS client ID isn't in this build.
+    if (isNativeApp()) {
+      try {
+        const iosClientId = (import.meta as any).env?.VITE_GOOGLE_IOS_CLIENT_ID as string | undefined;
+        if (!iosClientId) throw new Error("ios-client-id-missing");
+        const { SocialLogin } = await import("@capgo/capacitor-social-login");
+        await SocialLogin.initialize({ google: { iOSClientId: iosClientId } });
+        let idToken: string | undefined;
+        try {
+          const result = await SocialLogin.login({ provider: "google", options: { scopes: ["email", "profile"] } });
+          const r = (result as any)?.result;
+          idToken = r?.idToken ?? r?.authentication?.idToken;
+        } catch {
+          // The user closed the account sheet — stop here, no Safari bounce.
+          return;
+        }
+        if (!idToken) throw new Error("no-id-token");
+        const res = await fetch("/api/crm/auth/google/native", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+          credentials: "include",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast({ title: "Sign-in failed", description: data.message || "Google sign-in was denied.", variant: "destructive" });
+          return;
+        }
+        if (data.token) setCrmToken(data.token);
+        window.location.href = "/mobile";
+        return;
+      } catch {
+        // Plugin not compiled into this shell yet (or unconfigured) — the
+        // in-webview web flow below still works.
+      }
+    }
     // Phones and the native shell must come back to the Field app — the
     // server-side OAuth callback can't see the viewport, so tell it now.
     const wantsMobile = isNativeApp() || window.innerWidth < 768;

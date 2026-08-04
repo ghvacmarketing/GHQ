@@ -86,7 +86,7 @@ import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate,
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { recordUserActivity } from "./activity-tracker";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, revokeOtherCrmSessions, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
-import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
+import { startGoogleOAuth, handleGoogleOAuthCallback, handleNativeGoogleLogin, isGoogleOAuthConfigured } from "./crm-google-auth";
 import { startGmailConnect, handleGmailConnectCallback } from "./crm-gmail-auth";
 import {
   isGmailOAuthConfigured,
@@ -6844,6 +6844,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/auth/google/callback - Handle Google OAuth callback
   app.get("/api/crm/auth/google/callback", (req, res) => {
     void handleGoogleOAuthCallback(req, res);
+  });
+
+  // POST /api/crm/auth/google/native - Native Google Sign-In (iOS account
+  // sheet): verifies the on-device ID token and mints a normal CRM session.
+  app.post("/api/crm/auth/google/native", (req, res) => {
+    void handleNativeGoogleLogin(req, res);
   });
 
   // GET /api/crm/auth/google/status - Whether the Google sign-in button should appear
