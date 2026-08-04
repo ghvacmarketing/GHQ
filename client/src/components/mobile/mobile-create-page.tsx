@@ -76,22 +76,39 @@ export function MobileCreatePage({
   const doExit = () => {
     // Bottom-sheet exit with the REAL page beneath: clone the sheet as a
     // static ghost, navigate immediately (destination paints under it right
-    // away, entrance fade suppressed), then glide the ghost down over it —
-    // slow ease-in with a beat of hesitation.
+    // away, entrance fade suppressed), then glide the ghost down over it.
+    // Fully opaque the whole ride — it must read as a sheet, not a fade.
     const el = rootRef.current;
     if (el) {
       const ghost = el.cloneNode(true) as HTMLElement;
+      // cloneNode misses live state — imprint typed values and scroll
+      // positions so the ghost is pixel-identical to what was on screen.
+      const srcInputs = el.querySelectorAll<HTMLInputElement>("input");
+      ghost.querySelectorAll<HTMLInputElement>("input").forEach((g, i) => {
+        const s = srcInputs[i];
+        if (s) g.setAttribute("value", s.value);
+      });
+      const srcAreas = el.querySelectorAll<HTMLTextAreaElement>("textarea");
+      ghost.querySelectorAll<HTMLTextAreaElement>("textarea").forEach((g, i) => {
+        const s = srcAreas[i];
+        if (s) g.textContent = s.value;
+      });
       ghost.style.animation = "none";
-      ghost.style.transition = "transform 460ms cubic-bezier(0.5, 0.05, 0.7, 0.25), opacity 460ms ease-in";
+      ghost.style.transition = "transform 460ms cubic-bezier(0.5, 0.05, 0.7, 0.25)";
       ghost.style.pointerEvents = "none";
       ghost.setAttribute("aria-hidden", "true");
       document.body.appendChild(ghost);
+      // Scroll positions only apply once the ghost has layout
+      const srcDivs = el.querySelectorAll<HTMLElement>("div");
+      const ghostDivs = ghost.querySelectorAll<HTMLElement>("div");
+      srcDivs.forEach((s, i) => {
+        if (s.scrollTop > 0 && ghostDivs[i]) ghostDivs[i].scrollTop = s.scrollTop;
+      });
       el.style.visibility = "hidden";
       markSkipEntrance();
       leave();
       requestAnimationFrame(() => {
         ghost.style.transform = "translateY(100%)";
-        ghost.style.opacity = "0.7";
       });
       setTimeout(() => ghost.remove(), 480);
       return;
