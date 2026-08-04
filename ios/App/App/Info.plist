@@ -36,7 +36,7 @@
 			<string>GoogleSignIn</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID</string>
+				<string>com.googleusercontent.apps.82730414886-mdmotag7rdidk2mrpsdv8huj2dli34gl</string>
 			</array>
 		</dict>
 	</array>
