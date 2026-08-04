@@ -238,18 +238,33 @@ export default function CrmLogin() {
           </form>
 
           <div className="mt-8 border-t border-slate-200 pt-5 text-center">
-            <p className="text-sm text-muted-foreground">
-              Giesbrecht HVAC customer?{" "}
-              {/* Phones go back to the welcome chooser (both doors), not
-                  straight into the other login. Desktop has no chooser. */}
-              <a
-                href={isNativeApp() || window.innerWidth < 768 ? "/" : "/portal/login"}
-                className="font-medium text-[#711419] hover:underline"
+            {/* Phones go back to the welcome chooser (both doors); a real
+                button with a hard navigation — the anchor was getting
+                swallowed. Desktop has no chooser, so it keeps the direct
+                portal link. */}
+            {isNativeApp() || window.innerWidth < 768 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/";
+                }}
+                className="text-sm font-medium text-[#711419]"
                 data-testid="link-customer-portal"
               >
-                {isNativeApp() || window.innerWidth < 768 ? "Choose a different sign-in" : "Sign in to the Customer Portal"}
-              </a>
-            </p>
+                Back to welcome page
+              </button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Giesbrecht HVAC customer?{" "}
+                <a
+                  href="/portal/login"
+                  className="font-medium text-[#711419] hover:underline"
+                  data-testid="link-customer-portal"
+                >
+                  Sign in to the Customer Portal
+                </a>
+              </p>
+            )}
           </div>
         </div>
         </div>

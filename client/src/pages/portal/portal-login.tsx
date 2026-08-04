@@ -581,18 +581,29 @@ export default function PortalLogin() {
         )}
         <div className="mt-7">{body}</div>
 
-        {/* Phones go back to the welcome chooser (both doors), not straight
-            into the other login. Desktop has no chooser. */}
-        <p className="mt-10 border-t border-slate-200 pt-5 text-center text-sm text-slate-500" data-testid="link-team-signin">
-          Work at Giesbrecht HVAC?{" "}
-          <a
-            href={isNativeApp() || window.innerWidth < 768 ? "/" : "/crm/login"}
-            className="font-semibold"
-            style={{ color: BRAND }}
-          >
-            {isNativeApp() || window.innerWidth < 768 ? "Choose a different sign-in" : "Team sign-in"}
-          </a>
-        </p>
+        {/* Phones go back to the welcome chooser (both doors); a real button
+            with a hard navigation. Desktop keeps the direct team link. */}
+        <div className="mt-10 border-t border-slate-200 pt-5 text-center text-sm text-slate-500" data-testid="link-team-signin">
+          {isNativeApp() || window.innerWidth < 768 ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/";
+              }}
+              className="font-semibold"
+              style={{ color: BRAND }}
+            >
+              Back to welcome page
+            </button>
+          ) : (
+            <p>
+              Work at Giesbrecht HVAC?{" "}
+              <a href="/crm/login" className="font-semibold" style={{ color: BRAND }}>
+                Team sign-in
+              </a>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

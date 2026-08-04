@@ -10,7 +10,10 @@ const config: CapacitorConfig = {
   webDir: "dist/public",
   server: {
     url: "https://www.ghvac.app",
-    allowNavigation: ["www.ghvac.app", "ghvac.app", "ghvac-tools.onrender.com"],
+    // accounts.google.com stays INSIDE the webview — without it Capacitor
+    // bounced "Continue with Google" out to Safari, the session cookie landed
+    // in Safari's jar, and the app never saw the login.
+    allowNavigation: ["www.ghvac.app", "ghvac.app", "ghvac-tools.onrender.com", "accounts.google.com"],
   },
   plugins: {
     Keyboard: {

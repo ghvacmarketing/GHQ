@@ -1389,18 +1389,19 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               })}
             </div>
           )}
-          {/* Create sits right under the list (or empty state) — same full
-              create page as the "+" button with the job pre-selected. */}
-          <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
-            onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
-            data-testid="button-start-quick-quote"
-          >
-            <Plus className="h-4 w-4" />
-            Create Quick Quote
-          </button>
         </CardContent>
       </Card>
+
+      {/* Create — BELOW the card, styled exactly like the create page's
+          submit button; opens the same full create page with the job
+          pre-selected. */}
+      <button
+        className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
+        onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
+        data-testid="button-start-quick-quote"
+      >
+        Create Quick Quote
+      </button>
 
       {/* Send Quote Email Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); } }}>
@@ -1977,45 +1978,25 @@ function InvoiceTab({
         </CardContent>
       </Card>
 
-      {/* Create New Invoice */}
-      <Card data-testid="create-invoice-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Receipt className="h-4 w-4 text-green-600" />
-            Create Invoice
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <>
-              <p className="text-sm text-slate-600">
-                Create an invoice for work completed on this job.
-              </p>
-              <div className="flex flex-col gap-2">
-                {/* Same full create page as the "+" button — the job is
-                    pre-selected so there's nothing to pick. */}
-                <Button
-                  className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-                  onClick={() => navigate(`/mobile/invoices/new?job=${workOrder.id}`)}
-                  data-testid="button-show-create-invoice-form"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Invoice
-                </Button>
-                {allAvailableQuotes.length > 0 && (
-                  <Button
-                    variant="outline"
-                    className="w-full min-h-[48px] border-green-200 text-green-700 hover:bg-green-50"
-                    onClick={() => setShowQuoteSelection(true)}
-                    data-testid="button-create-invoice-from-quote"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Create from Quote ({allAvailableQuotes.length})
-                  </Button>
-                )}
-              </div>
-            </>
-        </CardContent>
-      </Card>
+      {/* Create — BELOW the invoices card, same structure as the Quote tab:
+          the create-page-style submit button plus the from-quote secondary,
+          both opening the same full create page with the job pre-selected. */}
+      <button
+        className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
+        onClick={() => navigate(`/mobile/invoices/new?job=${workOrder.id}`)}
+        data-testid="button-show-create-invoice-form"
+      >
+        Create Invoice
+      </button>
+      {allAvailableQuotes.length > 0 && (
+        <button
+          className="flex h-13 w-full items-center justify-center gap-2 rounded-xl border border-[#711419]/30 bg-white py-3.5 text-base font-semibold text-[#711419] shadow-sm transition-transform active:scale-[0.98]"
+          onClick={() => setShowQuoteSelection(true)}
+          data-testid="button-create-invoice-from-quote"
+        >
+          Create from Quote ({allAvailableQuotes.length})
+        </button>
+      )}
 
       {/* Quote Selection Dialog for Create Invoice from Quote */}
       <Dialog open={showQuoteSelection} onOpenChange={setShowQuoteSelection}>
