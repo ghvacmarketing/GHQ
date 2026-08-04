@@ -603,7 +603,9 @@ select.dark-input option {
   to   { transform: translateX(0); border-radius: 0; }
 }
 .page-slide-in {
-  animation: page-slide-in-right 0.3s cubic-bezier(0.32, 0.72, 0.34, 1);
+  /* easeOutExpo-style curve: quick launch, long gentle settle — reads far
+     smoother than the old near-linear ride */
+  animation: page-slide-in-right 0.42s cubic-bezier(0.16, 1, 0.3, 1);
   /* Clips content to the curved corners while the card is in motion */
   overflow: hidden;
 }

@@ -237,6 +237,13 @@ export default function MobileCustomerDetail() {
       const pr = Math.max(0, Math.min(1, off / w));
       if (underlayRef.current) underlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
       if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+      // The floating controls hold still but fade WITH the drag
+      for (const b of [backRef.current, editBtnRef.current]) {
+        if (b) {
+          b.style.transition = "none";
+          b.style.opacity = String(1 - pr);
+        }
+      }
     }
   };
   const onSwipeEnd = (e: React.PointerEvent) => {
@@ -253,6 +260,12 @@ export default function MobileCustomerDetail() {
     } else {
       el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateX(0)";
+      for (const b of [backRef.current, editBtnRef.current]) {
+        if (b) {
+          b.style.transition = "opacity 0.25s ease-out";
+          b.style.opacity = "1";
+        }
+      }
       underlayRef.current?.animate(
         [{ transform: underlayRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
         { duration: 260, easing: "ease-out", fill: "forwards" },
@@ -265,6 +278,12 @@ export default function MobileCustomerDetail() {
         if (el) {
           el.style.transition = "";
           el.style.borderRadius = "";
+        }
+        for (const b of [backRef.current, editBtnRef.current]) {
+          if (b) {
+            b.style.transition = "";
+            b.style.opacity = "";
+          }
         }
         setShowUnderlay(false);
       }, 320);

@@ -4145,10 +4145,22 @@ export default function MobileJobDetail() {
     if (!el) return;
     el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
     el.style.transform = "translateX(0)";
+    for (const b of [backRef.current, actionsRef.current]) {
+      if (b) {
+        b.style.transition = "opacity 0.25s ease-out";
+        b.style.opacity = "1";
+      }
+    }
     setTimeout(() => {
       if (el) {
         el.style.transition = "";
         el.style.borderRadius = "";
+      }
+      for (const b of [backRef.current, actionsRef.current]) {
+        if (b) {
+          b.style.transition = "";
+          b.style.opacity = "";
+        }
       }
     }, 290);
   };
@@ -4206,6 +4218,13 @@ export default function MobileJobDetail() {
         const pr = Math.max(0, Math.min(1, off / w));
         if (pageUnderlayRef.current) pageUnderlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
         if (pageScrimRef.current) pageScrimRef.current.style.opacity = String(0.18 * (1 - pr));
+        // The floating controls hold still but fade WITH the drag
+        for (const b of [backRef.current, actionsRef.current]) {
+          if (b) {
+            b.style.transition = "none";
+            b.style.opacity = String(1 - pr);
+          }
+        }
       }
     }
   };

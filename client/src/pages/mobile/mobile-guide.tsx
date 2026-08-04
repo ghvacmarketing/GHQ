@@ -141,6 +141,11 @@ export default function MobileGuide() {
       const pr = Math.max(0, Math.min(1, off / w));
       if (underlayRef.current) underlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
       if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+      // The floating back holds still but fades WITH the drag
+      if (backRef.current) {
+        backRef.current.style.transition = "none";
+        backRef.current.style.opacity = String(1 - pr);
+      }
     }
   };
   const onSwipeEnd = (e: React.PointerEvent) => {
@@ -157,6 +162,10 @@ export default function MobileGuide() {
     } else {
       el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
       el.style.transform = "translateX(0)";
+      if (backRef.current) {
+        backRef.current.style.transition = "opacity 0.25s ease-out";
+        backRef.current.style.opacity = "1";
+      }
       underlayRef.current?.animate(
         [{ transform: underlayRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
         { duration: 260, easing: "ease-out", fill: "forwards" },
@@ -169,6 +178,10 @@ export default function MobileGuide() {
         if (el) {
           el.style.transition = "";
           el.style.borderRadius = "";
+        }
+        if (backRef.current) {
+          backRef.current.style.transition = "";
+          backRef.current.style.opacity = "";
         }
         setShowUnderlay(false);
       }, 320);
