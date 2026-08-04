@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Droplets, ArrowLeft } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Building2, ArrowLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PortalLayout } from "./portal-layout";
+import { PortalLayout, PortalHeader } from "./portal-layout";
 import {
   SensorCard,
   SensorTrendChart,
@@ -46,40 +43,39 @@ export default function PortalSensors() {
 
   return (
     <PortalLayout>
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setLocation("/portal/dashboard")} className="text-slate-500">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back
-          </Button>
-          <div className="flex items-center gap-2">
-            <Droplets className="h-5 w-5 text-[#711419]" />
-            <h1 className="text-2xl font-semibold text-slate-900">Environment Monitoring</h1>
-          </div>
-        </div>
-        <p className="text-sm text-slate-500">
-          Live humidity and temperature from the sensors at your property.
-        </p>
+      {/* Not a tab — a frosted back bubble returns Home, like the app's sub-pages */}
+      <button
+        onClick={() => setLocation("/portal/dashboard")}
+        className="liquid-glass mb-4 flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition-transform active:scale-95"
+        aria-label="Back to dashboard"
+        data-testid="button-back"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </button>
+      <PortalHeader
+        title="Environment Monitoring"
+        subtitle="Live humidity and temperature from the sensors at your property"
+      />
 
+      <div className="space-y-5">
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Skeleton className="h-40" />
-            <Skeleton className="h-40" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="skeleton-shimmer h-40 rounded-[4px] bg-slate-200" />
+            <div className="skeleton-shimmer h-40 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.08s" } as React.CSSProperties} />
           </div>
         ) : sensors.length === 0 ? (
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none">
-            <CardContent className="p-8 text-center text-sm text-slate-500">
-              No sensors are set up for your property yet. Contact us if you'd like remote humidity
-              monitoring installed.
-            </CardContent>
-          </Card>
+          <div className="rounded-[4px] border border-slate-300/70 bg-white p-8 text-center text-sm text-slate-500">
+            No sensors are set up for your property yet. Contact us if you'd like remote humidity
+            monitoring installed.
+          </div>
         ) : (
           groups.map((g) => (
             <div key={g.title}>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="mb-2 flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-slate-400" />
                 <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{g.title}</h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {g.sensors.map((s) => (
                   <SensorCard key={s.id} sensor={s} onClick={() => setDetail(s)} />
                 ))}
@@ -90,7 +86,7 @@ export default function PortalSensors() {
       </div>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           {detail && (
             <>
               <DialogHeader>
@@ -99,7 +95,7 @@ export default function PortalSensors() {
                   <RiskBadge risk={detail.risk} />
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex items-center gap-6 mb-2">
+              <div className="mb-2 flex items-center gap-6">
                 <div>
                   <p className="text-3xl font-bold tabular-nums" style={{ color: "#711419" }}>
                     {detail.humidity != null ? `${Math.round(detail.humidity)}%` : "—"}

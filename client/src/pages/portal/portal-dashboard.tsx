@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
-  FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign, Receipt, Droplets,
-  CalendarDays, CalendarPlus, Loader2, Truck,
+  ClipboardCheck, Wrench, ChevronRight, DollarSign, Receipt, Droplets,
+  CalendarDays, Loader2, Truck, Phone, LogOut,
 } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
 
@@ -72,6 +70,12 @@ const WORK_ORDER_STATUS_LABELS: Record<string, string> = {
   on_site: "Technician on site",
 };
 
+function greetingForHour(h: number): string {
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function PortalDashboard() {
   const [, setLocation] = useLocation();
 
@@ -122,16 +126,26 @@ export default function PortalDashboard() {
     }
   }, [customerError, setLocation]);
 
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/portal/auth/logout");
+    } catch (e) {
+    }
+    setLocation("/portal/login");
+  };
+
   if (customerLoading) {
     return (
       <PortalLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Skeleton className="h-40" />
-            <Skeleton className="h-40" />
-            <Skeleton className="h-40" />
+        <div className="space-y-5">
+          <div className="skeleton-shimmer h-9 w-56 rounded-[4px] bg-slate-200" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="skeleton-shimmer h-28 rounded-[4px] bg-slate-200" />
+            <div className="skeleton-shimmer h-28 rounded-[4px] bg-slate-200" />
+            <div className="skeleton-shimmer h-28 rounded-[4px] bg-slate-200" />
+            <div className="skeleton-shimmer h-28 rounded-[4px] bg-slate-200" />
           </div>
+          <div className="skeleton-shimmer h-40 rounded-[4px] bg-slate-200" />
         </div>
       </PortalLayout>
     );
@@ -168,326 +182,295 @@ export default function PortalDashboard() {
     });
   };
 
+  const firstName = customer.name?.trim().split(/\s+/)[0] || "";
+  const now = new Date();
+
   return (
     <PortalLayout>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-welcome">
-            Welcome, {customer.name}
-          </h1>
-          <p className="text-slate-500 mt-1">View your account information and history</p>
+      <div className="space-y-6">
+        {/* Greeting header — same voice as the app's agenda */}
+        <div className="flex items-center justify-between" data-testid="portal-greeting-header">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="text-welcome">
+              {greetingForHour(now.getHours())}
+              {firstName ? `, ${firstName}` : ""}
+            </h1>
+            <p className="text-sm text-slate-500">
+              {now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+            </p>
+          </div>
+          {/* Call + logout share one frosted bubble */}
+          <div className="liquid-glass flex items-center rounded-full">
+            <a
+              href="tel:+17068260644"
+              className="flex h-11 w-12 items-center justify-center rounded-l-full text-slate-600 transition-transform active:scale-95"
+              style={{ WebkitTapHighlightColor: "transparent" }}
+              aria-label="Call Giesbrecht HVAC"
+              data-testid="button-call"
+            >
+              <Phone className="h-5 w-5" />
+            </a>
+            <span className="h-6 w-px bg-slate-200" aria-hidden />
+            <button
+              onClick={handleLogout}
+              className="flex h-11 w-12 items-center justify-center rounded-r-full text-slate-600 transition-transform active:scale-95"
+              style={{ WebkitTapHighlightColor: "transparent" }}
+              aria-label="Log out"
+              data-testid="button-logout"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Stat tiles — tap through to the matching tab */}
+        <div className="grid grid-cols-2 gap-3">
           <Link href="/portal/invoices">
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-open-invoices">
-            <CardHeader className="pb-2">
+            <div className="h-full rounded-[4px] border border-slate-300/70 bg-white p-3.5 transition-transform active:scale-[0.98]" data-testid="card-open-invoices">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Open Invoices</CardTitle>
-                <div className="p-2 bg-amber-100 rounded-[3px]">
-                  <DollarSign className="h-5 w-5 text-amber-600" />
-                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Open Invoices</p>
+                <span className="rounded-[3px] bg-amber-100 p-1.5">
+                  <DollarSign className="h-4 w-4 text-amber-600" />
+                </span>
               </div>
-            </CardHeader>
-            <CardContent>
               {dashboardLoading ? (
-                <Skeleton className="h-8 w-24" />
+                <div className="skeleton-shimmer mt-2 h-8 w-20 rounded-[4px] bg-slate-200" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold text-slate-900" data-testid="text-open-invoices-count">
+                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-slate-900" data-testid="text-open-invoices-count">
                     {dashboardData?.invoicesSummary?.openCount || 0}
                   </p>
-                  <p className="text-sm text-slate-500" data-testid="text-open-invoices-total">
+                  <p className="text-xs text-slate-500" data-testid="text-open-invoices-total">
                     {formatCurrency(parseFloat(dashboardData?.invoicesSummary?.openTotal || "0"))} total
                   </p>
                 </>
               )}
-            </CardContent>
-          </Card>
-          </Link>
-
-          <Link href="/portal/agreements">
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-agreements">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Maintenance Agreements</CardTitle>
-                <div className="p-2 bg-green-100 rounded-[3px]">
-                  <ClipboardCheck className="h-5 w-5 text-green-600" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {dashboardLoading ? (
-                <Skeleton className="h-8 w-24" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold text-slate-900" data-testid="text-agreements-active">
-                    {dashboardData?.agreementsSummary?.active || 0}
-                  </p>
-                  <p className="text-sm text-slate-500" data-testid="text-agreements-total">
-                    {dashboardData?.agreementsSummary?.total || 0} total agreements
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
+            </div>
           </Link>
 
           <Link href="/portal/quotes">
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-quotes">
-            <CardHeader className="pb-2">
+            <div className="h-full rounded-[4px] border border-slate-300/70 bg-white p-3.5 transition-transform active:scale-[0.98]" data-testid="card-quotes">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pending Quotes</CardTitle>
-                <div className="p-2 bg-[#711419]/[0.08] rounded-[3px]">
-                  <Receipt className="h-5 w-5 text-[#711419]" />
-                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pending Quotes</p>
+                <span className="rounded-[3px] bg-[#711419]/[0.08] p-1.5">
+                  <Receipt className="h-4 w-4 text-[#711419]" />
+                </span>
               </div>
-            </CardHeader>
-            <CardContent>
               {dashboardLoading ? (
-                <Skeleton className="h-8 w-24" />
+                <div className="skeleton-shimmer mt-2 h-8 w-20 rounded-[4px] bg-slate-200" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold text-slate-900" data-testid="text-pending-quotes-count">
+                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-slate-900" data-testid="text-pending-quotes-count">
                     {dashboardData?.quotesSummary?.pendingCount || 0}
                   </p>
-                  <p className="text-sm text-slate-500" data-testid="text-pending-quotes-total">
+                  <p className="text-xs text-slate-500" data-testid="text-pending-quotes-total">
                     {formatCurrency(parseFloat(dashboardData?.quotesSummary?.pendingTotal || "0"))} pending
                   </p>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Link>
+
+          <Link href="/portal/agreements">
+            <div className="h-full rounded-[4px] border border-slate-300/70 bg-white p-3.5 transition-transform active:scale-[0.98]" data-testid="card-agreements">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Maintenance</p>
+                <span className="rounded-[3px] bg-green-100 p-1.5">
+                  <ClipboardCheck className="h-4 w-4 text-green-600" />
+                </span>
+              </div>
+              {dashboardLoading ? (
+                <div className="skeleton-shimmer mt-2 h-8 w-20 rounded-[4px] bg-slate-200" />
+              ) : (
+                <>
+                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-slate-900" data-testid="text-agreements-active">
+                    {dashboardData?.agreementsSummary?.active || 0}
+                  </p>
+                  <p className="text-xs text-slate-500" data-testid="text-agreements-total">
+                    {dashboardData?.agreementsSummary?.total || 0} total agreements
+                  </p>
+                </>
+              )}
+            </div>
           </Link>
 
           <Link href="/portal/service-history">
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-recent-service">
-            <CardHeader className="pb-2">
+            <div className="h-full rounded-[4px] border border-slate-300/70 bg-white p-3.5 transition-transform active:scale-[0.98]" data-testid="card-recent-service">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Recent Service</CardTitle>
-                <div className="p-2 bg-[#711419]/[0.08] rounded-[3px]">
-                  <Wrench className="h-5 w-5 text-[#711419]" />
-                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Recent Service</p>
+                <span className="rounded-[3px] bg-[#711419]/[0.08] p-1.5">
+                  <Wrench className="h-4 w-4 text-[#711419]" />
+                </span>
               </div>
-            </CardHeader>
-            <CardContent>
               {dashboardLoading ? (
-                <Skeleton className="h-8 w-24" />
+                <div className="skeleton-shimmer mt-2 h-8 w-20 rounded-[4px] bg-slate-200" />
               ) : dashboardData?.recentService ? (
                 <>
-                  <p className="text-lg font-semibold text-slate-900" data-testid="text-recent-service-date">
+                  <p className="mt-1.5 text-lg font-bold text-slate-900" data-testid="text-recent-service-date">
                     {formatDate(dashboardData.recentService.date)}
                   </p>
-                  <p className="text-sm text-slate-500 truncate" data-testid="text-recent-service-description">
+                  <p className="truncate text-xs text-slate-500" data-testid="text-recent-service-description">
                     {dashboardData.recentService.title || "Service completed"}
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-slate-400">No recent service</p>
+                <p className="mt-2 text-sm text-slate-400">No recent service</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
           </Link>
         </div>
 
-        {/* Upcoming appointments + request service */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-upcoming-appointments">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays className="h-5 w-5 text-[#711419]" />
-                Upcoming Appointments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {appointmentsLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-14" />
-                  <Skeleton className="h-14" />
-                </div>
-              ) : (appointments?.workOrders?.length || 0) === 0 && (appointments?.maintenanceVisits?.length || 0) === 0 ? (
-                <p className="text-sm text-slate-400 py-4 text-center" data-testid="text-no-appointments">
-                  Nothing scheduled right now.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {appointments?.workOrders?.map((wo) => (
-                    <li
-                      key={wo.id}
-                      className="flex items-start gap-3 rounded-[4px] border border-slate-300/70 p-3"
-                      data-testid={`appointment-${wo.id}`}
-                    >
-                      <div className="p-2 bg-[#711419]/[0.08] rounded-[3px] shrink-0">
-                        <Truck className="h-4 w-4 text-[#711419]" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {wo.title || wo.visitType || "Service visit"}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {formatDateTime(wo.scheduledStart)}
-                          <span className="ml-2 text-xs text-emerald-600">
-                            {WORK_ORDER_STATUS_LABELS[wo.status] || wo.status}
-                          </span>
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                  {appointments?.maintenanceVisits?.map((v) => (
-                    <li
-                      key={v.id}
-                      className="flex items-start gap-3 rounded-[4px] border border-slate-300/70 p-3"
-                      data-testid={`visit-${v.id}`}
-                    >
-                      <div className="p-2 bg-green-100 rounded-[3px] shrink-0">
-                        <ClipboardCheck className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          Maintenance visit {v.visitNumber} of {v.totalVisitsInCycle}
-                          {v.agreementPlan ? ` — ${v.agreementPlan}` : ""}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          Target: {formatDate(v.targetDate)}
-                          {v.status === "pending" && (
-                            <span className="ml-2 text-xs text-amber-600">Call us to schedule</span>
-                          )}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-request-service">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarPlus className="h-5 w-5 text-[#711419]" />
-                Need Service?
-              </CardTitle>
-              <CardDescription>
-                Book online and pick a time, or send us a note and we'll call you.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <a href="/book-online" target="_blank" rel="noopener">
-                <Button className="w-full text-white" style={{ backgroundColor: "#711419" }} data-testid="button-book-online">
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  Book a Visit Online
-                </Button>
-              </a>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200" /></div>
-                <div className="relative flex justify-center text-[11px] font-semibold uppercase tracking-wider"><span className="bg-white px-2 text-slate-500">or request a callback</span></div>
-              </div>
+        {/* Upcoming appointments */}
+        <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-upcoming-appointments">
+          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Upcoming appointments
+          </p>
+          <div className="p-3.5">
+            {appointmentsLoading ? (
               <div className="space-y-2">
-                <Label htmlFor="service-request">What's going on?</Label>
-                <Textarea
-                  id="service-request"
-                  rows={2}
-                  placeholder="e.g. AC isn't cooling upstairs..."
-                  value={requestMessage}
-                  onChange={(e) => setRequestMessage(e.target.value)}
-                  className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
-                  data-testid="input-service-request"
-                />
+                <div className="skeleton-shimmer h-14 rounded-[4px] bg-slate-200" />
+                <div className="skeleton-shimmer h-14 rounded-[4px] bg-slate-200" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="preferred-time">Preferred day/time (optional)</Label>
-                <Input
-                  id="preferred-time"
-                  placeholder="e.g. weekday mornings"
-                  value={preferredTime}
-                  onChange={(e) => setPreferredTime(e.target.value)}
-                  className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
-                  data-testid="input-preferred-time"
-                />
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => serviceRequest.mutate()}
-                disabled={serviceRequest.isPending || !requestMessage.trim()}
-                className="w-full"
-                data-testid="button-send-service-request"
-              >
-                {serviceRequest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Request"}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Quick Links</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Link href="/portal/invoices">
-              <Button
-                variant="outline"
-                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
-                data-testid="button-view-invoices"
-              >
-                <span className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  View Invoices
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/portal/quotes">
-              <Button
-                variant="outline"
-                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
-                data-testid="button-view-quotes"
-              >
-                <span className="flex items-center gap-2">
-                  <Receipt className="h-4 w-4" />
-                  View Quotes
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/portal/agreements">
-              <Button
-                variant="outline"
-                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
-                data-testid="button-view-agreements"
-              >
-                <span className="flex items-center gap-2">
-                  <ClipboardCheck className="h-4 w-4" />
-                  View Agreements
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/portal/service-history">
-              <Button
-                variant="outline"
-                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
-                data-testid="button-view-service-history"
-              >
-                <span className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4" />
-                  Service History
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/portal/sensors">
-              <Button
-                variant="outline"
-                className="w-full justify-between h-auto py-4 rounded-[4px] border-slate-300/70 hover:border-[#711419] hover:text-[#711419]"
-                data-testid="button-view-sensors"
-              >
-                <span className="flex items-center gap-2">
-                  <Droplets className="h-4 w-4" />
-                  Environment Monitoring
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            ) : (appointments?.workOrders?.length || 0) === 0 && (appointments?.maintenanceVisits?.length || 0) === 0 ? (
+              <p className="py-3 text-center text-sm text-slate-400" data-testid="text-no-appointments">
+                Nothing scheduled right now.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {appointments?.workOrders?.map((wo) => (
+                  <li
+                    key={wo.id}
+                    className="flex items-start gap-3 rounded-[4px] border border-slate-300/70 border-l-4 border-l-[#711419] p-3"
+                    data-testid={`appointment-${wo.id}`}
+                  >
+                    <div className="shrink-0 rounded-[3px] bg-[#711419]/[0.08] p-2">
+                      <Truck className="h-4 w-4 text-[#711419]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {wo.title || wo.visitType || "Service visit"}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {formatDateTime(wo.scheduledStart)}
+                        <span className="ml-2 text-xs font-medium text-emerald-600">
+                          {WORK_ORDER_STATUS_LABELS[wo.status] || wo.status}
+                        </span>
+                      </p>
+                    </div>
+                  </li>
+                ))}
+                {appointments?.maintenanceVisits?.map((v) => (
+                  <li
+                    key={v.id}
+                    className="flex items-start gap-3 rounded-[4px] border border-slate-300/70 border-l-4 border-l-emerald-500 p-3"
+                    data-testid={`visit-${v.id}`}
+                  >
+                    <div className="shrink-0 rounded-[3px] bg-green-100 p-2">
+                      <ClipboardCheck className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        Maintenance visit {v.visitNumber} of {v.totalVisitsInCycle}
+                        {v.agreementPlan ? ` — ${v.agreementPlan}` : ""}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        Target: {formatDate(v.targetDate)}
+                        {v.status === "pending" && (
+                          <span className="ml-2 text-xs font-medium text-amber-600">Call us to schedule</span>
+                        )}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
+
+        {/* Request service */}
+        <div className="rounded-[4px] border border-slate-300/70 bg-white" data-testid="card-request-service">
+          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Need service?
+          </p>
+          <div className="space-y-4 p-3.5">
+            <a href="/book-online" target="_blank" rel="noopener" className="block">
+              <button
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
+                data-testid="button-book-online"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Book a Visit Online
+              </button>
+            </a>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200" /></div>
+              <div className="relative flex justify-center text-[11px] font-semibold uppercase tracking-wider"><span className="bg-white px-2 text-slate-500">or request a callback</span></div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="service-request">What's going on?</Label>
+              <Textarea
+                id="service-request"
+                rows={2}
+                placeholder="e.g. AC isn't cooling upstairs..."
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                className="rounded-[4px] text-[16px] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+                data-testid="input-service-request"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="preferred-time">Preferred day/time (optional)</Label>
+              <Input
+                id="preferred-time"
+                placeholder="e.g. weekday mornings"
+                value={preferredTime}
+                onChange={(e) => setPreferredTime(e.target.value)}
+                className="h-12 rounded-[4px] text-[16px] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+                data-testid="input-preferred-time"
+              />
+            </div>
+            <button
+              onClick={() => serviceRequest.mutate()}
+              disabled={serviceRequest.isPending || !requestMessage.trim()}
+              className="flex h-12 w-full items-center justify-center rounded-[4px] border border-slate-300/70 bg-white text-base font-semibold text-slate-700 transition-transform active:scale-[0.98] disabled:opacity-50"
+              data-testid="button-send-service-request"
+            >
+              {serviceRequest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Request"}
+            </button>
+          </div>
+        </div>
+
+        {/* The pages that aren't tabs */}
+        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+          <p className="border-b border-slate-200/80 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            More
+          </p>
+          <Link href="/portal/agreements">
+            <div className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors active:bg-slate-50" data-testid="button-view-agreements">
+              <span className="rounded-[3px] bg-green-100 p-2">
+                <ClipboardCheck className="h-4 w-4 text-green-600" />
+              </span>
+              <span className="flex-1 text-sm font-semibold text-slate-900">Maintenance Agreements</span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </div>
+          </Link>
+          <Link href="/portal/sensors">
+            <div className="flex w-full items-center gap-3 border-t border-slate-200/80 px-3.5 py-3.5 text-left transition-colors active:bg-slate-50" data-testid="button-view-sensors">
+              <span className="rounded-[3px] bg-sky-100 p-2">
+                <Droplets className="h-4 w-4 text-sky-600" />
+              </span>
+              <span className="flex-1 text-sm font-semibold text-slate-900">Environment Monitoring</span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </div>
+          </Link>
+        </div>
+
+        <p className="pb-2 text-center text-xs text-slate-400">
+          Questions? Call us at{" "}
+          <a href="tel:+17068260644" className="font-medium text-[#711419]" data-testid="link-phone">
+            (706) 826-0644
+          </a>
+        </p>
       </div>
     </PortalLayout>
   );

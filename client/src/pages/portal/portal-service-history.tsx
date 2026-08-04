@@ -1,13 +1,9 @@
 import { useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Wrench, Calendar, CheckCircle } from "lucide-react";
-import { PortalLayout } from "./portal-layout";
+import { Wrench, Calendar, CheckCircle } from "lucide-react";
+import { PortalLayout, PortalHeader } from "./portal-layout";
 
 interface PortalWorkOrder {
   id: string;
@@ -82,95 +78,77 @@ export default function PortalServiceHistory() {
 
   return (
     <PortalLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/portal/dashboard">
-            <Button variant="ghost" size="sm" className="text-slate-600" data-testid="button-back">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
+      <PortalHeader title="Service History" subtitle="Your past and upcoming visits" />
 
-        <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
-            Service History
-          </h1>
-          <p className="text-slate-500 mt-1">View your past and upcoming service visits</p>
+      {isLoading ? (
+        <div className="space-y-2.5" data-testid="history-skeleton">
+          <div className="skeleton-shimmer h-24 rounded-[4px] bg-slate-200" />
+          <div className="skeleton-shimmer h-24 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.08s" } as React.CSSProperties} />
+          <div className="skeleton-shimmer h-24 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.16s" } as React.CSSProperties} />
         </div>
-
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
-          </div>
-        ) : workOrders.length === 0 ? (
-          <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="status-no-history">
-            <CardContent className="py-12 text-center">
-              <Wrench className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">No service history found</p>
-              <p className="text-sm text-slate-400 mt-2">Your completed service visits will appear here</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {workOrders.map((wo) => {
-              const status = statusConfig[wo.status] || statusConfig.scheduled;
-              const isCompleted = wo.status === "completed";
-              return (
-                <Card key={wo.id} className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid={`card-work-order-${wo.id}`}>
-                  <CardContent className="py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-[3px] ${isCompleted ? "bg-green-100" : "bg-[#711419]/[0.08]"}`}>
-                          {isCompleted ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <Wrench className="h-5 w-5 text-[#711419]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-slate-900" data-testid={`text-wo-title-${wo.id}`}>
-                            {wo.title}
-                          </h3>
-                          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-slate-500">
-                            <Badge variant="secondary" className="rounded-[3px] text-[10px] font-semibold uppercase tracking-wide" data-testid={`badge-wo-type-${wo.id}`}>
-                              {visitTypeLabels[wo.visitType] || wo.visitType}
-                            </Badge>
-                            {wo.orderNumber && (
-                              <span data-testid={`text-wo-number-${wo.id}`}>#{wo.orderNumber}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 mt-2 text-sm text-slate-500">
-                            <Calendar className="h-3 w-3" />
-                            <span data-testid={`text-wo-date-${wo.id}`}>
-                              {isCompleted && wo.completedAt 
-                                ? `Completed ${formatDate(wo.completedAt)}`
-                                : wo.scheduledStart 
-                                  ? `Scheduled ${formatDate(wo.scheduledStart)} ${formatTime(wo.scheduledStart)}`
-                                  : "Not scheduled"
-                              }
-                            </span>
-                          </div>
-                          {wo.summary && (
-                            <p className="mt-2 text-sm text-slate-600 line-clamp-2" data-testid={`text-wo-summary-${wo.id}`}>
-                              {wo.summary}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <StatusDot pill={status.className} data-testid={`badge-wo-status-${wo.id}`}>
-                        {status.label}
-                      </StatusDot>
+      ) : workOrders.length === 0 ? (
+        <div className="rounded-[4px] border border-slate-300/70 bg-white py-12 text-center" data-testid="status-no-history">
+          <Wrench className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+          <p className="text-sm text-slate-500">No service history yet</p>
+          <p className="mt-1 text-xs text-slate-400">Your completed service visits will appear here</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {workOrders.map((wo) => {
+            const status = statusConfig[wo.status] || statusConfig.scheduled;
+            const isCompleted = wo.status === "completed";
+            return (
+              <div
+                key={wo.id}
+                className={`rounded-[4px] border border-slate-300/70 border-l-4 bg-white p-3.5 ${isCompleted ? "border-l-emerald-500" : "border-l-[#711419]"}`}
+                data-testid={`card-work-order-${wo.id}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className={`shrink-0 rounded-[3px] p-2 ${isCompleted ? "bg-green-100" : "bg-[#711419]/[0.08]"}`}>
+                      {isCompleted ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Wrench className="h-4 w-4 text-[#711419]" />
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-slate-900" data-testid={`text-wo-title-${wo.id}`}>
+                        {wo.title}
+                      </h3>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        <span className="font-semibold uppercase tracking-wide" data-testid={`badge-wo-type-${wo.id}`}>
+                          {visitTypeLabels[wo.visitType] || wo.visitType}
+                        </span>
+                        {wo.orderNumber && <span data-testid={`text-wo-number-${wo.id}`}> · #{wo.orderNumber}</span>}
+                      </p>
+                      <p className="mt-1.5 flex items-center gap-1 text-xs text-slate-500">
+                        <Calendar className="h-3 w-3" />
+                        <span data-testid={`text-wo-date-${wo.id}`}>
+                          {isCompleted && wo.completedAt
+                            ? `Completed ${formatDate(wo.completedAt)}`
+                            : wo.scheduledStart
+                              ? `Scheduled ${formatDate(wo.scheduledStart)} ${formatTime(wo.scheduledStart)}`
+                              : "Not scheduled"
+                          }
+                        </span>
+                      </p>
+                      {wo.summary && (
+                        <p className="mt-2 line-clamp-2 text-sm text-slate-600" data-testid={`text-wo-summary-${wo.id}`}>
+                          {wo.summary}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <StatusDot pill={status.className} data-testid={`badge-wo-status-${wo.id}`}>
+                    {status.label}
+                  </StatusDot>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </PortalLayout>
   );
 }

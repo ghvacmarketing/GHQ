@@ -263,9 +263,10 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - Property type (residential/commercial) affects QuickBooks class assignment
 
 ### Customer Portal
-- Self-service portal for customers
-- View invoices, agreements, service history
-- Access via magic link login (no password needed)
+- Self-service portal for customers at {domain}/portal — styled like the mobile app (bottom tab bar: Home, Quotes, Invoices, History, Profile)
+- Home shows a greeting, open-invoice/pending-quote/agreement stats, upcoming appointments, and a "Need service?" request form; Maintenance Agreements and Environment Monitoring (sensors) live under "More"
+- Customers log in with phone number or email + password; first-time signup verifies their phone by SMS code; forgot-password also works by SMS code (legacy magic links still validate)
+- Customers can self-manage name/email/phone/password from the Profile tab; address changes are requested and reviewed by the office
 
 ---
 
@@ -774,7 +775,7 @@ The Settings page at /crm/settings contains these sub-sections:
 
 ### Public-facing pages (outside the CRM)
 - **Online Booking**: {domain}/book — customer-facing booking form (not in the sidebar, no login needed)
-- **Customer Portal**: {domain}/portal — customers view invoices/agreements (accessed via magic link)
+- **Customer Portal**: {domain}/portal — customers view/pay invoices, review quotes, and see agreements + service history (phone/email + password login)
 - **Quote Viewer**: {domain}/quote/{id} — customer views and accepts/declines a quote
 - **Invoice Viewer**: {domain}/invoice/{id} — customer views and pays an invoice
 - **Salesbook**: {domain}/price-book — digital flipbook for sales presentations (no login needed)

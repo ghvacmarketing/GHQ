@@ -270,9 +270,8 @@ function MobileWrapper({ children }: { children: ReactNode }) {
 // Portal-specific loading placeholder
 function PortalLoader() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#faf9f7]" data-testid="portal-loader">
-      <Loader2 className="h-8 w-8 animate-spin text-[#711419] mb-4" />
-      <p className="text-slate-500">Loading Customer Portal...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50" data-testid="portal-loader">
+      <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
     </div>
   );
 }

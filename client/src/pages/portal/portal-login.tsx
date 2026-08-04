@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Home } from "lucide-react";
-import { PortalLayout } from "./portal-layout";
+import redlogo from "@assets/redlogo.webp";
 
 type View =
   | "login"
@@ -26,6 +24,8 @@ interface Candidate {
 
 const BRAND = "#711419";
 
+const inputClass = "h-12 rounded-[4px] bg-white text-[16px] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400";
+
 async function postJson(url: string, body: Record<string, unknown>) {
   const res = await fetch(url, {
     method: "POST",
@@ -40,6 +40,19 @@ async function postJson(url: string, body: Record<string, unknown>) {
     // non-JSON error body
   }
   return { ok: res.ok, data };
+}
+
+function SubmitButton({ loading, children, testid }: { loading: boolean; children: React.ReactNode; testid: string }) {
+  return (
+    <button
+      type="submit"
+      disabled={loading}
+      className="flex h-12 w-full items-center justify-center rounded-[4px] bg-[#711419] text-base font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
+      data-testid={testid}
+    >
+      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : children}
+    </button>
+  );
 }
 
 export default function PortalLogin() {
@@ -233,7 +246,7 @@ export default function PortalLogin() {
     <button
       type="button"
       onClick={() => switchView("login")}
-      className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
+      className="inline-flex items-center gap-1 text-sm text-slate-500"
       data-testid="button-back-to-login"
     >
       <ArrowLeft className="h-3.5 w-3.5" /> Back to login
@@ -243,14 +256,14 @@ export default function PortalLogin() {
   const alerts = (
     <>
       {error && (
-        <div className="flex items-start gap-2 rounded-[4px] bg-red-50 border border-red-200 p-3 text-sm text-red-700" data-testid="text-error">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-2 rounded-[4px] border border-red-200 bg-red-50 p-3 text-sm text-red-700" data-testid="text-error">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {info && !error && (
-        <div className="flex items-start gap-2 rounded-[4px] bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700" data-testid="text-info">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-2 rounded-[4px] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700" data-testid="text-info">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{info}</span>
         </div>
       )}
@@ -269,7 +282,7 @@ export default function PortalLogin() {
           minLength={8}
           required
           placeholder="At least 8 characters"
-          className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+          className={inputClass}
           data-testid="input-new-password"
         />
       </div>
@@ -282,7 +295,7 @@ export default function PortalLogin() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           minLength={8}
           required
-          className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+          className={inputClass}
           data-testid="input-confirm-password"
         />
       </div>
@@ -318,7 +331,7 @@ export default function PortalLogin() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
-              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+              className={inputClass}
               data-testid="input-identifier"
             />
           </div>
@@ -331,18 +344,16 @@ export default function PortalLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+              className={inputClass}
               data-testid="input-password"
             />
           </div>
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-login">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log In"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-login">Log In</SubmitButton>
           <div className="flex items-center justify-between text-sm">
             <button
               type="button"
               onClick={() => { setPhone(""); switchView("forgot-phone"); }}
-              className="text-slate-500 hover:underline"
+              className="text-slate-500"
               data-testid="link-forgot-password"
             >
               Forgot password?
@@ -350,7 +361,7 @@ export default function PortalLogin() {
             <button
               type="button"
               onClick={() => { setPhone(""); switchView("signup-phone"); }}
-              className="font-medium hover:underline"
+              className="font-semibold"
               style={{ color: BRAND }}
               data-testid="link-create-account"
             >
@@ -376,13 +387,11 @@ export default function PortalLogin() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
-              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+              className={inputClass}
               data-testid="input-signup-phone"
             />
           </div>
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-signup-start">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Text Me a Code"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-signup-start">Text Me a Code</SubmitButton>
           {backToLogin}
         </form>
       );
@@ -405,17 +414,15 @@ export default function PortalLogin() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               required
-              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+              className={inputClass}
               data-testid="input-signup-code"
             />
           </div>
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-signup-verify">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-signup-verify">Verify</SubmitButton>
           <button
             type="button"
             onClick={() => switchView("signup-phone")}
-            className="text-sm text-slate-500 hover:underline"
+            className="text-sm text-slate-500"
             data-testid="button-resend-code"
           >
             Didn't get a code? Try again
@@ -436,12 +443,12 @@ export default function PortalLogin() {
                 key={c.customerId}
                 type="button"
                 onClick={() => { setSelectedCustomerId(c.customerId); switchView("signup-password"); }}
-                className="w-full flex items-start gap-3 rounded-[4px] border border-slate-300/70 hover:border-[#711419] hover:bg-[#711419]/[0.04] p-3 text-left transition-colors"
+                className="flex w-full items-start gap-3 rounded-[4px] border border-slate-300/70 bg-white p-3.5 text-left transition-transform active:scale-[0.99]"
                 data-testid={`button-candidate-${c.customerId}`}
               >
-                <Home className="h-4 w-4 mt-0.5 shrink-0 text-slate-400" />
+                <Home className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                 <span>
-                  <span className="block font-medium text-slate-800">{c.name}</span>
+                  <span className="block font-semibold text-slate-800">{c.name}</span>
                   {c.address && <span className="block text-sm text-slate-500">{c.address}</span>}
                 </span>
               </button>
@@ -461,9 +468,7 @@ export default function PortalLogin() {
         <form onSubmit={handleSignupComplete} className="space-y-4">
           {alerts}
           {passwordFields}
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-signup-complete">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Account"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-signup-complete">Create Account</SubmitButton>
           {backToLogin}
         </form>
       );
@@ -484,13 +489,11 @@ export default function PortalLogin() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
-              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+              className={inputClass}
               data-testid="input-forgot-phone"
             />
           </div>
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-forgot-start">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Text Me a Code"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-forgot-start">Text Me a Code</SubmitButton>
           <p className="text-xs text-slate-500">
             Log in with email only, or no longer have this number? Give us a call and we'll send you a fresh access link.
           </p>
@@ -516,14 +519,12 @@ export default function PortalLogin() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               required
-              className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus-visible:border-slate-400"
+              className={inputClass}
               data-testid="input-forgot-code"
             />
           </div>
           {passwordFields}
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-forgot-complete">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reset Password"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-forgot-complete">Reset Password</SubmitButton>
           {backToLogin}
         </form>
       );
@@ -536,13 +537,11 @@ export default function PortalLogin() {
         <form onSubmit={handleSetPassword} className="space-y-4">
           {alerts}
           {passwordFields}
-          <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND }} disabled={loading} data-testid="button-set-password">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Password"}
-          </Button>
+          <SubmitButton loading={loading} testid="button-set-password">Save Password</SubmitButton>
           <button
             type="button"
             onClick={() => setLocation("/portal/dashboard")}
-            className="text-sm text-slate-500 hover:underline"
+            className="text-sm text-slate-500"
             data-testid="button-skip-password"
           >
             Skip for now
@@ -552,26 +551,42 @@ export default function PortalLogin() {
       break;
   }
 
+  // Seamless sign-in — the form sits directly on the canvas (no card), same
+  // as the app's login: centered logo, bold title, content up top.
   return (
-    <PortalLayout showLogout={false}>
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <Card className="w-full max-w-md rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-login">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-semibold" style={{ color: BRAND }} data-testid="text-login-title">
-              {title}
-            </CardTitle>
-            {description && <CardDescription data-testid="text-login-description">{description}</CardDescription>}
-          </CardHeader>
-          <CardContent>{body}</CardContent>
-        </Card>
+    <div
+      className="min-h-dvh overflow-y-auto bg-slate-50"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+      data-testid="portal-login-page"
+      onFocusCapture={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.tagName === "INPUT") {
+          setTimeout(() => {
+            t.scrollIntoView({ block: "center", behavior: "smooth" });
+          }, 300);
+        }
+      }}
+    >
+      <div className="mx-auto flex w-full max-w-sm flex-col px-5 pb-16 pt-[10vh] animate-in fade-in duration-300">
+        <img src={redlogo} alt="Giesbrecht HVAC" className="mx-auto mb-6 h-11" />
+        <h1 className="text-center text-[26px] font-semibold tracking-tight text-slate-900" data-testid="text-login-title">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-1 text-center text-sm text-slate-500" data-testid="text-login-description">
+            {description}
+          </p>
+        )}
+        <div className="mt-7">{body}</div>
+
         {/* The other audience's door — mirrors the CRM login's portal link */}
-        <p className="mt-5 text-center text-sm text-slate-500" data-testid="link-team-signin">
+        <p className="mt-10 border-t border-slate-200 pt-5 text-center text-sm text-slate-500" data-testid="link-team-signin">
           Work at Giesbrecht HVAC?{" "}
-          <a href="/crm/login" className="font-medium hover:underline" style={{ color: BRAND }}>
+          <a href="/crm/login" className="font-semibold" style={{ color: BRAND }}>
             Team sign-in
           </a>
         </p>
       </div>
-    </PortalLayout>
+    </div>
   );
 }

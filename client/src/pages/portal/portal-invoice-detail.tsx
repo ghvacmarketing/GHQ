@@ -181,10 +181,20 @@ export default function PortalInvoiceDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
+        {/* Frosted back bubble home to the portal's invoice list */}
+        <Link href="/portal/invoices">
+          <button
+            className="liquid-glass flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition-transform active:scale-95"
+            aria-label="Back to invoices"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        </Link>
         <div className="flex justify-center mb-6 py-4">
-          <img 
-            src={ghvacLogo} 
-            alt="Giesbrecht HVAC" 
+          <img
+            src={ghvacLogo}
+            alt="Giesbrecht HVAC"
             className="h-16 sm:h-20 w-auto object-contain"
           />
         </div>

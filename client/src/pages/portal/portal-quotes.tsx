@@ -1,14 +1,9 @@
 import { useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Receipt, ExternalLink } from "lucide-react";
-import { PortalLayout } from "./portal-layout";
+import { FileText, ChevronRight, ExternalLink } from "lucide-react";
+import { PortalLayout, PortalHeader } from "./portal-layout";
 
 interface PortalQuote {
   id: string;
@@ -76,109 +71,79 @@ export default function PortalQuotes() {
 
   return (
     <PortalLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/portal/dashboard">
-            <Button variant="ghost" size="sm" className="text-slate-600" data-testid="button-back">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
+      <PortalHeader title="Quotes" subtitle="Review and accept your quotes" />
 
-        <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
-            Your Quotes
-          </h1>
-          <p className="text-slate-500 mt-1">View and manage your quote history</p>
+      {isLoading ? (
+        <div className="space-y-2.5" data-testid="quotes-skeleton">
+          <div className="skeleton-shimmer h-20 rounded-[4px] bg-slate-200" />
+          <div className="skeleton-shimmer h-20 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.08s" } as React.CSSProperties} />
+          <div className="skeleton-shimmer h-20 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.16s" } as React.CSSProperties} />
         </div>
-
-        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-quotes">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-[#711419]" />
-              Quote History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : quotes.length === 0 ? (
-              <div className="text-center py-12" data-testid="status-no-quotes">
-                <Receipt className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">No quotes found</p>
-              </div>
+      ) : quotes.length === 0 ? (
+        <div className="rounded-[4px] border border-slate-300/70 bg-white py-12 text-center" data-testid="status-no-quotes">
+          <FileText className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+          <p className="text-sm text-slate-500">No quotes yet</p>
+          <p className="mt-1 text-xs text-slate-400">Quotes we prepare for you will show up here</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {quotes.map((quote) => {
+            const status = statusConfig[quote.status] || statusConfig.draft;
+            const viewable = !!(quote.portalCanView && quote.viewToken);
+            const pendingAction = viewable && quote.status === "sent";
+            const inner = (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900" data-testid={`text-quote-title-${quote.id}`}>
+                      {quote.title || `Quote ${quote.quoteNumber}`}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500" data-testid={`text-quote-number-${quote.id}`}>
+                      {quote.quoteNumber} · {formatDate(quote.quoteDate)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <p className="text-sm font-bold tabular-nums text-slate-900" data-testid={`text-quote-total-${quote.id}`}>
+                      {formatCurrency(quote.total)}
+                    </p>
+                    {viewable && <ChevronRight className="h-4 w-4 text-slate-400" />}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <StatusDot pill={status.className} data-testid={`badge-quote-status-${quote.id}`}>
+                    {status.label}
+                  </StatusDot>
+                  {viewable ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#711419]" data-testid={`button-view-quote-${quote.id}`}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {pendingAction ? "View & Accept" : "View"}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400" data-testid={`text-quote-contact-${quote.id}`}>
+                      Contact us to review
+                    </span>
+                  )}
+                </div>
+              </>
+            );
+            const rowClass = `w-full rounded-[4px] border border-slate-300/70 border-l-4 bg-white p-3.5 text-left ${pendingAction ? "border-l-amber-500" : "border-l-[#711419]"}`;
+            return viewable ? (
+              <button
+                key={quote.id}
+                onClick={() => setLocation(`/quote/${quote.viewToken}`)}
+                className={`${rowClass} transition-transform active:scale-[0.99]`}
+                data-testid={`row-quote-${quote.id}`}
+              >
+                {inner}
+              </button>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="[&_td]:py-4 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Quote #</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {quotes.map((quote) => {
-                      const status = statusConfig[quote.status] || statusConfig.draft;
-                      return (
-                        <TableRow key={quote.id} data-testid={`row-quote-${quote.id}`}>
-                          <TableCell className="font-medium" data-testid={`text-quote-number-${quote.id}`}>
-                            {quote.quoteNumber}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate" data-testid={`text-quote-title-${quote.id}`}>
-                            {quote.title || "—"}
-                          </TableCell>
-                          <TableCell data-testid={`text-quote-date-${quote.id}`}>
-                            {formatDate(quote.quoteDate)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium" data-testid={`text-quote-total-${quote.id}`}>
-                            {formatCurrency(quote.total)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <StatusDot 
-                              pill={status.className}
-                              data-testid={`badge-quote-status-${quote.id}`}
-                            >
-                              {status.label}
-                            </StatusDot>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {quote.portalCanView && quote.viewToken ? (
-                              <Link href={`/quote/${quote.viewToken}`}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"
-                                  data-testid={`button-view-quote-${quote.id}`}
-                                >
-                                  <ExternalLink className="h-4 w-4 mr-1" />
-                                  {quote.status === "sent" ? "View & Accept" : "View"}
-                                </Button>
-                              </Link>
-                            ) : (
-                              <span className="text-xs text-slate-400" data-testid={`text-quote-contact-${quote.id}`}>
-                                Contact us to review
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <div key={quote.id} className={rowClass} data-testid={`row-quote-${quote.id}`}>
+                {inner}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            );
+          })}
+        </div>
+      )}
     </PortalLayout>
   );
 }

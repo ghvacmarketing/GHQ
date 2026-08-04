@@ -1,14 +1,9 @@
 import { useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText, CreditCard, Eye } from "lucide-react";
-import { PortalLayout } from "./portal-layout";
+import { FileText, ChevronRight, CreditCard } from "lucide-react";
+import { PortalLayout, PortalHeader } from "./portal-layout";
 
 interface PortalInvoice {
   id: string;
@@ -76,115 +71,71 @@ export default function PortalInvoices() {
 
   return (
     <PortalLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/portal/dashboard">
-            <Button variant="ghost" size="sm" className="text-slate-600" data-testid="button-back">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
+      <PortalHeader title="Invoices" subtitle="View, track, and pay your invoices" />
 
-        <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900" data-testid="text-page-title">
-            Your Invoices
-          </h1>
-          <p className="text-slate-500 mt-1">View and track your invoice history</p>
+      {isLoading ? (
+        <div className="space-y-2.5" data-testid="invoices-skeleton">
+          <div className="skeleton-shimmer h-20 rounded-[4px] bg-slate-200" />
+          <div className="skeleton-shimmer h-20 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.08s" } as React.CSSProperties} />
+          <div className="skeleton-shimmer h-20 rounded-[4px] bg-slate-200" style={{ "--shimmer-delay": "0.16s" } as React.CSSProperties} />
         </div>
-
-        <Card className="rounded-[4px] border-slate-300/70 bg-white shadow-none" data-testid="card-invoices">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#711419]" />
-              Invoice History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : invoices.length === 0 ? (
-              <div className="text-center py-12" data-testid="status-no-invoices">
-                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">No invoices found</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table className="[&_td]:py-4 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Invoice #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoices.map((invoice) => {
-                      const status = statusConfig[invoice.status] || statusConfig.sent;
-                      const payable = invoice.status !== "paid" && invoice.status !== "void" &&
-                        parseFloat(invoice.balanceDue || "0") > 0;
-                      return (
-                        <TableRow
-                          key={invoice.id}
-                          className="cursor-pointer hover:bg-slate-50"
-                          onClick={() => setLocation(`/portal/invoice/${invoice.id}`)}
-                          data-testid={`row-invoice-${invoice.id}`}
-                        >
-                          <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>
-                            {invoice.invoiceNumber}
-                          </TableCell>
-                          <TableCell data-testid={`text-invoice-date-${invoice.id}`}>
-                            {formatDate(invoice.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-right" data-testid={`text-invoice-total-${invoice.id}`}>
-                            {formatCurrency(invoice.total)}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold" data-testid={`text-invoice-balance-${invoice.id}`}>
-                            {formatCurrency(invoice.balanceDue)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <StatusDot
-                              pill={status.className}
-                              data-testid={`badge-invoice-status-${invoice.id}`}
-                            >
-                              {status.label}
-                            </StatusDot>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Link href={`/portal/invoice/${invoice.id}`} onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant={payable ? "default" : "ghost"}
-                                size="sm"
-                                className={payable
-                                  ? "text-white bg-[#711419] hover:bg-[#8a1a1f]"
-                                  : "text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"}
-                                data-testid={`button-invoice-action-${invoice.id}`}
-                              >
-                                {payable ? (
-                                  <><CreditCard className="h-4 w-4 mr-1" /> View &amp; Pay</>
-                                ) : (
-                                  <><Eye className="h-4 w-4 mr-1" /> View</>
-                                )}
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      ) : invoices.length === 0 ? (
+        <div className="rounded-[4px] border border-slate-300/70 bg-white py-12 text-center" data-testid="status-no-invoices">
+          <FileText className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+          <p className="text-sm text-slate-500">No invoices yet</p>
+          <p className="mt-1 text-xs text-slate-400">Invoices we send you will show up here</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {invoices.map((invoice) => {
+            const status = statusConfig[invoice.status] || statusConfig.sent;
+            const payable = invoice.status !== "paid" && invoice.status !== "void" &&
+              parseFloat(invoice.balanceDue || "0") > 0;
+            return (
+              <button
+                key={invoice.id}
+                onClick={() => setLocation(`/portal/invoice/${invoice.id}`)}
+                className={`w-full rounded-[4px] border border-slate-300/70 border-l-4 bg-white p-3.5 text-left transition-transform active:scale-[0.99] ${payable ? "border-l-amber-500" : "border-l-emerald-500"}`}
+                data-testid={`row-invoice-${invoice.id}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900" data-testid={`text-invoice-number-${invoice.id}`}>
+                      Invoice {invoice.invoiceNumber}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500" data-testid={`text-invoice-date-${invoice.id}`}>
+                      {formatDate(invoice.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="text-right">
+                      <p className="text-sm font-bold tabular-nums text-slate-900" data-testid={`text-invoice-total-${invoice.id}`}>
+                        {formatCurrency(invoice.total)}
+                      </p>
+                      {payable && (
+                        <p className="text-xs font-medium tabular-nums text-amber-600" data-testid={`text-invoice-balance-${invoice.id}`}>
+                          {formatCurrency(invoice.balanceDue)} due
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <StatusDot pill={status.className} data-testid={`badge-invoice-status-${invoice.id}`}>
+                    {status.label}
+                  </StatusDot>
+                  {payable && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#711419]" data-testid={`button-invoice-action-${invoice.id}`}>
+                      <CreditCard className="h-3.5 w-3.5" /> View &amp; Pay
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </PortalLayout>
   );
 }
