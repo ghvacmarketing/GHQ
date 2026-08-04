@@ -7,7 +7,7 @@ import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-acti
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { useKeyboardInset } from "@/lib/native";
-import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
@@ -393,6 +393,19 @@ export default function AssistantOverlay({
   const histSheetRef = useRef<HTMLDivElement>(null);
   const histScrollRef = useRef<HTMLDivElement>(null);
   const histDragY = useRef<number | null>(null);
+  // Drag-dismiss leaves an inline translateY(100%) on the sheet — clearing
+  // it at close raced the class flip and flashed the sheet at rest for one
+  // frame. Clear it as the sheet OPENS instead, letting the class
+  // transition drive the ride up.
+  useEffect(() => {
+    if (historyOpen) {
+      const el = histSheetRef.current;
+      if (el) {
+        el.style.transition = "";
+        el.style.transform = "";
+      }
+    }
+  }, [historyOpen]);
 
   // Grab-anywhere dismiss: press ANYWHERE on the history sheet and move
   // clearly downward (steeper than sideways, list at its top) — the sheet
@@ -458,8 +471,8 @@ export default function AssistantOverlay({
       setTimeout(() => {
         setHistoryOpen(false);
         clearHistScrim();
-        el.style.transition = "";
-        el.style.transform = "";
+        // Inline transform stays (off-screen) — clearing it here raced the
+        // class flip and flashed the sheet at rest; the open effect clears it
       }, 200);
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
@@ -504,8 +517,8 @@ export default function AssistantOverlay({
       setTimeout(() => {
         setHistoryOpen(false);
         clearHistScrim();
-        el.style.transition = "";
-        el.style.transform = "";
+        // Inline transform stays (off-screen) — clearing it here raced the
+        // class flip and flashed the sheet at rest; the open effect clears it
       }, 200);
     } else {
       el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
@@ -562,99 +575,76 @@ export default function AssistantOverlay({
   };
   const pressFired = () => !!pressRef.current?.fired;
 
-  // Hold-to-dismiss from EMPTY background: press quiet space (not a row,
-  // button, or message), hold ~240ms, then drag the whole sheet down. Moving
-  // before the hold matures is a normal scroll. Once armed, a non-passive
-  // touchmove preventDefault pins the content so the sheet is the only thing
-  // that moves under the finger.
-  type HoldSt = { y: number; armed: boolean; timer: number; has: boolean; scroller: HTMLElement | null; stop: ((ev: TouchEvent) => void) | null };
-  const chatHoldSt = useRef<HoldSt>({ y: 0, armed: false, timer: 0, has: false, scroller: null, stop: null });
-  const holdDragHandlers = (
-    stRef: React.MutableRefObject<HoldSt>,
-    getEl: () => HTMLDivElement | null,
-    commit: () => void,
-    hooks?: { onCommitStart?: () => void; onProgress?: (p: number) => void; onSpringBack?: () => void; holdMs?: number },
-  ) => {
-    const onCommitStart = hooks?.onCommitStart;
-    const holdMs = hooks?.holdMs ?? 240;
-    const release = (st: HoldSt) => {
-      window.clearTimeout(st.timer);
-      if (st.scroller && st.stop) st.scroller.removeEventListener("touchmove", st.stop);
-      st.has = false;
-      st.armed = false;
-      st.scroller = null;
-      st.stop = null;
-    };
-    const end = (e: React.PointerEvent) => {
-      const st = stRef.current;
-      if (!st.has) return;
-      const wasArmed = st.armed;
-      const dy = e.clientY - st.y;
-      release(st);
-      const el = getEl();
-      if (!el || !wasArmed) return;
-      if (dy > 110) {
-        onCommitStart?.();
-        el.style.transition = "transform 0.25s ease-in";
-        el.style.transform = "translateY(100%)";
-        window.setTimeout(() => {
-          commit();
-          el.style.transition = "";
-          el.style.transform = "";
-        }, 240);
-      } else {
-        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-        el.style.transform = "translateY(0)";
-        hooks?.onSpringBack?.();
-        window.setTimeout(() => {
-          el.style.transition = "";
-          el.style.transform = "";
-        }, 260);
+  // Grab-anywhere dismiss for the CHAT sheet — same rule as the history
+  // sheet: press anywhere and move clearly downward (steeper than sideways,
+  // any scroller under the finger at its top) and the sheet rides the finger
+  // immediately. Inputs, the handle, and open layers are excluded; a drag
+  // suppresses the click behind it.
+  const chatAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
+  const onChatAnyDown = (e: React.PointerEvent) => {
+    if (historyOpen || modeSheetOpen) {
+      chatAnyDrag.current = null;
+      return;
+    }
+    const t = e.target as HTMLElement;
+    if (t.closest("input, textarea, [data-vdrag]")) {
+      chatAnyDrag.current = null;
+      return;
+    }
+    const sc = chatScrollRef.current;
+    const inScroller = !!sc && sc.contains(t);
+    chatAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0 };
+  };
+  const onChatAnyMove = (e: React.PointerEvent) => {
+    const st = chatAnyDrag.current;
+    const el = sheetRef.current;
+    if (!st || !el) return;
+    const dy = e.clientY - st.y;
+    const dx = Math.abs(e.clientX - st.x);
+    if (!st.engaged) {
+      if (!st.eligible) return;
+      if (dy > 14 && dy > dx * 1.3) {
+        st.engaged = true;
+        el.style.transition = "none";
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      } else if (dy < -10 || dx > 16) {
+        st.eligible = false;
+        return;
       }
-    };
-    return {
-      onPointerDown: (e: React.PointerEvent) => {
-        const t = e.target as HTMLElement;
-        if (t !== e.currentTarget && !t.hasAttribute("data-sheet-bg")) return;
-        const scroller = e.currentTarget as HTMLElement;
-        const st = stRef.current;
-        st.y = e.clientY;
-        st.has = true;
-        st.armed = false;
-        scroller.setPointerCapture?.(e.pointerId);
-        st.timer = window.setTimeout(() => {
-          st.armed = true;
-          try {
-            navigator.vibrate?.(8);
-          } catch {
-            /* no haptics */
-          }
-          const stop = (ev: TouchEvent) => ev.preventDefault();
-          scroller.addEventListener("touchmove", stop, { passive: false });
-          st.scroller = scroller;
-          st.stop = stop;
-          const el = getEl();
-          if (el) el.style.transition = "none";
-        }, holdMs);
-      },
-      onPointerMove: (e: React.PointerEvent) => {
-        const st = stRef.current;
-        if (!st.has) return;
-        const dy = e.clientY - st.y;
-        if (!st.armed) {
-          // Finger moved before the hold matured — it's a scroll, stand down
-          if (Math.abs(dy) > 8) release(st);
-          return;
-        }
-        const el = getEl();
-        if (el) {
-          el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
-          hooks?.onProgress?.(Math.max(0, dy) / (el.clientHeight || window.innerHeight));
-        }
-      },
-      onPointerUp: end,
-      onPointerCancel: end,
-    };
+    }
+    if (st.engaged) {
+      const off = Math.max(0, dy);
+      el.style.transform = `translateY(${off}px)`;
+      trackBackdrop(off / (el.clientHeight || window.innerHeight));
+    }
+  };
+  const onChatAnyEnd = (e: React.PointerEvent) => {
+    const st = chatAnyDrag.current;
+    chatAnyDrag.current = null;
+    const el = sheetRef.current;
+    if (!st?.engaged || !el) return;
+    dragTapSuppress.current = true;
+    window.setTimeout(() => {
+      dragTapSuppress.current = false;
+    }, 250);
+    const dy = e.clientY - st.y;
+    if (dy > 110) {
+      fadeBackdrop();
+      el.style.transition = "transform 0.25s ease-in";
+      el.style.transform = "translateY(100%)";
+      setTimeout(() => {
+        onClose();
+        el.style.transition = "";
+        el.style.transform = "";
+      }, 240);
+    } else {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateY(0)";
+      restoreBackdrop();
+      setTimeout(() => {
+        if (el) el.style.transition = "";
+      }, 260);
+    }
   };
 
   // Stick-to-bottom scrolling: auto-scroll only while the user is already at
@@ -1288,10 +1278,19 @@ export default function AssistantOverlay({
           "absolute inset-x-0 bottom-0 flex select-none flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] animate-in slide-in-from-bottom duration-300 origin-top transition-transform",
           historyOpen && "scale-[0.93]",
         )}
-        // select-none sheet-wide: holding empty space (the drag gesture) must
-        // never pop iOS's blue text selection on nearby bubbles. The composer
-        // opts back in below.
+        // select-none sheet-wide: dragging must never pop iOS's blue text
+        // selection on nearby bubbles. The composer opts back in below.
         style={{ top: "env(safe-area-inset-top)", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
+        onPointerDown={onChatAnyDown}
+        onPointerMove={onChatAnyMove}
+        onPointerUp={onChatAnyEnd}
+        onPointerCancel={onChatAnyEnd}
+        onClickCapture={(e) => {
+          if (dragTapSuppress.current) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }}
       >
         {/* Chat page */}
         <div
@@ -1361,12 +1360,13 @@ export default function AssistantOverlay({
         <div
           ref={chatScrollRef}
           onScroll={onChatScroll}
-          {...holdDragHandlers(chatHoldSt, () => sheetRef.current, onClose, {
-            onCommitStart: fadeBackdrop,
-            onProgress: trackBackdrop,
-            onSpringBack: restoreBackdrop,
-          })}
-          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-16"
+          // Room to scroll past the floating composer — messages glide
+          // beneath the card instead of clipping at a white band above it.
+          style={{
+            paddingBottom: `${kbInset + 140}px`,
+            transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+          }}
         >
           {hydrating && messages.length === 0 ? (
             /* Skeleton thread — bubble-shaped placeholders in the same
@@ -1719,17 +1719,19 @@ export default function AssistantOverlay({
           )}
         </div>
 
-        {/* Composer — Notion-style docked card: borderless textarea on top,
-            controls row underneath */}
+        {/* Composer — the original card, now TRULY floating: absolutely
+            positioned over the chat so messages glide beneath it (no white
+            band above the box). Rides the keyboard via bottom padding. */}
         <div
-          className="shrink-0 px-3 pt-1.5"
-          // Keyboard up: the composer card hugs the keys — no slim white band
-          // between the card and the keyboard.
-          style={{ paddingBottom: kbInset > 0 ? "4px" : "calc(10px + env(safe-area-inset-bottom))" }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3"
+          style={{
+            paddingBottom: kbInset > 0 ? `${kbInset + 8}px` : "calc(10px + env(safe-area-inset-bottom))",
+            transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+          }}
         >
           {/* Same centered column as the thread so the bar lines up with the
               messages on wide screens */}
-          <div className="mx-auto w-full max-w-2xl">
+          <div className="pointer-events-auto mx-auto w-full max-w-2xl">
           {listening && (
             <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#711419]">
               <span className="relative flex h-2 w-2">
@@ -1745,120 +1747,100 @@ export default function AssistantOverlay({
               Got it — writing that down...
             </p>
           )}
-          {/* Composer — exactly the customer-messaging pattern: no card
-              holding it, just a bare row of circles + the keyboard-gray
-              pill, with the maroon send arrow popping in INSIDE the pill
-              the moment there's something to send. */}
-          {attachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {attachments.map((src, i) => (
-                <div key={i} className="relative">
-                  <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
-                  <button
-                    onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
-                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
-                    aria-label="Remove photo"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => {
-                pickImages(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={attachments.length >= 4 || pending}
-              className="mb-[3px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
-              aria-label="Attach photos"
-              data-testid="assistant-attach"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-            {supportsVoice && (
-              <button
-                onClick={listening ? stopVoice : startVoice}
-                disabled={transcribing}
-                className={cn(
-                  "relative mb-[3px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full shadow-md transition-transform active:scale-95",
-                  listening ? "bg-[#711419] text-white" : "liquid-glass text-slate-700",
-                )}
-                aria-label={listening ? "Stop listening" : "Speak to the assistant"}
-                data-testid="assistant-mic"
-              >
-                {listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
-                {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
-              </button>
+          <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-lg">
+            {attachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachments.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
+                    <button
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
+                      aria-label="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-            <div className="flex min-h-[44px] min-w-0 flex-1 items-end rounded-full bg-slate-200 py-1 pl-4 pr-1">
-              <textarea
-                ref={composerRef}
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendQuestion(input);
-                  }
-                }}
-                placeholder={
-                  listening
-                    ? "Listening..."
-                    : transcribing
-                      ? "Transcribing..."
-                      : copilot
-                        ? "Tell me the details — I'll fill the form…"
-                        : "Ask Gibbs anything…"
+            <textarea
+              ref={composerRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendQuestion(input);
                 }
-                className="max-h-32 w-full select-text resize-none bg-transparent py-[7px] text-[16px] leading-[22px] text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-500 focus:outline-none focus-visible:ring-0"
-                data-testid="assistant-input"
+              }}
+              placeholder={
+                listening
+                  ? "Listening..."
+                  : transcribing
+                    ? "Transcribing..."
+                    : copilot
+                      ? "Tell me the details — I'll fill the form…"
+                      : "Ask Gibbs anything…"
+              }
+              className="max-h-32 min-h-[28px] w-full select-text resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400 focus:outline-none focus-visible:ring-0"
+              data-testid="assistant-input"
+            />
+            <div className="mt-1.5 flex items-center gap-0.5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  pickImages(e.target.files);
+                  e.target.value = "";
+                }}
               />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={attachments.length >= 4 || pending}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-40"
+                aria-label="Attach photos"
+                data-testid="assistant-attach"
+              >
+                <ImagePlus className="h-5 w-5" />
+              </button>
+              {supportsVoice && (
+                <button
+                  onClick={listening ? stopVoice : startVoice}
+                  disabled={transcribing}
+                  className={cn(
+                    "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95",
+                    listening ? "bg-[#711419] text-white" : "text-slate-500 active:bg-slate-100",
+                  )}
+                  aria-label={listening ? "Stop listening" : "Speak to the assistant"}
+                  data-testid="assistant-mic"
+                >
+                  {listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
+                  {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                </button>
+              )}
+              <div className="flex-1" />
               <button
                 onClick={() => sendQuestion(input)}
                 disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-                className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow transition-all duration-200 active:scale-90",
-                  input.trim().length >= 3 || attachments.length > 0 || pending
-                    ? "scale-100 opacity-100"
-                    : "pointer-events-none scale-50 opacity-0",
-                )}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:bg-slate-200 disabled:text-slate-400"
                 aria-label="Send"
                 data-testid="assistant-send"
               >
                 {pending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
+                  <ArrowUp className="h-4 w-4" />
                 )}
               </button>
             </div>
           </div>
           </div>
         </div>
-
-        {/* Keyboard spacer — the sheet keeps its full height (its white
-            background fills the screen, never the page behind); this strip
-            grows to the keyboard's height so the composer and thread glide up
-            above the keys with an ease that tracks iOS's keyboard animation.
-            A dedicated element, because the drag gestures overwrite inline
-            transitions on the sheet and chat containers. */}
-        <div
-          aria-hidden="true"
-          className="shrink-0"
-          style={{ height: kbInset, transition: "height 0.32s cubic-bezier(0.32, 0.72, 0, 1)" }}
-        />
         </div>
 
 

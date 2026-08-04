@@ -737,10 +737,16 @@ export default function MobilePhotos() {
         {/* Photo grid */}
         {customerId && (
           filesLoading ? (
-            <div className="grid grid-cols-3 gap-2">
-              <Skeleton className="aspect-square rounded-lg" />
-              <Skeleton className="aspect-square rounded-lg" />
-              <Skeleton className="aspect-square rounded-lg" />
+            /* Full skeleton grid in the exact tile shape — fades in, light
+               band sweeping each tile with a stagger */
+            <div className="grid grid-cols-3 gap-2 animate-in fade-in duration-300">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div
+                  key={i}
+                  className="skeleton-shimmer aspect-square rounded-lg bg-slate-200"
+                  style={{ "--shimmer-delay": `${(i % 3) * 120}ms` } as React.CSSProperties}
+                />
+              ))}
             </div>
           ) : shownPhotos.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
@@ -786,14 +792,20 @@ export default function MobilePhotos() {
                         </span>
                       </span>
                     ) : (
-                      <img
-                        src={p.thumbUrl || p.url}
-                        alt={p.name}
-                        loading="lazy"
-                        draggable={false}
-                        className="pointer-events-none aspect-square w-full select-none rounded-lg object-cover"
-                        style={{ WebkitTouchCallout: "none" }}
-                      />
+                      /* Shimmer sits UNDER the image — the photo simply
+                         paints over it as it loads, so tiles never pop in
+                         from blank white */
+                      <span className="relative block aspect-square w-full overflow-hidden rounded-lg bg-slate-200">
+                        <span className="skeleton-shimmer absolute inset-0" aria-hidden />
+                        <img
+                          src={p.thumbUrl || p.url}
+                          alt={p.name}
+                          loading="lazy"
+                          draggable={false}
+                          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                          style={{ WebkitTouchCallout: "none" }}
+                        />
+                      </span>
                     )}
                   </button>
                 </div>

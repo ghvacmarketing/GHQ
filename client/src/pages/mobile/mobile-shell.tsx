@@ -426,6 +426,13 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
 function SheetTile({
   icon: Icon, img, label, onClick, testid,
 }: { icon: typeof Camera; img?: string; label: string; onClick: () => void; testid: string }) {
+  // The metal badge fades in over a shimmer instead of popping when its
+  // asset arrives (first open before the image is cached).
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (imgRef.current?.complete) setImgLoaded(true);
+  }, []);
   return (
     <button
       onClick={onClick}
@@ -433,7 +440,17 @@ function SheetTile({
       data-testid={testid}
     >
       {img ? (
-        <img src={img} alt="" className="h-8 w-8 select-none" draggable={false} />
+        <span className="relative h-8 w-8">
+          {!imgLoaded && <span className="skeleton-shimmer absolute inset-0 rounded-md bg-slate-200" aria-hidden />}
+          <img
+            ref={imgRef}
+            src={img}
+            alt=""
+            onLoad={() => setImgLoaded(true)}
+            className={`h-8 w-8 select-none transition-opacity duration-200 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+            draggable={false}
+          />
+        </span>
       ) : (
         <Icon className="h-6 w-6 text-[#711419]" />
       )}
