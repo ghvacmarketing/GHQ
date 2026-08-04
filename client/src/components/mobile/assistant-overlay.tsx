@@ -593,7 +593,7 @@ export default function AssistantOverlay({
   // any scroller under the finger at its top) and the sheet rides the finger
   // immediately. Inputs, the handle, and open layers are excluded; a drag
   // suppresses the click behind it.
-  const chatAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean } | null>(null);
+  const chatAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean; fromBottom: boolean } | null>(null);
   const onChatAnyDown = (e: React.PointerEvent) => {
     if (historyOpen || modeSheetOpen) {
       chatAnyDrag.current = null;
@@ -606,7 +606,19 @@ export default function AssistantOverlay({
     }
     const sc = chatScrollRef.current;
     const inScroller = !!sc && sc.contains(t);
-    chatAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0, inScroller };
+    // On the conversation itself: dismiss only from its very TOP or very
+    // BOTTOM — anywhere mid-history a downward drag is just scrolling.
+    // Everywhere else on the sheet, dismiss from anywhere.
+    const atTop = (sc?.scrollTop ?? 0) <= 0;
+    const atBottom = !!sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 1;
+    chatAnyDrag.current = {
+      x: e.clientX,
+      y: e.clientY,
+      engaged: false,
+      eligible: !inScroller || atTop || atBottom,
+      inScroller,
+      fromBottom: inScroller && atBottom && !atTop,
+    };
   };
   const onChatAnyMove = (e: React.PointerEvent) => {
     const st = chatAnyDrag.current;
@@ -646,6 +658,12 @@ export default function AssistantOverlay({
       const off = Math.max(0, dy);
       el.style.transform = `translateY(${off}px)`;
       trackBackdrop(off / (el.clientHeight || window.innerHeight));
+      // Engaged from the thread's bottom: hold the scroll pinned there so
+      // the native scroll doesn't ALSO run underneath the sheet drag.
+      if (st.fromBottom) {
+        const sc = chatScrollRef.current;
+        if (sc) sc.scrollTop = sc.scrollHeight;
+      }
     }
   };
   const onChatAnyEnd = (e: React.PointerEvent) => {
