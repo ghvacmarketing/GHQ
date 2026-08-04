@@ -411,7 +411,7 @@ export default function AssistantOverlay({
   // clearly downward (steeper than sideways, list at its top) — the sheet
   // rides the finger immediately, no hold needed. Taps and scrolls are
   // untouched; a drag suppresses the click that follows it.
-  const histAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
+  const histAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean } | null>(null);
   const dragTapSuppress = useRef(false);
   const onHistAnyDown = (e: React.PointerEvent) => {
     const t = e.target as HTMLElement;
@@ -421,7 +421,7 @@ export default function AssistantOverlay({
     }
     const sc = histScrollRef.current;
     const inScroller = !!sc && sc.contains(t);
-    histAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0 };
+    histAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0, inScroller };
   };
   const onHistAnyMove = (e: React.PointerEvent) => {
     const st = histAnyDrag.current;
@@ -435,12 +435,25 @@ export default function AssistantOverlay({
     const dy = e.clientY - st.y;
     const dx = Math.abs(e.clientX - st.x);
     if (!st.engaged) {
-      if (!st.eligible) return;
+      if (!st.eligible) {
+        // Mid-gesture handoff — the list scrolls to its top, then the sheet
+        // takes over from right here (fresh baseline, no jump)
+        if (st.inScroller && dy > 0 && (histScrollRef.current?.scrollTop ?? 1) <= 0) {
+          st.eligible = true;
+          st.y = e.clientY;
+          st.x = e.clientX;
+        }
+        return;
+      }
       if (dy > 14 && dy > dx * 1.3) {
         st.engaged = true;
         el.style.transition = "none";
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-      } else if (dy < -10 || dx > 16) {
+      } else if (dx > 16) {
+        st.eligible = false;
+        st.inScroller = false;
+        return;
+      } else if (dy < -10) {
         st.eligible = false;
         return;
       }
@@ -580,7 +593,7 @@ export default function AssistantOverlay({
   // any scroller under the finger at its top) and the sheet rides the finger
   // immediately. Inputs, the handle, and open layers are excluded; a drag
   // suppresses the click behind it.
-  const chatAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean } | null>(null);
+  const chatAnyDrag = useRef<{ x: number; y: number; engaged: boolean; eligible: boolean; inScroller: boolean } | null>(null);
   const onChatAnyDown = (e: React.PointerEvent) => {
     if (historyOpen || modeSheetOpen) {
       chatAnyDrag.current = null;
@@ -593,7 +606,7 @@ export default function AssistantOverlay({
     }
     const sc = chatScrollRef.current;
     const inScroller = !!sc && sc.contains(t);
-    chatAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0 };
+    chatAnyDrag.current = { x: e.clientX, y: e.clientY, engaged: false, eligible: !inScroller || (sc?.scrollTop ?? 0) <= 0, inScroller };
   };
   const onChatAnyMove = (e: React.PointerEvent) => {
     const st = chatAnyDrag.current;
@@ -602,12 +615,29 @@ export default function AssistantOverlay({
     const dy = e.clientY - st.y;
     const dx = Math.abs(e.clientX - st.x);
     if (!st.engaged) {
-      if (!st.eligible) return;
+      if (!st.eligible) {
+        // Mid-gesture handoff: dragging down on the thread scrolls it — the
+        // moment it reaches its top, the SHEET takes over from right here
+        // (fresh baseline so it doesn't jump by the scrolled distance).
+        if (st.inScroller && dy > 0 && (chatScrollRef.current?.scrollTop ?? 1) <= 0) {
+          st.eligible = true;
+          st.y = e.clientY;
+          st.x = e.clientX;
+        }
+        return;
+      }
       if (dy > 14 && dy > dx * 1.3) {
         st.engaged = true;
         el.style.transition = "none";
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-      } else if (dy < -10 || dx > 16) {
+      } else if (dx > 16) {
+        // Clearly horizontal — never becomes a sheet drag (and no handoff)
+        st.eligible = false;
+        st.inScroller = false;
+        return;
+      } else if (dy < -10) {
+        // Scrolling up — stand down, but keep the handoff alive in case the
+        // finger reverses and pulls the thread past its top
         st.eligible = false;
         return;
       }
