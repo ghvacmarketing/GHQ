@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, ListFilter, Loader2, Play, Search, Trash2, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, ListFilter, Loader2, Pencil, Play, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { isNativeApp, takeNativePhoto, useKeyboardInset } from "@/lib/native";
+import { isNativeApp, pickNativeLibraryPhotos, takeNativePhoto, useKeyboardInset } from "@/lib/native";
 import { customerTypeBadge } from "./mobile-quote-new";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,17 +23,10 @@ export default function MobilePhotos() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // Straight-to-camera input (photo OR video) for the tap-a-job flow.
-  const captureInputRef = useRef<HTMLInputElement | null>(null);
-  // A just-captured image held in the markup editor before upload.
-  const [annotating, setAnnotating] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   // The customer photos get attached to — always chosen via search.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null; customerType?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
-  // Capture actions live in their OWN compact sheet (Take Photo / library),
-  // opened after a customer is chosen — nothing inline on the page.
-  const [actionOpen, setActionOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   // The picker works exactly like the address finder: the input only MOUNTS
@@ -71,8 +64,8 @@ export default function MobilePhotos() {
     const cname = params.get("cname");
     if (cid) {
       setPickedCustomer({ id: cid, name: cname || "Customer", phone: null });
-      // Straight to the capture sheet — the on-page buttons are gone.
-      setActionOpen(true);
+      // Straight to the sheet's capture step — no on-page buttons.
+      setSearchActive(true);
     }
     if (params.get("pick") === "1") setSearchActive(true);
     if (cid || params.get("pick")) window.history.replaceState({}, "", "/mobile/photos");
@@ -119,11 +112,10 @@ export default function MobilePhotos() {
 
   const chooseCustomer = (c: { id: string; name: string; phone?: string | null; customerType?: string | null }) => {
     setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null, customerType: c.customerType ?? null });
-    setSearchActive(false);
     setCustomerSearch("");
-    // Search sheet slides down, the compact capture sheet slides up — the
-    // same sheet-to-sheet handoff the "+" menu uses.
-    setTimeout(() => setActionOpen(true), 120);
+    // The sheet STAYS — search swaps for the capture actions in place;
+    // only the keyboard drops.
+    searchInputRef.current?.blur();
   };
   const closeSearch = () => {
     // Keyboard drops while the sheet slides away — one motion out.
@@ -333,19 +325,25 @@ export default function MobilePhotos() {
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [flash, setFlash] = useState(false);
-  // Shots appear instantly with a local preview while uploading in the background
-  const [pendingShots, setPendingShots] = useState<Array<{ id: string; url: string; status: "uploading" | "done" | "error" }>>([]);
+  // Shots appear instantly with a local preview while uploading in the
+  // background. Each keeps its File (tap-to-edit re-opens it in markup) and
+  // learns its server id so an edited version can replace the original.
+  const [pendingShots, setPendingShots] = useState<Array<{ id: string; url: string; status: "uploading" | "done" | "error"; file: File; serverId?: string }>>([]);
+  // Originals replaced by an edit BEFORE their upload finished: delete them
+  // server-side the moment their id arrives.
+  const replacedIds = useRef<Set<string>>(new Set());
+  // A session shot open in markup — editing is optional and per-photo, after
+  // the shooting, never a forced step in it.
+  const [editShot, setEditShot] = useState<{ id: string; url: string; file: File; serverId?: string } | null>(null);
   const [viewer, setViewer] = useState<{ src: string; name: string } | null>(null);
   // Fullscreen video player — separate from the annotation viewer.
   const [videoViewer, setVideoViewer] = useState<{ src: string; name: string; poster?: string | null } | null>(null);
 
   const openCamera = async () => {
-    // iOS shell: use the real native camera instead of the in-page one
-    if (isNativeApp()) {
-      const shot = await takeNativePhoto();
-      if (shot) await handleUpload([shot]);
-      return;
-    }
+    // OUR camera everywhere, native shell included: multi-shot with instant
+    // background upload — never the system camera's per-photo Retake/Use
+    // round-trip. (WKWebView supports getUserMedia; camera permission is
+    // already granted to the shell.)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1440 } },
@@ -361,7 +359,12 @@ export default function MobilePhotos() {
         }
       }, 50);
     } catch {
-      // No camera permission/support — fall back to the native picker
+      // No in-page camera (permission/support) — system camera, then picker
+      if (isNativeApp()) {
+        const shot = await takeNativePhoto();
+        if (shot) await handleUpload([shot]);
+        return;
+      }
       fileInputRef.current?.click();
     }
   };
@@ -386,17 +389,50 @@ export default function MobilePhotos() {
       const file = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
       // INSTANT: the shot shows up immediately with a local preview; the
       // upload runs in the background and the shutter never blocks.
-      const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const localUrl = URL.createObjectURL(blob);
-      setPendingShots((prev) => [{ id: localId, url: localUrl, status: "uploading" as const }, ...prev]);
-      uploadOne(file)
-        .then(() => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "done" as const } : ps))))
-        .catch(() => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "error" as const } : ps))));
+      startShotUpload(file);
     }, "image/jpeg", 0.85);
   };
 
-  // Single-file background upload used by the camera (no global blocking)
-  const uploadOne = async (file: File) => {
+  // Background-upload one shot into the session strip; returns its local id.
+  const startShotUpload = (file: File) => {
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const localUrl = URL.createObjectURL(file);
+    setPendingShots((prev) => [{ id: localId, url: localUrl, status: "uploading" as const, file }, ...prev]);
+    uploadOne(file)
+      .then((serverId) => {
+        // Edited away while this was still in flight — remove the original
+        if (replacedIds.current.has(localId)) {
+          replacedIds.current.delete(localId);
+          if (serverId && customerId) {
+            apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${serverId}`).catch(() => {});
+          }
+          return;
+        }
+        setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "done" as const, serverId } : ps)));
+      })
+      .catch(() => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "error" as const } : ps))));
+    return localId;
+  };
+
+  // Swap a session shot for its edited version: the edit takes the original's
+  // spot in the strip and uploads; the un-edited original is deleted.
+  const replaceShot = (orig: { id: string; serverId?: string }, edited: File) => {
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const localUrl = URL.createObjectURL(edited);
+    setPendingShots((prev) => prev.map((ps) => (ps.id === orig.id ? { id: localId, url: localUrl, status: "uploading" as const, file: edited } : ps)));
+    uploadOne(edited)
+      .then((serverId) => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "done" as const, serverId } : ps))))
+      .catch(() => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "error" as const } : ps))));
+    if (orig.serverId && customerId) {
+      apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${orig.serverId}`).catch(() => {});
+    } else {
+      replacedIds.current.add(orig.id);
+    }
+  };
+
+  // Single-file background upload used by the camera (no global blocking).
+  // Returns the created file record's id so an edit can replace the shot.
+  const uploadOne = async (file: File): Promise<string | undefined> => {
     if (!customerId) throw new Error("no customer");
     const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
       name: file.name,
@@ -406,7 +442,7 @@ export default function MobilePhotos() {
     const { uploadURL, objectPath } = await presignRes.json();
     await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
     const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
-    await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
+    const created = await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
       name: file.name,
       url: fileUrl,
       objectPath,
@@ -414,6 +450,8 @@ export default function MobilePhotos() {
       size: file.size,
     });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "files"] });
+    const rec = await created.json().catch(() => null);
+    return rec?.id ?? rec?.file?.id ?? undefined;
   };
 
   const handleUpload = async (list: FileList | File[] | null) => {
@@ -512,9 +550,8 @@ export default function MobilePhotos() {
                     onClick={() => {
                       if (!job.customerId) return;
                       setPickedCustomer({ id: job.customerId, name: job.customerName || "Customer", phone: null });
-                      // Straight to the camera — the tap IS the intent. Same
-                      // user gesture, so iOS allows the programmatic open.
-                      captureInputRef.current?.click();
+                      // Straight into OUR camera — the tap IS the intent.
+                      openCamera();
                     }}
                     className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${ji > 0 ? "border-t border-slate-200/80" : ""}`}
                     data-testid={`photo-job-${job.id}`}
@@ -561,27 +598,8 @@ export default function MobilePhotos() {
           </div>
         )}
 
-        {/* Straight-to-camera input for the tap-a-job flow — mounted
-            unconditionally so the SAME tap that targets the job can open it.
-            Captured photos go through Markup first; videos upload as-is. */}
-        <input
-          ref={captureInputRef}
-          type="file"
-          accept="image/*,video/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (!f) return;
-            if (f.type.startsWith("image/")) setAnnotating(f);
-            else handleUpload([f]);
-          }}
-          data-testid="input-photo-capture"
-        />
-
-        {/* Library input — mounted unconditionally so the capture sheet's
-            "Add from Library" can fire it in the same tap gesture. */}
+        {/* Library input (web fallback) — mounted unconditionally so the
+            sheet's "Add from Library" can fire it in the same tap gesture. */}
         <input
           ref={fileInputRef}
           type="file"
@@ -776,7 +794,7 @@ export default function MobilePhotos() {
           once the sheet settles, results beneath padded above the keyboard,
           customer TYPE metal badges on every row. No X — the sheet drags
           shut like every other. */}
-      <DraggableSheet full open={searchActive} onOpenChange={(o) => { if (!o) closeSearch(); }} title="Choose customer" testid="photos-customer-sheet">
+      <DraggableSheet full open={searchActive} onOpenChange={(o) => { if (!o) closeSearch(); }} title="Save media to" testid="photos-customer-sheet">
         <div
           className="flex h-full min-h-0 flex-col"
           onPointerDown={(e) => {
@@ -788,114 +806,120 @@ export default function MobilePhotos() {
         >
           <h2 className="text-lg font-semibold text-slate-900">Save media to…</h2>
 
-          <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            {searchSettled ? (
-              <input
-                ref={searchInputRef}
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                placeholder="Search by name or phone"
-                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
-                data-testid="photos-search-input"
-              />
-            ) : (
-              <span className="h-full w-full min-w-0 content-center text-[16px] text-slate-400">Search by name or phone</span>
-            )}
-          </div>
-
-          <div
-            className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
-            style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
-          >
-            {customerSearch.trim().length < 2 ? (
-              <p className="pt-9 text-center text-sm text-slate-400">Start typing a customer's name or phone number.</p>
-            ) : searchResults.length === 0 ? (
-              <p className="pt-9 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
-            ) : (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="customer-search-results">
-                {searchResults.map((c, i) => (
+          {activeCustomer ? (
+            /* Customer chosen — the capture actions appear right here in the
+               SAME sheet. Both fire inside the tap gesture so iOS opens the
+               camera / library without complaint. */
+            <div className="mt-3 space-y-3" data-testid="photo-target">
+              <div className="flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3">
+                {activeCustomer.customerType && (
+                  <img src={customerTypeBadge(activeCustomer.customerType)} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
+                  {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
+                </div>
+                {!isTechRole && (
                   <button
-                    key={c.id}
-                    onClick={() => chooseCustomer(c)}
-                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-                    data-testid={`search-customer-${c.id}`}
+                    onClick={() => {
+                      setPickedCustomer(null);
+                      setCustomerSearch("");
+                      setTimeout(() => searchInputRef.current?.focus({ preventScroll: true }), 60);
+                    }}
+                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
+                    data-testid="button-change-customer"
                   >
-                    <img
-                      src={customerTypeBadge(c.customerType)}
-                      alt=""
-                      className="h-9 w-9 shrink-0 select-none"
-                      draggable={false}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{c.name}</span>
-                      <span className="block truncate text-xs text-slate-500">
-                        {[c.phone, c.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
-                      </span>
-                    </span>
+                    Change
                   </button>
-                ))}
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      </DraggableSheet>
-
-      {/* Capture sheet — the ONLY place photos get taken or added from. Shows
-          the chosen customer, then Take Photo / Add from Library; both fire
-          in the tap gesture so iOS allows the camera/picker to open. */}
-      <DraggableSheet open={actionOpen} onOpenChange={setActionOpen} title="Add media" testid="photos-action-sheet">
-        {activeCustomer && (
-          <div className="space-y-3 pb-1">
-            <div className="flex items-center gap-3 rounded-[4px] border border-slate-300/70 bg-white px-3.5 py-3" data-testid="photo-target">
-              {activeCustomer.customerType && (
-                <img src={customerTypeBadge(activeCustomer.customerType)} alt="" className="h-9 w-9 shrink-0 select-none" draggable={false} />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Save media to</p>
-                <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
-                {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
-              </div>
-              {!isTechRole && (
-                <button
-                  onClick={() => {
-                    setActionOpen(false);
-                    setCustomerSearch("");
-                    setTimeout(() => setSearchActive(true), 120);
-                  }}
-                  className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
-                  data-testid="button-change-customer"
-                >
-                  Change
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  closeSearch();
+                  openCamera();
+                }}
+                disabled={uploading}
+                className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
+                data-testid="button-take-photo"
+              >
+                <Camera className="h-5 w-5" />
+                Take Photo
+              </button>
+              <button
+                onClick={async () => {
+                  closeSearch();
+                  // Native shell: the photo LIBRARY directly — never the iOS
+                  // "Photo Library / Take Photo / Choose File" menu.
+                  if (isNativeApp()) {
+                    const files = await pickNativeLibraryPhotos();
+                    if (files && files.length) await handleUpload(files);
+                    return;
+                  }
+                  fileInputRef.current?.click();
+                }}
+                disabled={uploading}
+                className="flex h-13 w-full items-center justify-center gap-2 rounded-xl border border-slate-300/70 bg-white py-3.5 text-base font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
+                data-testid="button-add-from-library"
+              >
+                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                Add from Library
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setActionOpen(false);
-                openCamera();
-              }}
-              disabled={uploading}
-              className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
-              data-testid="button-take-photo"
-            >
-              <Camera className="h-5 w-5" />
-              Take Photo
-            </button>
-            <button
-              onClick={() => {
-                setActionOpen(false);
-                fileInputRef.current?.click();
-              }}
-              disabled={uploading}
-              className="flex h-13 w-full items-center justify-center gap-2 rounded-xl border border-slate-300/70 bg-white py-3.5 text-base font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
-              data-testid="button-add-from-library"
-            >
-              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-              Add from Library
-            </button>
-          </div>
-        )}
+          ) : (
+            <>
+              <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                {searchSettled ? (
+                  <input
+                    ref={searchInputRef}
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Search by name or phone"
+                    className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
+                    data-testid="photos-search-input"
+                  />
+                ) : (
+                  <span className="h-full w-full min-w-0 content-center text-[16px] text-slate-400">Search by name or phone</span>
+                )}
+              </div>
+
+              <div
+                className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+                style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
+              >
+                {customerSearch.trim().length < 2 ? (
+                  <p className="pt-9 text-center text-sm text-slate-400">Start typing a customer's name or phone number.</p>
+                ) : searchResults.length === 0 ? (
+                  <p className="pt-9 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
+                ) : (
+                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="customer-search-results">
+                    {searchResults.map((c, i) => (
+                      <button
+                        key={c.id}
+                        onClick={() => chooseCustomer(c)}
+                        className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                        data-testid={`search-customer-${c.id}`}
+                      >
+                        <img
+                          src={customerTypeBadge(c.customerType)}
+                          alt=""
+                          className="h-9 w-9 shrink-0 select-none"
+                          draggable={false}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-slate-900">{c.name}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {[c.phone, c.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </DraggableSheet>
 
       {/* iOS-style long-press preview: always mounted so the CSS transitions
@@ -969,14 +993,17 @@ export default function MobilePhotos() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Markup a just-captured shot (draw / arrows / text) before upload */}
-      {annotating && (
+      {/* Markup a session shot (draw / arrows / text) — opened by tapping a
+          thumb in the camera strip, AFTER the shooting. The edited version
+          replaces the original wherever its upload got to. */}
+      {editShot && (
         <PhotoAnnotator
-          file={annotating}
-          onCancel={() => setAnnotating(null)}
-          onDone={(f) => {
-            setAnnotating(null);
-            handleUpload([f]);
+          file={editShot.file}
+          onCancel={() => setEditShot(null)}
+          onDone={(edited) => {
+            const orig = editShot;
+            setEditShot(null);
+            replaceShot(orig, edited);
           }}
         />
       )}
@@ -1043,7 +1070,13 @@ export default function MobilePhotos() {
             {pendingShots.length > 0 && (
               <div className="flex w-full items-center gap-2 overflow-x-auto px-4 pb-1" data-testid="camera-session-strip">
                 {pendingShots.map((ps) => (
-                  <div key={ps.id} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/25">
+                  <button
+                    key={ps.id}
+                    onClick={() => setEditShot({ id: ps.id, url: ps.url, file: ps.file, serverId: ps.serverId })}
+                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/25 transition-transform active:scale-95"
+                    data-testid={`camera-shot-${ps.id}`}
+                    aria-label="Edit this shot"
+                  >
                     <img src={ps.url} alt="" className="h-full w-full object-cover" />
                     {ps.status === "uploading" && (
                       <span className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -1053,7 +1086,8 @@ export default function MobilePhotos() {
                     {ps.status === "error" && (
                       <span className="absolute inset-0 flex items-center justify-center bg-red-600/60 text-[10px] font-bold text-white">!</span>
                     )}
-                  </div>
+                    <Pencil className="absolute bottom-1 right-1 h-3 w-3 text-white drop-shadow" />
+                  </button>
                 ))}
                 <span className="ml-1 shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
                   {pendingShots.length} this session
@@ -1062,6 +1096,7 @@ export default function MobilePhotos() {
             )}
             <p className="text-xs font-medium text-white/70">
               Auto-saves to {activeCustomer?.name || "the customer"}
+              {pendingShots.length > 0 ? " · tap a shot to edit" : ""}
             </p>
             <button
               onClick={capturePhoto}

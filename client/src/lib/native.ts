@@ -178,3 +178,23 @@ export async function takeNativePhoto(): Promise<File | null> {
     return null; // user cancelled the camera sheet
   }
 }
+
+/** Pick photos straight from the native photo LIBRARY (multi-select) —
+ *  no iOS "Photo Library / Take Photo / Choose File" menu in between.
+ *  Returns Files for the upload pipeline, or null if cancelled / not native. */
+export async function pickNativeLibraryPhotos(): Promise<File[] | null> {
+  if (!isNativeApp()) return null;
+  try {
+    const picked = await Camera.pickImages({ quality: 85, limit: 20 });
+    const files: File[] = [];
+    for (const p of picked.photos) {
+      if (!p.webPath) continue;
+      const blob = await (await fetch(p.webPath)).blob();
+      const ext = (p.format || "jpeg").toLowerCase();
+      files.push(new File([blob], `photo-${Date.now()}-${files.length}.${ext}`, { type: blob.type || `image/${ext}` }));
+    }
+    return files;
+  } catch {
+    return null; // user cancelled the library picker
+  }
+}
