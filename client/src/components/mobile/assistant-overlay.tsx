@@ -805,15 +805,21 @@ export default function AssistantOverlay({
   // conversations survive app restarts and are shared with desktop Ask AI.
   // Copilot opens FRESH instead: yesterday's chat under a "Helping with:
   // New customer" chip would be noise.
+  // While the stored thread loads, skeleton bubbles hold the space so the
+  // conversation doesn't pop in suddenly.
+  const [hydrating, setHydrating] = useState(false);
   useEffect(() => {
     if (!open || hydrated || copilot) return;
     setHydrated(true);
-    fetchLatestAiConversation().then((latest) => {
-      if (latest) {
-        setConversationId(latest.id);
-        setMessages((prev) => (prev.length === 0 ? latest.messages : prev));
-      }
-    });
+    setHydrating(true);
+    fetchLatestAiConversation()
+      .then((latest) => {
+        if (latest) {
+          setConversationId(latest.id);
+          setMessages((prev) => (prev.length === 0 ? latest.messages : prev));
+        }
+      })
+      .finally(() => setHydrating(false));
   }, [open, hydrated]);
 
   const { data: pastConversations = [] } = useQuery<AiConversationSummary[]>({
@@ -1350,7 +1356,24 @@ export default function AssistantOverlay({
           })}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16"
         >
-          {messages.length === 0 && !pending ? (
+          {hydrating && messages.length === 0 ? (
+            /* Skeleton thread — bubble-shaped placeholders in the same
+               alternating rhythm as a real conversation */
+            <div className="mx-auto w-full max-w-2xl space-y-4 pt-2" data-testid="assistant-skeleton">
+              <div className="flex justify-end">
+                <div className="h-10 w-3/5 animate-pulse rounded-[4px] rounded-br-[1px] bg-[#711419]/15" />
+              </div>
+              <div className="h-16 w-[85%] animate-pulse rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100" />
+              <div className="flex justify-end">
+                <div className="h-8 w-2/5 animate-pulse rounded-[4px] rounded-br-[1px] bg-[#711419]/15 [animation-delay:120ms]" />
+              </div>
+              <div className="h-24 w-[88%] animate-pulse rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100 [animation-delay:120ms]" />
+              <div className="flex justify-end">
+                <div className="h-10 w-1/2 animate-pulse rounded-[4px] rounded-br-[1px] bg-[#711419]/15 [animation-delay:240ms]" />
+              </div>
+              <div className="h-14 w-[70%] animate-pulse rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100 [animation-delay:240ms]" />
+            </div>
+          ) : messages.length === 0 && !pending ? (
             <div data-sheet-bg="" className="flex min-h-[calc(100%+1px)] flex-col items-center pt-[7vh] text-center">
               {/* Persona block — the badge already sits in the header, so the
                   empty state is just the name */}
@@ -1922,14 +1945,15 @@ export default function AssistantOverlay({
             <span className="h-1 w-10 rounded-full bg-slate-300" />
           </div>
           <div
-            className="flex shrink-0 items-center justify-between overflow-hidden px-4"
+            className="grid shrink-0"
             style={{
-              maxHeight: searching ? 0 : 40,
+              gridTemplateRows: searching ? "0fr" : "1fr",
               opacity: searching ? 0 : 1,
-              paddingBottom: searching ? 0 : 8,
-              transition: "max-height 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease, padding-bottom 0.25s ease",
+              transition: "grid-template-rows 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease",
             }}
           >
+            <div className="overflow-hidden">
+          <div className="flex items-center justify-between px-4 pb-2">
             {activeSpace ? (
               <button
                 onClick={() => setActiveSpace(null)}
@@ -1944,6 +1968,8 @@ export default function AssistantOverlay({
             )}
             <p className="text-[10px] text-slate-300">Hold a chat for options</p>
           </div>
+            </div>
+          </div>
 
           <div
             ref={histScrollRef}
@@ -1954,13 +1980,14 @@ export default function AssistantOverlay({
                 smoothly while searching. */}
             {activeSpaceObj && (
               <div
-                className="overflow-hidden"
+                className="grid"
                 style={{
-                  maxHeight: searching ? 0 : 72,
+                  gridTemplateRows: searching ? "0fr" : "1fr",
                   opacity: searching ? 0 : 1,
-                  transition: "max-height 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease",
+                  transition: "grid-template-rows 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease",
                 }}
               >
+              <div className="overflow-hidden">
               <div data-sheet-bg="" className="mb-2 flex items-center gap-2.5 px-1.5 pt-1">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-slate-50 text-slate-500">
                   <Folder className="h-5 w-5" />
@@ -1973,6 +2000,7 @@ export default function AssistantOverlay({
                 </span>
               </div>
               </div>
+              </div>
             )}
 
             {/* Spaces — folder rows above the chats (tap to open, hold to
@@ -1980,13 +2008,14 @@ export default function AssistantOverlay({
                 while searching — leaving just the chats. */}
             {!activeSpace && (
               <div
-                className="overflow-hidden"
+                className="grid"
                 style={{
-                  maxHeight: searching ? 0 : 520,
+                  gridTemplateRows: searching ? "0fr" : "1fr",
                   opacity: searching ? 0 : 1,
-                  transition: "max-height 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease",
+                  transition: "grid-template-rows 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease",
                 }}
               >
+              <div className="overflow-hidden">
               <div data-sheet-bg="" className="mb-3">
                 <p className="px-1.5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Spaces</p>
                 {spaces.map((s) => (
@@ -2030,6 +2059,7 @@ export default function AssistantOverlay({
                   </span>
                   <span className="text-[15px] font-medium text-slate-500">New space</span>
                 </button>
+              </div>
               </div>
               </div>
             )}
@@ -2128,17 +2158,23 @@ export default function AssistantOverlay({
                 }
               }}
               className={cn(
-                "pointer-events-auto relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-lg transition-all duration-200 active:scale-90",
+                "pointer-events-auto relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-lg transition-all duration-300 ease-out active:scale-90",
                 searching ? "border border-slate-300/70 bg-white text-slate-500" : "bg-[#711419] text-white",
               )}
               aria-label={searching ? "Close search" : "New chat"}
               data-testid={searching ? "assistant-history-clear" : "assistant-history-new-chat"}
             >
               <SquarePen
-                className={cn("h-5 w-5 transition-all duration-200", searching ? "rotate-45 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")}
+                className={cn(
+                  "h-5 w-5 transition-all duration-300 ease-out",
+                  searching ? "rotate-90 scale-[0.4] opacity-0" : "rotate-0 scale-100 opacity-100",
+                )}
               />
               <X
-                className={cn("absolute h-5 w-5 transition-all duration-200", searching ? "rotate-0 scale-100 opacity-100" : "-rotate-45 scale-50 opacity-0")}
+                className={cn(
+                  "absolute h-5 w-5 transition-all duration-300 ease-out",
+                  searching ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-[0.4] opacity-0",
+                )}
               />
             </button>
           </div>
