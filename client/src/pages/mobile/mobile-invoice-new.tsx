@@ -55,7 +55,11 @@ function formatCurrency(amount: number | string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
 }
 
-export default function MobileInvoiceNew() {
+export default function MobileInvoiceNew({
+  jobId: jobIdProp,
+  fromQuoteId: fromQuoteIdProp,
+  onClose,
+}: { jobId?: string; fromQuoteId?: string; onClose?: () => void } = {}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -65,11 +69,12 @@ export default function MobileInvoiceNew() {
   const [pickedCustomer, setPickedCustomer] = useState<CrmCustomer | null>(null);
   const [pickedWorkOrder, setPickedWorkOrder] = useState<WorkOrderWithRelations | null>(null);
 
-  // Launched from inside a job (?job=<id>): the work order is already known,
-  // so the picker never shows — the exact same form, minus the selection.
+  // Launched from inside a job — as an OVERLAY (props + onClose, the sheet
+  // rides over the live job page) or via ?job=<id> — the work order is
+  // already known, so the picker never shows.
   const searchParams = new URLSearchParams(useSearch());
-  const presetJobId = searchParams.get("job");
-  const fromQuoteId = searchParams.get("fromQuote");
+  const presetJobId = jobIdProp ?? searchParams.get("job");
+  const fromQuoteId = fromQuoteIdProp ?? searchParams.get("fromQuote");
   const { data: presetJob, isLoading: presetLoading } = useQuery<WorkOrderWithRelations | null>({
     queryKey: ["/api/crm/work-orders", "create-preset", presetJobId],
     queryFn: async () => {
@@ -257,9 +262,10 @@ export default function MobileInvoiceNew() {
       toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      // In-job creation lands back on the job's Invoice tab; the "+" flow
-      // opens the new invoice itself.
-      if (presetJobId) navigate(`/mobile/job/${presetJobId}?tab=invoice`);
+      // Overlay mode just closes back onto the live job tab; the route
+      // flavors navigate — job tab or the new invoice itself.
+      if (onClose) onClose();
+      else if (presetJobId) navigate(`/mobile/job/${presetJobId}?tab=invoice`);
       else if (invoice?.id) navigate(`/mobile/invoices/${invoice.id}`);
     },
     onError: (error: Error) => {
@@ -337,7 +343,8 @@ export default function MobileInvoiceNew() {
     <MobileCreatePage
       title="New invoice"
       dirty={dirty}
-      exitTo={presetJobId ? `/mobile/job/${presetJobId}?tab=invoice` : undefined}
+      onClose={onClose}
+      exitTo={!onClose && presetJobId ? `/mobile/job/${presetJobId}?tab=invoice` : undefined}
       testid="mobile-invoice-new-page"
     >
       <div className="space-y-4">

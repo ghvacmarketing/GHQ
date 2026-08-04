@@ -65,7 +65,7 @@ function formatCurrency(amount: number | string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
 }
 
-export default function MobileQuoteNew() {
+export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: string; onClose?: () => void } = {}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -75,9 +75,10 @@ export default function MobileQuoteNew() {
   const [pickedCustomer, setPickedCustomer] = useState<CrmCustomer | null>(null);
   const [pickedWorkOrder, setPickedWorkOrder] = useState<WorkOrderWithRelations | null>(null);
 
-  // Launched from inside a job (?job=<id>): the work order is already known,
-  // so the picker never shows — the exact same form, minus the selection.
-  const presetJobId = new URLSearchParams(useSearch()).get("job");
+  // Launched from inside a job — as an OVERLAY (jobId prop + onClose, the
+  // sheet rides over the live job page) or via ?job=<id> — the work order
+  // is already known, so the picker never shows.
+  const presetJobId = jobIdProp ?? new URLSearchParams(useSearch()).get("job");
   const { data: presetJob, isLoading: presetLoading } = useQuery<WorkOrderWithRelations | null>({
     queryKey: ["/api/crm/work-orders", "create-preset", presetJobId],
     queryFn: async () => {
@@ -197,9 +198,10 @@ export default function MobileQuoteNew() {
       toast({ title: "Quote Created", description: "Your quick quote has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      // In-job creation lands back on the job's Quote tab; the "+" flow
-      // opens the new quote itself.
-      if (presetJobId) navigate(`/mobile/job/${presetJobId}?tab=quote`);
+      // Overlay mode just closes back onto the live job tab; the route
+      // flavors navigate — job tab or the new quote itself.
+      if (onClose) onClose();
+      else if (presetJobId) navigate(`/mobile/job/${presetJobId}?tab=quote`);
       else if (quote?.id) navigate(`/mobile/quotes/${quote.id}`);
     },
     onError: (error: Error) => {
@@ -265,7 +267,8 @@ export default function MobileQuoteNew() {
     <MobileCreatePage
       title="New quote"
       dirty={dirty}
-      exitTo={presetJobId ? `/mobile/job/${presetJobId}?tab=quote` : undefined}
+      onClose={onClose}
+      exitTo={!onClose && presetJobId ? `/mobile/job/${presetJobId}?tab=quote` : undefined}
       onSave={pickedWorkOrder ? handleCreateQuote : undefined}
       saveLabel="Create quote"
       saveDisabled={!canSubmit}

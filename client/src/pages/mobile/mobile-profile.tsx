@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, startOfWeek } from "date-fns";
@@ -51,6 +51,26 @@ export default function MobileProfile() {
   const backRef = useRef<HTMLButtonElement | null>(null);
   const [showUnderlay, setShowUnderlay] = useState(false);
   const swipeDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+
+  // The push-entrance rides in OVER the real agenda (parallax + scrim), so
+  // the slide never crosses a blank white screen.
+  useEffect(() => {
+    setShowUnderlay(true);
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const raf = requestAnimationFrame(() => {
+      underlayRef.current?.animate(
+        [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
+        { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" },
+      );
+      scrimRef.current?.animate(
+        [{ opacity: "0" }, { opacity: "0.18" }],
+        { duration: 420, easing: "linear", fill: "forwards" },
+      );
+      t = setTimeout(() => setShowUnderlay(false), 480);
+    });
+    return () => { cancelAnimationFrame(raf); if (t) clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const goBackAnimated = (fromDx = 0) => {
     // The home page is already on screen as the underlay — its remount

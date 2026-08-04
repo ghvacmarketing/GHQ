@@ -4,7 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Camera, Download, ImageIcon, ImagePlus, ListFilter, Loader2, Play, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { isNativeApp, takeNativePhoto } from "@/lib/native";
+import { isNativeApp, takeNativePhoto, useKeyboardInset } from "@/lib/native";
+import { customerTypeBadge } from "./mobile-quote-new";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -30,47 +31,25 @@ export default function MobilePhotos() {
   // The customer photos get attached to — always chosen via search.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
-  const [searchClosing, setSearchClosing] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
-  // Keyboard inset for the search overlay: the overlay itself always covers
-  // the full viewport (so the page never shows through); only the bottom
-  // input bar rides up by however much the iOS keyboard eats.
-  const searchBarRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  // The picker works exactly like the address finder: the input only MOUNTS
+  // once the sheet has finished sliding in (iOS births the caret against the
+  // layer state at focus time — a moving sheet leaves it displaced), then
+  // focuses; the results list pads its bottom above the keyboard.
+  const keyboardInset = useKeyboardInset();
+  const [searchSettled, setSearchSettled] = useState(false);
   useEffect(() => {
-    if (!searchActive) return;
-    const bar = () => searchBarRef.current;
-    const setInset = (px: number) => {
-      // Direct style write — zero React latency between keyboard and bar
-      const el = bar();
-      if (el) el.style.paddingBottom = px > 0 ? `${px + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)";
-    };
-    setInset(0);
-    // Overlay paints first; the keyboard rises a beat later (feels ordered
-    // AND gives the bar its position before any animation starts).
-    const focusT = setTimeout(() => searchInputRef.current?.focus(), 60);
-
-    let removeNative: (() => void) | null = null;
-    if (isNativeApp()) {
-      // Native path: keyboardWillShow carries the height BEFORE the slide
-      import("@capacitor/keyboard").then(({ Keyboard }) => {
-        const subs: any[] = [];
-        Keyboard.addListener("keyboardWillShow", (info: any) => setInset(info?.keyboardHeight || 0)).then((h) => subs.push(h));
-        Keyboard.addListener("keyboardWillHide", () => setInset(0)).then((h) => subs.push(h));
-        removeNative = () => subs.forEach((h) => h?.remove?.());
-      }).catch(() => {});
+    if (!searchActive) {
+      setSearchSettled(false);
+      return;
     }
-    const vv = window.visualViewport;
-    const update = () => setInset(Math.max(0, window.innerHeight - (vv?.height || window.innerHeight) - (vv?.offsetTop || 0)));
-    vv?.addEventListener("resize", update);
-    vv?.addEventListener("scroll", update);
-    return () => {
-      clearTimeout(focusT);
-      removeNative?.();
-      vv?.removeEventListener("resize", update);
-      vv?.removeEventListener("scroll", update);
-    };
+    const t = setTimeout(() => setSearchSettled(true), 540);
+    return () => clearTimeout(t);
   }, [searchActive]);
+  useEffect(() => {
+    if (searchSettled) searchInputRef.current?.focus({ preventScroll: true });
+  }, [searchSettled]);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -119,7 +98,7 @@ export default function MobilePhotos() {
   const customerId = activeCustomer?.id || null;
 
   // Search ANY customer to attach photos to (mobile-friendly, tech-accessible).
-  const { data: searchResults = [] } = useQuery<Array<{ id: string; name: string; phone?: string | null }>>({
+  const { data: searchResults = [] } = useQuery<Array<{ id: string; name: string; phone?: string | null; customerType?: string | null; fullAddress?: string | null }>>({
     queryKey: ["/api/mobile/customers", customerSearch],
     queryFn: async () => {
       const res = await fetch(`/api/mobile/customers?search=${encodeURIComponent(customerSearch.trim())}`, { credentials: "include" });
@@ -137,14 +116,10 @@ export default function MobilePhotos() {
     setCustomerSearch("");
   };
   const closeSearch = () => {
-    // Keyboard drops while the overlay slides away — one motion out.
+    // Keyboard drops while the sheet slides away — one motion out.
     searchInputRef.current?.blur();
-    setSearchClosing(true);
-    setTimeout(() => {
-      setSearchActive(false);
-      setSearchClosing(false);
-      setCustomerSearch("");
-    }, 190);
+    setSearchActive(false);
+    setCustomerSearch("");
   };
 
   // Today's jobs with their photo coverage — powers the required-photos
@@ -844,78 +819,83 @@ export default function MobilePhotos() {
         </div>
       </DraggableSheet>
 
-      {/* Notion-style full-screen search: results fill from the top while the
-          input is docked at the bottom, riding above the iOS keyboard via
-          window.visualViewport height tracking. */}
-      {searchActive && (
-        <div
-          className={`fixed inset-0 z-50 flex flex-col bg-slate-50 ${
-            searchClosing
-              ? "animate-out fade-out slide-out-to-bottom-2 duration-200 fill-mode-forwards"
-              : "animate-in fade-in slide-in-from-bottom-2 duration-200"
-          }`}
-          data-testid="photos-search-overlay"
+      {/* Customer picker — a full sheet in the create-page mold (rounded top
+          below the status bar, X top-left) whose search works EXACTLY like
+          the address finder: top pill input that mounts once the sheet
+          settles, results beneath padded above the keyboard, customer TYPE
+          metal badges on every row. */}
+      <DraggableSheet full open={searchActive} onOpenChange={(o) => { if (!o) closeSearch(); }} title="Choose customer" testid="photos-customer-sheet">
+        <button
+          onClick={closeSearch}
+          className="absolute left-4 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-transform active:scale-90"
+          aria-label="Close"
+          data-testid="photos-search-close"
         >
+          <X className="h-5 w-5" />
+        </button>
+        <div
+          className="flex h-full min-h-0 flex-col"
+          onPointerDown={(e) => {
+            // Nothing on this sheet may steal the caret: taps on rows or
+            // empty space keep the keyboard pinned to the search box —
+            // clicks still fire.
+            if (e.target !== searchInputRef.current) e.preventDefault();
+          }}
+        >
+          <h2 className="pl-11 text-lg font-semibold text-slate-900">Save media to…</h2>
+
+          <div className="mt-3 flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
+            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            {searchSettled ? (
+              <input
+                ref={searchInputRef}
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                placeholder="Search by name or phone"
+                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
+                data-testid="photos-search-input"
+              />
+            ) : (
+              <span className="h-full w-full min-w-0 content-center text-[16px] text-slate-400">Search by name or phone</span>
+            )}
+          </div>
+
           <div
-            className={`min-h-0 flex-1 overflow-y-auto px-4 ${customerSearch.trim().length < 2 || searchResults.length === 0 ? "flex flex-col justify-end" : ""}`}
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
+            className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+            style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
           >
             {customerSearch.trim().length < 2 ? (
-              <p className="pb-6 text-center text-sm text-slate-400">Type to search photos and customers.</p>
+              <p className="pt-9 text-center text-sm text-slate-400">Start typing a customer's name or phone number.</p>
             ) : searchResults.length === 0 ? (
-              <p className="pb-6 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
+              <p className="pt-9 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
             ) : (
               <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="customer-search-results">
-                {searchResults.map((c) => (
+                {searchResults.map((c, i) => (
                   <button
                     key={c.id}
                     onClick={() => chooseCustomer(c)}
-                    className="flex w-full items-center gap-3 border-b border-slate-200/70 px-4 py-3 text-left last:border-0 active:bg-slate-50"
+                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
                     data-testid={`search-customer-${c.id}`}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419]/10 text-[13px] font-semibold text-[#711419]">
-                      {(c.name || "?").trim().charAt(0).toUpperCase()}
-                    </span>
+                    <img
+                      src={customerTypeBadge(c.customerType)}
+                      alt=""
+                      className="h-9 w-9 shrink-0 select-none"
+                      draggable={false}
+                    />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-slate-900">{c.name}</span>
-                      {c.phone && <span className="block truncate text-xs text-slate-500">{c.phone}</span>}
+                      <span className="block truncate text-sm font-semibold text-slate-900">{c.name}</span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {[c.phone, c.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
+                      </span>
                     </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <div
-            ref={searchBarRef}
-            className="flex items-center gap-2 px-4 pt-2"
-            style={{
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
-              // Eased ride-up that tracks the iOS keyboard curve instead of jumping
-              transition: "padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
-            }}
-          >
-            <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
-              <input
-                ref={searchInputRef}
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                placeholder="Search customers"
-                className="h-full w-full min-w-0 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
-                data-testid="photos-search-input"
-              />
-            </div>
-            <button
-              onClick={closeSearch}
-              className="liquid-glass flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-slate-700 shadow-sm transition-transform active:scale-90"
-              aria-label="Close search"
-              data-testid="photos-search-close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
         </div>
-      )}
+      </DraggableSheet>
 
       {/* iOS-style long-press preview: always mounted so the CSS transitions
           run; visibility is driven by body.ios-preview-open */}

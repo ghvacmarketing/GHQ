@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { format, addYears, addMonths } from "date-fns";
@@ -66,6 +66,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { markSkipEntrance, skipEntranceOnce, usePushEntrance } from "@/lib/page-transitions";
+
+// The in-job create flows mount as OVERLAYS over the live tab (no
+// navigation, no white flash) — loaded on first open.
+const QuoteCreateOverlay = lazy(() => import("./mobile-quote-new"));
+const InvoiceCreateOverlay = lazy(() => import("./mobile-invoice-new"));
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
@@ -1239,6 +1244,7 @@ const quoteStatusConfig: Record<string, { label: string; className: string }> = 
 function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [createOpen, setCreateOpen] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
@@ -1393,15 +1399,21 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       </Card>
 
       {/* Create — BELOW the card, styled exactly like the create page's
-          submit button; opens the same full create page with the job
-          pre-selected. */}
+          submit button; the create sheet rises as an OVERLAY over this tab
+          (no navigation, nothing goes white). */}
       <button
         className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
-        onClick={() => navigate(`/mobile/quotes/new?job=${workOrder.id}`)}
+        onClick={() => setCreateOpen(true)}
         data-testid="button-start-quick-quote"
       >
         Create Quick Quote
       </button>
+
+      {createOpen && (
+        <Suspense fallback={null}>
+          <QuoteCreateOverlay jobId={workOrder.id} onClose={() => setCreateOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Send Quote Email Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); } }}>
@@ -1496,6 +1508,7 @@ function InvoiceTab({
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [createOverlay, setCreateOverlay] = useState<{ fromQuote?: string } | null>(null);
   const [showQuoteSelection, setShowQuoteSelection] = useState(false);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -1695,11 +1708,11 @@ function InvoiceTab({
     });
   };
 
-  // Create invoice from quote — hands off to the full create page with the
-  // job AND the quote pre-selected; the page prefills the line items.
+  // Create invoice from quote — the create sheet overlays this tab with the
+  // job AND the quote pre-selected; the sheet prefills the line items.
   const createFromQuote = (quote: CrmQuote & { lineItems?: CrmQuoteLineItem[] }) => {
     setShowQuoteSelection(false);
-    navigate(`/mobile/invoices/new?job=${workOrder.id}&fromQuote=${quote.id}`);
+    setCreateOverlay({ fromQuote: quote.id });
   };
 
   const formatCurrency = (amount: number | string) => {
@@ -1979,11 +1992,11 @@ function InvoiceTab({
       </Card>
 
       {/* Create — BELOW the invoices card, same structure as the Quote tab:
-          the create-page-style submit button plus the from-quote secondary,
-          both opening the same full create page with the job pre-selected. */}
+          the create sheet rises as an OVERLAY over this tab (no navigation,
+          nothing goes white); from-quote pre-fills the line items. */}
       <button
         className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
-        onClick={() => navigate(`/mobile/invoices/new?job=${workOrder.id}`)}
+        onClick={() => setCreateOverlay({})}
         data-testid="button-show-create-invoice-form"
       >
         Create Invoice
@@ -1996,6 +2009,16 @@ function InvoiceTab({
         >
           Create from Quote ({allAvailableQuotes.length})
         </button>
+      )}
+
+      {createOverlay && (
+        <Suspense fallback={null}>
+          <InvoiceCreateOverlay
+            jobId={workOrder.id}
+            fromQuoteId={createOverlay.fromQuote}
+            onClose={() => setCreateOverlay(null)}
+          />
+        </Suspense>
       )}
 
       {/* Quote Selection Dialog for Create Invoice from Quote */}
@@ -2282,7 +2305,12 @@ export default function MobileJobDetail() {
   const backRef = useRef<HTMLButtonElement | null>(null);
   const actionsRef = useRef<HTMLDivElement | null>(null);
   const swipe = useRef<{ x: number; y: number; active: boolean } | null>(null);
+  const leavingRef = useRef(false);
   const goBackAnimated = (fromDx = 0) => {
+    // Double-fired exits (fast double-tap on the arrow) must not run the
+    // leave animation twice.
+    if (leavingRef.current) return;
+    leavingRef.current = true;
     // The jobs page is already on screen as the underlay — its remount after
     // navigation must not fade in again (the post-swipe "flash").
     markSkipEntrance();
@@ -2355,6 +2383,7 @@ export default function MobileJobDetail() {
     const ov = overviewRef.current;
     const scrim = scrimRef.current;
     if (!sec || activeTab === "overview") { setActiveTab("overview"); return; }
+    layerBusy.current = true;
     tabScroll.current[activeTab] = sec.scrollTop;
     const w = sec.clientWidth || window.innerWidth;
     const startP = Math.max(0, Math.min(1, fromDx / w));
@@ -2381,9 +2410,17 @@ export default function MobileJobDetail() {
       setClosedLayerStyles();
       if (sectionsRef.current) sectionsRef.current.style.transform = "";
       setActiveTab("overview");
-      requestAnimationFrame(() => cancelLayerAnimations());
+      requestAnimationFrame(() => {
+        cancelLayerAnimations();
+        layerBusy.current = false;
+      });
     }, dur);
   };
+
+  // One transition at a time: a second back (arrow or swipe) firing while a
+  // close was still settling double-drove the layers — the split-second
+  // "content moved" glitch on the overview. Entries no-op while busy.
+  const layerBusy = useRef(false);
 
   // Tab-bar switches land on the Overview with a shell-style CROSSFADE —
   // the section fades away over a static overview (same feel as switching
@@ -2391,6 +2428,7 @@ export default function MobileJobDetail() {
   const closeSectionFaded = () => {
     const sec = sectionsRef.current;
     if (!sec || activeTab === "overview") { setActiveTab("overview"); return; }
+    layerBusy.current = true;
     tabScroll.current[activeTab] = sec.scrollTop;
     cancelLayerAnimations();
     if (overviewRef.current) overviewRef.current.style.transform = "";
@@ -2400,7 +2438,10 @@ export default function MobileJobDetail() {
       setClosedLayerStyles();
       if (sectionsRef.current) sectionsRef.current.style.transform = "";
       setActiveTab("overview");
-      requestAnimationFrame(() => cancelLayerAnimations());
+      requestAnimationFrame(() => {
+        cancelLayerAnimations();
+        layerBusy.current = false;
+      });
     }, 210);
   };
 
@@ -2434,6 +2475,9 @@ export default function MobileJobDetail() {
   const sectionUnderRef = useRef<HTMLDivElement | null>(null);
   const sectionUnderScrimRef = useRef<HTMLDivElement | null>(null);
   const handleFloatingBack = () => {
+    // A back tapped mid-transition would double-drive the layers — wait out
+    // the ~200ms settle instead.
+    if (layerBusy.current) return;
     if (activeTab === "overview") {
       goBackAnimated();
       return;
@@ -2448,6 +2492,7 @@ export default function MobileJobDetail() {
   // static page (the inner wrappers carry the same 0.2s fade via CSS).
   const switchTab = (next: TabType) => {
     if (next === activeTab) return;
+    if (layerBusy.current) return; // one transition at a time
     // Remember where you came FROM — unless this switch IS a back-pop
     if (!tabBackPop.current) tabHistory.current.push(activeTab);
     tabBackPop.current = false;
@@ -2463,13 +2508,17 @@ export default function MobileJobDetail() {
     if (fromOverview && sec) {
       // Fade the section in over the STATIC overview, then park the
       // overview beneath (parallax position) for the back gestures.
+      layerBusy.current = true;
       cancelLayerAnimations();
       if (overviewRef.current) overviewRef.current.style.transform = "";
       if (scrimRef.current) scrimRef.current.style.opacity = "0";
       sec.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease", fill: "forwards" });
       setTimeout(() => {
         setOpenLayerStyles();
-        requestAnimationFrame(() => cancelLayerAnimations());
+        requestAnimationFrame(() => {
+          cancelLayerAnimations();
+          layerBusy.current = false;
+        });
       }, 210);
     }
   };
@@ -2507,6 +2556,7 @@ export default function MobileJobDetail() {
     const onStart = (e: TouchEvent) => {
       if (sectionSwipe.current || e.touches.length !== 1) return;
       if (activeTabRef.current === "overview") return;
+      if (layerBusy.current) return; // a close is still settling
       const t = e.touches[0];
       if (t.clientX > 48) return;
       sectionSwipe.current = { id: t.identifier, x: t.clientX, y: t.clientY, engaged: false };
@@ -2570,6 +2620,7 @@ export default function MobileJobDetail() {
         } else {
           // Section-to-section: finish revealing the under-layer, then swap
           // the real tab in and drop the under copy once it's covered.
+          layerBusy.current = true;
           const underEl = sectionUnderRef.current;
           const w2 = el.clientWidth || window.innerWidth;
           const startP = Math.max(0, Math.min(1, Math.max(0, dx) / w2));
@@ -2585,6 +2636,7 @@ export default function MobileJobDetail() {
             { duration: dur, easing: "linear", fill: "forwards" },
           );
           window.setTimeout(() => {
+            layerBusy.current = false; // release BEFORE the guarded switch
             tabBackPop.current = true;
             switchTabRef.current(prev);
             el.style.transition = "none";
@@ -2672,6 +2724,9 @@ export default function MobileJobDetail() {
   const onSwipeStart = (e: React.PointerEvent) => {
     // A second finger mid-swipe must not hijack or wipe the gesture
     if (swipeDrag.current) return;
+    // A section close is still settling — starting the page exit now would
+    // stack two transitions and glitch the overview for a frame.
+    if (layerBusy.current) return;
     // Sections have their OWN native-touch back-swipe (pointer events die
     // to pointercancel inside their scroller) — this pointer drag is the
     // Overview's whole-page exit only.
