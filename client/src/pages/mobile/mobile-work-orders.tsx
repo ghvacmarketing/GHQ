@@ -326,13 +326,12 @@ export default function MobileWorkOrders() {
           data-testid="wo-search-overlay"
         >
           <div
-            className={`min-h-0 flex-1 overflow-y-auto px-4 ${searchQuery.trim().length < 2 || results.length === 0 ? "flex flex-col justify-end" : ""}`}
+            className={`min-h-0 flex-1 overflow-y-auto px-4 ${(searchQuery.trim().length < 2 ? rows.length === 0 : results.length === 0) ? "flex flex-col justify-end" : ""}`}
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}
           >
             {searchQuery.trim().length < 2 ? (
               rows.length > 0 ? (
                 <div className="pb-2">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Recent</h3>
                   <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
                     {rows.slice(0, 5).map((wo, i) => woRow(wo, i))}
                   </div>
