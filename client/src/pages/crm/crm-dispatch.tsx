@@ -1,4 +1,6 @@
 import { firstNameOf } from "@/components/user-avatar-badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreIcon } from "@/components/crm/more-icon";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
@@ -2856,8 +2858,16 @@ export default function CrmDispatch() {
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [panelClosing, setPanelClosing] = useState(false);
+  // Header actions menu (the 4-dot square) + its confirm dialogs — controlled
+  // so the dialogs survive the dropdown closing beneath them.
+  const [panelActionsOpen, setPanelActionsOpen] = useState(false);
+  const [cancelWoOpen, setCancelWoOpen] = useState(false);
+  const [deleteWoOpen, setDeleteWoOpen] = useState(false);
   // Slide the drawer out, then unmount it
   const closePanel = () => {
+    setPanelActionsOpen(false);
+    setCancelWoOpen(false);
+    setDeleteWoOpen(false);
     setPanelClosing(true);
     setTimeout(() => {
       setSelectedWorkOrderId(null);
@@ -4955,29 +4965,110 @@ export default function CrmDispatch() {
           >
           {false ? null : (
           <div className="flex h-full w-full flex-col">
-            {/* Panel Header — color reflects visit type */}
-            <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${
+            {/* Panel Header — color reflects visit type. X pinned top-right;
+                the 4-dot actions square sits bottom-right and carries what
+                used to be the Actions section at the panel's bottom. */}
+            <div className={`relative flex-shrink-0 px-4 pb-4 pt-3.5 ${
               (selectedWorkOrder.visitType || "SERVICE") === "SERVICE"
                 ? (selectedWorkOrder.priority === "high" ? "bg-red-600 text-white" : selectedWorkOrder.priority === "low" ? "bg-green-600 text-white" : "bg-yellow-500 text-white")
                 : (visitTypeHeaderColors[selectedWorkOrder.visitType || "SERVICE"] || "bg-slate-600 text-white")
             }`}>
-              <div className="min-w-0">
+              <button
+                onClick={closePanel}
+                className="absolute right-2.5 top-2.5 rounded-full p-1.5 opacity-80 transition-colors hover:bg-white/20 hover:opacity-100"
+                aria-label="Close panel"
+                data-testid="panel-close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="min-w-0 pr-12">
                 <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">Work Order · {selectedWorkOrder.workOrderNumber}</p>
-                <h2 className="truncate text-base font-semibold leading-tight" data-testid="panel-workorder-title">
+                <h2 className="truncate text-lg font-semibold leading-tight" data-testid="panel-workorder-title">
                   {visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType || "Service"}
                 </h2>
-                <p className="truncate text-xs opacity-80">{selectedWorkOrder.customerName}</p>
+                <p className="truncate text-[13px] opacity-80">{selectedWorkOrder.customerName}</p>
               </div>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={closePanel}
-                  className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
-                  aria-label="Close panel"
-                >
-                  <XCircle className="h-4 w-4" />
-                </button>
+              <div className="absolute bottom-2.5 right-2.5">
+                <DropdownMenu open={panelActionsOpen} onOpenChange={setPanelActionsOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`flex h-8 w-8 items-center justify-center rounded-md transition-all duration-200 active:scale-90 ${
+                        panelActionsOpen ? "bg-white/30" : "bg-white/15 hover:bg-white/25"
+                      }`}
+                      title="Work order actions"
+                      data-testid="panel-actions"
+                    >
+                      <MoreIcon open={panelActionsOpen} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href={`/crm/work-orders/${selectedWorkOrder.id}`} data-testid="button-view-full-details">
+                        <FileText className="h-4 w-4 mr-2" /> View details
+                      </Link>
+                    </DropdownMenuItem>
+                    {selectedWorkOrder.assignedTechId && (
+                      <DropdownMenuItem
+                        onClick={handleUnassign}
+                        disabled={updateWorkOrderMutation.isPending}
+                        data-testid="button-unassign"
+                      >
+                        <UserX className="h-4 w-4 mr-2" /> Unassign
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => setCancelWoOpen(true)}
+                      disabled={updateWorkOrderMutation.isPending || selectedWorkOrder.status === "cancelled"}
+                      data-testid="button-cancel-wo"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" /> Cancel work order
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => setDeleteWoOpen(true)}
+                      data-testid="button-delete-wo"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
+
+            {/* Confirm dialogs for the header menu — controlled, so they
+                outlive the dropdown that opened them */}
+            <AlertDialog open={cancelWoOpen} onOpenChange={setCancelWoOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel Work Order?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will cancel the work order. This action can be undone by changing the status later.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep Work Order</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleCancelWorkOrder}>
+                    Yes, Cancel It
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={deleteWoOpen} onOpenChange={setDeleteWoOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the work order. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep It</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteWorkOrder} className="bg-red-600 hover:bg-red-700">
+                    Delete Permanently
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Panel Content - Scrollable, organized as grouped info cards */}
             <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3 scrollbar-hide">
@@ -5188,85 +5279,6 @@ export default function CrmDispatch() {
                   />
                 </PanelSection>
 
-                <PanelSection title="Actions">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Link href={`/crm/work-orders/${selectedWorkOrder.id}`}>
-                      <Button
-                        variant="ghost"
-                        className="w-full h-7 justify-start text-xs text-slate-600 hover:text-slate-900 px-2"
-                        data-testid="button-view-full-details"
-                      >
-                        <FileText className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                        View Details
-                      </Button>
-                    </Link>
-                    {selectedWorkOrder.assignedTechId && (
-                      <Button
-                        variant="ghost"
-                        className="w-full h-7 justify-start text-xs text-slate-600 hover:text-slate-900 px-2"
-                        onClick={handleUnassign}
-                        disabled={updateWorkOrderMutation.isPending}
-                        data-testid="button-unassign"
-                      >
-                        <UserX className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                        Unassign
-                      </Button>
-                    )}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="w-full h-7 justify-start text-xs text-slate-500 hover:text-orange-600 px-2"
-                          disabled={updateWorkOrderMutation.isPending || selectedWorkOrder.status === "cancelled"}
-                          data-testid="button-cancel-wo"
-                        >
-                          <XCircle className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                          Cancel
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Cancel Work Order?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will cancel the work order. This action can be undone by changing the status later.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Keep Work Order</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleCancelWorkOrder}>
-                            Yes, Cancel It
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="w-full h-7 justify-start text-xs text-slate-500 hover:text-red-600 px-2"
-                          data-testid="button-delete-wo"
-                        >
-                          <Trash2 className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete the work order. This cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Keep It</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteWorkOrder} className="bg-red-600 hover:bg-red-700">
-                            Delete Permanently
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </PanelSection>
             </div>
           </div>
           )}

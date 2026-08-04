@@ -1358,20 +1358,21 @@ export default function AssistantOverlay({
         >
           {hydrating && messages.length === 0 ? (
             /* Skeleton thread — bubble-shaped placeholders in the same
-               alternating rhythm as a real conversation */
-            <div className="mx-auto w-full max-w-2xl space-y-4 pt-2" data-testid="assistant-skeleton">
+               alternating rhythm as a real conversation: the whole set fades
+               in and a light band flows left→right across each strip. */
+            <div className="mx-auto w-full max-w-2xl space-y-4 pt-2 animate-in fade-in duration-300" data-testid="assistant-skeleton">
               <div className="flex justify-end">
-                <div className="h-10 w-3/5 animate-pulse rounded-[4px] rounded-br-[1px] bg-[#711419]/15" />
+                <div className="skeleton-shimmer h-10 w-3/5 rounded-[4px] rounded-br-[1px] bg-[#711419]/10" />
               </div>
-              <div className="h-16 w-[85%] animate-pulse rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100" />
+              <div className="skeleton-shimmer h-16 w-[85%] rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100" />
               <div className="flex justify-end">
-                <div className="h-8 w-2/5 animate-pulse rounded-[4px] rounded-br-[1px] bg-[#711419]/15 [animation-delay:120ms]" />
+                <div className="skeleton-shimmer h-8 w-2/5 rounded-[4px] rounded-br-[1px] bg-[#711419]/10" style={{ "--shimmer-delay": "150ms" } as React.CSSProperties} />
               </div>
-              <div className="h-24 w-[88%] animate-pulse rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100 [animation-delay:120ms]" />
+              <div className="skeleton-shimmer h-24 w-[88%] rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100" style={{ "--shimmer-delay": "150ms" } as React.CSSProperties} />
               <div className="flex justify-end">
-                <div className="h-10 w-1/2 animate-pulse rounded-[4px] rounded-br-[1px] bg-[#711419]/15 [animation-delay:240ms]" />
+                <div className="skeleton-shimmer h-10 w-1/2 rounded-[4px] rounded-br-[1px] bg-[#711419]/10" style={{ "--shimmer-delay": "300ms" } as React.CSSProperties} />
               </div>
-              <div className="h-14 w-[70%] animate-pulse rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100 [animation-delay:240ms]" />
+              <div className="skeleton-shimmer h-14 w-[70%] rounded-[4px] rounded-tl-[1px] border border-slate-200/70 bg-slate-100" style={{ "--shimmer-delay": "300ms" } as React.CSSProperties} />
             </div>
           ) : messages.length === 0 && !pending ? (
             <div data-sheet-bg="" className="flex min-h-[calc(100%+1px)] flex-col items-center pt-[7vh] text-center">

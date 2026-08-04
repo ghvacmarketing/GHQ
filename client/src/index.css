@@ -608,6 +608,27 @@ select.dark-input option {
   overflow: hidden;
 }
 
+/* Skeleton shimmer — a light band flowing left→right across placeholder
+   strips (the classic loading sheen) instead of the flat opacity pulse.
+   Stagger rows with --shimmer-delay. */
+@keyframes skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+  animation-delay: var(--shimmer-delay, 0s);
+}
+
 /* No overscroll rubber-banding: horizontal kills the browser history swipe,
    vertical kills the bounce that flashes bare white past the app's edges.
    The background matches the app so any iOS viewport hangover (keyboard

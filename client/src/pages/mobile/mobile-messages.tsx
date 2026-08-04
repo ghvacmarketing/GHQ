@@ -398,17 +398,18 @@ export default function MobileMessages() {
 
         <div className="-mx-4">
           {loadingConversations ? (
-            /* Skeleton rows shaped exactly like conversations: plate + lines */
-            <div className="divide-y divide-slate-100">
+            /* Skeleton rows shaped exactly like conversations: plate + lines,
+               fading in with a light band flowing across each strip */
+            <div className="divide-y divide-slate-100 animate-in fade-in duration-300">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <div className="h-12 w-12 shrink-0 animate-pulse rounded-[10px] bg-slate-200" />
+                <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ "--shimmer-delay": `${(i - 1) * 90}ms` } as React.CSSProperties}>
+                  <div className="skeleton-shimmer h-12 w-12 shrink-0 rounded-[10px] bg-slate-200" />
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-baseline justify-between gap-2">
-                      <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
-                      <div className="h-3 w-12 animate-pulse rounded bg-slate-100" />
+                      <div className="skeleton-shimmer h-4 w-32 rounded bg-slate-200" />
+                      <div className="skeleton-shimmer h-3 w-12 rounded bg-slate-100" />
                     </div>
-                    <div className="h-3.5 w-40 animate-pulse rounded bg-slate-100" />
+                    <div className="skeleton-shimmer h-3.5 w-40 rounded bg-slate-100" />
                   </div>
                 </div>
               ))}
