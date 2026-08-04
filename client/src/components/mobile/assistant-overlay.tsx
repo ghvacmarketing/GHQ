@@ -7,7 +7,7 @@ import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-acti
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import { useKeyboardInset } from "@/lib/native";
-import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
+import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, Loader2, MessagesSquare, Mic, Pencil, Plus, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
@@ -1733,94 +1733,102 @@ export default function AssistantOverlay({
               Got it — writing that down...
             </p>
           )}
-          <div className="rounded-2xl border border-slate-300/70 bg-white p-3 shadow-sm">
-            {attachments.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {attachments.map((src, i) => (
-                  <div key={i} className="relative">
-                    <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
-                    <button
-                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
-                      aria-label="Remove photo"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <textarea
-              ref={composerRef}
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendQuestion(input);
-                }
+          {/* Composer — exactly the customer-messaging pattern: no card
+              holding it, just a bare row of circles + the keyboard-gray
+              pill, with the maroon send arrow popping in INSIDE the pill
+              the moment there's something to send. */}
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachments.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt="" className="h-14 w-14 rounded-[4px] border border-slate-300 object-cover" />
+                  <button
+                    onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white"
+                    aria-label="Remove photo"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                pickImages(e.target.files);
+                e.target.value = "";
               }}
-              placeholder={
-                listening
-                  ? "Listening..."
-                  : transcribing
-                    ? "Transcribing..."
-                    : copilot
-                      ? "Tell me the details — I'll fill the form…"
-                      : "Ask Gibbs anything…"
-              }
-              className="max-h-32 min-h-[28px] w-full select-text resize-none overflow-y-auto bg-transparent text-[16px] leading-6 text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400 focus:outline-none focus-visible:ring-0"
-              data-testid="assistant-input"
             />
-            <div className="mt-1.5 flex items-center gap-0.5">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  pickImages(e.target.files);
-                  e.target.value = "";
-                }}
-              />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={attachments.length >= 4 || pending}
+              className="mb-[3px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full liquid-glass text-slate-700 shadow-md transition-transform active:scale-95 disabled:opacity-40"
+              aria-label="Attach photos"
+              data-testid="assistant-attach"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+            {supportsVoice && (
               <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={attachments.length >= 4 || pending}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-40"
-                aria-label="Attach photos"
-                data-testid="assistant-attach"
+                onClick={listening ? stopVoice : startVoice}
+                disabled={transcribing}
+                className={cn(
+                  "relative mb-[3px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full shadow-md transition-transform active:scale-95",
+                  listening ? "bg-[#711419] text-white" : "liquid-glass text-slate-700",
+                )}
+                aria-label={listening ? "Stop listening" : "Speak to the assistant"}
+                data-testid="assistant-mic"
               >
-                <ImagePlus className="h-5 w-5" />
+                {listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
+                {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
               </button>
-              {supportsVoice && (
-                <button
-                  onClick={listening ? stopVoice : startVoice}
-                  disabled={transcribing}
-                  className={cn(
-                    "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95",
-                    listening ? "bg-[#711419] text-white" : "text-slate-500 active:bg-slate-100",
-                  )}
-                  aria-label={listening ? "Stop listening" : "Speak to the assistant"}
-                  data-testid="assistant-mic"
-                >
-                  {listening && <span className="absolute inset-0 animate-ping rounded-full border border-[#711419]" />}
-                  {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
-                </button>
-              )}
-              <div className="flex-1" />
+            )}
+            <div className="flex min-h-[44px] min-w-0 flex-1 items-end rounded-full bg-slate-200 py-1 pl-4 pr-1">
+              <textarea
+                ref={composerRef}
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendQuestion(input);
+                  }
+                }}
+                placeholder={
+                  listening
+                    ? "Listening..."
+                    : transcribing
+                      ? "Transcribing..."
+                      : copilot
+                        ? "Tell me the details — I'll fill the form…"
+                        : "Ask Gibbs anything…"
+                }
+                className="max-h-32 w-full select-text resize-none bg-transparent py-[7px] text-[16px] leading-[22px] text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-500 focus:outline-none focus-visible:ring-0"
+                data-testid="assistant-input"
+              />
               <button
                 onClick={() => sendQuestion(input)}
                 disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white transition-all duration-150 ease-out active:scale-90 disabled:bg-slate-200 disabled:text-slate-400"
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow transition-all duration-200 active:scale-90",
+                  input.trim().length >= 3 || attachments.length > 0 || pending
+                    ? "scale-100 opacity-100"
+                    : "pointer-events-none scale-50 opacity-0",
+                )}
                 aria-label="Send"
                 data-testid="assistant-send"
               >
                 {pending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <ArrowUp className="h-4 w-4" />
+                  <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
                 )}
               </button>
             </div>
