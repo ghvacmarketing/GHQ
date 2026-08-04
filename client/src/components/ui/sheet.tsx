@@ -21,7 +21,9 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fill-mode-forwards",
+      // duration-300: the backdrop darkens/lightens gradually with the sheet
+      // ride (nested pickers pass a shorter duration via overlayClassName)
+      "fixed inset-0 z-50 bg-black/80 duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fill-mode-forwards",
       className
     )}
     {...props}

@@ -60,6 +60,15 @@ export function DraggableSheet({
   const dismissAnimated = () => {
     const el = sheetRef.current;
     if (!el) return onOpenChange(false);
+    // Root sheets lighten the page gradually WITH the slide-down (nested
+    // pickers keep their quick scrim so the parent sheet pops back fast).
+    if (!nested) {
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) {
+        overlay.style.transition = "opacity 0.24s ease-in";
+        overlay.style.opacity = "0";
+      }
+    }
     el.style.transition = "transform 0.22s ease-in";
     el.style.transform = "translateY(100%)";
     // Leave the sheet translated off-screen: clearing the transform here made
@@ -134,7 +143,7 @@ export function DraggableSheet({
             sheetRef.current.style.animation = "none";
           }
         }}
-        overlayClassName={nested ? "z-[95] bg-black/40" : "z-[85]"}
+        overlayClassName={nested ? "z-[95] bg-black/40 duration-150" : "z-[85]"}
         className={`${nested ? "z-[100] shadow-[0_-8px_32px_rgba(0,0,0,0.3)]" : "z-[90]"} rounded-t-3xl border-t-0 px-5 pt-0 [&>button]:hidden ${glass ? "bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60" : ""} ${
           full
             ? "flex h-[calc(100dvh-env(safe-area-inset-top)-10px)] flex-col"

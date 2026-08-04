@@ -219,7 +219,18 @@ export default function AssistantOverlay({
   };
   const bottomRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ y: number; dy: number; active: boolean } | null>(null);
+
+  // Lighten the page gradually WITH the sheet's slide-down (the backdrop
+  // otherwise pops away only when the component unmounts).
+  const fadeBackdrop = () => {
+    const b = backdropRef.current;
+    if (b) {
+      b.style.transition = "opacity 0.24s ease-in";
+      b.style.opacity = "0";
+    }
+  };
 
   // Swipe down on the handle/header to dismiss — live drag follow, commit
   // past ~110px, spring back otherwise (same feel as DraggableSheet).
@@ -241,6 +252,7 @@ export default function AssistantOverlay({
     dragRef.current = null;
     if (!st || !el) return;
     if (st.dy > 110) {
+      fadeBackdrop();
       el.style.transition = "transform 0.25s ease-in";
       el.style.transform = "translateY(100%)";
       setTimeout(() => {
@@ -338,6 +350,96 @@ export default function AssistantOverlay({
     }
   };
   const pressFired = () => !!pressRef.current?.fired;
+
+  // Hold-to-dismiss from EMPTY background: press quiet space (not a row,
+  // button, or message), hold ~240ms, then drag the whole sheet down. Moving
+  // before the hold matures is a normal scroll. Once armed, a non-passive
+  // touchmove preventDefault pins the content so the sheet is the only thing
+  // that moves under the finger.
+  type HoldSt = { y: number; armed: boolean; timer: number; has: boolean; scroller: HTMLElement | null; stop: ((ev: TouchEvent) => void) | null };
+  const chatHoldSt = useRef<HoldSt>({ y: 0, armed: false, timer: 0, has: false, scroller: null, stop: null });
+  const histHoldSt = useRef<HoldSt>({ y: 0, armed: false, timer: 0, has: false, scroller: null, stop: null });
+  const holdDragHandlers = (
+    stRef: React.MutableRefObject<HoldSt>,
+    getEl: () => HTMLDivElement | null,
+    commit: () => void,
+    onCommitStart?: () => void,
+  ) => {
+    const release = (st: HoldSt) => {
+      window.clearTimeout(st.timer);
+      if (st.scroller && st.stop) st.scroller.removeEventListener("touchmove", st.stop);
+      st.has = false;
+      st.armed = false;
+      st.scroller = null;
+      st.stop = null;
+    };
+    const end = (e: React.PointerEvent) => {
+      const st = stRef.current;
+      if (!st.has) return;
+      const wasArmed = st.armed;
+      const dy = e.clientY - st.y;
+      release(st);
+      const el = getEl();
+      if (!el || !wasArmed) return;
+      if (dy > 110) {
+        onCommitStart?.();
+        el.style.transition = "transform 0.25s ease-in";
+        el.style.transform = "translateY(100%)";
+        window.setTimeout(() => {
+          commit();
+          el.style.transition = "";
+          el.style.transform = "";
+        }, 240);
+      } else {
+        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+        el.style.transform = "translateY(0)";
+        window.setTimeout(() => {
+          el.style.transition = "";
+          el.style.transform = "";
+        }, 260);
+      }
+    };
+    return {
+      onPointerDown: (e: React.PointerEvent) => {
+        const t = e.target as HTMLElement;
+        if (t !== e.currentTarget && !t.hasAttribute("data-sheet-bg")) return;
+        const scroller = e.currentTarget as HTMLElement;
+        const st = stRef.current;
+        st.y = e.clientY;
+        st.has = true;
+        st.armed = false;
+        scroller.setPointerCapture?.(e.pointerId);
+        st.timer = window.setTimeout(() => {
+          st.armed = true;
+          try {
+            navigator.vibrate?.(8);
+          } catch {
+            /* no haptics */
+          }
+          const stop = (ev: TouchEvent) => ev.preventDefault();
+          scroller.addEventListener("touchmove", stop, { passive: false });
+          st.scroller = scroller;
+          st.stop = stop;
+          const el = getEl();
+          if (el) el.style.transition = "none";
+        }, 240);
+      },
+      onPointerMove: (e: React.PointerEvent) => {
+        const st = stRef.current;
+        if (!st.has) return;
+        const dy = e.clientY - st.y;
+        if (!st.armed) {
+          // Finger moved before the hold matured — it's a scroll, stand down
+          if (Math.abs(dy) > 8) release(st);
+          return;
+        }
+        const el = getEl();
+        if (el) el.style.transform = `translateY(${dy >= 0 ? dy : dy / 4}px)`;
+      },
+      onPointerUp: end,
+      onPointerCancel: end,
+    };
+  };
 
   // Stick-to-bottom scrolling: auto-scroll only while the user is already at
   // (or near) the bottom. Scrolling up to reread never gets yanked back down
@@ -930,8 +1032,14 @@ export default function AssistantOverlay({
     <div className="fixed inset-0 z-[120]" data-testid="assistant-overlay">
       {/* Backdrop — tap to dismiss; touch-action none so swipes here can't
           scroll the app behind the sheet. Bleeds past the viewport so an iOS
-          rubber-band bounce never exposes bare page behind it. */}
-      <div className="absolute inset-x-0 -bottom-40 -top-40 bg-black/50 backdrop-blur-[2px]" style={{ touchAction: "none" }} onClick={onClose} />
+          rubber-band bounce never exposes bare page behind it. Fades in with
+          the sheet and fades out with any dismiss (fadeBackdrop). */}
+      <div
+        ref={backdropRef}
+        className="absolute inset-x-0 -bottom-40 -top-40 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300"
+        style={{ touchAction: "none" }}
+        onClick={onClose}
+      />
       {/* Bleed guard — a bounce lifts the whole view, including fixed
           elements; this strip sits just below the viewport so what slides up
           from under the sheet is sheet-colored, never a bare page. */}
@@ -1008,10 +1116,11 @@ export default function AssistantOverlay({
         <div
           ref={chatScrollRef}
           onScroll={onChatScroll}
+          {...holdDragHandlers(chatHoldSt, () => sheetRef.current, onClose, fadeBackdrop)}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-16"
         >
           {messages.length === 0 && !pending ? (
-            <div className="flex min-h-[calc(100%+1px)] flex-col items-center pt-[7vh] text-center">
+            <div data-sheet-bg="" className="flex min-h-[calc(100%+1px)] flex-col items-center pt-[7vh] text-center">
               {/* Persona block — the badge already sits in the header, so the
                   empty state is just the name */}
               <button
@@ -1025,7 +1134,7 @@ export default function AssistantOverlay({
               <p className="mt-3 max-w-[260px] text-sm text-slate-500">
                 {firstName ? `What can I get done, ${firstName}?` : "What can I get done?"} Anything I set up waits for your approval.
               </p>
-              <div className="mt-7 flex w-full max-w-sm flex-col gap-2">
+              <div data-sheet-bg="" className="mt-7 flex w-full max-w-sm flex-col gap-2">
                 {STARTERS.map((s) => (
                   <button
                     key={s}
@@ -1044,11 +1153,11 @@ export default function AssistantOverlay({
               )}
             </div>
           ) : (
-            <div className="mx-auto min-h-[calc(100%+1px)] w-full max-w-2xl space-y-4 pb-2">
+            <div data-sheet-bg="" className="mx-auto min-h-[calc(100%+1px)] w-full max-w-2xl space-y-4 pb-2">
               {messages.map((msg, i) => {
                 if (msg.role === "user") {
                   return (
-                    <div key={i} className="flex justify-end">
+                    <div key={i} data-sheet-bg="" className="flex justify-end">
                       <div className="max-w-[85%] space-y-1.5">
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="flex flex-wrap justify-end gap-1.5">
@@ -1070,7 +1179,7 @@ export default function AssistantOverlay({
                 // typing; older messages render their cards instantly.
                 const revealed = freshIndex === null || i < freshIndex || typedOut;
                 return (
-                  <div key={i} className="space-y-2">
+                  <div key={i} data-sheet-bg="" className="space-y-2">
                     {msg.content.trim() !== "" && (
                       <div className="max-w-[92%] whitespace-pre-wrap break-words rounded-[4px] rounded-tl-[1px] border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-800">
                         <TypewriterText
@@ -1549,10 +1658,12 @@ export default function AssistantOverlay({
         <div
           ref={histSheetRef}
           className={cn(
-            "absolute inset-x-0 bottom-0 flex flex-col rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out",
+            "absolute inset-x-0 bottom-0 flex select-none flex-col rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out",
             historyOpen ? "translate-y-0" : "translate-y-full",
           )}
-          style={{ top: "env(safe-area-inset-top)" }}
+          // select-none + no callout: holding a chat row must open OUR menu,
+          // never iOS text selection sweeping the whole sheet blue.
+          style={{ top: "env(safe-area-inset-top)", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
           data-testid="assistant-history-sheet"
         >
           <div
@@ -1584,10 +1695,11 @@ export default function AssistantOverlay({
           <div
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
             style={{ touchAction: "pan-y", paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
+            {...holdDragHandlers(histHoldSt, () => histSheetRef.current, () => setHistoryOpen(false))}
           >
             {/* Inside a space — its header; new chats file here */}
             {activeSpaceObj && !historySearch.trim() && (
-              <div className="mb-2 flex items-center gap-2.5 px-1.5 pt-1">
+              <div data-sheet-bg="" className="mb-2 flex items-center gap-2.5 px-1.5 pt-1">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 bg-slate-50 text-slate-500">
                   <Folder className="h-5 w-5" />
                 </span>
@@ -1603,7 +1715,7 @@ export default function AssistantOverlay({
             {/* Spaces — folder rows above the chats (tap to open, hold to
                 delete), with New space as the last row */}
             {!activeSpace && !historySearch.trim() && (
-              <div className="mb-3">
+              <div data-sheet-bg="" className="mb-3">
                 <p className="px-1.5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Spaces</p>
                 {spaces.map((s) => (
                   <button
@@ -1658,9 +1770,9 @@ export default function AssistantOverlay({
                     : "No conversations yet — ask something and it'll be saved here."}
               </p>
             ) : (
-              <div className="min-h-[1px]">
+              <div data-sheet-bg="" className="min-h-[1px]">
                 {groupedConversations.map((group) => (
-                  <div key={group.label} className="mb-2">
+                  <div key={group.label} data-sheet-bg="" className="mb-2">
                     <p className="px-1.5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
                     {group.items.map((c) => (
                       <button
@@ -1756,11 +1868,13 @@ export default function AssistantOverlay({
             }}
           />
           <div
-            className="absolute inset-x-3 overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-3 duration-200"
+            className="absolute inset-x-3 select-none overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-3 duration-200"
             style={{
               bottom: kbInset > 0 ? `${kbInset + 12}px` : "calc(16px + env(safe-area-inset-bottom))",
               transition: "bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
-            }}
+              WebkitUserSelect: "none",
+              WebkitTouchCallout: "none",
+            } as React.CSSProperties}
           >
             {chatMenu && (
               <>
@@ -1809,7 +1923,7 @@ export default function AssistantOverlay({
                       }}
                       placeholder="Chat name"
                       maxLength={80}
-                      className="h-11 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+                      className="h-11 w-full select-text rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400 focus:border-[#711419]"
                       data-testid="assistant-chat-rename-input"
                     />
                     <div className="mt-3 flex justify-end gap-2">
@@ -1864,7 +1978,7 @@ export default function AssistantOverlay({
                         }}
                         placeholder="New space…"
                         maxLength={60}
-                        className="h-10 min-w-0 flex-1 rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+                        className="h-10 min-w-0 flex-1 select-text rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400 focus:border-[#711419]"
                         data-testid="assistant-chat-move-newspace-input"
                       />
                       <button
@@ -1914,7 +2028,7 @@ export default function AssistantOverlay({
                   }}
                   placeholder="e.g. Marketing ideas"
                   maxLength={60}
-                  className="h-11 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+                  className="h-11 w-full select-text rounded-[4px] border border-slate-300 bg-white px-3 text-[16px] text-slate-900 outline-none [-webkit-user-select:text] placeholder:text-slate-400 focus:border-[#711419]"
                   data-testid="assistant-newspace-input"
                 />
                 <div className="mt-3 flex justify-end gap-2">
