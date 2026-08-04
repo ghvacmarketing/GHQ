@@ -4020,6 +4020,8 @@ export default function MobileJobDetail() {
 
   // Slide-out + swipe-right back to the jobs list (iOS-style)
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const backRef = useRef<HTMLButtonElement | null>(null);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
   const swipe = useRef<{ x: number; y: number; active: boolean } | null>(null);
   const goBackAnimated = (fromDx = 0) => {
     // The jobs page is already on screen as the underlay — its remount after
@@ -4036,6 +4038,14 @@ export default function MobileJobDetail() {
       el.style.borderRadius = "24px 0 0 24px";
       el.style.transition = `transform ${dur}ms ease-in`;
       el.style.transform = "translateX(100%)";
+      // The floating controls hold still while the page leaves — they fade
+      // out as the swipe commits, exactly like the customer detail page.
+      for (const btn of [backRef.current, actionsRef.current]) {
+        if (!btn) continue;
+        btn.style.transition = `opacity ${Math.max(120, dur - 40)}ms ease-out`;
+        btn.style.opacity = "0";
+        btn.style.pointerEvents = "none";
+      }
       pageUnderlayRef.current?.animate(
         [{ transform: `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
         { duration: dur, easing: "ease-out", fill: "forwards" },
@@ -4701,6 +4711,58 @@ export default function MobileJobDetail() {
           <div ref={pageScrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
         </div>
       )}
+      {/* Floating back — OUTSIDE the sliding panel: it holds its spot while
+          the page follows your finger, then fades away as the swipe commits.
+          Overview-only (sections navigate via the tab bar), styled exactly
+          like the customer detail page's back button. */}
+      <button
+        ref={backRef}
+        onClick={() => goBackAnimated()}
+        className={`fixed left-3 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-opacity active:scale-95 ${
+          activeTab === "overview" ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
+        data-testid="button-back"
+        aria-label="Back"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+      {/* Supervisor actions float top-right, same family as the customer
+          page's Edit pill — they hold still and fade with the back arrow. */}
+      {isSupervisor && (
+        <div
+          ref={actionsRef}
+          className={`fixed right-3 z-30 flex items-center gap-2 transition-opacity ${
+            activeTab === "overview" ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
+        >
+          {!isAssignedToMe ? (
+            <button
+              onClick={() => assignToMeMutation.mutate()}
+              disabled={assignToMeMutation.isPending}
+              className="flex h-10 items-center gap-1.5 rounded-full bg-[#711419] px-4 text-sm font-medium text-white shadow-sm transition-transform active:scale-95 disabled:opacity-60"
+              data-testid="button-assign-to-me"
+            >
+              {assignToMeMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserPlus className="h-4 w-4" />
+              )}
+              Assign to Me
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowEditDialog(true)}
+              className="flex h-10 items-center gap-1.5 rounded-full border border-slate-300/70 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-transform active:scale-95"
+              data-testid="button-edit-work-order"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </button>
+          )}
+        </div>
+      )}
       <div
         ref={pageRef}
         className="page-slide-in relative z-10 h-full shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
@@ -4722,48 +4784,7 @@ export default function MobileJobDetail() {
         <div className="relative min-h-0 flex-1" data-testid="mobile-job-detail">
           {/* Base layer: the Overview hub — always mounted so it parallaxes
               beneath a section while you swipe it away */}
-          <div ref={overviewRef} className="absolute inset-0 overflow-auto px-4 pb-28">
-            {/* In-flow header row — scrolls away with the content (no sticky
-                band). Back is Overview-only; the edge swipe leaves the job
-                from any tab. */}
-            <div className="mb-2 flex items-center justify-between pt-4">
-              <button
-                onClick={() => goBackAnimated()}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-700 shadow-sm transition-transform active:scale-95"
-                data-testid="button-back"
-                aria-label="Back"
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-              <div className="flex items-center gap-2">
-                {isSupervisor && !isAssignedToMe && (
-                  <Button
-                    onClick={() => assignToMeMutation.mutate()}
-                    disabled={assignToMeMutation.isPending}
-                    className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
-                    data-testid="button-assign-to-me"
-                  >
-                    {assignToMeMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : (
-                      <UserPlus className="h-4 w-4 mr-1" />
-                    )}
-                    Assign to Me
-                  </Button>
-                )}
-                {isSupervisor && isAssignedToMe && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowEditDialog(true)}
-                    className="min-h-[44px]"
-                    data-testid="button-edit-work-order"
-                  >
-                    <Pencil className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-            </div>
+          <div ref={overviewRef} className="absolute inset-0 overflow-auto px-4 pb-28 pt-14">
             <OverviewTab
               onGoTab={(t) => switchTab(t as TabType)}
               workOrder={workOrder}

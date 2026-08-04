@@ -11,6 +11,12 @@ let cachedUntil = 0;
 let cachedVal = false;
 
 export function markSkipEntrance(): void {
+  // A swipe PRE-MOUNTS the destination as its underlay, whose shell reads
+  // skipEntranceOnce() → false and caches that answer. Without busting the
+  // cache here, a quick flick's real arrival (within the cache window) read
+  // the stale "false" and played the mount fade anyway — the post-swipe
+  // flash on fast swipes.
+  cachedUntil = 0;
   try {
     sessionStorage.setItem("ghq-skip-entrance", String(Date.now()));
   } catch {
