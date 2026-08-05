@@ -1410,27 +1410,14 @@ export default function CrmChecklists() {
                   <ChevronDown className="mr-1 h-4 w-4 rotate-90" />
                   Settings
                 </Button>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={openGlobalAI}
-                    title="Describe a checklist and Gibbs builds it for your approval"
-                    data-testid="button-gibbs-build-checklist"
-                  >
-                    <img src={badgeGibbs} alt="" className="mr-1.5 h-4 w-4 select-none" draggable={false} />
-                    Ask Gibbs to build one
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
-                    onClick={openStartFlow}
-                    data-testid="button-new-checklist-list"
-                  >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                  onClick={openStartFlow}
+                  data-testid="button-new-checklist-list"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
+                </Button>
               </div>
               {checklistsLoading ? (
                 /* Skeleton cards — without this the empty state (a dashed
@@ -1561,17 +1548,6 @@ export default function CrmChecklists() {
               {!checklist.isActive && (
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">Inactive</span>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={openGlobalAI}
-                title="Describe a checklist and Gibbs builds it for your approval"
-                data-testid="button-canvas-gibbs"
-              >
-                <img src={badgeGibbs} alt="" className="mr-1.5 h-4 w-4 select-none" draggable={false} />
-                Gibbs
-              </Button>
               <Button variant="outline" size="sm" className="h-8" onClick={openEditChecklist} data-testid="button-edit-checklist">
                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
               </Button>
@@ -1931,7 +1907,7 @@ export default function CrmChecklists() {
                 <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/90 px-1.5 py-1 shadow-lg backdrop-blur">
                   <button
                     onClick={() => applyZoom(zoom - 0.1)}
-                    disabled={zoom <= 0.4}
+                    disabled={zoom <= 0.25}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
                     title="Zoom out"
                     data-testid="canvas-zoom-out"
@@ -1948,7 +1924,7 @@ export default function CrmChecklists() {
                   </button>
                   <button
                     onClick={() => applyZoom(zoom + 0.1)}
-                    disabled={zoom >= 1.5}
+                    disabled={zoom >= 2}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
                     title="Zoom in"
                     data-testid="canvas-zoom-in"
@@ -1963,6 +1939,14 @@ export default function CrmChecklists() {
                     data-testid="canvas-organize"
                   >
                     <Wand2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={openGlobalAI}
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
+                    title="Gibbs can build a checklist for you"
+                    data-testid="canvas-gibbs"
+                  >
+                    <img src={badgeGibbs} alt="Gibbs" className="h-5 w-5 select-none" draggable={false} />
                   </button>
                 </div>
               </div>
