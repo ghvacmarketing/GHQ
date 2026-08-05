@@ -310,6 +310,7 @@ export default function AssistantOverlay({
   const closeSheetAnimated = () => {
     const el = sheetRef.current;
     if (!el) return onClose();
+    setSheetClosing(true);
     fadeBackdrop();
     el.style.transition = "transform 0.25s ease-in";
     el.style.transform = "translateY(100%)";
@@ -427,6 +428,7 @@ export default function AssistantOverlay({
     dragRef.current = null;
     if (!st || !el) return;
     if (st.dy > 110) {
+      setSheetClosing(true);
       fadeBackdrop();
       el.style.transition = "transform 0.25s ease-in";
       el.style.transform = "translateY(100%)";
@@ -756,6 +758,7 @@ export default function AssistantOverlay({
       }, 250);
       const dy = t.clientY - ended.y;
       if (dy > 110) {
+        setSheetClosing(true);
         fadeBackdrop();
         el.style.transition = "transform 0.25s ease-in";
         el.style.transform = "translateY(100%)";
@@ -833,7 +836,14 @@ export default function AssistantOverlay({
   // the shared hook's keyboardWillShow signal is the only one that fires
   // there. Web PWAs use the burst-remeasured local value. Take whichever.
   const kbInsetNative = useKeyboardInset();
-  const kbInset = Math.max(kbInsetWeb, kbInsetNative);
+  // Closing collapses the inset INSTANTLY: the keyboard's dismissal reveals
+  // whatever sits where it was, and a sheet still padded for the keys showed
+  // a band of blank sheet-white there for the length of the slide-out.
+  const [sheetClosing, setSheetClosing] = useState(false);
+  const kbInset = sheetClosing ? 0 : Math.max(kbInsetWeb, kbInsetNative);
+  useEffect(() => {
+    if (open) setSheetClosing(false);
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const measure = () => {
@@ -1429,7 +1439,7 @@ export default function AssistantOverlay({
           the sheet and fades out with any dismiss (fadeBackdrop). */}
       <div
         ref={backdropRef}
-        className="absolute inset-x-0 -bottom-40 -top-40 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300"
+        className="absolute inset-x-0 -bottom-96 -top-40 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300"
         style={{ touchAction: "none" }}
         onClick={closeSheetAnimated}
       />
