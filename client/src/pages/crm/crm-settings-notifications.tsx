@@ -410,8 +410,7 @@ export default function CrmSettingsNotifications() {
                     <TableHead className="w-36">To</TableHead>
                     <TableHead className="w-32">Type</TableHead>
                     <TableHead>Notification</TableHead>
-                    <TableHead className="w-20 text-right">Read</TableHead>
-                    <TableHead className="w-14 text-right">Clear</TableHead>
+                    <TableHead className="w-24 text-right">Read</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -431,22 +430,25 @@ export default function CrmSettingsNotifications() {
                         {n.preview && <p className="truncate text-xs text-slate-500">{n.preview}</p>}
                       </TableCell>
                       <TableCell className="text-right">
-                        {n.isRead ? (
-                          <span className="text-xs text-emerald-600">✓</span>
-                        ) : (
-                          <span className="inline-block h-2 w-2 rounded-full bg-[#711419]" title="Unread" />
-                        )}
-                      </TableCell>
-                      <TableCell className="w-14 text-right">
-                        <button
-                          onClick={() => deleteNotification.mutate(n.id)}
-                          disabled={deleteNotification.isPending}
-                          className="rounded-[3px] border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                          title="Delete notification"
-                          data-testid={`notif-delete-${n.id}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {/* Read state + delete share the LAST cell — a
+                            separate column overflowed the card and rendered
+                            clipped past its right edge. */}
+                        <div className="flex items-center justify-end gap-2.5">
+                          {n.isRead ? (
+                            <span className="text-xs text-emerald-600">✓</span>
+                          ) : (
+                            <span className="inline-block h-2 w-2 rounded-full bg-[#711419]" title="Unread" />
+                          )}
+                          <button
+                            onClick={() => deleteNotification.mutate(n.id)}
+                            disabled={deleteNotification.isPending}
+                            className="rounded-[3px] border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                            title="Delete notification"
+                            data-testid={`notif-delete-${n.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
