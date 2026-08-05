@@ -223,24 +223,10 @@ export function PhotoAnnotator({
         </button>
       </div>
 
-      {/* Canvas — the color rail floats on its LEFT edge, out of the
-          drawing hand's way, one thumb-reach from the screen side. */}
-      <div ref={wrapRef} className="relative flex min-h-0 flex-1 items-center justify-center p-3 pl-14">
+      {/* Canvas — full-bleed: the photo gets the whole screen between the
+          bars; color lives in ONE cycling swatch down in the toolbar. */}
+      <div ref={wrapRef} className="relative flex min-h-0 flex-1 items-center justify-center p-1">
         {!ready && <Loader2 className="h-8 w-8 animate-spin text-white/60" />}
-        <div className="absolute left-2 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-2 rounded-[8px] border border-white/10 bg-white/10 p-1.5 backdrop-blur" data-testid="annotator-colors">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className={`h-8 w-8 rounded-[6px] border-2 transition-transform active:scale-90 ${
-                color === c ? "scale-110 border-white" : "border-white/25"
-              }`}
-              style={{ background: c }}
-              aria-label={`Color ${c}`}
-              data-testid={`annotator-color-${c.replace("#", "")}`}
-            />
-          ))}
-        </div>
         <canvas
           ref={canvasRef}
           className={`max-h-full max-w-full rounded-[6px] shadow-2xl ${ready ? "" : "hidden"}`}
@@ -268,11 +254,18 @@ export function PhotoAnnotator({
         )}
       </div>
 
-      {/* Toolbar — industrial: hairline segmented tools with the maroon
-          carrying the selected state, create-style Save. Colors live on the
-          left rail beside the canvas. */}
+      {/* Toolbar — industrial: ONE cycling color swatch, hairline segmented
+          tools with the maroon carrying the selected state, create-style
+          Save. Tap the swatch to step through the palette. */}
       <div className="px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 14px)" }}>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setColor(COLORS[(COLORS.indexOf(color) + 1) % COLORS.length])}
+            className="h-11 w-11 shrink-0 rounded-[8px] border-2 border-white/50 shadow-inner transition-transform active:scale-90"
+            style={{ background: color }}
+            aria-label="Change color"
+            data-testid="annotator-color-cycle"
+          />
           <div className="flex flex-1 items-center gap-1 rounded-[8px] border border-white/10 bg-white/10 p-1 backdrop-blur">
             {TOOLS.map(({ key, label, icon: Icon }) => (
               <button

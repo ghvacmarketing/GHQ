@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -1035,19 +1036,26 @@ export default function MobilePhotos() {
       </AlertDialog>
 
       {/* Markup a session shot (draw / arrows / text) — opened by tapping a
-          thumb in the camera strip, AFTER the shooting. The edited version
-          replaces the original wherever its upload got to. */}
-      {editShot && (
-        <PhotoAnnotator
-          file={editShot.file}
-          onCancel={() => setEditShot(null)}
-          onDone={(edited) => {
-            const orig = editShot;
-            setEditShot(null);
-            replaceShot(orig, edited);
-          }}
-        />
-      )}
+          thumb in the camera strip or the sheet grid. PORTALED to body:
+          inside the shell's main, drawing strokes bubbled into the
+          pull-to-refresh listener and yanked the page mid-edit. Saving
+          lands you on the Save-media sheet with the session laid out. */}
+      {editShot &&
+        createPortal(
+          <PhotoAnnotator
+            file={editShot.file}
+            onCancel={() => setEditShot(null)}
+            onDone={(edited) => {
+              const orig = editShot;
+              setEditShot(null);
+              replaceShot(orig, edited);
+              // Done editing → the recap sheet, not back into the camera
+              if (cameraOpen) closeCamera();
+              else setSearchActive(true);
+            }}
+          />,
+          document.body,
+        )}
 
       {/* Fullscreen viewer + markup editor */}
       {viewer && (
@@ -1062,7 +1070,8 @@ export default function MobilePhotos() {
 
       {/* Fullscreen video player — CompanyCam videos stream straight from
           the CDN (nothing stored on our side) */}
-      {videoViewer && (
+      {videoViewer &&
+        createPortal(
         <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black" data-testid="video-viewer">
           <button
             onClick={() => setVideoViewer(null)}
@@ -1082,12 +1091,15 @@ export default function MobilePhotos() {
             preload="auto"
             className="max-h-full w-full animate-in fade-in duration-200"
           />
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Fullscreen in-app camera — house chrome: frosted industrial chips,
-          uppercase micro-labels, maroon-ringed shutter. Every press saves. */}
-      {cameraOpen && (
+          uppercase micro-labels, maroon-ringed shutter. Every press saves.
+          Portaled clear of the shell main (pull-to-refresh bubbling). */}
+      {cameraOpen &&
+        createPortal(
         <div className="fixed inset-0 z-[60] flex flex-col bg-black" data-testid="camera-overlay">
           <video
             ref={videoRef}
@@ -1175,7 +1187,8 @@ export default function MobilePhotos() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
     </MobileShell>
