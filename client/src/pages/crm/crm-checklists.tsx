@@ -1385,31 +1385,30 @@ export default function CrmChecklists() {
       <div className="flex min-h-0 flex-1 flex-col">
         {view === "list" ? (
           <>
-            {/* Gallery — every checklist at a glance; click to edit on the canvas */}
-            <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-5 py-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/crm/settings")}
-                data-testid="button-back-to-settings"
-              >
-                <ChevronDown className="mr-1 h-4 w-4 rotate-90" />
-                Settings
-              </Button>
-              <div className="mr-2 hidden h-5 w-px bg-slate-200 sm:block" />
-              <ClipboardList className="h-4 w-4 text-[#711419]" />
-              <span className="text-sm font-semibold text-slate-900">Checklists</span>
-              <Button
-                size="sm"
-                className="ml-auto h-8 bg-[#711419] hover:bg-[#8a1a1f]"
-                onClick={openStartFlow}
-                data-testid="button-new-checklist-list"
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
-              </Button>
-            </div>
+            {/* Gallery — every checklist at a glance; click to edit on the
+                canvas. No header strip: just a light back link and the New
+                button floating in the content. */}
             <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => navigate("/crm/settings")}
+                  data-testid="button-back-to-settings"
+                >
+                  <ChevronDown className="mr-1 h-4 w-4 rotate-90" />
+                  Settings
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                  onClick={openStartFlow}
+                  data-testid="button-new-checklist-list"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
+                </Button>
+              </div>
               {checklists.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <button
