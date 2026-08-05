@@ -331,9 +331,11 @@ function ProfileHeader({ user }: { user: CrmUser }) {
     },
     refetchInterval: 60 * 1000,
   });
-  const fieldNotifs = (notifications || []).filter((n) =>
-    n.entityType === "work_order" || n.entityType === "task",
-  );
+  // The bell shows EVERYTHING that pushes to this phone — job/task changes,
+  // command-center broadcasts, sensor alerts. The old field-only filter left
+  // invisible unread pinning the icon badge (a "60" you couldn't clear) and
+  // hid the Mark-all-read button behind a count of zero.
+  const fieldNotifs = notifications || [];
   const unreadField = fieldNotifs.filter((n) => !n.isRead);
   const unreadCount = unreadField.length;
 
@@ -411,7 +413,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
         )}
 
       {/* Notifications sheet */}
-      <DraggableSheet open={notifOpen} onOpenChange={setNotifOpen} title="Notifications" testid="sheet-notifications">
+      <DraggableSheet tall open={notifOpen} onOpenChange={setNotifOpen} title="Notifications" testid="sheet-notifications">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-base font-semibold text-slate-800">Notifications</span>
           {unreadCount > 0 && (
@@ -420,7 +422,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
             </button>
           )}
         </div>
-        <div className="-mx-5 max-h-[55vh] overflow-y-auto px-5">
+        <div className="pb-2">
           {fieldNotifs.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-400">You&apos;re all caught up.</p>
           ) : (
