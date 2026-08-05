@@ -479,39 +479,33 @@ export default function CrmWorkOrders() {
       });
   }, [visitType, createDialogOpen]);
 
-  // Fetch checklist questions when SERVICE is selected and workSubtype changes
+  // Every checklist for the chosen type + subtype (dynamic subtypes + the
+  // "ANY" general bucket) — same source the dispatch board uses, so the
+  // creator can PICK which checklist rides the job. The old per-legacy-enum
+  // endpoint couldn't match dynamic subtypes like "Repair AC" at all.
+  const [availableChecklists, setAvailableChecklists] = useState<Array<{ id: string; name: string; questions: ChecklistQuestion[] }>>([]);
   useEffect(() => {
     if (!createDialogOpen) return;
-    if (visitType !== "SERVICE") {
+    if (!workSubtype) {
+      setAvailableChecklists([]);
       setChecklistQuestions([]);
       setChecklistAnswers({});
       setChecklistId(null);
       return;
     }
 
-    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype] || "OTHER";
-
     setChecklistLoading(true);
-    fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })
-      .then(res => {
-        if (!res.ok) {
-          setChecklistQuestions([]);
-          setChecklistId(null);
-          return null;
-        }
-        return res.json();
-      })
+    fetch(`/api/crm/checklists/for-subtype?visitType=${encodeURIComponent(visitType)}&subtype=${encodeURIComponent(workSubtype)}`, { credentials: "include" })
+      .then(res => (res.ok ? res.json() : []))
       .then(data => {
-        if (data && data.questions) {
-          setChecklistQuestions(data.questions);
-          setChecklistId(data.id);
-          setChecklistAnswers({});
-        } else {
-          setChecklistQuestions([]);
-          setChecklistId(null);
-        }
+        const list = Array.isArray(data) ? data : [];
+        setAvailableChecklists(list);
+        setChecklistQuestions(list[0]?.questions ?? []);
+        setChecklistId(list[0]?.id ?? null);
+        setChecklistAnswers({});
       })
       .catch(() => {
+        setAvailableChecklists([]);
         setChecklistQuestions([]);
         setChecklistId(null);
       })
@@ -1002,6 +996,9 @@ export default function CrmWorkOrders() {
         assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
         priority,
         status: "scheduled",
+        // The creator's checklist pick rides the job (server auto-matches
+        // only when nothing is sent)
+        assignedChecklistId: checklistId,
       });
       const workOrder = await res.json();
 
@@ -2197,6 +2194,31 @@ export default function CrmWorkOrders() {
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="bg-amber-50/50 border border-amber-200 rounded-lg p-4 space-y-4">
+                    {/* WHICH checklist rides this job — every match for the
+                        type/subtype plus the General (ANY) bucket */}
+                    {availableChecklists.length > 1 && (
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium text-amber-900">Checklist</Label>
+                        <Select
+                          value={checklistId ?? ""}
+                          onValueChange={(id) => {
+                            const picked = availableChecklists.find((c) => c.id === id);
+                            setChecklistId(id);
+                            setChecklistQuestions(picked?.questions ?? []);
+                            setChecklistAnswers({});
+                          }}
+                        >
+                          <SelectTrigger className="bg-white" data-testid="create-wo-checklist">
+                            <SelectValue placeholder="Pick a checklist" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableChecklists.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     {checklistLoading ? (
                       <div className="space-y-3">
                         <Skeleton className="h-6 w-3/4" />

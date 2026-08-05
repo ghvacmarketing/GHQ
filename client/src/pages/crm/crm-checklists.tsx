@@ -183,7 +183,7 @@ export default function CrmChecklists() {
   const [showCreateChecklist, setShowCreateChecklist] = useState(false);
   const [showEditChecklist, setShowEditChecklist] = useState(false);
   const [showDeleteChecklist, setShowDeleteChecklist] = useState(false);
-  const [checklistForm, setChecklistForm] = useState({ name: "", description: "", isActive: true });
+  const [checklistForm, setChecklistForm] = useState({ name: "", description: "", isActive: true, visitType: "" as ChecklistVisitType | "", serviceType: "" });
 
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<ChecklistQuestion | null>(null);
@@ -553,11 +553,17 @@ export default function CrmChecklists() {
         name: checklistForm.name,
         description: checklistForm.description || null,
         isActive: checklistForm.isActive,
+        ...(checklistForm.visitType ? { visitType: checklistForm.visitType } : {}),
+        ...(checklistForm.serviceType ? { serviceType: checklistForm.serviceType } : {}),
       });
       return res.json();
     },
     onSuccess: () => {
       invalidate();
+      // Re-filed under a different type/subtype: follow it so the canvas
+      // keeps showing the checklist you just edited.
+      if (checklistForm.visitType) setVisitType(checklistForm.visitType);
+      if (checklistForm.serviceType) setSubtype(checklistForm.serviceType);
       setShowEditChecklist(false);
       toast({ title: "Checklist updated" });
     },
@@ -1188,7 +1194,7 @@ export default function CrmChecklists() {
   // ----- dialog openers -----
   const openNewChecklist = () => {
     const subtypeLabel = subtype.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-    setChecklistForm({ name: `${subtypeLabel} Checklist`, description: "", isActive: true });
+    setChecklistForm({ name: `${subtypeLabel} Checklist`, description: "", isActive: true, visitType: (visitType || "SERVICE") as ChecklistVisitType, serviceType: subtype });
     setShowCreateChecklist(true);
   };
 
@@ -1198,6 +1204,8 @@ export default function CrmChecklists() {
       name: checklist.name,
       description: checklist.description || "",
       isActive: checklist.isActive,
+      visitType: ((checklist as any).visitType as ChecklistVisitType) || "SERVICE",
+      serviceType: checklist.serviceType,
     });
     setShowEditChecklist(true);
   };
@@ -1553,6 +1561,17 @@ export default function CrmChecklists() {
               {!checklist.isActive && (
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">Inactive</span>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={openGlobalAI}
+                title="Describe a checklist and Gibbs builds it for your approval"
+                data-testid="button-canvas-gibbs"
+              >
+                <img src={badgeGibbs} alt="" className="mr-1.5 h-4 w-4 select-none" draggable={false} />
+                Gibbs
+              </Button>
               <Button variant="outline" size="sm" className="h-8" onClick={openEditChecklist} data-testid="button-edit-checklist">
                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
               </Button>
@@ -2158,6 +2177,51 @@ export default function CrmChecklists() {
                 onChange={(e) => setChecklistForm({ ...checklistForm, description: e.target.value })}
                 data-testid="input-edit-checklist-description"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Work order type</Label>
+                <Select
+                  value={checklistForm.visitType}
+                  onValueChange={(v) => setChecklistForm({ ...checklistForm, visitType: v as ChecklistVisitType, serviceType: "" })}
+                >
+                  <SelectTrigger data-testid="edit-checklist-visit-type">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {checklistVisitTypeEnum.map((type) => (
+                      <SelectItem key={type} value={type}>{VISIT_TYPE_LABELS[type]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Subtype</Label>
+                <Select
+                  value={checklistForm.serviceType}
+                  onValueChange={(v) => setChecklistForm({ ...checklistForm, serviceType: v })}
+                >
+                  <SelectTrigger data-testid="edit-checklist-subtype">
+                    <SelectValue placeholder="Subtype" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ANY">
+                      <span className="font-medium text-[#711419]">General — any subtype</span>
+                    </SelectItem>
+                    {workOrderSubtypes
+                      .filter((x) => x.visitType === checklistForm.visitType)
+                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                      .map((x) => (
+                        <SelectItem key={x.id} value={x.subtype}>{x.subtype}</SelectItem>
+                      ))}
+                    {checklistForm.serviceType &&
+                      checklistForm.serviceType !== "ANY" &&
+                      !workOrderSubtypes.some((x) => x.visitType === checklistForm.visitType && x.subtype === checklistForm.serviceType) && (
+                        <SelectItem value={checklistForm.serviceType}>{checklistForm.serviceType} (legacy)</SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox
