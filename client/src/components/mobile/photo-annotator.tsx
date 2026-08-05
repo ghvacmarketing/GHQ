@@ -223,9 +223,24 @@ export function PhotoAnnotator({
         </button>
       </div>
 
-      {/* Canvas */}
-      <div ref={wrapRef} className="relative flex min-h-0 flex-1 items-center justify-center p-3">
+      {/* Canvas — the color rail floats on its LEFT edge, out of the
+          drawing hand's way, one thumb-reach from the screen side. */}
+      <div ref={wrapRef} className="relative flex min-h-0 flex-1 items-center justify-center p-3 pl-14">
         {!ready && <Loader2 className="h-8 w-8 animate-spin text-white/60" />}
+        <div className="absolute left-2 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-2 rounded-[8px] border border-white/10 bg-white/10 p-1.5 backdrop-blur" data-testid="annotator-colors">
+          {COLORS.map((c) => (
+            <button
+              key={c}
+              onClick={() => setColor(c)}
+              className={`h-8 w-8 rounded-[6px] border-2 transition-transform active:scale-90 ${
+                color === c ? "scale-110 border-white" : "border-white/25"
+              }`}
+              style={{ background: c }}
+              aria-label={`Color ${c}`}
+              data-testid={`annotator-color-${c.replace("#", "")}`}
+            />
+          ))}
+        </div>
         <canvas
           ref={canvasRef}
           className={`max-h-full max-w-full rounded-[6px] shadow-2xl ${ready ? "" : "hidden"}`}
@@ -253,23 +268,10 @@ export function PhotoAnnotator({
         )}
       </div>
 
-      {/* Toolbar — industrial: squared swatches, hairline segmented tools
-          with the maroon carrying the selected state, create-style Save */}
+      {/* Toolbar — industrial: hairline segmented tools with the maroon
+          carrying the selected state, create-style Save. Colors live on the
+          left rail beside the canvas. */}
       <div className="px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 14px)" }}>
-        <div className="mb-3 flex items-center justify-center gap-2">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className={`h-8 w-8 rounded-[6px] border-2 transition-transform active:scale-90 ${
-                color === c ? "scale-110 border-white" : "border-white/25"
-              }`}
-              style={{ background: c }}
-              aria-label={`Color ${c}`}
-              data-testid={`annotator-color-${c.replace("#", "")}`}
-            />
-          ))}
-        </div>
         <div className="flex items-center gap-2">
           <div className="flex flex-1 items-center gap-1 rounded-[8px] border border-white/10 bg-white/10 p-1 backdrop-blur">
             {TOOLS.map(({ key, label, icon: Icon }) => (

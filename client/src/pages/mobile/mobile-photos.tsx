@@ -1079,7 +1079,8 @@ export default function MobilePhotos() {
             controls
             autoPlay
             playsInline
-            className="max-h-full w-full"
+            preload="auto"
+            className="max-h-full w-full animate-in fade-in duration-200"
           />
         </div>
       )}

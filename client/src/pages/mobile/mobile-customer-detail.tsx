@@ -157,7 +157,16 @@ export default function MobileCustomerDetail() {
   useRequireCrmAuth();
   const entered = usePushEntrance();
   const { id } = useParams<{ id: string }>();
-  const [viewer, setViewer] = useState<CustomerPhoto | null>(null);
+  // Media lightbox — a swipeable pager over ALL the customer's media, opened
+  // at the tapped tile. viewerIdx tracks the visible slide as you swipe.
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerStart, setViewerStart] = useState(0);
+  const [viewerIdx, setViewerIdx] = useState(0);
+  const openViewer = (i: number) => {
+    setViewerStart(i);
+    setViewerIdx(i);
+    setViewerOpen(true);
+  };
   const [editOpen, setEditOpen] = useState(false);
 
   // ── iOS-style tracked back-swipe with the REAL customers page revealed
@@ -475,10 +484,10 @@ export default function MobileCustomerDetail() {
                       <span className="ml-auto text-[11px] font-semibold text-slate-400">{photos.length}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-0.5 p-0.5">
-                      {photos.map((p) => (
+                      {photos.map((p, pi) => (
                         <button
                           key={p.id}
-                          onClick={() => setViewer(p)}
+                          onClick={() => openViewer(pi)}
                           className="relative aspect-square overflow-hidden bg-slate-100"
                           data-testid={`customer-photo-${p.id}`}
                         >
@@ -572,20 +581,26 @@ export default function MobileCustomerDetail() {
         </button>
       )}
 
-      {/* Lightbox — tap a tile, see it big; videos play inline */}
-      {viewer && (
+      {/* Lightbox — a PAGER over all the customer's media: swipe left/right
+          between photos and videos (scroll-snap, so it rides the finger with
+          native momentum). Only the visible video actually mounts + plays —
+          neighbors show a muted first frame, so swiping never stutters and
+          audio can't run from off-screen slides. */}
+      {viewerOpen && photos && photos.length > 0 && (
         <div
           className="fixed inset-0 z-[80] flex flex-col bg-black/95 animate-in fade-in duration-200"
-          onClick={() => setViewer(null)}
           data-testid="customer-photo-viewer"
         >
           <div
-            className="flex items-center justify-between px-3"
+            className="flex items-center justify-between gap-2 px-3"
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)" }}
           >
-            <span className="min-w-0 truncate pr-3 text-sm font-medium text-white/70">{viewer.name}</span>
+            <span className="min-w-0 truncate text-sm font-medium text-white/70">{photos[viewerIdx]?.name || ""}</span>
+            <span className="ml-auto shrink-0 rounded-[4px] border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80 tabular-nums">
+              {Math.min(viewerIdx + 1, photos.length)} / {photos.length}
+            </span>
             <button
-              onClick={() => setViewer(null)}
+              onClick={() => setViewerOpen(false)}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-transform active:scale-95"
               aria-label="Close"
               data-testid="customer-photo-viewer-close"
@@ -593,18 +608,74 @@ export default function MobileCustomerDetail() {
               <X className="h-5 w-5" strokeWidth={2.25} />
             </button>
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center p-3" onClick={(e) => e.stopPropagation()}>
-            {isVideoFile(viewer) ? (
-              <video src={viewer.url} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg" />
-            ) : (
-              <img src={viewer.url} alt={viewer.name} className="max-h-full max-w-full rounded-lg object-contain" />
-            )}
+          <div
+            ref={(el) => {
+              // Land on the tapped tile BEFORE the first paint — a one-shot
+              // per mount (re-renders must not re-jump the scroll).
+              if (el && el.dataset.positioned !== "1") {
+                el.dataset.positioned = "1";
+                el.scrollLeft = viewerStart * el.clientWidth;
+              }
+            }}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+              if (i !== viewerIdx && i >= 0 && i < photos.length) setViewerIdx(i);
+            }}
+            className="scrollbar-hide flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
+            data-testid="customer-photo-pager"
+          >
+            {photos.map((p, i) => {
+              const near = Math.abs(i - viewerIdx) <= 1;
+              const active = i === viewerIdx;
+              return (
+                <div
+                  key={p.id}
+                  className="flex h-full w-full shrink-0 snap-center items-center justify-center p-3"
+                  onClick={() => setViewerOpen(false)}
+                >
+                  {!near ? null : isVideoFile(p) ? (
+                    active ? (
+                      <video
+                        src={p.url}
+                        poster={p.thumbUrl || undefined}
+                        controls
+                        autoPlay
+                        playsInline
+                        preload="auto"
+                        className="max-h-full max-w-full rounded-[6px]"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      /* Neighbor video: muted first frame only — no playback,
+                         no controls, nothing to stutter mid-swipe. */
+                      <video
+                        src={p.url}
+                        poster={p.thumbUrl || undefined}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="max-h-full max-w-full rounded-[6px]"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    )
+                  ) : (
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      className="max-h-full max-w-full rounded-[6px] object-contain"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
           <p
             className="px-4 text-center text-xs text-white/50"
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 14px)" }}
           >
-            {viewer.createdAt ? format(new Date(viewer.createdAt), "MMM d, yyyy · h:mm a") : ""}
+            {photos[viewerIdx]?.createdAt ? format(new Date(photos[viewerIdx]!.createdAt!), "MMM d, yyyy · h:mm a") : ""}
           </p>
         </div>
       )}

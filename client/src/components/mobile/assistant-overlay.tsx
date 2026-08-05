@@ -1554,7 +1554,10 @@ export default function AssistantOverlay({
           // beneath the card instead of clipping at a white band above it.
           style={{
             paddingBottom: `${kbInset + 140}px`,
-            transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+            // iOS keyboard timing (~250ms, its own ease) — anything slower
+            // leaves a white gap hanging between the composer and the keys
+            // for the tail of the slide.
+            transition: "padding-bottom 0.25s cubic-bezier(0.38, 0.7, 0.125, 1)",
           }}
         >
           {hydrating && messages.length === 0 ? (
@@ -1923,7 +1926,7 @@ export default function AssistantOverlay({
           className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3"
           style={{
             paddingBottom: kbInset > 0 ? `${kbInset + 8}px` : "calc(10px + env(safe-area-inset-bottom))",
-            transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+            transition: "padding-bottom 0.25s cubic-bezier(0.38, 0.7, 0.125, 1)",
           }}
         >
           {/* Same centered column as the thread so the bar lines up with the
@@ -2320,7 +2323,7 @@ export default function AssistantOverlay({
             className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 px-3"
             style={{
               paddingBottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(12px + env(safe-area-inset-bottom))",
-              transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+              transition: "padding-bottom 0.25s cubic-bezier(0.38, 0.7, 0.125, 1)",
             }}
           >
             <div className="pointer-events-auto flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-lg">
@@ -2437,7 +2440,7 @@ export default function AssistantOverlay({
             className="absolute inset-x-3 select-none overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-3 duration-200"
             style={{
               bottom: kbInset > 0 ? `${kbInset + 12}px` : "calc(16px + env(safe-area-inset-bottom))",
-              transition: "bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+              transition: "bottom 0.25s cubic-bezier(0.38, 0.7, 0.125, 1)",
               WebkitUserSelect: "none",
               WebkitTouchCallout: "none",
             } as React.CSSProperties}
