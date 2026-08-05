@@ -15804,6 +15804,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actorId: user.id,
           });
         }
+        // End-time-only changes (someone stretched or trimmed the visit on
+        // the dispatch board) change the tech's day too — same self-silent
+        // rule as everything else.
+        const newEnd = updateData.scheduledEnd as Date | null | undefined;
+        const endChanged = newEnd !== undefined &&
+          String(newEnd ? new Date(newEnd).getTime() : null) !== String(existingWorkOrder.scheduledEnd ? new Date(existingWorkOrder.scheduledEnd).getTime() : null);
+        if (!assignmentChanged && !scheduleChanged && endChanged && newEnd && notifyTech && notifyTech !== user.id) {
+          const grew = existingWorkOrder.scheduledEnd ? new Date(newEnd).getTime() > new Date(existingWorkOrder.scheduledEnd).getTime() : true;
+          const untilTime = new Date(newEnd).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+          await db.insert(crmNotifications).values({
+            userId: notifyTech,
+            type: "status_change" as any,
+            title: grew ? "Your job was extended" : "Your job was shortened",
+            preview: `${workOrder?.title || existingWorkOrder.title || "Work order"} — now until ${untilTime}`,
+            entityType: "work_order",
+            entityId: req.params.id,
+            actorId: user.id,
+          });
+        }
       } catch (e) {
         console.error("WO change notification failed:", e);
       }

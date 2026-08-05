@@ -338,11 +338,10 @@ function ProfileHeader({ user }: { user: CrmUser }) {
   const unreadCount = unreadField.length;
 
   const markAllRead = async () => {
-    await Promise.all(
-      unreadField.map((n) =>
-        fetch(`/api/crm/notifications/${n.id}/read`, { method: "PATCH", credentials: "include" }),
-      ),
-    );
+    // ALL of them, one call — the bell only SHOWS field notifications, but
+    // system rows (sensor alerts etc.) count toward the icon badge too; a
+    // filtered per-row sweep left the badge stuck on invisible unread.
+    await fetch("/api/crm/notifications/mark-all-read", { method: "POST", credentials: "include" });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications", "mobile-bell"] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
   };
