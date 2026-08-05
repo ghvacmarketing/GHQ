@@ -1102,6 +1102,12 @@ async function runWaterHeaterSeeds() {
   await runProtectionAndCarePlanSeeds();
   await runWaterHeaterSeeds();
   try {
+    const { seedNoCoolChecklist } = await import("./seed-no-cool-checklist");
+    await seedNoCoolChecklist();
+  } catch (err) {
+    console.error("No-cool checklist seed import error (non-fatal):", err);
+  }
+  try {
     const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
     ensureSalesbookConverted();
   } catch (err) {
