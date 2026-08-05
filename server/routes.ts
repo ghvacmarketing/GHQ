@@ -24291,7 +24291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "Mini Split Repair": "NO_AC",
   };
   const checklistsForSubtype = async (visitType: string, subtype: string) => {
-    const keys = Array.from(new Set([subtype, LEGACY_SUBTYPE_TO_SERVICE_TYPE[subtype] || "OTHER"]));
+    // "ANY" is the general bucket: a checklist filed under it applies to
+    // EVERY subtype of its visit type (assignable to any service call).
+    const keys = Array.from(new Set([subtype, LEGACY_SUBTYPE_TO_SERVICE_TYPE[subtype] || "OTHER", "ANY"]));
     return db.select().from(serviceCallChecklists)
       .where(and(
         eq(serviceCallChecklists.isActive, true),

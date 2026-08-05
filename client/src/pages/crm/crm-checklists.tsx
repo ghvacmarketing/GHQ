@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { openGlobalAI } from "@/components/crm/ghq-search";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -254,7 +256,7 @@ export default function CrmChecklists() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: checklists = [] } = useQuery<ChecklistWithQuestions[]>({
+  const { data: checklists = [], isLoading: checklistsLoading } = useQuery<ChecklistWithQuestions[]>({
     queryKey: ["/api/crm/checklists"],
     enabled: !!currentUser,
   });
@@ -446,7 +448,7 @@ export default function CrmChecklists() {
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       const cur = zoomRef.current;
-      const next = Math.min(1.5, Math.max(0.4, cur * Math.exp(-e.deltaY * 0.0016)));
+      const next = Math.min(2, Math.max(0.25, cur * Math.exp(-e.deltaY * 0.0016)));
       if (next === cur) return;
       const wx = (cx - panRef.current.x) / cur;
       const wy = (cy - panRef.current.y) / cur;
@@ -687,7 +689,7 @@ export default function CrmChecklists() {
 
   // Zoom about the viewport center so the content doesn't jump
   const applyZoom = (next: number) => {
-    next = Math.min(1.5, Math.max(0.4, Math.round(next * 10) / 10));
+    next = Math.min(2, Math.max(0.25, Math.round(next * 10) / 10));
     const vp = viewportRef.current;
     const cur = zoomRef.current;
     if (!vp || next === cur) return;
@@ -908,7 +910,7 @@ export default function CrmChecklists() {
     switch (st.kind) {
       case "flow": {
         const p = worldPoint(e);
-        setFlowPos({ x: Math.max(0, p.x - st.ox), y: Math.max(0, p.y - st.oy) });
+        setFlowPos({ x: p.x - st.ox, y: p.y - st.oy });
         break;
       }
       case "photo-pending": {
@@ -919,7 +921,7 @@ export default function CrmChecklists() {
       }
       case "photo": {
         const p = worldPoint(e);
-        setPhotoPos((prev) => ({ ...prev, [st.id]: { x: Math.max(0, p.x - st.ox), y: Math.max(0, p.y - st.oy) } }));
+        setPhotoPos((prev) => ({ ...prev, [st.id]: { x: p.x - st.ox, y: p.y - st.oy } }));
         break;
       }
       case "step-pending": {
@@ -1389,7 +1391,7 @@ export default function CrmChecklists() {
                 canvas. No header strip: just a light back link and the New
                 button floating in the content. */}
             <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-5">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex items-center justify-between gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1400,16 +1402,37 @@ export default function CrmChecklists() {
                   <ChevronDown className="mr-1 h-4 w-4 rotate-90" />
                   Settings
                 </Button>
-                <Button
-                  size="sm"
-                  className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
-                  onClick={openStartFlow}
-                  data-testid="button-new-checklist-list"
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={openGlobalAI}
+                    title="Describe a checklist and Gibbs builds it for your approval"
+                    data-testid="button-gibbs-build-checklist"
+                  >
+                    <img src={badgeGibbs} alt="" className="mr-1.5 h-4 w-4 select-none" draggable={false} />
+                    Ask Gibbs to build one
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                    onClick={openStartFlow}
+                    data-testid="button-new-checklist-list"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
+                  </Button>
+                </div>
               </div>
-              {checklists.length === 0 ? (
+              {checklistsLoading ? (
+                /* Skeleton cards — without this the empty state (a dashed
+                   canvas-looking tile) flashed before the query landed */
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-28 animate-pulse rounded-[4px] border border-slate-200 bg-white" />
+                  ))}
+                </div>
+              ) : checklists.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <button
                     onClick={openStartFlow}
@@ -1455,7 +1478,7 @@ export default function CrmChecklists() {
                                 )}
                               </div>
                               <p className="mt-0.5 text-xs text-slate-500">
-                                {c.serviceType.replace(/_/g, " ")} · {c.questions?.length ?? 0} steps · {c.photoSteps?.length ?? 0} photo
+                                {(c.serviceType as string) === "ANY" ? "General — any subtype" : c.serviceType.replace(/_/g, " ")} · {c.questions?.length ?? 0} steps · {c.photoSteps?.length ?? 0} photo
                                 {(c.photoSteps?.length ?? 0) !== 1 ? "s" : ""}
                               </p>
                               {c.description && <p className="mt-2 line-clamp-2 text-xs text-slate-400">{c.description}</p>}
@@ -1728,11 +1751,12 @@ export default function CrmChecklists() {
                     height: worldSize.h,
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     transformOrigin: "0 0",
+                    willChange: "transform",
                     transition: panning || wheeling ? "none" : "transform 0.18s ease-out",
                   }}
                 >
                   {/* Arrows (step → photo) */}
-                  <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full">
+                  <svg className="pointer-events-none absolute z-0" style={{ left: -4000, top: -4000, width: worldSize.w + 8000, height: worldSize.h + 8000 }}>
                     <defs>
                       <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
                         <path d="M 0 0.5 L 6 3.5 L 0 6.5 z" fill={MAROON} fillOpacity="0.55" />
@@ -1741,30 +1765,35 @@ export default function CrmChecklists() {
                         <path d="M 0 0.5 L 6 3.5 L 0 6.5 z" fill="#b45309" />
                       </marker>
                     </defs>
-                    {arrows.map((l) => (
-                      <path
-                        key={l.id}
-                        d={l.d}
-                        fill="none"
-                        stroke={MAROON}
-                        strokeWidth={1.5}
-                        strokeOpacity={0.4}
-                        markerEnd="url(#arrowhead)"
-                      />
-                    ))}
-                    {dragLink && (() => {
-                      const sr = stepRectOf(dragLink.stepId);
-                      return sr ? (
+                    {/* The svg is padded 4000px past the world on every side
+                        (cards can live at negative coordinates now) — this
+                        group maps world space back onto it. */}
+                    <g transform="translate(4000, 4000)">
+                      {arrows.map((l) => (
                         <path
-                          d={anchoredPath(sr, { x: dragLink.to.x, y: dragLink.to.y, w: 0, h: 0 })}
+                          key={l.id}
+                          d={l.d}
                           fill="none"
-                          stroke="#b45309"
+                          stroke={MAROON}
                           strokeWidth={1.5}
-                          strokeDasharray="4 4"
-                          markerEnd="url(#arrowhead-live)"
+                          strokeOpacity={0.4}
+                          markerEnd="url(#arrowhead)"
                         />
-                      ) : null;
-                    })()}
+                      ))}
+                      {dragLink && (() => {
+                        const sr = stepRectOf(dragLink.stepId);
+                        return sr ? (
+                          <path
+                            d={anchoredPath(sr, { x: dragLink.to.x, y: dragLink.to.y, w: 0, h: 0 })}
+                            fill="none"
+                            stroke="#b45309"
+                            strokeWidth={1.5}
+                            strokeDasharray="4 4"
+                            markerEnd="url(#arrowhead-live)"
+                          />
+                        ) : null;
+                      })()}
+                    </g>
                   </svg>
 
                   {/* Flow block: the checklist steps */}
@@ -2002,6 +2031,10 @@ export default function CrmChecklists() {
                   <SelectValue placeholder="Select subtype" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* General bucket: applies to EVERY subtype of this type */}
+                  <SelectItem value="ANY">
+                    <span className="font-medium text-[#711419]">General — any subtype</span>
+                  </SelectItem>
                   {sSubtypes.length > 0 ? (
                     sSubtypes.map((x) => (
                       <SelectItem key={x.id} value={x.subtype}>{x.subtype}</SelectItem>

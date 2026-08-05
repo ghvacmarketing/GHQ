@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { serviceCallChecklists, checklistQuestions, checklistPhotoSteps } from "@shared/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 /** One-time seed: the "No Cool — Service Call" checklist, transcribed from
  *  the CompanyCam original (2026-08-05, 16 screenshots, deduped). Runs at
@@ -129,19 +129,46 @@ const PHOTO_STEPS: Array<{ label: string; instructions?: string; linkKey?: strin
   { label: "Thermostat — after service" },
 ];
 
+/** The REAL dispatch subtype for no-cool work ("Repair AC" in the
+ *  work_order_subtypes table) — falls back to legacy NO_AC if the org
+ *  hasn't got one. */
+async function repairAcSubtype(): Promise<string> {
+  try {
+    const rows = (await db.execute(sql`
+      SELECT subtype FROM work_order_subtypes
+      WHERE visit_type = 'SERVICE' AND is_active = true AND lower(subtype) LIKE '%repair%ac%'
+      ORDER BY sort_order LIMIT 1
+    `)) as unknown as { rows?: Array<{ subtype: string }> };
+    return rows.rows?.[0]?.subtype || "NO_AC";
+  } catch {
+    return "NO_AC";
+  }
+}
+
 export async function seedNoCoolChecklist(): Promise<void> {
   try {
+    const targetSubtype = await repairAcSubtype();
+
+    // Relocation fix (idempotent): the first seed filed this under legacy
+    // NO_AC; it belongs with the real "Repair AC" dispatch subtype.
+    if (targetSubtype !== "NO_AC") {
+      await db
+        .update(serviceCallChecklists)
+        .set({ serviceType: targetSubtype as any })
+        .where(and(eq(serviceCallChecklists.name, NAME), eq(serviceCallChecklists.serviceType, "NO_AC" as any)));
+    }
+
     const [existing] = await db
       .select({ id: serviceCallChecklists.id })
       .from(serviceCallChecklists)
-      .where(and(eq(serviceCallChecklists.name, NAME), eq(serviceCallChecklists.serviceType, "NO_AC")));
+      .where(eq(serviceCallChecklists.name, NAME));
     if (existing) return; // seeded once — the canvas owns it from then on
 
     const [checklist] = await db
       .insert(serviceCallChecklists)
       .values({
         visitType: "SERVICE",
-        serviceType: "NO_AC",
+        serviceType: targetSubtype as any,
         name: NAME,
         description:
           "Full no-cool service call flow: client greeting & first-look diagnosis, indoor and outdoor diagnostics, repairs, and visit wrap-up. Transcribed from the CompanyCam checklist.",
