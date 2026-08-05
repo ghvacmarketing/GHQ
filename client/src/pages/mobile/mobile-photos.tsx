@@ -162,6 +162,15 @@ export default function MobilePhotos() {
   const todayJobs = photoStatus?.jobs ?? [];
   const missingPhotoJobs = todayJobs.filter((j) => j.status === "completed" && j.photosToday === 0);
 
+  const isVideo = (f: { contentType?: string | null }) => !!f.contentType?.startsWith("video/");
+  // Kind filter (All / Photos / Videos) — the feed re-queries SERVER-side so
+  // "Videos" pulls the latest 30 VIDEOS, not the videos that happen to
+  // survive a shared 30-row window.
+  const [mediaFilterOpen, setMediaFilterOpen] = useState(false);
+  const [mediaKind, setMediaKind] = useState<"all" | "photos" | "videos">("all");
+  const kindMatch = (f: { contentType?: string | null }) =>
+    mediaKind === "all" || (mediaKind === "videos" ? isVideo(f) : !isVideo(f));
+
   // Recent company-wide photos for the horizontal gallery strip. Tapping one
   // jumps to the customer it's attached to.
   type FeedPhoto = {
@@ -169,9 +178,9 @@ export default function MobilePhotos() {
     customerId: string | null; customerName: string | null; uploadedByName: string | null;
   };
   const { data: recentPhotos = [] } = useQuery<FeedPhoto[]>({
-    queryKey: ["/api/mobile/photos/feed"],
+    queryKey: ["/api/mobile/photos/feed", mediaKind],
     queryFn: async () => {
-      const res = await fetch("/api/mobile/photos/feed", { credentials: "include" });
+      const res = await fetch(`/api/mobile/photos/feed?kind=${mediaKind}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -208,14 +217,6 @@ export default function MobilePhotos() {
   const photos = (files || []).filter(
     (f) => f.contentType?.startsWith("image/") || f.contentType?.startsWith("video/"),
   );
-  const isVideo = (f: { contentType?: string | null }) => !!f.contentType?.startsWith("video/");
-
-  // Kind filter (All / Photos / Videos) — applies to the gallery and the
-  // recent strip alike.
-  const [mediaFilterOpen, setMediaFilterOpen] = useState(false);
-  const [mediaKind, setMediaKind] = useState<"all" | "photos" | "videos">("all");
-  const kindMatch = (f: { contentType?: string | null }) =>
-    mediaKind === "all" || (mediaKind === "videos" ? isVideo(f) : !isVideo(f));
   const shownPhotos = photos.filter(kindMatch);
 
   // Supervisor+ can pull photos down or remove bad shots from the record.
@@ -666,7 +667,20 @@ export default function MobilePhotos() {
                   className="w-56 shrink-0 snap-start overflow-hidden rounded-lg border border-slate-100 bg-white text-left shadow-sm transition-transform active:scale-[0.98]"
                   data-testid={`recent-customer-${c.id}`}
                 >
-                  <img src={c.latest.thumbUrl || c.latest.url} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                  {c.latest.contentType?.startsWith("video/") ? (
+                    <span className="relative block h-28 w-full bg-slate-900">
+                      {c.latest.thumbUrl && (
+                        <img src={c.latest.thumbUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+                      )}
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50">
+                          <Play className="h-4 w-4 fill-white text-white" />
+                        </span>
+                      </span>
+                    </span>
+                  ) : (
+                    <img src={c.latest.thumbUrl || c.latest.url} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                  )}
                   <div className="px-3.5 py-2.5">
                     <p className="truncate text-[14px] font-semibold text-slate-900">{c.name}</p>
                     <p className="mt-0.5 truncate text-[11px] text-slate-500">

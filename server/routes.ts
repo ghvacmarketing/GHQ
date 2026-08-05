@@ -14239,8 +14239,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/mobile/photos/feed - recent company-wide photo strip for the
   // mobile app (tech-accessible; the /api/crm/photos/feed above is admin-only)
-  app.get("/api/mobile/photos/feed", requireCrmTechOrAbove, async (_req, res) => {
+  app.get("/api/mobile/photos/feed", requireCrmTechOrAbove, async (req, res) => {
     try {
+      // ?kind=photos|videos filters SERVER-side: with a shared 30-row window
+      // a busy photo day starved the videos filter to an empty rail.
+      const kind = String(req.query.kind || "all");
+      const kindWhere =
+        kind === "videos"
+          ? sql`${customerFiles.contentType} LIKE 'video/%'`
+          : kind === "photos"
+            ? sql`${customerFiles.contentType} LIKE 'image/%'`
+            : sql`(${customerFiles.contentType} LIKE 'image/%' OR ${customerFiles.contentType} LIKE 'video/%')`;
       const rows = await db.select({
         id: customerFiles.id,
         name: customerFiles.name,
@@ -14255,7 +14264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(customerFiles)
         .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
-        .where(sql`(${customerFiles.contentType} LIKE 'image/%' OR ${customerFiles.contentType} LIKE 'video/%')`)
+        .where(kindWhere)
         .orderBy(desc(customerFiles.createdAt))
         .limit(30);
       res.json(rows);

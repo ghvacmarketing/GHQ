@@ -500,8 +500,10 @@ export default function CrmWorkOrders() {
       .then(data => {
         const list = Array.isArray(data) ? data : [];
         setAvailableChecklists(list);
-        setChecklistQuestions(list[0]?.questions ?? []);
-        setChecklistId(list[0]?.id ?? null);
+        // ONE match auto-rides; several = a real prompt (no silent default)
+        const only = list.length === 1 ? list[0] : null;
+        setChecklistQuestions(only?.questions ?? []);
+        setChecklistId(only?.id ?? null);
         setChecklistAnswers({});
       })
       .catch(() => {
@@ -972,6 +974,12 @@ export default function CrmWorkOrders() {
       // Generate checklist summary (tries AI, falls back to local) and prepend to description
       const checklistSummary = await generateChecklistSummary();
       const finalDescription = checklistSummary + woDescription.trim();
+
+      // Several checklists fit and none was chosen — PROMPT, never default
+      if (availableChecklists.length > 1 && !checklistId) {
+        setShowChecklist(true);
+        throw new Error("Several checklists fit this job — pick one in the checklist section first.");
+      }
 
       // Build schedule times only if we have a date
       let scheduledStartUTC = null;
@@ -2226,6 +2234,8 @@ export default function CrmWorkOrders() {
                         <Skeleton className="h-6 w-2/3" />
                         <Skeleton className="h-10 w-full" />
                       </div>
+                    ) : availableChecklists.length > 1 && !checklistId ? (
+                      <p className="text-sm font-medium text-amber-800">Several checklists fit this job — choose one above before creating.</p>
                     ) : checklistQuestions.length === 0 ? (
                       <p className="text-sm text-amber-700">No checklist questions available for this service type.</p>
                     ) : (
