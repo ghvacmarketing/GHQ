@@ -13,6 +13,8 @@ import type { CrmUser } from "@shared/schema";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 import {
   AI_ACTION_LABELS,
+  AI_ACTION_CATEGORIES,
+  AI_ACTION_CATEGORY_STYLES,
   AiStreamStartError,
   actionLineItems,
   type AiChatMessage as ChatMessage,
@@ -1733,10 +1735,18 @@ export default function AssistantOverlay({
                             )}
                           </>
                         )}
-                        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#711419]">
+                        <p className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#711419]">
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} —{" "}
                           {msg.actionState === "done" ? "approved & ran" : msg.actionState === "executing" ? "running" : "needs your approval"}
+                          {AI_ACTION_CATEGORIES[msg.proposedAction.type] && (
+                            <span
+                              className={`ml-auto rounded-[3px] border px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-wide ${AI_ACTION_CATEGORY_STYLES[AI_ACTION_CATEGORIES[msg.proposedAction.type].key]}`}
+                              data-testid="action-category-chip"
+                            >
+                              {AI_ACTION_CATEGORIES[msg.proposedAction.type].label}
+                            </span>
+                          )}
                         </p>
                         <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                         {editing?.index !== i && <GibbsActionPreview action={msg.proposedAction} />}

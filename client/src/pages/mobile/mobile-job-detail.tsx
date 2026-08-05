@@ -229,6 +229,8 @@ function OverviewTab({
   onGoTab: (tab: string) => void;
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
+  // Photos door opens the camera RIGHT HERE, aimed at this job's customer
+  const [ovCameraOpen, setOvCameraOpen] = useState(false);
   const displayStatus = optimisticStatus || workOrder.status;
   const status = statusConfig[displayStatus] || statusConfig.scheduled;
   const customerName = workOrder.customer?.name || "Unknown Customer";
@@ -470,24 +472,22 @@ function OverviewTab({
         </Card>
       )}
 
-      {/* Section doors — the welcome-screen card language (icon plate,
-          title, sub, arrow) so a tech reads them as BUTTONS at a glance */}
+      {/* Section doors — welcome-screen card language (title, sub, arrow;
+          no icon plates) so a tech reads them as BUTTONS at a glance.
+          Photos opens the camera RIGHT HERE aimed at this job's customer. */}
       <div className="space-y-2.5" data-testid="job-tiles">
         {[
-          { key: "checklist", icon: Wrench, title: "Checklist", sub: "Tasks, notes & wrap-up", go: () => onGoTab("work") },
-          { key: "photos", icon: Camera, title: "Photos", sub: "Job-site photos & videos", go: () => goNavigate("/mobile/photos") },
-          { key: "quote", icon: FileText, title: "Quote", sub: "Build & present", go: () => onGoTab("quote") },
-          { key: "invoice", icon: Receipt, title: "Invoice", sub: "Collect payment", go: () => onGoTab("invoice") },
-        ].map(({ key, icon: Icon, title, sub, go }) => (
+          { key: "checklist", title: "Checklist", sub: "Tasks, notes & wrap-up", go: () => onGoTab("work") },
+          { key: "photos", title: "Photos", sub: "Snap job-site photos — straight to the customer", go: () => workOrder.customerId && setOvCameraOpen(true) },
+          { key: "quote", title: "Quote", sub: "Build & present", go: () => onGoTab("quote") },
+          { key: "invoice", title: "Invoice", sub: "Collect payment", go: () => onGoTab("invoice") },
+        ].map(({ key, title, sub, go }) => (
           <button
             key={key}
             onClick={go}
             className="flex w-full items-center gap-3.5 rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-transform active:scale-[0.99] active:bg-slate-50"
             data-testid={`tile-${key}`}
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
-              <Icon className="h-5 w-5" strokeWidth={1.75} />
-            </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-semibold text-slate-900">{title}</span>
               <span className="mt-0.5 block text-[12px] leading-snug text-slate-500">{sub}</span>
@@ -496,6 +496,13 @@ function OverviewTab({
           </button>
         ))}
       </div>
+      {ovCameraOpen && workOrder.customerId && (
+        <CustomerCamera
+          customerId={workOrder.customerId}
+          customerName={workOrder.customer?.name || "Customer"}
+          onClose={() => setOvCameraOpen(false)}
+        />
+      )}
 
       {/* Schedule */}
       <Card className="rounded-lg border-slate-100 shadow-sm" data-testid="card-schedule">

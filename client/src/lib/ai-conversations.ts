@@ -5,7 +5,7 @@
 export type AiProposedAction = {
   // "fill_form" is create-copilot only: applied straight to the open form,
   // never rendered as an approval card and never persisted.
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "fill_form";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_checklist" | "create_item" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -36,7 +36,40 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   create_invoice: "New invoice — draft",
   delete_quote: "Delete quote — permanent",
   log_call: "Log a call",
+  create_checklist: "New checklist template",
+  create_item: "New price book item",
   fill_form: "Filled the form",
+};
+
+/** What KIND of thing an action touches — rendered as a chip on the approval
+ *  card so a glance says how far the blast radius reaches:
+ *  - ops: day-to-day records (jobs, tasks, customers, quotes, the log)
+ *  - outbound: leaves the building (texts, emails a customer will read)
+ *  - builder: company setup — templates/catalog the whole team runs on
+ *    (supervisor+ approval; a bad one shapes every future job) */
+export const AI_ACTION_CATEGORIES: Record<string, { key: "ops" | "outbound" | "builder"; label: string }> = {
+  create_task: { key: "ops", label: "Day-to-day" },
+  create_work_order: { key: "ops", label: "Day-to-day" },
+  create_customer: { key: "ops", label: "Day-to-day" },
+  update_customer: { key: "ops", label: "Day-to-day" },
+  delete_customer: { key: "ops", label: "Day-to-day" },
+  delete_work_order: { key: "ops", label: "Day-to-day" },
+  create_quote: { key: "ops", label: "Day-to-day" },
+  create_invoice: { key: "ops", label: "Day-to-day" },
+  delete_quote: { key: "ops", label: "Day-to-day" },
+  log_call: { key: "ops", label: "Day-to-day" },
+  send_sms: { key: "outbound", label: "Sends to customer" },
+  send_email: { key: "outbound", label: "Sends to customer" },
+  create_checklist: { key: "builder", label: "Company setup" },
+  create_item: { key: "builder", label: "Company setup" },
+};
+
+/** Chip styling per category — maroon for outbound (it LEAVES the building),
+ *  amber for builder (it changes the system for everyone), slate for ops. */
+export const AI_ACTION_CATEGORY_STYLES: Record<"ops" | "outbound" | "builder", string> = {
+  ops: "border-slate-300/70 bg-slate-100 text-slate-600",
+  outbound: "border-[#711419]/25 bg-[#711419]/10 text-[#711419]",
+  builder: "border-amber-300 bg-amber-50 text-amber-800",
 };
 
 /** Normalized line items for quote/invoice approval cards, with the total the

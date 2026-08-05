@@ -173,6 +173,9 @@ export default function CrmChecklists() {
   const [visitType, setVisitType] = useState<ChecklistVisitType | "">("");
   const [subtype, setSubtype] = useState("");
   const [checklistId, setChecklistId] = useState("");
+  // The page opens on a LIST of every checklist; picking one (or starting a
+  // new flow) drops into the canvas. Back from the canvas returns here.
+  const [view, setView] = useState<"list" | "canvas">("list");
 
   // Dialogs
   const [showCreateChecklist, setShowCreateChecklist] = useState(false);
@@ -1174,6 +1177,7 @@ export default function CrmChecklists() {
       setSubtype(sST);
       setChecklistId(created ? created.id : sPick);
       setStartOpen(false);
+      setView("canvas");
       if (created) toast({ title: "Checklist created" });
     },
     onError,
@@ -1379,17 +1383,104 @@ export default function CrmChecklists() {
   return (
     <CrmLayout currentUser={currentUser} disableScroll flush>
       <div className="flex min-h-0 flex-1 flex-col">
+        {view === "list" ? (
+          <>
+            {/* Gallery — every checklist at a glance; click to edit on the canvas */}
+            <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-5 py-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate("/crm/settings")}
+                data-testid="button-back-to-settings"
+              >
+                <ChevronDown className="mr-1 h-4 w-4 rotate-90" />
+                Settings
+              </Button>
+              <div className="mr-2 hidden h-5 w-px bg-slate-200 sm:block" />
+              <ClipboardList className="h-4 w-4 text-[#711419]" />
+              <span className="text-sm font-semibold text-slate-900">Checklists</span>
+              <Button
+                size="sm"
+                className="ml-auto h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                onClick={openStartFlow}
+                data-testid="button-new-checklist-list"
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> New checklist
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-5">
+              {checklists.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <button
+                    onClick={openStartFlow}
+                    className="rounded-lg border-2 border-dashed border-slate-300 bg-white/70 px-10 py-8 text-center transition-colors hover:border-[#711419] hover:bg-white"
+                    data-testid="checklist-list-empty-new"
+                  >
+                    <ClipboardList className="mx-auto mb-3 h-8 w-8 text-slate-400" />
+                    <p className="text-sm font-semibold text-slate-700">Create your first checklist</p>
+                    <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                      Pick a work order type and subtype, then build the flow on the canvas.
+                    </p>
+                  </button>
+                </div>
+              ) : (
+                checklistVisitTypeEnum
+                  .filter((vt) => checklists.some((c) => (((c as any).visitType as string) || "SERVICE") === vt))
+                  .map((vt) => (
+                    <div key={vt} className="mb-6">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {VISIT_TYPE_LABELS[vt]}
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {checklists
+                          .filter((c) => (((c as any).visitType as string) || "SERVICE") === vt)
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                setVisitType(vt);
+                                setSubtype(c.serviceType);
+                                setChecklistId(c.id);
+                                setView("canvas");
+                              }}
+                              className="rounded-[4px] border border-slate-300/70 bg-white p-4 text-left shadow-sm transition-all hover:border-[#711419]/40 hover:shadow"
+                              data-testid={`checklist-card-${c.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-semibold text-slate-900">{c.name}</p>
+                                {!c.isActive && (
+                                  <span className="shrink-0 rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                                    Inactive
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {c.serviceType.replace(/_/g, " ")} · {c.questions?.length ?? 0} steps · {c.photoSteps?.length ?? 0} photo
+                                {(c.photoSteps?.length ?? 0) !== 1 ? "s" : ""}
+                              </p>
+                              {c.description && <p className="mt-2 line-clamp-2 text-xs text-slate-400">{c.description}</p>}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </>
+        ) : (
+          <>
         {/* Toolbar: the flow selection (type → subtype → checklist) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-5 py-3">
           <Button
             variant="ghost"
             size="sm"
             className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate("/crm/settings")}
+            onClick={() => setView("list")}
             data-testid="button-back-to-settings"
           >
             <ChevronDown className="mr-1 h-4 w-4 rotate-90" />
-            Settings
+            Checklists
           </Button>
           <div className="mr-2 hidden h-5 w-px bg-slate-200 sm:block" />
           <ClipboardList className="h-4 w-4 text-[#711419]" />
@@ -1862,6 +1953,8 @@ export default function CrmChecklists() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {/* Start flow */}

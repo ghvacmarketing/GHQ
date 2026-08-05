@@ -367,7 +367,7 @@ export interface ProposedAction {
   // "fill_form" is create-copilot only: it patches the form on the user's
   // screen (nothing saves until they tap Create) and is never persisted or
   // executable through /execute-action.
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "fill_form";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_checklist" | "create_item" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -415,7 +415,7 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call"] },
+            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call", "create_checklist", "create_item"] },
             summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
             params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
           },
@@ -1025,13 +1025,17 @@ Action types and their params:
    params: { "customerName": string (required), "invoiceKind": "quick" | "from_quote" | "deposit" (required), "workOrderTitle"/"workOrderId": string (optional — which visit, for quick), "quoteNumber"/"quoteId": string (optional — which quote, for from_quote/deposit), "depositAmount": number (optional, dollars), "depositPercent": number (optional), "lineItems": array of 1-15 { "description", "quantity", "unitPrice" } (REQUIRED for quick, OMIT otherwise), "notes": string (optional) }
 11. delete_quote — deletes one quote. Only propose on an explicit delete/remove request. The server refuses accepted quotes and quotes an invoice was billed from, and asks the user to pick when the customer has several. params: { "customerName": string (required), "quoteNumber": string (optional — if the user said it or your lookup shows it), "quoteId": string (optional — ONLY from a lookup) }
 12. log_call — adds an entry to TODAY's call log (the Phone page's shared log of who called and why), so someone on the road can dictate a call right after hanging up ("log a call from Mrs. Jenkins, her heat pump is icing up again", "add to the call log: Brian Smith called about his invoice"). Write the description as a clean one-or-two-sentence summary of what the call was about, keeping every concrete detail the user said (symptoms, addresses, promises made, callback times). The caller does NOT need to be an existing CRM customer — log the name exactly as given. params: { "clientName": string (required — who called), "description": string (required — what the call was about), "phone": string (optional — the caller's number if the user said it), "tag": "service" | "install" | "sales" | "maintenance" | "billing" | "other" (optional — categorize when obvious), "billable": boolean (optional — only if the user says it's billable work) }
+
+BUILDER ACTIONS — the two below change COMPANY SETUP (templates and the catalog the whole team runs on), not day-to-day records. Only supervisors, admins, and the owner can approve them — if the current user is a tech or sales, say so instead of proposing. Design them with care and show your plan in the answer before the card: these shape how every future job runs.
+13. create_checklist — builds a complete service checklist template (what techs fill on jobs; lands in Settings → Checklists, editable on the canvas). Compose the checklist YOURSELF from what the user describes plus your HVAC knowledge: group steps into logical sections (e.g. "Client Greeting", "Diagnostics — Indoor Unit", "Visit Wrap-Up"), pick the right questionType per step (yes_no for confirmations, select with options for graded/branching readings — include "N/A" where a step can be skipped, text for readings and notes, multi_select for pick-many), mark truly critical steps isRequired, and put scripts/guidance in helpText. Add photoSteps for anything worth documenting visually. In your answer, sketch the section outline BEFORE the card so the user can adjust. params: { "name": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (required), "serviceType": string (required — the work order subtype key, e.g. "NO_AC", "NO_HEAT", "WATER_LEAK"; ask which subtype it belongs to if unclear), "description": string (optional), "questions": array of { "section": string (optional — group label), "question": string, "questionType": "yes_no" | "text" | "number" | "select" | "multi_select", "options": string[] (required for select/multi_select), "isRequired": boolean (optional), "helpText": string (optional — scripts, expected ranges) } (required, in order), "photoSteps": array of { "label": string, "instructions": string (optional), "isRequired": boolean (optional, default true) } (optional) }
+14. create_item — adds an item to the price book (the catalog quotes and invoices pull from). Confirm the sell price before proposing if the user didn't give one — never invent prices. params: { "name": string (required), "rate": number (required — sell price in dollars), "costPrice": number (optional — our cost), "itemType": "parts" | "equipment" | "material" | "service" | "discount" | "agreement" | "residential" | "commercial" | "crawlspace" (optional), "category": "install" | "service" | "maintenance" | "discount" | "protection" | "field_edge" (optional), "unit": string (optional, default "each"), "partNumber": string (optional), "description": string (optional) }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_checklist" | "create_item", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
 - replacesPrevious: true ONLY when proposedActions replaces earlier still-un-approved proposal(s) per the ADJUSTMENTS rules — omit otherwise${modeSection}${copilotSection}`;
     
     // Build message array: system + prior turns + current question.
@@ -1057,7 +1061,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "fill_form") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -1227,7 +1231,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "fill_form") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&

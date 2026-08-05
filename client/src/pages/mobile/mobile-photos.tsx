@@ -28,6 +28,12 @@ export default function MobilePhotos() {
   // The customer photos get attached to — always chosen via search.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null; customerType?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
+  // Filter-by-customer mode: the page shows ONLY that customer's media —
+  // no Today's jobs, no rails — until the filter is cleared.
+  const [customerOnly, setCustomerOnly] = useState(false);
+  // What a search pick MEANS: "target" = save-media-to flow (sheet stays,
+  // capture actions appear); "filter" = browse their media on the page.
+  const searchIntent = useRef<"target" | "filter">("target");
   const [customerSearch, setCustomerSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   // The picker works exactly like the address finder: the input only MOUNTS
@@ -117,6 +123,13 @@ export default function MobilePhotos() {
     if (c.id !== pickedCustomer?.id) setPendingShots([]);
     setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null, customerType: c.customerType ?? null });
     setCustomerSearch("");
+    if (searchIntent.current === "filter") {
+      // Browsing, not saving: close the sheet and show ONLY their media.
+      searchIntent.current = "target";
+      setCustomerOnly(true);
+      closeSearch();
+      return;
+    }
     // The sheet STAYS — search swaps for the capture actions in place;
     // only the keyboard drops.
     searchInputRef.current?.blur();
@@ -328,6 +341,7 @@ export default function MobilePhotos() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [camReady, setCamReady] = useState(false);
   const [flash, setFlash] = useState(false);
   // Shots appear instantly with a local preview while uploading in the
   // background. Each keeps its File (tap-to-edit re-opens it in markup) and
@@ -377,6 +391,7 @@ export default function MobilePhotos() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraOpen(false);
+    setCamReady(false);
     // Land back on the sheet with the session's shots laid out — the recap
     // (and tap-to-edit) lives there, not somewhere off in the page.
     if (pendingShots.length > 0) setSearchActive(true);
@@ -512,7 +527,7 @@ export default function MobilePhotos() {
           >
             <ListFilter className="h-4 w-4" />
             Filters
-            {mediaKind !== "all" && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
+            {(mediaKind !== "all" || customerOnly) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#711419]" />}
           </button>
           {!isTechRole && (
             <button
@@ -526,8 +541,29 @@ export default function MobilePhotos() {
           )}
         </div>
 
+        {/* Customer-filter chip — everything else stands down until cleared */}
+        {customerOnly && activeCustomer && (
+          <div className="flex items-center gap-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.06] px-3.5 py-2.5" data-testid="customer-filter-chip">
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">
+              {activeCustomer.name}
+              <span className="font-normal text-slate-500"> — all media</span>
+            </p>
+            <button
+              onClick={() => {
+                setCustomerOnly(false);
+                setPickedCustomer(null);
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 active:scale-95"
+              aria-label="Clear customer filter"
+              data-testid="customer-filter-clear"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Missing-photos nudge: finished jobs with zero shots on record */}
-        {missingPhotoJobs.length > 0 && (
+        {!customerOnly && missingPhotoJobs.length > 0 && (
           <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-3.5 py-2.5" data-testid="missing-photos-nudge">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800">
               <Camera className="h-4 w-4" />
@@ -539,7 +575,7 @@ export default function MobilePhotos() {
 
         {/* Today's jobs — photo coverage per job; tap to target that customer.
             The section never disappears: an empty card explains itself. */}
-        {!techBlocked && (
+        {!customerOnly && !techBlocked && (
           <div data-testid="today-photo-jobs">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
             {todayJobs.length === 0 ? (
@@ -597,7 +633,7 @@ export default function MobilePhotos() {
           </div>
         )}
 
-        {techBlocked && (
+        {!customerOnly && techBlocked && (
           <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-4 py-4 text-center" data-testid="tech-offsite-banner">
             <p className="text-sm font-semibold text-amber-900">You're not on site at a job</p>
             <p className="mt-1 text-xs text-amber-800">
@@ -619,7 +655,7 @@ export default function MobilePhotos() {
         />
 
         {/* Customers with recent photo activity — larger cards, more info */}
-        {recentCustomers.length > 0 && (
+        {!customerOnly && recentCustomers.length > 0 && (
           <div className="pt-1" data-testid="recent-customers">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Customers</p>
             <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4 scrollbar-hide">
@@ -646,7 +682,7 @@ export default function MobilePhotos() {
         )}
 
         {/* Recent photos across the company — tap to open who it's linked to */}
-        {recentPhotos.filter(kindMatch).length > 0 && (
+        {!customerOnly && recentPhotos.filter(kindMatch).length > 0 && (
           <div className="pt-1" data-testid="recent-photos">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
             <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4 scrollbar-hide">
@@ -772,9 +808,13 @@ export default function MobilePhotos() {
       <DraggableSheet tall open={mediaFilterOpen} onOpenChange={setMediaFilterOpen} title="Filter media" testid="sheet-media-filter">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
-          {mediaKind !== "all" && (
+          {(mediaKind !== "all" || customerOnly) && (
             <button
-              onClick={() => setMediaKind("all")}
+              onClick={() => {
+                setMediaKind("all");
+                setCustomerOnly(false);
+                setPickedCustomer(null);
+              }}
               className="text-sm font-semibold text-[#711419]"
               data-testid="media-filter-clear"
             >
@@ -794,6 +834,25 @@ export default function MobilePhotos() {
             ]}
             testid="media-filter"
           />
+          {/* Filter by CUSTOMER — search, pick, and the page shows only
+              their media until cleared */}
+          <button
+            onClick={() => {
+              setMediaFilterOpen(false);
+              searchIntent.current = "filter";
+              setCustomerSearch("");
+              setPickedCustomer(null);
+              setTimeout(() => setSearchActive(true), 120);
+            }}
+            className="flex min-h-[52px] w-full items-center justify-between gap-3 py-3 text-left"
+            data-testid="media-filter-customer"
+          >
+            <span className="text-sm font-medium text-slate-700">Customer</span>
+            <span className="flex items-center gap-1.5 text-sm text-slate-500">
+              {customerOnly && activeCustomer ? activeCustomer.name : "Any"}
+              <Search className="h-4 w-4 text-slate-400" />
+            </span>
+          </button>
         </div>
       </DraggableSheet>
 
@@ -906,6 +965,43 @@ export default function MobilePhotos() {
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
                 Add from Library
               </button>
+
+              {/* Everything already on file for this customer — scrollable
+                  right here in the sheet; tap to view full-screen. */}
+              {photos.length > 0 && (
+                <div className="pt-1">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    Their media ({photos.length})
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5 pb-4" data-testid="sheet-customer-media">
+                    {photos.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setSearchActive(false);
+                          if (isVideo(p)) setVideoViewer({ src: p.url, name: p.name, poster: p.thumbUrl });
+                          else setViewer({ src: p.url, name: p.name });
+                        }}
+                        className="relative aspect-square overflow-hidden rounded-[6px] border border-slate-300/70 bg-slate-100"
+                        data-testid={`sheet-media-${p.id}`}
+                      >
+                        {isVideo(p) ? (
+                          <>
+                            {p.thumbUrl && <img src={p.thumbUrl} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50">
+                                <Play className="h-3.5 w-3.5 fill-white text-white" />
+                              </span>
+                            </span>
+                          </>
+                        ) : (
+                          <img src={p.thumbUrl || p.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -1101,18 +1197,21 @@ export default function MobilePhotos() {
       {cameraOpen &&
         createPortal(
         <div className="fixed inset-0 z-[60] flex flex-col bg-black" data-testid="camera-overlay">
+          {/* Hidden until real stream dimensions arrive — the object-cover
+              reframe nudged the preview visibly on every open. */}
           <video
             ref={videoRef}
             playsInline
             muted
             autoPlay
-            className="min-h-0 flex-1 object-cover"
+            onLoadedMetadata={() => setCamReady(true)}
+            className={`min-h-0 flex-1 object-cover transition-opacity duration-200 ${camReady ? "opacity-100" : "opacity-0"}`}
           />
           {flash && <div className="pointer-events-none absolute inset-0 bg-white/80" />}
 
-          {/* Top chrome: close · target chip · session count */}
+          {/* Top chrome: close · session count */}
           <div
-            className="absolute inset-x-0 flex items-center gap-2 px-3"
+            className="absolute inset-x-0 flex items-center justify-between gap-2 px-3"
             style={{ top: "calc(10px + env(safe-area-inset-top))" }}
           >
             <button
@@ -1123,10 +1222,6 @@ export default function MobilePhotos() {
             >
               <X className="h-5 w-5" />
             </button>
-            <div className="min-w-0 flex-1 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 backdrop-blur">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Saving to</p>
-              <p className="truncate text-sm font-semibold leading-tight text-white">{activeCustomer?.name || "Customer"}</p>
-            </div>
             {pendingShots.length > 0 && (
               <div className="shrink-0 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 text-center backdrop-blur" data-testid="camera-shot-count">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Shots</p>
@@ -1165,8 +1260,9 @@ export default function MobilePhotos() {
                 ))}
               </div>
             )}
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">
-              {pendingShots.length > 0 ? "Tap a shot to edit · auto-saves" : "Every shot auto-saves"}
+            <p className="max-w-[85%] truncate text-center text-sm font-semibold text-white" data-testid="camera-customer-name">
+              {activeCustomer?.name || "Customer"}
+              {pendingShots.length > 0 && <span className="font-normal text-white/50"> · tap a shot to edit</span>}
             </p>
             <div className="grid w-full grid-cols-3 items-center px-6">
               <span aria-hidden />

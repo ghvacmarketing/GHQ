@@ -553,6 +553,10 @@ The Phone page keeps a shared day-by-day call log: each entry records who called
 ### Logging a call through Gibbs
 Gibbs can add an entry to TODAY's call log as an approval-gated action (log_call) — useful when someone on the road answers the phone and dictates what the call was about right after hanging up ("log a call from Mrs. Jenkins, her heat pump is icing up again"). Gibbs prepares the entry (caller, summary, optional phone/tag/billable) and nothing is saved until the user approves the card. The entry lands on the Phone page's log for today under the approving user's name.
 
+Gibbs can also BUILD company setup, approval-gated like everything else, but marked on the approval card with an amber "Company setup" chip because these shape how the whole team works (day-to-day actions carry a slate "Day-to-day" chip; texts/emails a maroon "Sends to customer" chip). Builder actions require supervisor, admin, or owner to approve — techs and sales can ask, but the server refuses their approval:
+- create_checklist — Gibbs composes a full checklist template from a description ("build me a no-heat service checklist"): sections, ordered questions with the right answer types (yes/no, text, selects with options, multi-select), required flags, help-text scripts, and required photo steps. It lands in Settings → Checklists ready to fine-tune on the canvas, and auto-assigns to matching jobs like any checklist.
+- create_item — Gibbs adds a price book item (name, sell price, optional cost/type/category/unit/part number). Gibbs never invents prices — it confirms the sell price first. The item is immediately available to quotes and invoices.
+
 ---
 
 ## NOTIFICATIONS
@@ -813,7 +817,7 @@ The Environment Monitoring page (/crm/analytics, sidebar: Operations) is a live 
 The Rebate Programs page (/crm/rebate-programs, sidebar: Operations) tracks HEAR and HER utility/government rebate cases. Search by client/address/case number; quick filters (All, In Progress, Waiting on Customer, Scope Needed, Approved, Closed); table shows case #, customer, program, status, priority, assignee, workflow step, rebate amount, application date. "New Case" requires the Neighborly case number, then links an existing CRM customer (auto-fills contact info) or manual details.
 
 ## CHECKLIST CANVAS
-The Checklist Canvas (/crm/checklists, reached from Settings → Service Checklists) is a node-based visual editor for authoring the checklists techs complete in the field. Pick a work order type → subtype → checklist, then edit on a pannable/zoomable canvas: ordered question steps grouped into collapsible sections, drag to reorder, plus free-floating photo steps (label, instructions, required toggle) that can be linked to specific questions with drag connectors.
+The Checklists page (/crm/checklists, reached from Settings → Service Checklists) opens on a GALLERY of every checklist — cards grouped by visit type showing name, subtype, step/photo counts, and active status. Click a card to edit that checklist on the canvas, or "New checklist" to start one. The Checklist Canvas itself is a node-based visual editor: ordered question steps grouped into collapsible sections, drag to reorder, plus free-floating photo steps (label, instructions, required toggle) that can be linked to specific questions with drag connectors. The canvas's back button returns to the gallery.
 
 ## INSTALL PLANNER
 The Install Planner (/crm/install-planner) is a capacity-planning board for tentative and sold installs. Calendar view: drag across days to create a hold, drag/resize blocks, cross month boundaries. Timeline view: Gantt-style bars per crew, draggable across dates and crews; crews can be added/renamed/deleted. Blocks carry confidence (High/Medium/Low, dashed) or Sold (solid green) styling; a "Crews/day" setting caps daily capacity. Each block links a CRM customer with dates, crew, estimated value, and notes; a "Sell" action converts a hold to Sold.

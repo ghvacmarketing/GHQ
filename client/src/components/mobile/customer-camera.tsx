@@ -22,6 +22,7 @@ export function CustomerCamera({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [flash, setFlash] = useState(false);
+  const [viewReady, setViewReady] = useState(false);
   const [shots, setShots] = useState<Array<{ id: string; url: string; status: "uploading" | "done" | "error"; file: File; serverId?: string }>>([]);
   const replacedIds = useRef<Set<string>>(new Set());
   const [editShot, setEditShot] = useState<{ id: string; url: string; file: File; serverId?: string } | null>(null);
@@ -136,11 +137,21 @@ export function CustomerCamera({
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex flex-col bg-black" data-testid="job-camera-overlay">
-      <video ref={videoRef} playsInline muted autoPlay className="min-h-0 flex-1 object-cover" />
+      {/* Hidden until the stream reports real dimensions — object-cover
+          reframes when they arrive, which nudged the preview visibly on
+          every open. */}
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        autoPlay
+        onLoadedMetadata={() => setViewReady(true)}
+        className={`min-h-0 flex-1 object-cover transition-opacity duration-200 ${viewReady ? "opacity-100" : "opacity-0"}`}
+      />
       {flash && <div className="pointer-events-none absolute inset-0 bg-white/80" />}
 
       <div
-        className="absolute inset-x-0 flex items-center gap-2 px-3"
+        className="absolute inset-x-0 flex items-center justify-between gap-2 px-3"
         style={{ top: "calc(10px + env(safe-area-inset-top))" }}
       >
         <button
@@ -151,10 +162,6 @@ export function CustomerCamera({
         >
           <X className="h-5 w-5" />
         </button>
-        <div className="min-w-0 flex-1 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 backdrop-blur">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Saving to</p>
-          <p className="truncate text-sm font-semibold leading-tight text-white">{customerName}</p>
-        </div>
         {shots.length > 0 && (
           <div className="shrink-0 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 text-center backdrop-blur">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Shots</p>
@@ -193,8 +200,9 @@ export function CustomerCamera({
             ))}
           </div>
         )}
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">
-          {shots.length > 0 ? "Tap a shot to edit · auto-saves" : "Every shot auto-saves"}
+        <p className="max-w-[85%] truncate text-center text-sm font-semibold text-white" data-testid="job-camera-customer">
+          {customerName}
+          {shots.length > 0 && <span className="font-normal text-white/50"> · tap a shot to edit</span>}
         </p>
         <div className="grid w-full grid-cols-3 items-center px-6">
           <span aria-hidden />

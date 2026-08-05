@@ -5,6 +5,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
 import {
   AI_ACTION_LABELS,
+  AI_ACTION_CATEGORIES,
+  AI_ACTION_CATEGORY_STYLES,
   type AiChatMessage,
   type AiConversationSummary,
   type AiHelpPayload,
@@ -1017,7 +1019,7 @@ export default function AiAssistantModal() {
                                 )}
                               </>
                             )}
-                            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
+                            <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
                               <ShieldCheck className="h-3.5 w-3.5" />
                               {AI_ACTION_LABELS[msg.proposedAction.type] || "Action"} —{" "}
                               {msg.actionState === "done"
@@ -1027,6 +1029,14 @@ export default function AiAssistantModal() {
                                   : viewUser
                                     ? `awaiting ${viewUser.name}'s approval`
                                     : "needs your approval"}
+                              {AI_ACTION_CATEGORIES[msg.proposedAction.type] && (
+                                <span
+                                  className={`ml-auto rounded-[3px] border px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-wide ${AI_ACTION_CATEGORY_STYLES[AI_ACTION_CATEGORIES[msg.proposedAction.type].key]}`}
+                                  data-testid="action-category-chip"
+                                >
+                                  {AI_ACTION_CATEGORIES[msg.proposedAction.type].label}
+                                </span>
+                              )}
                             </p>
                             <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
                             {editing?.index !== i && <GibbsActionPreview action={msg.proposedAction} />}

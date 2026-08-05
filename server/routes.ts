@@ -2937,6 +2937,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
             billable: z.boolean().optional(),
           }).strict(),
         }),
+        // ── Builder actions (company setup — supervisor+ only, gated below) ──
+        z.object({
+          type: z.literal("create_checklist"),
+          params: z.object({
+            name: z.string().trim().min(1).max(120),
+            visitType: z.enum(["SERVICE", "MAINTENANCE", "INSTALL", "SALES"]),
+            serviceType: z.string().trim().min(1).max(40),
+            description: z.string().max(600).optional(),
+            questions: z.array(
+              z.object({
+                section: z.string().trim().max(80).optional(),
+                question: z.string().trim().min(1).max(300),
+                questionType: z.enum(["yes_no", "text", "number", "select", "multi_select"]),
+                options: z.array(z.string().trim().min(1).max(120)).max(12).optional(),
+                isRequired: z.boolean().optional(),
+                helpText: z.string().max(400).optional(),
+              }).strict(),
+            ).min(1).max(120),
+            photoSteps: z.array(
+              z.object({
+                label: z.string().trim().min(1).max(120),
+                instructions: z.string().max(300).optional(),
+                isRequired: z.boolean().optional(),
+              }).strict(),
+            ).max(30).optional(),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("create_item"),
+          params: z.object({
+            name: z.string().trim().min(1).max(200),
+            rate: z.number().min(0).max(1_000_000),
+            costPrice: z.number().min(0).max(1_000_000).optional(),
+            itemType: z.enum(["parts", "equipment", "material", "service", "discount", "agreement", "residential", "commercial", "crawlspace"]).optional(),
+            category: z.enum(["install", "service", "maintenance", "discount", "protection", "field_edge"]).optional(),
+            unit: z.string().trim().max(30).optional(),
+            partNumber: z.string().trim().max(80).optional(),
+            description: z.string().max(1000).optional(),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -2944,6 +2984,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const action = parsedAction.data;
       console.log(`[AI Action] ${user.name} (${user.id}) approved ${action.type}:`, JSON.stringify(action.params));
+
+      // Builder actions change COMPANY SETUP — templates and catalog the
+      // whole team runs on — so they take supervisor+ regardless of who can
+      // chat with Gibbs. Day-to-day ops actions stay sales-and-up.
+      if ((action.type === "create_checklist" || action.type === "create_item") && !["supervisor", "owner", "admin"].includes(user.role)) {
+        return res.status(403).json({ message: "Only supervisors and up can change company setup (checklists, price book)." });
+      }
 
       if (action.type === "create_task") {
         const taskParsed = insertTaskSchema.safeParse({
@@ -2988,6 +3035,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const label = `Logged call from ${action.params.clientName}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "call_log", id: callLog.id, label, url: "/crm/phone" });
         return res.status(201).json({ ok: true, entity: "call_log", id: callLog.id, label, url: "/crm/phone" });
+      }
+
+      // create_checklist — a full checklist template (sections, questions,
+      // photo steps), landing in Settings → Checklists ready for the canvas.
+      if (action.type === "create_checklist") {
+        const serviceTypeKey = action.params.serviceType.toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+        const [newChecklist] = await db
+          .insert(serviceCallChecklists)
+          .values({
+            visitType: action.params.visitType,
+            serviceType: serviceTypeKey as any,
+            name: action.params.name,
+            description: action.params.description || null,
+            isActive: true,
+          })
+          .returning();
+        let qSort = 0;
+        for (const q of action.params.questions) {
+          qSort += 10;
+          await db.insert(checklistQuestions).values({
+            checklistId: newChecklist.id,
+            section: q.section || null,
+            question: q.question,
+            questionType: q.questionType,
+            options: q.options && q.options.length > 0 ? q.options : null,
+            isRequired: q.isRequired ?? false,
+            sortOrder: qSort,
+            helpText: q.helpText || null,
+          });
+        }
+        let pSort = 0;
+        for (const ps of action.params.photoSteps ?? []) {
+          pSort += 10;
+          await db.insert(checklistPhotoSteps).values({
+            checklistId: newChecklist.id,
+            label: ps.label,
+            instructions: ps.instructions || null,
+            isRequired: ps.isRequired ?? true,
+            sortOrder: pSort,
+          });
+        }
+        await logCrmAudit(
+          user.id,
+          "ai_action.create_checklist",
+          "checklist",
+          newChecklist.id,
+          { name: action.params.name, visitType: action.params.visitType, serviceType: serviceTypeKey, questions: action.params.questions.length, photoSteps: action.params.photoSteps?.length ?? 0 },
+          req.ip,
+        );
+        const label = `Checklist "${newChecklist.name}" — ${action.params.questions.length} steps${action.params.photoSteps?.length ? `, ${action.params.photoSteps.length} photo steps` : ""}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "checklist", id: newChecklist.id, label, url: "/crm/checklists" });
+        return res.status(201).json({ ok: true, entity: "checklist", id: newChecklist.id, label, url: "/crm/checklists" });
+      }
+
+      // create_item — a price book item (catalog everyone quotes from).
+      if (action.type === "create_item") {
+        const [newItem] = await db
+          .insert(crmItems)
+          .values({
+            name: action.params.name,
+            description: action.params.description || null,
+            category: (action.params.category || "service") as any,
+            itemType: (action.params.itemType || "parts") as any,
+            partNumber: action.params.partNumber || null,
+            rate: String(action.params.rate),
+            costPrice: action.params.costPrice !== undefined ? String(action.params.costPrice) : null,
+            unit: action.params.unit || "each",
+          })
+          .returning();
+        await logCrmAudit(user.id, "ai_action.create_item", "item", newItem.id, { params: action.params }, req.ip);
+        const label = `Price book item "${newItem.name}" — $${action.params.rate}${action.params.unit ? `/${action.params.unit}` : ""}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "item", id: newItem.id, label, url: "/crm/items" });
+        return res.status(201).json({ ok: true, entity: "item", id: newItem.id, label, url: "/crm/items" });
       }
 
       // send_sms — text a customer through the CRM messaging line (Textline).
@@ -14235,6 +14355,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gte(crmWorkOrders.scheduledStart, dayStart),
         lte(crmWorkOrders.scheduledStart, dayEnd),
         ne(crmWorkOrders.status, "cancelled"),
+        // Only jobs actually ON the dispatch board — queue-staged work
+        // (NeedsScheduling, WaitingOnParts, …) carries a date but isn't
+        // dispatched, and it inflated "Today's jobs" past the board.
+        sql`(${crmWorkOrders.dispatchQueueStage} IS NULL OR ${crmWorkOrders.dispatchQueueStage} = 'Scheduled')`,
       ];
       if (mineOnly) conditions.push(eq(crmWorkOrders.assignedTechId, user.id));
 
@@ -29735,6 +29859,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         gte(crmWorkOrders.scheduledStart, dayStart),
         lte(crmWorkOrders.scheduledStart, dayEnd),
         ne(crmWorkOrders.status, "cancelled"),
+        // Board jobs only — queue-staged work isn't dispatched yet
+        sql`(${crmWorkOrders.dispatchQueueStage} IS NULL OR ${crmWorkOrders.dispatchQueueStage} = 'Scheduled')`,
       ];
       if (isTech) {
         conds.push(eq(crmWorkOrders.assignedTechId, user.id));
