@@ -18,6 +18,10 @@ import { compressImage } from "@/lib/compress-image";
 import { MobileCreatePage } from "@/components/mobile/mobile-create-page";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
 
 /** Mobile Messages — WhatsApp-style. The conversation list lives in the
@@ -25,20 +29,33 @@ import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from 
  *  containers): warm chat canvas, tailed bubbles, day chips, composer pinned
  *  to the true bottom above the keyboard/safe area. */
 
-/** iMessage-style swipe-to-delete: the row rides the finger left, a red
- *  delete panel shows behind, and letting go PAST HALFWAY commits — the row
- *  slides off, collapses, and the thread is deleted. Short of halfway it
- *  springs back. Only the tracked finger can move or end the drag. */
+/** iMessage-style swipe-to-delete with a CONFIRMATION: a short swipe parks
+ *  the row open on a red Delete button; a long swipe (past halfway) asks
+ *  directly. Nothing is deleted without the warning dialog — confirm and
+ *  the row slides off and collapses smoothly; cancel springs it home. */
 function SwipeDeleteRow({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
+  const PARK = 92; // parked reveal width — the Delete button underneath
   const rowRef = useRef<HTMLDivElement | null>(null);
-  const iconRef = useRef<HTMLSpanElement | null>(null);
-  const drag = useRef<{ pid: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const drag = useRef<{ pid: number; x: number; y: number; startOff: number; engaged: boolean; active: boolean } | null>(null);
+  const parkedRef = useRef(0);
   const suppressClick = useRef(false);
   const [removing, setRemoving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  const settle = (off: number) => {
+    const el = rowRef.current;
+    if (!el) return;
+    parkedRef.current = off;
+    el.style.transition = "transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1)";
+    el.style.transform = `translateX(${off}px)`;
+    window.setTimeout(() => {
+      if (rowRef.current) rowRef.current.style.transition = "";
+    }, 310);
+  };
 
   const onDown = (e: React.PointerEvent) => {
     if (drag.current) return; // a second finger must not hijack the drag
-    drag.current = { pid: e.pointerId, x: e.clientX, y: e.clientY, engaged: false, active: true };
+    drag.current = { pid: e.pointerId, x: e.clientX, y: e.clientY, startOff: parkedRef.current, engaged: false, active: true };
   };
   const onMove = (e: React.PointerEvent) => {
     const st = drag.current;
@@ -47,22 +64,25 @@ function SwipeDeleteRow({ onDelete, children }: { onDelete: () => void; children
     const dx = e.clientX - st.x;
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
-      if (dx < -8 && Math.abs(dx) > dy) {
+      const opening = st.startOff === 0 && dx < -8;
+      const closing = st.startOff !== 0 && dx > 8;
+      if ((opening || closing) && Math.abs(dx) > dy) {
         st.engaged = true;
         el.style.transition = "none";
         el.setPointerCapture?.(e.pointerId);
-      } else if (dy > 12 || dx > 12) {
+      } else if (dy > 12) {
         st.active = false;
         return;
       }
     }
     if (st.engaged) {
-      const off = Math.min(0, dx);
-      el.style.transform = `translateX(${off}px)`;
       const w = el.clientWidth || window.innerWidth;
-      // The trash pops slightly once you're past the point of no return
-      const icon = iconRef.current;
-      if (icon) icon.style.transform = Math.abs(off) > w / 2 ? "scale(1.2)" : "scale(1)";
+      // Follow the finger from wherever the row was resting; drift past the
+      // button gets progressively stiffer instead of flying off.
+      const raw = Math.min(0, st.startOff + dx);
+      const over = Math.min(0, raw + PARK);
+      const off = raw >= -PARK ? raw : -PARK + over * 0.55;
+      el.style.transform = `translateX(${Math.max(off, -w * 0.75)}px)`;
     }
   };
   const onUp = (e: React.PointerEvent) => {
@@ -75,20 +95,28 @@ function SwipeDeleteRow({ onDelete, children }: { onDelete: () => void; children
     window.setTimeout(() => {
       suppressClick.current = false;
     }, 250);
-    const dx = e.clientX - st.x;
+    const m = /-?[\d.]+/.exec(el.style.transform);
+    const off = m ? parseFloat(m[0]) : 0;
     const w = el.clientWidth || window.innerWidth;
-    if (-dx > w / 2) {
-      el.style.transition = "transform 0.18s ease-in";
-      el.style.transform = "translateX(-100%)";
-      setRemoving(true);
-      window.setTimeout(onDelete, 210);
+    if (-off > w / 2) {
+      // Deep swipe = intent to delete — but the WARNING still gates it
+      settle(-PARK);
+      setConfirming(true);
+    } else if (-off > PARK / 2) {
+      settle(-PARK); // parked open on the Delete button
     } else {
-      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-      el.style.transform = "translateX(0)";
-      window.setTimeout(() => {
-        if (el) el.style.transition = "";
-      }, 260);
+      settle(0);
     }
+  };
+
+  const doRemove = () => {
+    setConfirming(false);
+    const el = rowRef.current;
+    if (!el) return onDelete();
+    el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
+    el.style.transform = "translateX(-110%)";
+    setRemoving(true);
+    window.setTimeout(onDelete, 320);
   };
 
   return (
@@ -96,21 +124,37 @@ function SwipeDeleteRow({ onDelete, children }: { onDelete: () => void; children
       className="relative overflow-hidden"
       style={
         removing
-          ? { maxHeight: 0, opacity: 0, transition: "max-height 0.25s ease-in, opacity 0.2s ease-in" }
+          ? { maxHeight: 0, opacity: 0, transition: "max-height 0.3s cubic-bezier(0.32, 0.72, 0, 1) 0.08s, opacity 0.22s ease-in" }
           : { maxHeight: "96px" }
       }
       onClickCapture={(e) => {
+        // A tap while parked open just closes the row (never opens the thread)
+        if (parkedRef.current !== 0 && !confirming) {
+          e.preventDefault();
+          e.stopPropagation();
+          settle(0);
+          return;
+        }
         if (suppressClick.current) {
           e.preventDefault();
           e.stopPropagation();
         }
       }}
     >
-      <div className="absolute inset-y-0 right-0 flex w-full items-center justify-end bg-red-500 pr-6" aria-hidden>
-        <span ref={iconRef} className="text-white transition-transform duration-150">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }}
+        className="absolute inset-y-0 right-0 flex w-full items-center justify-end bg-red-500 pr-[30px] text-white"
+        aria-label="Delete conversation"
+        data-testid="row-delete-reveal"
+      >
+        <span className="flex flex-col items-center gap-0.5">
           <Trash2 className="h-5 w-5" />
+          <span className="text-[11px] font-semibold">Delete</span>
         </span>
-      </div>
+      </button>
       <div
         ref={rowRef}
         className="relative bg-slate-50"
@@ -122,6 +166,36 @@ function SwipeDeleteRow({ onDelete, children }: { onDelete: () => void; children
       >
         {children}
       </div>
+
+      {/* The warning — nothing deletes without it */}
+      <AlertDialog
+        open={confirming}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirming(false);
+            settle(0);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The whole thread disappears from Messages. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="conversation-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={doRemove}
+              data-testid="conversation-delete-confirm"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
