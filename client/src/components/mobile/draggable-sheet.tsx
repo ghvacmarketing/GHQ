@@ -219,6 +219,101 @@ export function DraggableSheet({
     return () => el.removeEventListener("touchmove", guard);
   }, [radixOpen]);
 
+  // Mid-gesture HANDOFF (the Gibbs-thread feel): a drag born deep in a
+  // scrolled list scrolls natively — but the moment the list hits its top
+  // with the finger still pulling down, the SHEET takes over from right
+  // there, fresh baseline, no lift-and-regrab. Pointer events are already
+  // dead by then (the native scroll cancels them), so this tracker rides
+  // raw touch events in parallel with the pointer path above.
+  useEffect(() => {
+    if (!radixOpen) return;
+    const el = sheetRef.current;
+    if (!el) return;
+    let st: { id: number; y: number; scroller: HTMLElement; engaged: boolean } | null = null;
+    const tracked = (list: TouchList, id: number) => {
+      for (let i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
+      return null;
+    };
+    const onStart = (e: TouchEvent) => {
+      if (st || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const sc = scrollerAt(e.target as Node);
+      // Only the handoff case — a touch born INSIDE a scrolled-down list.
+      // (Top-of-list touches are the pointer path's job.)
+      if (!sc || sc.scrollTop <= 0) return;
+      st = { id: t.identifier, y: t.clientY, scroller: sc, engaged: false };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!st) return;
+      const t = tracked(e.touches, st.id);
+      if (!t) return;
+      if (!st.engaged) {
+        if (st.scroller.scrollTop > 0) {
+          // Still scrolling — keep the baseline fresh so the takeover
+          // measures from the top-arrival, not the whole drag.
+          st.y = t.clientY;
+          return;
+        }
+        if (t.clientY - st.y > 6) {
+          st.engaged = true;
+          st.y = t.clientY;
+          el.style.transition = "none";
+          (document.activeElement as HTMLElement | null)?.blur?.();
+        } else {
+          return;
+        }
+      }
+      if (e.cancelable) e.preventDefault();
+      const dyc = Math.max(0, t.clientY - st.y);
+      el.style.transform = `translateY(${dyc}px)`;
+      // The list must not rubber-band underneath the ride
+      st.scroller.scrollTop = 0;
+      const ov = overlayOf();
+      if (ov) {
+        ov.style.transition = "none";
+        ov.style.opacity = String(Math.max(0, 1 - dyc / (el.clientHeight || window.innerHeight)));
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!st) return;
+      const t = tracked(e.changedTouches, st.id);
+      if (!t) return; // only the tracked finger ends it
+      const ended = st;
+      st = null;
+      if (!ended.engaged) return;
+      if (t.clientY - ended.y > 90) {
+        dismissAnimated();
+      } else {
+        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+        el.style.transform = "translateY(0)";
+        const ov = overlayOf();
+        if (ov) {
+          ov.style.transition = "opacity 0.25s ease-out";
+          ov.style.opacity = "1";
+        }
+        setTimeout(() => {
+          el.style.transition = BASE_TRANSITION;
+          const o = overlayOf();
+          if (o) {
+            o.style.transition = "";
+            o.style.opacity = "";
+          }
+        }, 260);
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radixOpen]);
+
   return (
     <Sheet
       open={radixOpen}
