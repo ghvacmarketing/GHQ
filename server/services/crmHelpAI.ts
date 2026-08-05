@@ -902,8 +902,12 @@ export async function askCrmHelp(
   onAnswerDelta?: (text: string) => void,
   /** Create-copilot: the user is on a create form; Gibbs fills it. */
   createContext?: CreateCopilotContext,
+  /** Who is asking — "me"/"my"/"I" resolve to this exact user. */
+  currentUser?: { id: string; name: string | null; role: string | null },
 ): Promise<CrmHelpResponse> {
-  const normalizedQuestion = `${mode}:${question.toLowerCase().trim()}`;
+  // Cache is per-USER: "my jobs today" must never replay one person's
+  // answer to somebody else.
+  const normalizedQuestion = `${currentUser?.id || "anon"}:${mode}:${question.toLowerCase().trim()}`;
   const hasImages = !!images && images.length > 0;
 
   // Detect what live data might be needed
@@ -955,6 +959,8 @@ export async function askCrmHelp(
 VOICE — sound like one of us, not like software: plain-spoken, warm, practical, small-town Georgia professional. Direct answers, real numbers, no corporate fluff. Talk to techs like techs, to the office like a helpful coworker. When company documents (brand guide, SOPs) are available via the company_docs tool, let them shape how you talk about the company.
 
 Right now it is ${formatInTimeZone(new Date(), BUSINESS_TIMEZONE, "EEEE, MMMM d, yyyy 'at' h:mm a")} Eastern time (${BUSINESS_TIMEZONE}) — resolve every relative date the user says ("today", "tomorrow", "next Tuesday", "10 AM") against this clock.
+${currentUser ? `
+YOU ARE TALKING TO: ${currentUser.name || "an unnamed user"}${currentUser.role ? ` (${currentUser.role})` : ""} — CRM user id ${currentUser.id}. Every first-person reference in their messages means THIS person: "me", "my", "I", "myself", "mine". "Assign it to me" / "my jobs" / "what's on my schedule" / "text me" always resolves to ${currentUser.name || "this user"} — never ask who they are. When an action or lookup needs a tech/assignee/user and they mean themselves, use this exact name${currentUser.name ? ` ("${currentUser.name}")` : ""} and id (${currentUser.id}). Greet or refer to them by first name when it feels natural.` : ""}
 
 Users can attach photos (equipment, model/serial plates, thermostats, job sites, error codes). When a photo is attached, read it carefully — identify make/model/serial numbers, describe visible issues, diagnose what you can see — and fold what you find into your answer or into the params of any action they asked you to prepare.
 

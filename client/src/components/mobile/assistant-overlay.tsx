@@ -6,7 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import { cn } from "@/lib/utils";
 import { useVoiceDictation } from "@/hooks/use-voice-dictation";
-import { useKeyboardInset } from "@/lib/native";
+import { isNativeApp, useKeyboardInset } from "@/lib/native";
 import { ArrowUp, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Folder, History, ImagePlus, Loader2, MessagesSquare, Mic, Pencil, Plus, RotateCcw, Search, ShieldCheck, Sparkles, SquarePen, Trash2, Wrench, X } from "lucide-react";
 import { TypewriterText } from "@/components/crm/typewriter-text";
 import type { CrmUser } from "@shared/schema";
@@ -843,6 +843,47 @@ export default function AssistantOverlay({
   const kbInset = sheetClosing ? 0 : Math.max(kbInsetWeb, kbInsetNative);
   useEffect(() => {
     if (open) setSheetClosing(false);
+  }, [open]);
+
+  // Native shell: the COMPOSER rides the keyboard on the compositor — a
+  // WAAPI translateY fired straight from the keyboard events. No React
+  // state, no render latency, no layout-bound padding animation: the two
+  // things that made the old ride lag the keys and flash white on close.
+  const composerLiftRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open || !isNativeApp()) return;
+    let alive = true;
+    const subs: Array<{ remove?: () => void }> = [];
+    import("@capacitor/keyboard")
+      .then(({ Keyboard }) => {
+        if (!alive) return;
+        const KB_EASE = "cubic-bezier(0.38, 0.7, 0.125, 1)";
+        const ride = (toY: number) => {
+          const el = composerLiftRef.current;
+          if (!el) return;
+          const from = getComputedStyle(el).transform;
+          el.getAnimations().forEach((a) => a.cancel());
+          el.animate(
+            [{ transform: from === "none" ? "translateY(0px)" : from }, { transform: `translateY(${toY}px)` }],
+            { duration: 250, easing: KB_EASE, fill: "forwards" },
+          );
+        };
+        Keyboard.addListener("keyboardWillShow", (info: { keyboardHeight?: number }) => {
+          const el = composerLiftRef.current;
+          if (!el) return;
+          const h = Number(info?.keyboardHeight) || 0;
+          // The static bottom padding (10px + safe-area) already lifts the
+          // card off the screen edge — the keys swallow that space.
+          const pad = parseFloat(getComputedStyle(el).paddingBottom) || 0;
+          ride(-Math.max(0, h - pad + 8));
+        }).then((s) => subs.push(s));
+        Keyboard.addListener("keyboardWillHide", () => ride(0)).then((s) => subs.push(s));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      subs.forEach((s) => s.remove?.());
+    };
   }, [open]);
   useEffect(() => {
     if (!open) return;
@@ -1920,14 +1961,20 @@ export default function AssistantOverlay({
         </div>
 
         {/* Composer — the original card, now TRULY floating: absolutely
-            positioned over the chat so messages glide beneath it (no white
-            band above the box). Rides the keyboard via bottom padding. */}
+            positioned over the chat so messages glide beneath it. In the
+            native shell it rides the keyboard via compositor TRANSFORM (the
+            effect above); padding stays static. Web keeps the inset ride. */}
         <div
+          ref={composerLiftRef}
           className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3"
-          style={{
-            paddingBottom: kbInset > 0 ? `${kbInset + 8}px` : "calc(10px + env(safe-area-inset-bottom))",
-            transition: "padding-bottom 0.25s cubic-bezier(0.38, 0.7, 0.125, 1)",
-          }}
+          style={
+            isNativeApp()
+              ? { paddingBottom: "calc(10px + env(safe-area-inset-bottom))", willChange: "transform" }
+              : {
+                  paddingBottom: kbInset > 0 ? `${kbInset + 8}px` : "calc(10px + env(safe-area-inset-bottom))",
+                  transition: "padding-bottom 0.25s cubic-bezier(0.38, 0.7, 0.125, 1)",
+                }
+          }
         >
           {/* Same centered column as the thread so the bar lines up with the
               messages on wide screens */}

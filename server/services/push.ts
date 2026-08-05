@@ -140,6 +140,6 @@ export function startPushNotificationBridge(): void {
     } catch (e) {
       console.error("[push] bridge tick failed:", (e as any)?.message || e);
     }
-  }, 20_000);
-  console.log("[push] notification bridge running (APNs, 20s cadence)");
+  }, 3_000);
+  console.log("[push] notification bridge running (APNs, 3s cadence)");
 }

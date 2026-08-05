@@ -2220,7 +2220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // drift. onDelta (when given) receives live answer text as it generates.
   const runCrmHelpExchange = async (
     req: any,
-    user: { id: string },
+    user: { id: string; name?: string | null; role?: string | null },
     onDelta?: (text: string) => void,
   ) => {
     {
@@ -2305,7 +2305,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // mode preference belongs to the standalone chat, and conversation-only
       // mode would strip the fill_form behavior the copilot exists for.
       const effectiveMode = createContext ? "general" : mode;
-      const result = await askCrmHelp(question, history, images, effectiveMode, onDelta, createContext);
+      const result = await askCrmHelp(question, history, images, effectiveMode, onDelta, createContext, {
+        id: user.id,
+        name: user.name ?? null,
+        role: user.role ?? null,
+      });
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;
@@ -14371,6 +14375,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // a full-screen "update in TestFlight" wall on next open. 0/unset = off.
   app.get("/api/mobile/min-ios-build", (_req, res) => {
     res.json({ minBuild: Number(process.env.MIN_IOS_BUILD || 0) || 0 });
+  });
+
+  // Fire a real test push at the CALLER's registered devices — the fastest
+  // end-to-end check (env vars + APNs + token + lock screen), no need to
+  // stage a work-order assignment just to see a banner.
+  app.get("/api/crm/push/test", requireCrmAuth, async (req, res) => {
+    try {
+      const { pushConfigured, sendPushToUser } = await import("./services/push");
+      if (!pushConfigured()) {
+        return res.json({ ok: false, configured: false, message: "APNS_AUTH_KEY / APNS_KEY_ID / APPLE_TEAM_ID not set on this deploy" });
+      }
+      const userId = (req as any).crmUser.id;
+      const devices = await db.select().from(pushDeviceTokens).where(eq(pushDeviceTokens.userId, userId));
+      await sendPushToUser(userId, {
+        title: "GHQ push is live",
+        body: "Test notification — tap to open your agenda.",
+        link: "/mobile",
+      });
+      res.json({ ok: true, configured: true, devices: devices.length });
+    } catch (error) {
+      console.error("Error sending test push:", error);
+      res.status(500).json({ message: "Failed to send the test push" });
+    }
   });
 
   // Self-check for native push: is APNs configured on this deploy, and does
