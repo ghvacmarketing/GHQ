@@ -14373,6 +14373,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ minBuild: Number(process.env.MIN_IOS_BUILD || 0) || 0 });
   });
 
+  // Self-check for native push: is APNs configured on this deploy, and does
+  // the caller have a registered device? Visit while logged in to verify the
+  // env vars landed and the phone actually enrolled.
+  app.get("/api/crm/push/status", requireCrmAuth, async (req, res) => {
+    try {
+      const { pushConfigured } = await import("./services/push");
+      const userId = (req as any).crmUser.id;
+      const mine = await db.select().from(pushDeviceTokens).where(eq(pushDeviceTokens.userId, userId));
+      const all = await db.select({ n: sql<number>`count(*)` }).from(pushDeviceTokens);
+      res.json({
+        configured: pushConfigured(),
+        yourDevices: mine.length,
+        totalDevices: Number(all[0]?.n || 0),
+      });
+    } catch (error) {
+      console.error("Error reading push status:", error);
+      res.status(500).json({ message: "Failed to read push status" });
+    }
+  });
+
   // The Capacitor shell posts its APNs device token after login; tokens are
   // per-device, cascade-deleted with the user, and pruned when APNs reports
   // them dead. See server/services/push.ts for the delivery side.
