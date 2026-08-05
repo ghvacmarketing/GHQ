@@ -3579,7 +3579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (assignedTech && assignedTech.id !== user.id) {
         try {
           const when = scheduledStart
-            ? scheduledStart.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+            ? scheduledStart.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })
             : "unscheduled";
           await db.insert(crmNotifications).values({
             userId: assignedTech.id,
@@ -15522,7 +15522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (workOrder.assignedTechId && workOrder.assignedTechId !== user.id) {
         try {
           const when = workOrder.scheduledStart
-            ? new Date(workOrder.scheduledStart).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+            ? new Date(workOrder.scheduledStart).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })
             : "unscheduled";
           await db.insert(crmNotifications).values({
             userId: workOrder.assignedTechId,
@@ -15769,7 +15769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // moves one of theirs (self-changes are silent).
       try {
         const fmtWhen = (d: Date | string | null | undefined) =>
-          d ? new Date(d).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "unscheduled";
+          d ? new Date(d).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) : "unscheduled";
         const newTech = updateData.assignedTechId as string | null | undefined;
         const assignmentChanged = newTech !== undefined && newTech !== existingWorkOrder.assignedTechId;
         if (assignmentChanged && newTech && newTech !== user.id) {

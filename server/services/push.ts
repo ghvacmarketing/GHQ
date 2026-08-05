@@ -120,22 +120,39 @@ export function startPushNotificationBridge(): void {
     console.log("[push] APNS_AUTH_KEY/APNS_KEY_ID/APPLE_TEAM_ID not set — native push disabled");
     return;
   }
-  let lastSeen = new Date();
+  // The cursor advances on EPOCH MS (driver-agnostic: createdAt may come
+  // back as a Date or a naive string depending on the driver), and a sent-id
+  // set makes re-sends impossible no matter what the timestamps do — a
+  // string-vs-Date comparison here once silently never advanced the cursor
+  // and re-pushed every row since boot on every tick.
+  let lastSeenMs = Date.now();
+  const pushed = new Set<string>();
   setInterval(async () => {
     try {
+      // Small overlap window: the id set already dedupes, and it protects
+      // against sub-second cursor rounding dropping a row entirely.
       const rows = await db
         .select()
         .from(crmNotifications)
-        .where(gt(crmNotifications.createdAt, lastSeen))
+        .where(gt(crmNotifications.createdAt, new Date(lastSeenMs - 5_000)))
         .limit(200);
-      if (rows.length === 0) return;
-      lastSeen = rows.reduce((m, r) => (r.createdAt && r.createdAt > m ? r.createdAt : m), lastSeen);
       for (const n of rows) {
+        const t = n.createdAt ? new Date(n.createdAt as unknown as string | Date).getTime() : 0;
+        if (Number.isFinite(t) && t > lastSeenMs) lastSeenMs = t;
+        if (pushed.has(n.id)) continue;
+        pushed.add(n.id);
         await sendPushToUser(n.userId, {
           title: n.title,
           body: n.preview || undefined,
           link: notificationLink(n),
         }).catch(() => {});
+      }
+      if (pushed.size > 4_000) {
+        let drop = pushed.size - 2_000;
+        for (const id of pushed) {
+          if (drop-- <= 0) break;
+          pushed.delete(id);
+        }
       }
     } catch (e) {
       console.error("[push] bridge tick failed:", (e as any)?.message || e);
