@@ -24,11 +24,17 @@ if (typeof Image !== "undefined") {
     img.src = src;
   }
 }
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
-import { useNativePush } from "@/lib/native";
+import { getNativeBuildNumber, isNativeApp, useNativePush } from "@/lib/native";
 import { skipEntranceOnce } from "@/lib/page-transitions";
 import { queryClient } from "@/lib/queryClient";
+
+// TestFlight update gate — checked ONCE per app session (module cache), not
+// per navigation. The server's MIN_IOS_BUILD (runtime env) sets the floor;
+// shells below it get a full-screen update wall.
+let updateWallCache: boolean | null = null;
 
 // The AI assistant popup — loaded on first open, then kept mounted so the
 // conversation survives closing and reopening the sheet.
@@ -69,6 +75,29 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
   // Arriving from a tracked back-swipe: the destination was already fully
   // visible as the swipe underlay, so the mount fade must not blink it.
   const [skipEntrance] = useState(skipEntranceOnce);
+  // Out-of-date native shell? One check per session; the wall blocks all use.
+  const [updateWall, setUpdateWall] = useState(updateWallCache === true);
+  useEffect(() => {
+    if (updateWallCache !== null) return;
+    if (!isNativeApp()) {
+      updateWallCache = false;
+      return;
+    }
+    (async () => {
+      try {
+        const [build, res] = await Promise.all([
+          getNativeBuildNumber(),
+          fetch("/api/mobile/min-ios-build", { credentials: "include" }),
+        ]);
+        const min = Number((await res.json())?.minBuild || 0);
+        const wall = build != null && min > 0 && build < min;
+        updateWallCache = wall;
+        if (wall) setUpdateWall(true);
+      } catch {
+        updateWallCache = false; // never lock anyone out on a flaky check
+      }
+    })();
+  }, []);
   const [createOpen, setCreateOpen] = useState(false);
   const [photoTargetOpen, setPhotoTargetOpen] = useState(false);
   // The tab bar ducks while the keyboard is up — otherwise iOS shoves it
@@ -581,6 +610,31 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
           <AssistantOverlay open={assistantOpen} onClose={() => setAssistantOpen(false)} />
         </Suspense>
       )}
+
+      {/* TestFlight update wall — above every layer, portaled clear of any
+          transformed page so "fixed" means the actual screen. */}
+      {updateWall &&
+        createPortal(
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/95 px-6" data-testid="update-wall">
+            <div className="w-full max-w-sm rounded-[4px] border border-slate-300/70 bg-white p-6 text-center shadow-2xl">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Update required</p>
+              <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900">A newer GHQ is ready</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                This version of the app is out of date. Install the latest build in TestFlight, then come back — everything will be right where you left it.
+              </p>
+              <button
+                onClick={() => {
+                  window.location.href = "itms-beta://";
+                }}
+                className="mt-5 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
+                data-testid="update-wall-open-testflight"
+              >
+                Open TestFlight
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

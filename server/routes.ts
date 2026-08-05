@@ -14366,6 +14366,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ---- Native app (iOS shell) push registration ----
+  // TestFlight update gate: the shell compares its build number against this
+  // RUNTIME env value — raise MIN_IOS_BUILD in Render and older builds show
+  // a full-screen "update in TestFlight" wall on next open. 0/unset = off.
+  app.get("/api/mobile/min-ios-build", (_req, res) => {
+    res.json({ minBuild: Number(process.env.MIN_IOS_BUILD || 0) || 0 });
+  });
+
   // The Capacitor shell posts its APNs device token after login; tokens are
   // per-device, cascade-deleted with the user, and pruned when APNs reports
   // them dead. See server/services/push.ts for the delivery side.

@@ -156,6 +156,24 @@ export function useKeyboardInset(): number {
   return inset;
 }
 
+// ---- App version --------------------------------------------------------
+
+/** The native shell's BUILD number (the auto-incrementing one), or null when
+ *  not in the shell / the App plugin isn't compiled into this binary yet.
+ *  Drives the TestFlight update gate — the server's MIN_IOS_BUILD decides. */
+export async function getNativeBuildNumber(): Promise<number | null> {
+  if (!isNativeApp()) return null;
+  try {
+    if (!Capacitor.isPluginAvailable("App")) return null;
+    const { App } = await import("@capacitor/app");
+    const info = await App.getInfo();
+    const n = parseInt(info.build, 10);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null; // old shell — the gate simply stays quiet
+  }
+}
+
 // ---- Camera -------------------------------------------------------------
 
 /** Take a photo with the real native camera (iOS shell). Returns a File that
