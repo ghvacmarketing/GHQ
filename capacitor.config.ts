@@ -23,6 +23,11 @@ const config: CapacitorConfig = {
       resize: "none",
       style: "LIGHT",
     },
+    PushNotifications: {
+      // Without this, iOS silently swallows pushes that arrive while the
+      // app is OPEN on screen — banner + sound + badge even in foreground.
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   },
   ios: {
     // The web app handles safe areas itself (env(safe-area-inset-*)) —
