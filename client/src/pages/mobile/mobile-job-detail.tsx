@@ -1,12 +1,14 @@
 ﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
+import { CustomerCamera } from "@/components/mobile/customer-camera";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { format, addYears, addMonths } from "date-fns";
-import { 
-  ArrowLeft, 
-  Phone, 
-  MapPin, 
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Phone,
+  MapPin,
   Clock,
   Send,
   Loader2,
@@ -468,24 +470,31 @@ function OverviewTab({
         </Card>
       )}
 
-      {/* Section tiles */}
-      <div className="grid grid-cols-2 gap-2" data-testid="job-tiles">
-        <button onClick={() => onGoTab("work")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-checklist">
-          <p className="text-sm font-bold text-slate-900">Checklist</p>
-          <p className="mt-0.5 text-xs text-slate-500">Tasks, notes & wrap-up</p>
-        </button>
-        <button onClick={() => goNavigate("/mobile/photos")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-photos">
-          <p className="text-sm font-bold text-slate-900">Photos</p>
-          <p className="mt-0.5 text-xs text-slate-500">Job-site photos</p>
-        </button>
-        <button onClick={() => onGoTab("quote")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-quote">
-          <p className="text-sm font-bold text-slate-900">Quote</p>
-          <p className="mt-0.5 text-xs text-slate-500">Build & present</p>
-        </button>
-        <button onClick={() => onGoTab("invoice")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-invoice">
-          <p className="text-sm font-bold text-slate-900">Invoice</p>
-          <p className="mt-0.5 text-xs text-slate-500">Collect payment</p>
-        </button>
+      {/* Section doors — the welcome-screen card language (icon plate,
+          title, sub, arrow) so a tech reads them as BUTTONS at a glance */}
+      <div className="space-y-2.5" data-testid="job-tiles">
+        {[
+          { key: "checklist", icon: Wrench, title: "Checklist", sub: "Tasks, notes & wrap-up", go: () => onGoTab("work") },
+          { key: "photos", icon: Camera, title: "Photos", sub: "Job-site photos & videos", go: () => goNavigate("/mobile/photos") },
+          { key: "quote", icon: FileText, title: "Quote", sub: "Build & present", go: () => onGoTab("quote") },
+          { key: "invoice", icon: Receipt, title: "Invoice", sub: "Collect payment", go: () => onGoTab("invoice") },
+        ].map(({ key, icon: Icon, title, sub, go }) => (
+          <button
+            key={key}
+            onClick={go}
+            className="flex w-full items-center gap-3.5 rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-transform active:scale-[0.99] active:bg-slate-50"
+            data-testid={`tile-${key}`}
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
+              <Icon className="h-5 w-5" strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-slate-900">{title}</span>
+              <span className="mt-0.5 block text-[12px] leading-snug text-slate-500">{sub}</span>
+            </span>
+            <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300" strokeWidth={1.75} />
+          </button>
+        ))}
       </div>
 
       {/* Schedule */}
@@ -1084,20 +1093,57 @@ function WorkTab({
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(true);
   const { toast } = useToast();
+  // In-job camera: shots land straight on THIS job's customer.
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const camCustomerName = workOrder.customer?.name || "Customer";
+  const photosDoor = (
+    <>
+      <button
+        onClick={() => (workOrder.customerId ? setCameraOpen(true) : undefined)}
+        disabled={!workOrder.customerId}
+        className="flex w-full items-center gap-3.5 rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-transform active:scale-[0.99] active:bg-slate-50 disabled:opacity-50"
+        data-testid="work-take-photos"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
+          <Camera className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-slate-900">Take photos</span>
+          <span className="mt-0.5 block text-[12px] leading-snug text-slate-500">
+            Straight to {camCustomerName}&apos;s files — snap as many as you need
+          </span>
+        </span>
+        <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300" strokeWidth={1.75} />
+      </button>
+      {cameraOpen && workOrder.customerId && (
+        <CustomerCamera
+          customerId={workOrder.customerId}
+          customerName={camCustomerName}
+          onClose={() => setCameraOpen(false)}
+        />
+      )}
+    </>
+  );
 
   if (!checklistResponse || !checklistResponse.checklist) {
     if (assignedChecklist && assignedChecklist.questions.length > 0) {
-      return <ChecklistFillCard workOrder={workOrder} template={assignedChecklist} />;
+      return (
+        <div className="space-y-4">
+          {photosDoor}
+          <ChecklistFillCard workOrder={workOrder} template={assignedChecklist} />
+        </div>
+      );
     }
     return (
       <div className="space-y-4">
+        {photosDoor}
         <Card>
           <CardContent className="py-8 text-center">
             <ClipboardList className="h-12 w-12 text-slate-300 mx-auto mb-3" />
             <p className="text-slate-600 font-medium">No checklist for this job type</p>
             <p className="text-sm text-slate-500 mt-1">
-              {workOrder.visitType === "SERVICE" 
-                ? "This service type doesn't have a checklist defined" 
+              {workOrder.visitType === "SERVICE"
+                ? "This service type doesn't have a checklist defined"
                 : "Checklists are only available for service calls"}
             </p>
           </CardContent>
@@ -1108,6 +1154,7 @@ function WorkTab({
 
   return (
     <div className="space-y-4">
+      {photosDoor}
       <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-work-checklist">
         <CardHeader className="border-b border-slate-300/70 pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
@@ -1190,6 +1237,34 @@ function WorkTab({
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Step photos — submitted under __photos_<stepId> keys; without
+              this block they attached invisibly and looked lost. */}
+          {(() => {
+            const photoUrls = Object.entries(checklistResponse.answers || {})
+              .filter(([k]) => k.startsWith("__photos_"))
+              .flatMap(([, v]) => (Array.isArray(v) ? (v as string[]) : []));
+            if (photoUrls.length === 0) return null;
+            return (
+              <div data-testid="work-checklist-photos">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Checklist photos ({photoUrls.length})
+                </p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {photoUrls.map((u, i) => (
+                    <img
+                      key={i}
+                      src={u}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-square w-full rounded-[3px] border border-slate-300/70 object-cover"
+                      data-testid={`work-checklist-photo-${i}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {checklistResponse.completedAt && (
             <p className="text-xs text-slate-500 text-right">
@@ -3086,6 +3161,12 @@ export default function MobileJobDetail() {
       await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, payload);
     },
     onSuccess: (_, variables) => {
+      // Patch the cache BEFORE dropping the optimistic value — clearing
+      // first let the stale cached status flash the stepper backwards until
+      // the refetch landed (the forward-back-forward stutter).
+      queryClient.setQueryData<WorkOrderDetail>(["/api/crm/work-orders", params.id], (prev) =>
+        prev ? { ...prev, status: variables.newStatus } : prev,
+      );
       setOptimisticStatus(null);
       setShowCompletionModal(false);
       setCompletionSummary("");
