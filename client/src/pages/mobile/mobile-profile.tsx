@@ -267,6 +267,10 @@ export default function MobileProfile({ onClose }: { onClose?: () => void } = {}
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      // Release this phone's push token FIRST (needs the live session) — a
+      // signed-out phone must not keep buzzing with this user's alerts.
+      const { unregisterNativePush } = await import("@/lib/native");
+      await unregisterNativePush();
       await apiRequest("POST", "/api/crm/auth/logout");
     },
     onSuccess: () => {

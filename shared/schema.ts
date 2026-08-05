@@ -3772,6 +3772,9 @@ export const crmNotifications = pgTable("crm_notifications", {
   isRead: boolean("is_read").notNull().default(false),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  // Stamped by the APNs bridge when the push is CLAIMED for sending — the
+  // claim is atomic, so overlapping server instances can't both send.
+  pushedAt: timestamp("pushed_at"),
 });
 
 // Native app (iOS shell) push tokens — one row per device; a user can have

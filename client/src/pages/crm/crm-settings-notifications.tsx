@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Bell, Loader2, Search, Send, Smartphone } from "lucide-react";
+import { ArrowLeft, Bell, Loader2, Search, Send, Smartphone, Trash2 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -173,6 +173,15 @@ export default function CrmSettingsNotifications() {
   const deleteTemplate = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/notification-templates/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/notification-templates"] }),
+  });
+
+  const deleteNotification = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/notifications/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/admin"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/type-summary"] });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't delete the notification", variant: "destructive" }),
   });
 
   const send = useMutation({
@@ -402,6 +411,7 @@ export default function CrmSettingsNotifications() {
                     <TableHead className="w-32">Type</TableHead>
                     <TableHead>Notification</TableHead>
                     <TableHead className="w-20 text-right">Read</TableHead>
+                    <TableHead className="w-10" aria-label="Delete" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -426,6 +436,17 @@ export default function CrmSettingsNotifications() {
                         ) : (
                           <span className="inline-block h-2 w-2 rounded-full bg-[#711419]" title="Unread" />
                         )}
+                      </TableCell>
+                      <TableCell className="w-10 text-right">
+                        <button
+                          onClick={() => deleteNotification.mutate(n.id)}
+                          disabled={deleteNotification.isPending}
+                          className="rounded-[3px] p-1.5 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                          title="Delete notification"
+                          data-testid={`notif-delete-${n.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}

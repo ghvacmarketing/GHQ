@@ -2,7 +2,7 @@ import http2 from "http2";
 import crypto from "crypto";
 import { db } from "../db";
 import { crmNotifications, pushDeviceTokens } from "@shared/schema";
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
 /** APNs push for the iOS shell app — no SDK, just HTTP/2 + an ES256 JWT.
  *
@@ -181,13 +181,21 @@ export function startPushNotificationBridge(): void {
       const rows = await db
         .select()
         .from(crmNotifications)
-        .where(gt(crmNotifications.createdAt, new Date(lastSeenMs - 5_000)))
+        .where(and(gt(crmNotifications.createdAt, new Date(lastSeenMs - 5_000)), isNull(crmNotifications.pushedAt)))
         .limit(200);
       for (const n of rows) {
         const t = n.createdAt ? new Date(n.createdAt as unknown as string | Date).getTime() : 0;
         if (Number.isFinite(t) && t > lastSeenMs) lastSeenMs = t;
         if (pushed.has(n.id)) continue;
         pushed.add(n.id);
+        // Atomic cross-instance claim: during a deploy TWO instances run
+        // this bridge — only the one that stamps pushed_at gets to send.
+        const claimed = await db
+          .update(crmNotifications)
+          .set({ pushedAt: new Date() })
+          .where(and(eq(crmNotifications.id, n.id), isNull(crmNotifications.pushedAt)))
+          .returning({ id: crmNotifications.id });
+        if (claimed.length === 0) continue;
         await sendPushToUser(n.userId, {
           title: n.title,
           body: n.preview || undefined,
@@ -195,11 +203,11 @@ export function startPushNotificationBridge(): void {
         }).catch(() => {});
       }
       if (pushed.size > 4_000) {
-        let drop = pushed.size - 2_000;
-        for (const id of pushed) {
-          if (drop-- <= 0) break;
-          pushed.delete(id);
-        }
+        // Keep the newest half (insertion order) — bounded memory, and the
+        // dropped ids are long past the cursor window anyway.
+        const keep = Array.from(pushed).slice(-2_000);
+        pushed.clear();
+        keep.forEach((id) => pushed.add(id));
       }
     } catch (e) {
       console.error("[push] bridge tick failed:", (e as any)?.message || e);

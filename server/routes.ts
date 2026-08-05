@@ -10314,6 +10314,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/crm/notifications/:id — command-center cleanup (admin).
+  // Removes the row from every drawer/bell; a banner already delivered to a
+  // phone stays there (APNs can't retract), but the badge re-syncs.
+  app.delete("/api/crm/notifications/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const [deleted] = await db
+        .delete(crmNotifications)
+        .where(eq(crmNotifications.id, req.params.id))
+        .returning({ id: crmNotifications.id, userId: crmNotifications.userId, isRead: crmNotifications.isRead });
+      if (!deleted) return res.status(404).json({ message: "Notification not found" });
+      if (!deleted.isRead) {
+        import("./services/push").then(({ queueBadgeSync }) => queueBadgeSync(deleted.userId)).catch(() => {});
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      return res.status(500).json({ message: "Failed to delete the notification" });
+    }
+  });
+
   // POST /api/crm/notifications/mark-all-read - Mark all unread notifications as read
   app.post("/api/crm/notifications/mark-all-read", requireCrmAuth, async (req, res) => {
     try {
@@ -14383,6 +14403,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ minBuild: Number(process.env.MIN_IOS_BUILD || 0) || 0 });
   });
 
+  // Logout releases the phone's token — only the caller's own claim on it.
+  app.post("/api/crm/push/unregister-device", requireCrmAuth, async (req, res) => {
+    try {
+      const token = String(req.body?.token || "").trim();
+      if (!token) return res.status(400).json({ message: "A device token is required" });
+      const userId = (req as any).crmUser.id;
+      await db.delete(pushDeviceTokens).where(and(eq(pushDeviceTokens.token, token), eq(pushDeviceTokens.userId, userId)));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error unregistering push device:", error);
+      res.status(500).json({ message: "Failed to unregister the device" });
+    }
+  });
+
   // Fire a real test push at the CALLER's registered devices — the fastest
   // end-to-end check (env vars + APNs + token + lock screen), no need to
   // stage a work-order assignment just to see a banner.
@@ -14442,6 +14476,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           target: pushDeviceTokens.token,
           set: { userId, platform, lastSeenAt: new Date() },
         });
+      // ONE phone per user per platform: reinstalls mint a fresh token while
+      // the old one can stay deliverable for days — every push then landed
+      // on the same phone twice. This also reclaims a token left behind on
+      // someone else's device (their next app-open re-registers it to them).
+      const { ne: notEq } = await import("drizzle-orm");
+      await db
+        .delete(pushDeviceTokens)
+        .where(and(eq(pushDeviceTokens.userId, userId), eq(pushDeviceTokens.platform, platform), notEq(pushDeviceTokens.token, token)));
       res.json({ ok: true });
     } catch (error) {
       console.error("Error registering push device:", error);

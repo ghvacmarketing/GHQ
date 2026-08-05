@@ -55,6 +55,9 @@ export async function initNativePush(): Promise<void> {
   try {
     await PushNotifications.addListener("registration", async ({ value: token }) => {
       try {
+        // Remember the token so LOGOUT can release it — a signed-out phone
+        // must stop receiving the previous user's notifications.
+        try { localStorage.setItem("ghq-push-token", token); } catch { /* private mode */ }
         await apiRequest("POST", "/api/crm/push/register-device", {
           token,
           platform: Capacitor.getPlatform(),
@@ -73,6 +76,22 @@ export async function initNativePush(): Promise<void> {
     if (perm.receive === "granted") await PushNotifications.register();
   } catch (e) {
     console.error("[native] push init failed", e);
+  }
+}
+
+/** Release this phone's push token — call BEFORE the session dies on
+ *  logout, so a signed-out phone stops receiving the user's notifications.
+ *  Best-effort: a network failure must never block the logout. */
+export async function unregisterNativePush(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    const token = localStorage.getItem("ghq-push-token");
+    if (!token) return;
+    await apiRequest("POST", "/api/crm/push/unregister-device", { token });
+    localStorage.removeItem("ghq-push-token");
+    pushInitStarted = false; // next login re-registers cleanly
+  } catch {
+    /* best-effort */
   }
 }
 
