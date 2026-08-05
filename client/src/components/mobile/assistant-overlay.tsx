@@ -652,13 +652,16 @@ export default function AssistantOverlay({
   // pointer-driven drag could never engage from inside the conversation.
   // The touch stream keeps reporting through a native scroll, which is
   // what makes the sheet able to take over the moment the thread hits its
-  // limit. Rules: from the thread's very top or very bottom (or anywhere
-  // off the thread) a downward drag rides the sheet immediately;
-  // mid-history it just scrolls, and when the scroll runs out of room at
-  // the top the sheet takes over from right there (fresh baseline, no
-  // jump). Inputs, the handle, and open layers are excluded; a drag
-  // suppresses the click behind it. Re-attached per open — the sheet
-  // unmounts on close, which orphans a mount-once listener.
+  // limit. Rules: from the thread's very TOP (or anywhere off the thread)
+  // a downward drag rides the sheet immediately; anywhere in the thread it
+  // just SCROLLS — the sheet only takes over when the scroll runs out of
+  // room at the top (fresh baseline, no jump). The thread opens pinned to
+  // its bottom, so a bottom-eligibility rule swallowed every scroll-up as
+  // a sheet drag — that's why conversations "couldn't scroll". One long
+  // pull still closes from the bottom: scroll to top, keep pulling.
+  // Inputs, the handle, and open layers are excluded; a drag suppresses
+  // the click behind it. Re-attached per open — the sheet unmounts on
+  // close, which orphans a mount-once listener.
   useEffect(() => {
     if (!open) return;
     const el = sheetRef.current;
@@ -670,7 +673,6 @@ export default function AssistantOverlay({
       engaged: boolean;
       eligible: boolean;
       inScroller: boolean;
-      fromBottom: boolean;
     } | null = null;
     const trackedTouch = (list: TouchList) => {
       for (let i = 0; i < list.length; i++) {
@@ -688,15 +690,13 @@ export default function AssistantOverlay({
       const sc = chatScrollRef.current;
       const inScroller = !!sc && sc.contains(target as Node);
       const atTop = (sc?.scrollTop ?? 0) <= 0;
-      const atBottom = !!sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 2;
       st = {
         id: t0.identifier,
         x: t0.clientX,
         y: t0.clientY,
         engaged: false,
-        eligible: !inScroller || atTop || atBottom,
+        eligible: !inScroller || atTop,
         inScroller,
-        fromBottom: inScroller && atBottom && !atTop,
       };
     };
     const onMove = (e: TouchEvent) => {
@@ -741,12 +741,6 @@ export default function AssistantOverlay({
         const off = Math.max(0, t.clientY - st.y);
         el.style.transform = `translateY(${off}px)`;
         trackBackdrop(off / (el.clientHeight || window.innerHeight));
-        // Engaged from the thread's bottom: hold the scroll pinned there so
-        // a native scroll can't ALSO run underneath the sheet drag.
-        if (st.fromBottom) {
-          const sc = chatScrollRef.current;
-          if (sc) sc.scrollTop = sc.scrollHeight;
-        }
       }
     };
     const onEnd = (e: TouchEvent) => {
