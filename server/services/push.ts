@@ -2,7 +2,7 @@ import http2 from "http2";
 import crypto from "crypto";
 import { db } from "../db";
 import { crmNotifications, pushDeviceTokens } from "@shared/schema";
-import { eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
 
 /** APNs push for the iOS shell app — no SDK, just HTTP/2 + an ES256 JWT.
  *
@@ -41,11 +41,14 @@ function apnsJwt(): string {
   return jwtCache.token;
 }
 
-/** Send one alert to one device. Resolves to "ok", "gone" (dead token — the
- *  caller should delete it), or "error". */
+/** Send one alert (or a silent badge-only update when alert is null) to one
+ *  device. Resolves to "ok", "gone" (dead token — the caller should delete
+ *  it), or "error". The badge is the user's REAL unread count, not a
+ *  hardcoded 1. */
 function apnsSend(
   deviceToken: string,
-  alert: { title: string; body?: string; link?: string },
+  alert: { title: string; body?: string; link?: string } | null,
+  badge: number,
 ): Promise<"ok" | "gone" | "error"> {
   return new Promise((resolve) => {
     try {
@@ -73,10 +76,14 @@ function apnsSend(
       });
       req.on("error", () => { client.close(); resolve("error"); });
       req.end(
-        JSON.stringify({
-          aps: { alert: { title: alert.title, body: alert.body || "" }, sound: "default", badge: 1 },
-          link: alert.link || null,
-        }),
+        JSON.stringify(
+          alert
+            ? {
+                aps: { alert: { title: alert.title, body: alert.body || "" }, sound: "default", badge },
+                link: alert.link || null,
+              }
+            : { aps: { badge } }, // badge-only: updates the icon, no banner
+        ),
       );
     } catch (e) {
       console.error("[push] send failed:", (e as any)?.message || e);
@@ -85,16 +92,56 @@ function apnsSend(
   });
 }
 
+/** The user's live unread-notification count — what the icon badge shows. */
+async function unreadCount(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(crmNotifications)
+    .where(and(eq(crmNotifications.userId, userId), eq(crmNotifications.isRead, false)));
+  return Number(row?.n || 0);
+}
+
 /** Push an alert to every device a CRM user has registered. */
 export async function sendPushToUser(userId: string, alert: { title: string; body?: string; link?: string }): Promise<void> {
   if (!pushConfigured()) return;
   const devices = await db.select().from(pushDeviceTokens).where(eq(pushDeviceTokens.userId, userId));
+  if (devices.length === 0) return;
+  const badge = await unreadCount(userId);
   const dead: string[] = [];
   for (const d of devices) {
-    const r = await apnsSend(d.token, alert);
+    const r = await apnsSend(d.token, alert, badge);
     if (r === "gone") dead.push(d.token);
   }
   if (dead.length > 0) await db.delete(pushDeviceTokens).where(inArray(pushDeviceTokens.token, dead));
+}
+
+/** Re-sync the icon badge to the real unread count (silent — no banner).
+ *  Debounced per user: mark-all-read fires one PATCH per row and we want
+ *  ONE badge update at the end, not a countdown. */
+const badgeSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
+export function queueBadgeSync(userId: string): void {
+  if (!pushConfigured()) return;
+  const prior = badgeSyncTimers.get(userId);
+  if (prior) clearTimeout(prior);
+  badgeSyncTimers.set(
+    userId,
+    setTimeout(async () => {
+      badgeSyncTimers.delete(userId);
+      try {
+        const devices = await db.select().from(pushDeviceTokens).where(eq(pushDeviceTokens.userId, userId));
+        if (devices.length === 0) return;
+        const badge = await unreadCount(userId);
+        const dead: string[] = [];
+        for (const d of devices) {
+          const r = await apnsSend(d.token, null, badge);
+          if (r === "gone") dead.push(d.token);
+        }
+        if (dead.length > 0) await db.delete(pushDeviceTokens).where(inArray(pushDeviceTokens.token, dead));
+      } catch (e) {
+        console.error("[push] badge sync failed:", (e as any)?.message || e);
+      }
+    }, 1_500),
+  );
 }
 
 /** Deep link for a notification row — mirrors the web notification drawer. */

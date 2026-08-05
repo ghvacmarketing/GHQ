@@ -10304,6 +10304,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmNotifications.id, notificationId))
         .returning();
 
+      // Icon badge follows the unread count (debounced, silent push)
+      import("./services/push").then(({ queueBadgeSync }) => queueBadgeSync(currentUser.id)).catch(() => {});
+
       return res.json(updated);
     } catch (error) {
       console.error("Error marking notification as read:", error);
@@ -10327,6 +10330,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(crmNotifications.isRead, false)
           )
         );
+
+      // Icon badge follows the unread count (debounced, silent push)
+      import("./services/push").then(({ queueBadgeSync }) => queueBadgeSync(currentUser.id)).catch(() => {});
 
       return res.json({ updated: result.rowCount || 0 });
     } catch (error) {
