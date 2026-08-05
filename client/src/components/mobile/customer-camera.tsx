@@ -14,16 +14,23 @@ export function CustomerCamera({
   customerId,
   customerName,
   onClose,
+  onCapture,
 }: {
   customerId: string;
   customerName: string;
   onClose: () => void;
+  /** Capture mode: each shot is handed to the CALLER instead of uploading
+   *  here (checklist steps own their upload + naming + answer links). The
+   *  session strip / tap-to-edit hide — the step UI shows its own thumbs. */
+  onCapture?: (file: File) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [flash, setFlash] = useState(false);
   const [viewReady, setViewReady] = useState(false);
+  const [captureCount, setCaptureCount] = useState(0);
   const [shots, setShots] = useState<Array<{ id: string; url: string; status: "uploading" | "done" | "error"; file: File; serverId?: string }>>([]);
+  const shotTotal = onCapture ? captureCount : shots.length;
   const replacedIds = useRef<Set<string>>(new Set());
   const [editShot, setEditShot] = useState<{ id: string; url: string; file: File; serverId?: string } | null>(null);
 
@@ -50,7 +57,10 @@ export function CustomerCamera({
         if (cancelled) return;
         if (isNativeApp()) {
           const shot = await takeNativePhoto();
-          if (shot) await uploadOne(shot).catch(() => {});
+          if (shot) {
+            if (onCapture) onCapture(shot);
+            else await uploadOne(shot).catch(() => {});
+          }
         }
         onClose();
       }
@@ -114,7 +124,13 @@ export function CustomerCamera({
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
-        startShotUpload(new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
+        const file = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+        if (onCapture) {
+          onCapture(file);
+          setCaptureCount((c) => c + 1);
+        } else {
+          startShotUpload(file);
+        }
       },
       "image/jpeg",
       0.85,
@@ -162,10 +178,10 @@ export function CustomerCamera({
         >
           <X className="h-5 w-5" />
         </button>
-        {shots.length > 0 && (
+        {shotTotal > 0 && (
           <div className="shrink-0 rounded-[6px] border border-white/15 bg-black/50 px-3 py-1.5 text-center backdrop-blur">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">Shots</p>
-            <p className="text-sm font-semibold leading-tight text-white tabular-nums">{shots.length}</p>
+            <p className="text-sm font-semibold leading-tight text-white tabular-nums">{shotTotal}</p>
           </div>
         )}
       </div>
@@ -174,7 +190,7 @@ export function CustomerCamera({
         className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black via-black/80 to-transparent pt-12"
         style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
       >
-        {shots.length > 0 && (
+        {!onCapture && shots.length > 0 && (
           <div className="flex w-full items-center gap-2 overflow-x-auto px-4 pb-0.5" data-testid="job-camera-strip">
             {shots.map((s) => (
               <button
@@ -202,7 +218,7 @@ export function CustomerCamera({
         )}
         <p className="max-w-[85%] truncate text-center text-sm font-semibold text-white" data-testid="job-camera-customer">
           {customerName}
-          {shots.length > 0 && <span className="font-normal text-white/50"> · tap a shot to edit</span>}
+          {!onCapture && shots.length > 0 && <span className="font-normal text-white/50"> · tap a shot to edit</span>}
         </p>
         <div className="grid w-full grid-cols-3 items-center px-6">
           <span aria-hidden />

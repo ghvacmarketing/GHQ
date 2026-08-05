@@ -1,6 +1,9 @@
 ﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { CustomerCamera } from "@/components/mobile/customer-camera";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { isNativeApp, pickNativeLibraryPhotos } from "@/lib/native";
+import createPhoto from "@/assets/create-photo.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { format, addYears, addMonths } from "date-fns";
@@ -676,9 +679,12 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
   // files, and linked to the step inside the submitted answers under
   // __photos_<stepId> keys.
   const [stepPhotos, setStepPhotos] = useState<Record<string, Array<{ id: string; url: string; uploading: boolean }>>>({});
-  const captureInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
   const activeStepRef = useRef<{ id: string; label: string } | null>(null);
+  // OUR camera (not the iOS one) aimed at a single photo step
+  const [stepCamera, setStepCamera] = useState<{ id: string; label: string } | null>(null);
+  // Field mode: hide everything already satisfied, show only what's left
+  const [missingOnly, setMissingOnly] = useState(false);
 
   const uploadStepPhoto = async (step: { id: string; label: string }, file: File) => {
     if (!workOrder.customerId) {
@@ -723,9 +729,18 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
   const removeStepPhoto = (stepId: string, id: string) =>
     setStepPhotos((prev) => ({ ...prev, [stepId]: (prev[stepId] ?? []).filter((p) => p.id !== id) }));
 
-  const startCapture = (step: { id: string; label: string }, source: "camera" | "library") => {
+  const startCapture = async (step: { id: string; label: string }, source: "camera" | "library") => {
     activeStepRef.current = step;
-    (source === "camera" ? captureInputRef : libraryInputRef).current?.click();
+    if (source === "camera") {
+      setStepCamera(step); // the house camera, never the iOS one
+      return;
+    }
+    if (isNativeApp()) {
+      const files = await pickNativeLibraryPhotos();
+      if (files) for (const f of files) uploadStepPhoto(step, f);
+      return;
+    }
+    libraryInputRef.current?.click();
   };
 
   const allPhotoSteps = template.photoSteps ?? [];
@@ -736,26 +751,47 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
 
   // A photo step rendered as a live capture block — count, thumbnails with
   // remove, Take photo (camera) and Add (library, multiple).
+  // ONE calm row per photo requirement: label + state left, two icon
+  // buttons right (house camera / library), thumbs beneath.
   const renderPhotoStep = (ps: { id: string; label: string; instructions?: string | null; isRequired?: boolean | null }) => {
     const photos = stepPhotos[ps.id] ?? [];
     const doneCount = photos.filter((p) => !p.uploading).length;
+    const satisfied = doneCount > 0;
     return (
-      <div key={ps.id} className="rounded-[3px] border border-[#711419]/25 bg-[#711419]/5 p-2.5" data-testid={`fill-photo-${ps.id}`}>
-        <div className="flex items-center gap-1.5">
-          <Camera className="h-3.5 w-3.5 shrink-0 text-[#711419]" />
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[#711419]">
-            {ps.label}
-            {ps.isRequired === false && <span className="font-normal text-[#711419]/70"> (optional)</span>}
-          </span>
-          <span className={`shrink-0 text-[10px] font-bold tabular-nums ${doneCount > 0 ? "text-green-600" : "text-[#711419]/60"}`}>
-            {doneCount} added
-          </span>
+      <div
+        key={ps.id}
+        className={`rounded-[4px] border border-slate-300/70 bg-white p-3 ${!satisfied && ps.isRequired !== false ? "border-l-2 border-l-[#711419]" : ""}`}
+        data-testid={`fill-photo-${ps.id}`}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-800">{ps.label}</p>
+            <p className={`mt-0.5 text-[11px] font-semibold uppercase tracking-wide ${satisfied ? "text-green-600" : ps.isRequired !== false ? "text-[#711419]/70" : "text-slate-400"}`}>
+              {satisfied ? `${doneCount} added` : ps.isRequired !== false ? "Photo needed" : "Optional photo"}
+            </p>
+          </div>
+          <button
+            onClick={() => startCapture({ id: ps.id, label: ps.label }, "camera")}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-[#711419] text-white shadow-sm transition-transform active:scale-95"
+            aria-label="Take photo"
+            data-testid={`photo-take-${ps.id}`}
+          >
+            <Camera className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            onClick={() => startCapture({ id: ps.id, label: ps.label }, "library")}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] border border-slate-300/70 bg-white text-slate-600 transition-transform active:scale-95"
+            aria-label="Add from library"
+            data-testid={`photo-add-${ps.id}`}
+          >
+            <ImagePlus className="h-[18px] w-[18px]" />
+          </button>
         </div>
-        {ps.instructions && <p className="mt-0.5 text-[11px] text-[#711419]/80">{ps.instructions}</p>}
+        {ps.instructions && <p className="mt-1.5 text-xs text-slate-500">{ps.instructions}</p>}
         {photos.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {photos.map((p) => (
-              <div key={p.id} className="relative h-16 w-16 overflow-hidden rounded-[3px] border border-slate-300/70 bg-white">
+              <div key={p.id} className="relative h-16 w-16 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
                 <img src={p.url} alt="" className="h-full w-full object-cover" />
                 {p.uploading ? (
                   <span className="absolute inset-0 flex items-center justify-center bg-black/35">
@@ -776,22 +812,6 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
             ))}
           </div>
         )}
-        <div className="mt-2 flex gap-2">
-          <button
-            onClick={() => startCapture({ id: ps.id, label: ps.label }, "camera")}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-[3px] bg-[#711419] py-2 text-xs font-semibold text-white transition-transform active:scale-[0.98]"
-            data-testid={`photo-take-${ps.id}`}
-          >
-            <Camera className="h-4 w-4" /> Take photo
-          </button>
-          <button
-            onClick={() => startCapture({ id: ps.id, label: ps.label }, "library")}
-            className="flex items-center justify-center gap-1.5 rounded-[3px] border border-[#711419]/40 bg-white px-3 py-2 text-xs font-semibold text-[#711419] transition-transform active:scale-[0.98]"
-            data-testid={`photo-add-${ps.id}`}
-          >
-            <ImagePlus className="h-4 w-4" /> Add
-          </button>
-        </div>
       </div>
     );
   };
@@ -875,11 +895,8 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
       <Card className="rounded-[4px] border border-slate-300/70 bg-white shadow-none" data-testid="card-checklist-fill">
         <CardHeader className="border-b border-slate-300/70 pb-3">
           <CardTitle className="flex items-center justify-between gap-2 text-base font-semibold">
-            <span className="flex items-center gap-2 text-slate-900">
-              <Clipboard className="h-4 w-4 text-[#711419]" />
-              {template.name}
-            </span>
-            <span className="rounded-[3px] border border-slate-300/70 bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">
+            <span className="min-w-0 flex-1 truncate text-slate-900">{template.name}</span>
+            <span className="shrink-0 rounded-[3px] border border-slate-300/70 bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 tabular-nums">
               {answeredCount}/{template.questions.length}
             </span>
           </CardTitle>
@@ -895,15 +912,52 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
               style={{ width: `${(answeredCount / Math.max(1, template.questions.length)) * 100}%` }}
             />
           </div>
+          {(missingRequired > 0 || missingRequiredPhotos > 0) ? (
+            <button
+              onClick={() => setMissingOnly((v) => !v)}
+              className={`mt-2.5 flex w-full items-center justify-between rounded-[4px] border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                missingOnly ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-300/70 bg-slate-50 text-slate-700"
+              }`}
+              data-testid="checklist-missing-toggle"
+            >
+              <span>
+                {missingRequired + missingRequiredPhotos} left
+                <span className="font-normal text-slate-500">
+                  {" "}— {missingRequired > 0 ? `${missingRequired} answer${missingRequired === 1 ? "" : "s"}` : ""}
+                  {missingRequired > 0 && missingRequiredPhotos > 0 ? ", " : ""}
+                  {missingRequiredPhotos > 0 ? `${missingRequiredPhotos} photo${missingRequiredPhotos === 1 ? "" : "s"}` : ""}
+                </span>
+              </span>
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide">
+                {missingOnly ? "Show all" : "Show what's left"}
+              </span>
+            </button>
+          ) : (
+            <p className="mt-2.5 flex items-center gap-1.5 text-sm font-semibold text-green-600">
+              <CheckCircle2 className="h-4 w-4" /> Everything required is in — ready to submit
+            </p>
+          )}
         </CardHeader>
       </Card>
 
       {/* Each section is its own collapsible card — the bold slate header
           band stays visible even collapsed, so a section can't be missed. */}
       {sections.map((section, si) => {
-        const collapsed = collapsedSections.has(si);
         const done = answeredIn(section.qs);
         const complete = section.qs.length > 0 && done === section.qs.length;
+        // Field mode: only what still needs attention (required answers or
+        // required photos), sections with nothing left disappear entirely.
+        const needsAttention = (q: AssignedChecklistTemplate["questions"][number]) => {
+          const a = answers[q.id];
+          const unanswered = a === undefined || a === "";
+          const unmetPhoto = (photosByQuestion.get(q.id) ?? []).some(
+            (ps) => ps.isRequired !== false && !(stepPhotos[ps.id] ?? []).some((pp) => !pp.uploading),
+          );
+          return (q.isRequired && unanswered) || unmetPhoto;
+        };
+        const visibleQs = missingOnly ? section.qs.filter(needsAttention) : section.qs;
+        if (missingOnly && visibleQs.length === 0) return null;
+        const collapsed = !missingOnly && collapsedSections.has(si);
         return (
           <div key={si} className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid={`checklist-section-${si}`}>
             {showSectionHeaders && (
@@ -935,15 +989,22 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
             )}
             {!collapsed && (
               <div className="space-y-3 p-3.5">
-              {section.qs.map((q) => {
+              {visibleQs.map((q) => {
             const value = answers[q.id];
             const linkedPhotos = photosByQuestion.get(q.id) ?? [];
+            const answered = value !== undefined && value !== "";
             return (
               <div key={q.id}>
-              <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
-                <p className="text-sm font-medium text-slate-800">
-                  {q.question}
-                  {q.isRequired && <span className="ml-1 text-red-500">*</span>}
+              <div
+                className={`rounded-[4px] border border-slate-300/70 bg-white p-3.5 ${!answered && q.isRequired ? "border-l-2 border-l-[#711419]" : ""}`}
+                data-testid={`fill-question-${q.id}`}
+              >
+                <p className="flex items-start justify-between gap-2 text-sm font-medium text-slate-800">
+                  <span className="min-w-0">
+                    {q.question}
+                    {q.isRequired && !answered && <span className="ml-1 text-red-500">*</span>}
+                  </span>
+                  {answered && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />}
                 </p>
                 {q.helpText && <p className="mt-0.5 text-xs text-slate-500">{q.helpText}</p>}
                 {linkedPhotos.length > 0 && (
@@ -1039,17 +1100,18 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
         );
       })}
 
-          {generalPhotos.length > 0 && (
-            <div className="rounded-[4px] border border-slate-300/70 bg-white p-3.5" data-testid="fill-photo-steps">
-              <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                <Camera className="h-4 w-4 text-[#711419]" /> Required photos
-              </p>
-              <p className="mt-0.5 text-xs text-slate-500">Take them right here — they save to the customer as you go.</p>
-              <div className="mt-2 space-y-2">
-                {generalPhotos.map((ps) => renderPhotoStep(ps))}
+          {(() => {
+            const shown = missingOnly
+              ? generalPhotos.filter((ps) => ps.isRequired !== false && !(stepPhotos[ps.id] ?? []).some((pp) => !pp.uploading))
+              : generalPhotos;
+            if (shown.length === 0) return null;
+            return (
+              <div data-testid="fill-photo-steps">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Required photos</p>
+                <div className="space-y-2">{shown.map((ps) => renderPhotoStep(ps))}</div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <Button
             onClick={() => submit.mutate()}
@@ -1068,15 +1130,18 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                     : "Submit checklist"}
           </Button>
 
-      {/* Hidden pickers: camera capture (one at a time) + library (multiple) */}
-      <input
-        ref={captureInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        hidden
-        onChange={(e) => { onFilesPicked(e.target.files); e.target.value = ""; }}
-      />
+      {/* House camera aimed at ONE step — its shots ride uploadStepPhoto so
+          they get the WO/step naming and land in the answers links */}
+      {stepCamera && workOrder.customerId && (
+        <CustomerCamera
+          customerId={workOrder.customerId}
+          customerName={stepCamera.label}
+          onCapture={(f) => uploadStepPhoto(stepCamera, f)}
+          onClose={() => setStepCamera(null)}
+        />
+      )}
+
+      {/* Hidden library fallback (web only — native uses the photo picker) */}
       <input
         ref={libraryInputRef}
         type="file"
@@ -1111,9 +1176,7 @@ function WorkTab({
         className="flex w-full items-center gap-3.5 rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-transform active:scale-[0.99] active:bg-slate-50 disabled:opacity-50"
         data-testid="work-take-photos"
       >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] border border-[#711419]/20 bg-[#711419]/5 text-[#711419]">
-          <Camera className="h-5 w-5" strokeWidth={1.75} />
-        </span>
+        <img src={createPhoto} alt="" className="h-11 w-11 shrink-0 select-none" draggable={false} />
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold text-slate-900">Take photos</span>
           <span className="mt-0.5 block text-[12px] leading-snug text-slate-500">
@@ -2112,20 +2175,12 @@ function InvoiceTab({
           document.body,
         )}
 
-      {/* Quote Selection Dialog for Create Invoice from Quote */}
-      <Dialog open={showQuoteSelection} onOpenChange={setShowQuoteSelection}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-green-600" />
-              Select Quote
-            </DialogTitle>
-            <DialogDescription>
-              Choose an accepted quote to create an invoice from
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-y-auto max-h-[400px] space-y-4">
+      {/* Pick which accepted quote the invoice comes from — a HOUSE bottom
+          sheet, not a popup */}
+      <DraggableSheet tall open={showQuoteSelection} onOpenChange={setShowQuoteSelection} title="Select quote" testid="sheet-quote-selection">
+        <h2 className="text-lg font-semibold text-slate-900">Invoice from a quote</h2>
+        <p className="mt-0.5 text-sm text-slate-500">Choose the accepted quote to bill.</p>
+        <div className="mt-3 min-h-[35vh] space-y-4 pb-2">
             {customerQuotesLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-green-600" />
@@ -2145,9 +2200,9 @@ function InvoiceTab({
                     </p>
                     <div className="space-y-2">
                       {acceptedQuotes.map((quote) => (
-                        <div
+                        <button
                           key={quote.id}
-                          className="border rounded-lg p-3 hover:bg-green-50 cursor-pointer transition-colors"
+                          className="w-full rounded-[4px] border border-slate-300/70 bg-white p-3 text-left transition-transform active:scale-[0.99]"
                           onClick={() => createFromQuote(quote)}
                           data-testid={`quote-selection-${quote.id}`}
                         >
@@ -2162,7 +2217,7 @@ function InvoiceTab({
                               {formatCurrency(parseFloat(quote.total || "0"))}
                             </span>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -2176,9 +2231,9 @@ function InvoiceTab({
                     </p>
                     <div className="space-y-2">
                       {otherCustomerAcceptedQuotes.map((quote) => (
-                        <div
+                        <button
                           key={quote.id}
-                          className="border border-blue-200 rounded-lg p-3 hover:bg-blue-50 cursor-pointer transition-colors"
+                          className="w-full rounded-[4px] border border-slate-300/70 bg-white p-3 text-left transition-transform active:scale-[0.99]"
                           onClick={() => createFromQuote(quote)}
                           data-testid={`quote-selection-customer-${quote.id}`}
                         >
@@ -2196,22 +2251,15 @@ function InvoiceTab({
                               {formatCurrency(parseFloat(quote.total || "0"))}
                             </span>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
               </>
             )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowQuoteSelection(false)} className="min-h-[44px]">
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DraggableSheet>
 
       {/* Record Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={(open) => {
@@ -3510,6 +3558,17 @@ export default function MobileJobDetail() {
           <div ref={sectionUnderScrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
         </div>
       )}
+
+      {/* Top fade over the section card — content dissolves under the
+          chrome instead of colliding with it, same as every list page. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[32] bg-gradient-to-b from-slate-50 via-slate-50/85 to-transparent"
+        style={{
+          height: "calc(env(safe-area-inset-top) + 72px)",
+          display: activeTab === "overview" ? "none" : undefined,
+        }}
+        aria-hidden
+      />
 
       {/* Section layer — a FULL-SCREEN card over the shell (status bar
           included) so the back-swipe rides a complete iOS card instead of a
