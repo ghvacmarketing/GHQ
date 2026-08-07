@@ -7,6 +7,7 @@ import {
   revokeOtherCrmSessions,
   logCrmAudit,
   CRM_SESSION_COOKIE,
+  sessionDurationFor,
 } from "./crm-auth";
 
 const STATE_COOKIE = "crm_google_oauth_state";
@@ -124,7 +125,7 @@ export async function handleNativeGoogleLogin(req: Request, res: Response): Prom
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 8 * 60 * 60 * 1000,
+      maxAge: sessionDurationFor(session.deviceClass),
     });
 
     await logCrmAudit(user.id, "login", "user", user.id, { method: "google_native" }, req.ip);
@@ -224,7 +225,7 @@ export async function handleGoogleOAuthCallback(
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 8 * 60 * 60 * 1000,
+      maxAge: sessionDurationFor(session.deviceClass),
     });
 
     await logCrmAudit(

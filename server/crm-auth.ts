@@ -8,7 +8,13 @@ import { eq, and, gt, ne, isNull, or } from "drizzle-orm";
 const scryptAsync = promisify(scrypt);
 
 const CRM_SESSION_COOKIE = "crm_session_id";
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
+const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // desktop: 8 hours
+// Phones stay signed in unless the app sits UNUSED for a week — the expiry
+// slides forward on every authenticated request (see validateCrmSession).
+const MOBILE_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+export function sessionDurationFor(deviceClass: string | null | undefined): number {
+  return deviceClass === "mobile" ? MOBILE_SESSION_DURATION_MS : SESSION_DURATION_MS;
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
@@ -48,7 +54,8 @@ export async function createCrmSession(
   ipAddress?: string
 ): Promise<CrmSession> {
   const sessionToken = generateSessionToken();
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+  const deviceClass = classifyDevice(userAgent);
+  const expiresAt = new Date(Date.now() + sessionDurationFor(deviceClass));
 
   const [session] = await db
     .insert(crmSessions)
@@ -57,7 +64,7 @@ export async function createCrmSession(
       sessionToken,
       userAgent: userAgent || null,
       ipAddress: ipAddress || null,
-      deviceClass: classifyDevice(userAgent),
+      deviceClass,
       expiresAt,
     })
     .returning();
@@ -82,13 +89,19 @@ export async function validateCrmSession(sessionToken: string): Promise<CrmSessi
 
   if (!session) return null;
 
-  // Throttle lastSeenAt updates to reduce DB writes
+  // Throttle lastSeenAt updates to reduce DB writes. Mobile sessions SLIDE:
+  // every active minute pushes expiry a full week out, so a phone only logs
+  // out after seven days genuinely off the app.
   const now = Date.now();
   const lastUpdate = lastSeenCache.get(session.id) || 0;
   if (now - lastUpdate > LAST_SEEN_THROTTLE_MS) {
     lastSeenCache.set(session.id, now);
+    const patch: { lastSeenAt: Date; expiresAt?: Date } = { lastSeenAt: new Date() };
+    if (session.deviceClass === "mobile") {
+      patch.expiresAt = new Date(now + sessionDurationFor("mobile"));
+    }
     db.update(crmSessions)
-      .set({ lastSeenAt: new Date() })
+      .set(patch)
       .where(eq(crmSessions.id, session.id))
       .then(() => {})
       .catch((err) => console.error("lastSeenAt update failed:", err));
