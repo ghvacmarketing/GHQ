@@ -192,6 +192,9 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - Presenting a quote that has optional lines (mobile quote detail → Present to Client) turns the presentation into a menu: required lines show under "Included", optional lines are tap-to-add cards, and the total recalculates live as the customer picks
 - The customer picks, signs, and enters their name right on the technician's phone; accepting records the chosen items + signature on the quote, marks it Converted, and instantly creates a sent invoice for exactly the accepted items — the app lands on that invoice to collect payment on the spot
 - Declined optional items stay on the quote, so you can see what was offered vs. what was taken
+- How it reflects in the CRM: the quote flips to Converted (line editing locks, PDF gets the APPROVED stamp, signer recorded), and on the quote detail (desktop AND mobile) every optional line carries a badge — "Optional add-on — customer picks" before the decision, then "Add-on — taken" (green) or "Add-on — declined" (grayed/dimmed) after
+- The quote's stored total is rewritten to the ACCEPTED total on acceptance, so quote lists, dashboards, and sold analytics count what the customer actually took — before acceptance the quote counts in pipeline at the full menu value (max potential, same convention as options quotes counting their highest option)
+- The auto-created invoice contains only the accepted customer-visible items, notes it was accepted in person, and links to the customer/property/work order; the work order's billing disposition flips to "invoice created"
 - Deposit quote types (custom install / proposal / custom service) and options-mode quotes keep their existing flows — the menu applies to non-deposit quotes (built for lower-ticket service work / quick quotes)
 
 ### Multi-option quote totals (goals/analytics)
