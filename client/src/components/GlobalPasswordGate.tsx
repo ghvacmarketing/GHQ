@@ -34,6 +34,23 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some(pattern => pattern.test(pathname));
 }
 
+/** Phones skip the shared gate entirely: the native shell and the Field app
+ *  have their own per-user sign-in, techs shouldn't need the office password
+ *  on the road, and every data API is enforced server-side regardless. The
+ *  DESKTOP CRM entry keeps the gate. */
+function isMobileContext(): boolean {
+  if (typeof window === "undefined") return false;
+  const native = !!(window as any).Capacitor?.isNativePlatform?.();
+  return native || window.innerWidth < 768;
+}
+
+function skipsGateOnMobile(pathname: string): boolean {
+  return (
+    isMobileContext() &&
+    (pathname === "/" || pathname.startsWith("/mobile") || pathname.startsWith("/crm/login"))
+  );
+}
+
 interface StoredAuth {
   authenticated: boolean;
   expiry: number;
@@ -49,7 +66,7 @@ export default function GlobalPasswordGate({ children }: { children: React.React
 
   // Check if current route is a public route that should bypass password protection
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-  const isOnPublicRoute = isPublicRoute(currentPath);
+  const isOnPublicRoute = isPublicRoute(currentPath) || skipsGateOnMobile(currentPath);
 
   useEffect(() => {
     // Skip auth check for public routes - clients should access them without password
