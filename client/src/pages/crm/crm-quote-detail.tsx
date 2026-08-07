@@ -1119,6 +1119,18 @@ export default function CrmQuoteDetail() {
     ((item as any).customerVisible !== true && (item.lineType === "labor" || item.lineType === "other"));
   const visibleLineItems = (quote?.lineItems || []).filter((i) => !isInternalLine(i));
   const internalLineItems = (quote?.lineItems || []).filter((i) => isInternalLine(i));
+
+  // Menu quotes: lines flagged "optional add-on" get picked in person on the
+  // presentation; after acceptance, acceptedLineItemIds says what was taken.
+  const acceptedLineIds: string[] | null = Array.isArray((quote as any)?.acceptedLineItemIds)
+    ? ((quote as any).acceptedLineItemIds as string[])
+    : null;
+  const quoteDecided = quote?.status === "accepted" || quote?.status === "converted";
+  const addOnState = (item: any): "pending" | "taken" | "declined" | null => {
+    if (item?.isOptional !== true) return null;
+    if (!quoteDecided || !acceptedLineIds) return "pending";
+    return acceptedLineIds.includes(item.id) ? "taken" : "declined";
+  };
   const internalCostsTotal = internalLineItems.reduce((sum, i) => sum + (parseFloat(String(i.lineTotal || 0)) || 0), 0);
 
   // Presentation mode never shows internal pricing by default; the presenter
@@ -3129,7 +3141,7 @@ export default function CrmQuoteDetail() {
               <TableBody>
                 {visibleLineItems.length > 0 ? (
                   visibleLineItems.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className={addOnState(item) === "declined" ? "opacity-55" : undefined}>
                       {editingLineItemId === item.id ? (
                         <>
                           <TableCell>
@@ -3209,7 +3221,24 @@ export default function CrmQuoteDetail() {
                         </>
                       ) : (
                         <>
-                          <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} /></TableCell>
+                          <TableCell>
+                            <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
+                            {addOnState(item) === "pending" && (
+                              <span className="mt-1 inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-[#711419]/10 text-[#711419]" data-testid={`badge-addon-pending-${item.id}`}>
+                                Optional add-on — customer picks
+                              </span>
+                            )}
+                            {addOnState(item) === "taken" && (
+                              <span className="mt-1 inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700" data-testid={`badge-addon-taken-${item.id}`}>
+                                Add-on — taken
+                              </span>
+                            )}
+                            {addOnState(item) === "declined" && (
+                              <span className="mt-1 inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-slate-200 text-slate-600" data-testid={`badge-addon-declined-${item.id}`}>
+                                Add-on — declined
+                              </span>
+                            )}
+                          </TableCell>
                           {quote.quoteMode === "options" && (
                             <TableCell>
                               {item.optionTag ? (

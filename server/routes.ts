@@ -14592,6 +14592,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           signerIp: req.ip || null,
           signedAt: now,
           acceptedLineItemIds: selectedLineItemIds,
+          // Sold numbers must reflect what the customer actually took —
+          // declined add-ons stay on the quote as lines but drop out of the
+          // stored total (mirrors options-mode: sold = the chosen option).
+          subtotal: acceptedTotal.toFixed(2),
+          total: acceptedTotal.toFixed(2),
           updatedAt: now,
         })
         .where(eq(crmQuotes.id, quote.id));

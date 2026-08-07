@@ -507,10 +507,18 @@ export default function MobileQuoteDetail() {
                     <div>
                       {lineItems.map((item, i) => {
                         const isDiscount = item.isDiscountLine || item.lineType === "discount";
+                        // Menu quotes: optional add-ons picked in person; after
+                        // acceptance the quote records exactly what was taken.
+                        const acceptedIds = Array.isArray((quote as any).acceptedLineItemIds) ? ((quote as any).acceptedLineItemIds as string[]) : null;
+                        const optState = (item as any).isOptional === true
+                          ? ((["accepted", "converted"] as string[]).includes(quote.status) && acceptedIds
+                              ? (acceptedIds.includes(item.id) ? "taken" : "declined")
+                              : "pending")
+                          : null;
                         return (
                           <div
                             key={item.id}
-                            className={`flex items-start justify-between gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                            className={`flex items-start justify-between gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-200/80" : ""} ${optState === "declined" ? "opacity-55" : ""}`}
                             data-testid={`line-item-${item.id}`}
                           >
                             <div className="min-w-0 flex-1">
@@ -521,6 +529,20 @@ export default function MobileQuoteDetail() {
                               <p className="mt-0.5 text-xs text-slate-500">
                                 {item.quantity} × {formatCurrency(item.unitPrice)}
                               </p>
+                              {optState && (
+                                <span
+                                  className={`mt-1 inline-flex w-fit items-center rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                    optState === "taken"
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : optState === "declined"
+                                        ? "bg-slate-200 text-slate-500"
+                                        : "bg-[#711419]/10 text-[#711419]"
+                                  }`}
+                                  data-testid={`badge-addon-${optState}-${item.id}`}
+                                >
+                                  {optState === "taken" ? "Add-on · taken" : optState === "declined" ? "Add-on · declined" : "Optional add-on"}
+                                </span>
+                              )}
                             </div>
                             <span className={`shrink-0 text-sm font-semibold tabular-nums ${isDiscount ? "text-amber-700" : "text-slate-900"}`}>
                               {formatCurrency(item.lineTotal)}
