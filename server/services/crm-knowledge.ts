@@ -187,6 +187,13 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - In presentation mode the presenter can deliberately reveal the Internal costs panel with the "Internal costs" toggle button (top-right, next to Exit); it always resets to hidden
 - Lines can be MOVED between sections after creation: in the Internal costs card each row has a "Show to customer" (eye) action that promotes it into the customer-facing list; customer rows have a "Move to internal costs" (eye-off) action. On custom quotes the sell price never changes when lines move — it stays the worksheet's price
 
+### Menu quotes (optional add-ons — pick, sign & pay in person)
+- Any customer-visible line item can be flagged as an OPTIONAL ADD-ON with the "Optional add-on — customer picks" chip in the mobile quote line-items editor
+- Presenting a quote that has optional lines (mobile quote detail → Present to Client) turns the presentation into a menu: required lines show under "Included", optional lines are tap-to-add cards, and the total recalculates live as the customer picks
+- The customer picks, signs, and enters their name right on the technician's phone; accepting records the chosen items + signature on the quote, marks it Converted, and instantly creates a sent invoice for exactly the accepted items — the app lands on that invoice to collect payment on the spot
+- Declined optional items stay on the quote, so you can see what was offered vs. what was taken
+- Deposit quote types (custom install / proposal / custom service) and options-mode quotes keep their existing flows — the menu applies to non-deposit quotes (built for lower-ticket service work / quick quotes)
+
 ### Multi-option quote totals (goals/analytics)
 - An options-mode quote counts toward quoted pipeline at its HIGHEST-priced option (plus shared items); once accepted/sold it counts at the option the customer actually chose plus shared items — never the sum of all options
 

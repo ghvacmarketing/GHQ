@@ -14550,6 +14550,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // In-person menu-quote acceptance: the customer picked their add-ons on
+  // the tech's phone and SIGNED. Records the signature + selection on the
+  // quote and creates the invoice from EXACTLY the chosen items, ready to
+  // collect on the spot.
+  app.post("/api/mobile/quotes/:id/present-accept", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const schema = z.object({
+        selectedLineItemIds: z.array(z.string().min(1).max(64)).max(200),
+        signatureDataUrl: z.string().regex(/^data:image\/(png|jpeg);base64,/).max(400_000),
+        signerName: z.string().trim().min(1).max(120),
+      }).strict();
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Missing or invalid acceptance details." });
+      const { selectedLineItemIds, signatureDataUrl, signerName } = parsed.data;
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id));
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (quote.status === "converted") return res.status(400).json({ message: "This quote is already invoiced." });
+
+      const items = await db.select().from(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quote.id));
+      // The invoice must mirror exactly what the customer saw and signed —
+      // internal cost lines (worksheet labor/other build-up) never make it in.
+      const visibleItems = items.filter(
+        (it) => (it as any).customerVisible === true || ((it as any).customerVisible !== false && it.lineType !== "labor" && it.lineType !== "other"),
+      );
+      const selected = new Set(selectedLineItemIds);
+      const acceptedItems = visibleItems.filter((it) => !(it as any).isOptional || selected.has(it.id));
+      if (acceptedItems.length === 0) return res.status(400).json({ message: "Nothing was selected to accept." });
+      const acceptedTotal = acceptedItems.reduce((sum, it) => sum + parseFloat(it.lineTotal || "0"), 0);
+      if (acceptedTotal <= 0) return res.status(400).json({ message: "The accepted total must be greater than zero." });
+
+      const now = new Date();
+      await db.update(crmQuotes)
+        .set({
+          status: "converted" as const,
+          signatureImage: signatureDataUrl,
+          signerName,
+          signerIp: req.ip || null,
+          signedAt: now,
+          acceptedLineItemIds: selectedLineItemIds,
+          updatedAt: now,
+        })
+        .where(eq(crmQuotes.id, quote.id));
+
+      const invoiceNumber = await generateInvoiceNumber();
+      const [invoice] = await db.insert(crmInvoices).values({
+        invoiceNumber,
+        customerId: quote.customerId,
+        propertyId: quote.propertyId,
+        workOrderId: quote.workOrderId,
+        projectId: quote.projectId,
+        status: "sent" as const,
+        subtotal: acceptedTotal.toFixed(2),
+        laborTotal: "0",
+        total: acceptedTotal.toFixed(2),
+        balanceDue: acceptedTotal.toFixed(2),
+        notes: `Accepted in person by ${signerName} — signed on the technician's device.`,
+        createdBy: user.id,
+      }).returning();
+      autoSyncInvoice(invoice.id);
+
+      await db.insert(crmInvoiceLineItems).values(
+        acceptedItems.map((it) => ({
+          invoiceId: invoice.id,
+          lineType: it.lineType,
+          description: it.description,
+          partNumber: it.partNumber,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          amount: it.lineTotal,
+          lineTotal: it.lineTotal,
+          sortOrder: it.sortOrder,
+          itemId: it.itemId,
+          isDiscountLine: it.isDiscountLine,
+          discountKind: it.discountKind,
+        })),
+      );
+
+      if (quote.workOrderId) {
+        await db.update(crmWorkOrders)
+          .set({ billingDisposition: "invoice_created" as const, invoiceId: invoice.id, updatedAt: now })
+          .where(eq(crmWorkOrders.id, quote.workOrderId));
+      }
+
+      await logCrmAudit(
+        user.id,
+        "quote.present_accepted",
+        "quote",
+        quote.id,
+        { signerName, selected: selectedLineItemIds.length, acceptedTotal: acceptedTotal.toFixed(2), invoiceId: invoice.id },
+        req.ip,
+      );
+
+      return res.status(201).json({ ok: true, invoiceId: invoice.id, invoiceNumber, acceptedTotal: acceptedTotal.toFixed(2) });
+    } catch (error) {
+      console.error("Error accepting presented quote:", error);
+      return res.status(500).json({ message: "Failed to record the acceptance" });
+    }
+  });
+
   // Fire a real test push at the CALLER's registered devices — the fastest
   // end-to-end check (env vars + APNs + token + lock screen), no need to
   // stage a work-order assignment just to see a banner.
@@ -22240,7 +22342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line item not found" });
       }
       
-      const { description, partNumber, quantity, unitPrice, lineTotal, sortOrder, lineType, isDiscountLine, discountKind, customerVisible } = req.body;
+      const { description, partNumber, quantity, unitPrice, lineTotal, sortOrder, lineType, isDiscountLine, discountKind, customerVisible, isOptional } = req.body;
       
       // Merge existing line item data with updates to validate the final state
       const mergedLineItem = {
@@ -22279,6 +22381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Move a line between the customer-facing list and Internal costs.
       // customerVisible=true overrides the labor/other lineType default.
       if (typeof customerVisible === "boolean") updates.customerVisible = customerVisible;
+      // Menu quotes: flip a line between always-included and optional add-on.
+      if (typeof isOptional === "boolean") updates.isOptional = isOptional;
       
       const [updatedLineItem] = await db.update(crmQuoteLineItems)
         .set(updates)

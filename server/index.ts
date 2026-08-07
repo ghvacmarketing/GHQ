@@ -258,6 +258,10 @@ async function runTaggedCommentMigrations() {
     // Push-claim stamp — the APNs bridge marks rows it sends so overlapping
     // server instances (deploys) can never both push the same notification.
     await db.execute(sql`ALTER TABLE crm_notifications ADD COLUMN IF NOT EXISTS pushed_at timestamp`);
+    // Menu quotes: optional (customer-toggleable) line items + which ones
+    // were picked at the in-person signing.
+    await db.execute(sql`ALTER TABLE crm_quote_line_items ADD COLUMN IF NOT EXISTS is_optional boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE crm_quotes ADD COLUMN IF NOT EXISTS accepted_line_item_ids jsonb`);
   } catch (err) {
     console.error("Tagged comment migration error (non-fatal):", err);
   }

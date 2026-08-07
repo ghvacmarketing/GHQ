@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { X, FileText, Check, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +54,8 @@ export default function MobileQuotePresent() {
     `fixed inset-x-0 bottom-0 z-[70] flex flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.28)] ${closing ? "animate-out slide-out-to-bottom duration-200 fill-mode-forwards" : "animate-in slide-in-from-bottom duration-300"}`;
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  // Menu quotes: optional add-ons start UNSELECTED — the customer opts in.
+  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [signature, setSignature] = useState("");
   const [printedName, setPrintedName] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -120,8 +122,35 @@ export default function MobileQuotePresent() {
     }
   }, [quote?.depositPaidAt, quote?.depositAmount, quote?.selectedOption, selectedOption]);
 
+  // Re-opening an already-accepted menu quote: light up what the customer picked.
+  const acceptedIdsFromQuote = (quote as any)?.acceptedLineItemIds;
+  useEffect(() => {
+    if (Array.isArray(acceptedIdsFromQuote) && acceptedIdsFromQuote.length > 0) {
+      setPickedIds(new Set(acceptedIdsFromQuote));
+    }
+  }, [acceptedIdsFromQuote]);
+
   // Verify deposit payment - runs on redirect from Stripe AND when page loads with pending payment link
   const isDepositQuote = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
+
+  // ---- Menu quotes: any customer-visible line flagged "optional add-on"
+  // turns the presentation into a pick-and-choose menu. Deposit and
+  // options-mode quotes keep their existing flows untouched.
+  const lineAmount = (i: any) => parseFloat(String(i?.lineTotal || 0)) || 0;
+  const optionalItems = customerLineItems.filter((i: any) => i.isOptional === true);
+  const requiredItems = customerLineItems.filter((i: any) => i.isOptional !== true);
+  const isMenuQuote = !isDepositQuote && quote?.quoteMode !== "options" && optionalItems.length > 0;
+  const requiredTotal = requiredItems.reduce((s: number, i: any) => s + lineAmount(i), 0);
+  const pickedTotal = optionalItems.filter((i: any) => pickedIds.has(i.id)).reduce((s: number, i: any) => s + lineAmount(i), 0);
+  const menuTotal = requiredTotal + pickedTotal;
+  const togglePicked = (itemId: string) => {
+    setPickedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentSuccess = params.get('payment');
@@ -212,6 +241,42 @@ export default function MobileQuotePresent() {
     },
   });
 
+  // Menu accept: records the picks + signature server-side, which spins up the
+  // invoice for the accepted total — we land straight on it to collect.
+  const presentAcceptMutation = useMutation({
+    mutationFn: async (data: { selectedLineItemIds: string[]; signatureDataUrl: string; signerName: string }) => {
+      const res = await fetch(`/api/mobile/quotes/${id}/present-accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to accept quote");
+      }
+      return result;
+    },
+    onSuccess: (result: { invoiceId?: string; invoiceNumber?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      toast({
+        title: "Quote Accepted!",
+        description: result.invoiceNumber
+          ? `Invoice ${result.invoiceNumber} is ready to collect.`
+          : "The client's picks were recorded.",
+      });
+      if (result.invoiceId) navigate(`/mobile/invoices/${result.invoiceId}`);
+      else navigate(`/mobile/quotes/${id}`);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to accept quote", variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
+    },
+  });
+
   const handleAcceptQuote = () => {
     if (!signature) {
       toast({ title: "Signature Required", description: "Please have the client sign above.", variant: "destructive" });
@@ -227,6 +292,19 @@ export default function MobileQuotePresent() {
     }
     if (quote?.quoteMode === "options" && !selectedOption) {
       toast({ title: "Selection Required", description: "Please select one of the available options.", variant: "destructive" });
+      return;
+    }
+
+    if (isMenuQuote) {
+      if (menuTotal <= 0) {
+        toast({ title: "Nothing Selected", description: "Pick at least one item before accepting.", variant: "destructive" });
+        return;
+      }
+      presentAcceptMutation.mutate({
+        selectedLineItemIds: Array.from(pickedIds),
+        signatureDataUrl: signature,
+        signerName: printedName.trim(),
+      });
       return;
     }
 
@@ -339,7 +417,9 @@ export default function MobileQuotePresent() {
     );
   }
 
-  const isAlreadyAccepted = quote.status === "accepted";
+  // "converted" = menu accept already ran (quote signed + invoiced) — it is
+  // just as final as a plain acceptance.
+  const isAlreadyAccepted = quote.status === "accepted" || quote.status === "converted";
 
   return (
     <div className={sheetChrome(sheetClosing)} style={{ top: "env(safe-area-inset-top)" }} data-testid="mobile-quote-present">
@@ -518,6 +598,91 @@ export default function MobileQuotePresent() {
                       </div>
                     )
                   )}
+                </>
+              ) : isMenuQuote ? (
+                <>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Build Your Service</h3>
+                    <p className="text-sm text-slate-600">
+                      Tap any add-on to include it — your total updates as you choose.
+                    </p>
+                  </div>
+
+                  {requiredItems.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Included</p>
+                      <div className="space-y-2.5">
+                        {requiredItems.map((item: any) => (
+                          <div key={item.id} className="border rounded-lg p-3 bg-slate-50" data-testid={`menu-required-${item.id}`}>
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-200">
+                                <Check className="h-3.5 w-3.5 text-slate-500" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-800 break-words">{item.description}</p>
+                                <div className="mt-1 flex items-center justify-between text-sm">
+                                  <span className="text-slate-500">Qty: {parseFloat(item.quantity || "1")}</span>
+                                  <span className="font-semibold text-slate-800">{formatPresentationCurrency(item.lineTotal || "0")}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Optional add-ons — your choice</p>
+                    <div className="space-y-2.5">
+                      {optionalItems.map((item: any) => {
+                        const picked = pickedIds.has(item.id);
+                        return (
+                          <button
+                            type="button"
+                            key={item.id}
+                            onClick={() => !isAlreadyAccepted && togglePicked(item.id)}
+                            className={`w-full text-left border-2 rounded-lg p-3 transition-all ${isAlreadyAccepted ? "cursor-default" : "active:scale-[0.99]"} ${
+                              picked ? "border-[#711419] ring-2 ring-[#711419]/15 bg-[#711419]/[0.04]" : "border-slate-200 bg-white"
+                            }`}
+                            data-testid={`menu-optional-${item.id}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                                picked ? "border-[#711419] bg-[#711419]" : "border-slate-300 bg-white"
+                              }`}>
+                                {picked ? <Check className="h-3.5 w-3.5 text-white" /> : <Plus className="h-3.5 w-3.5 text-slate-400" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-800 break-words">{item.description}</p>
+                                <div className="mt-1 flex items-center justify-between text-sm">
+                                  <span className="text-slate-500">Qty: {parseFloat(item.quantity || "1")}</span>
+                                  <span className="font-bold" style={{ color: BRAND_COLOR }}>+{formatPresentationCurrency(item.lineTotal || "0")}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 border-t pt-4 space-y-1.5">
+                    {requiredItems.length > 0 && (
+                      <div className="flex justify-between text-sm text-slate-600">
+                        <span>Included services</span>
+                        <span>{formatPresentationCurrency(requiredTotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm text-slate-600">
+                      <span>Add-ons ({pickedIds.size} of {optionalItems.length})</span>
+                      <span>{formatPresentationCurrency(pickedTotal)}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2 text-lg font-semibold">
+                      <span>Your Total</span>
+                      <span style={{ color: BRAND_COLOR }} data-testid="menu-live-total">{formatPresentationCurrency(menuTotal)}</span>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <>
@@ -733,12 +898,12 @@ export default function MobileQuotePresent() {
                 ) : isDepositQuote ? null : (
                   <Button
                     onClick={handleAcceptQuote}
-                    disabled={acceptInPersonMutation.isPending}
+                    disabled={acceptInPersonMutation.isPending || presentAcceptMutation.isPending}
                     className="w-full min-h-[56px] text-lg"
                     style={{ backgroundColor: BRAND_COLOR }}
                     data-testid="button-accept-quote"
                   >
-                    {acceptInPersonMutation.isPending ? (
+                    {acceptInPersonMutation.isPending || presentAcceptMutation.isPending ? (
                       <>
                         <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                         Processing...
@@ -746,7 +911,7 @@ export default function MobileQuotePresent() {
                     ) : (
                       <>
                         <CheckCircle className="h-5 w-5 mr-2" />
-                        Accept Quote
+                        {isMenuQuote ? `Accept — ${formatPresentationCurrency(menuTotal)}` : "Accept Quote"}
                       </>
                     )}
                   </Button>

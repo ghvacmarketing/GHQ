@@ -21,6 +21,8 @@ export type EditableLineItem = {
   quantity: number;
   unitPrice: number;
   lineType: string;
+  /** Menu quotes: the customer toggles this line during presentation */
+  optional?: boolean;
 };
 
 const money = (n: number) =>
@@ -35,6 +37,7 @@ export function LineItemsEditor({
   subtotal,
   total,
   totalsTestPrefix,
+  onToggleOptional,
 }: {
   items: EditableLineItem[];
   onAdd: () => void;
@@ -47,6 +50,9 @@ export function LineItemsEditor({
   total: number;
   /** "quote" | "invoice" — keeps the existing testids intact. */
   totalsTestPrefix: string;
+  /** Quotes only: show the per-line "Optional add-on" toggle (menu quotes —
+   *  the customer picks these on/off when presented in person). */
+  onToggleOptional?: (id: string, optional: boolean) => void;
 }) {
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -141,6 +147,20 @@ export function LineItemsEditor({
                   {money(item.quantity * item.unitPrice)}
                 </span>
               </div>
+              {onToggleOptional && (
+                <button
+                  onClick={() => onToggleOptional(item.id, !item.optional)}
+                  className={`mt-2 inline-flex items-center gap-1.5 rounded-[4px] border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    item.optional
+                      ? "border-[#711419]/40 bg-[#711419]/5 text-[#711419]"
+                      : "border-slate-300/70 bg-white text-slate-400"
+                  }`}
+                  data-testid={`toggle-optional-${item.id}`}
+                >
+                  {item.optional ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                  Optional add-on{item.optional ? " — customer picks" : ""}
+                </button>
+              )}
             </div>
           ))}
         </div>

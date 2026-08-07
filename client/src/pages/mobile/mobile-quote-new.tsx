@@ -43,6 +43,8 @@ interface QuickQuoteLineItem {
   quantity: number;
   unitPrice: number;
   lineType: "service" | "discount" | "part" | "maintenance";
+  /** Menu quotes: the customer toggles this line on/off when presented */
+  optional?: boolean;
 }
 
 function calculateLineTotal(item: { quantity: number; unitPrice: number }): number {
@@ -150,7 +152,7 @@ export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: 
   const createQuoteMutation = useMutation({
     mutationFn: async (data: {
       title: string;
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string }>;
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number; lineType: string; isOptional?: boolean }>;
       subtotal: number;
       total: number;
     }) => {
@@ -169,6 +171,7 @@ export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: 
         lineTotal: item.lineTotal.toFixed(2),
         lineType: item.lineType,
         sortOrder: index,
+        isOptional: item.isOptional ?? false,
       }));
 
       const response = await apiRequest("POST", "/api/crm/quotes", {
@@ -243,6 +246,7 @@ export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: 
         unitPrice: item.unitPrice,
         lineTotal: calculateLineTotal(item),
         lineType: item.lineType,
+        isOptional: item.optional ?? false,
       })),
       subtotal,
       total,
@@ -412,6 +416,9 @@ export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: 
             onRemove={removeLineItem}
             onUpdate={(id, field, value) => updateLineItem(id, field, value)}
             onAddFromCatalog={addFromCatalog}
+            onToggleOptional={(id, optional) =>
+              setLineItems((prev) => prev.map((it) => (it.id === id ? { ...it, optional } : it)))
+            }
             subtotal={subtotal}
             total={total}
             totalsTestPrefix="quote"

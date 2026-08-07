@@ -1606,6 +1606,9 @@ export const crmQuotes = pgTable("crm_quotes", {
   stripePaymentLinkId: text("stripe_payment_link_id"),
   // Link to auto-generated deposit invoice
   depositInvoiceId: varchar("deposit_invoice_id"),
+  // Menu-quote acceptance: which line items the customer picked when they
+  // signed in person (required lines are implicitly included).
+  acceptedLineItemIds: json("accepted_line_item_ids").$type<string[]>(),
 }, (table) => ({
   statusIdx: index("crm_quotes_status_idx").on(table.status),
   customerIdIdx: index("crm_quotes_customer_id_idx").on(table.customerId),
@@ -1633,6 +1636,9 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   // Worksheet cost lines (labor, materials at cost) default to hidden —
   // they're backend pricing, not what the customer is quoted.
   customerVisible: boolean("customer_visible").default(true),
+  // Menu quotes: optional add-ons the CUSTOMER toggles during an in-person
+  // presentation (pick-and-choose); required lines are always included.
+  isOptional: boolean("is_optional").default(false),
   // QuickBooks sub-account override - if null, calculated from item category + property type
   quickbooksSubAccountId: varchar("quickbooks_sub_account_id"),
   createdAt: timestamp("created_at").defaultNow(),
