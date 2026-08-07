@@ -115,6 +115,10 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
     // Calculate deposit amount (minimum 50 cents per Stripe's requirement)
     const depositPct = depositOverride || await getDepositPercentage();
     const depositAmount = Math.max(50, Math.round((surchargedTotal * depositPct / 100) * 100)); // Convert to cents
+    // The CONTRACT deposit (no processing fee) — this is what offsets the
+    // balance invoice later; the fee is a cost of the card transaction, not
+    // a credit toward the job.
+    const baseDepositAmount = Math.round((total * depositPct / 100) * 100) / 100;
 
     const methodLabel = paymentMethod === "ach" ? "bank transfer (ACH)" : "credit/debit card";
     const feeNote = surchargeAmount > 0 ? ` (includes ${surchargeLabel(paymentMethod)} online payment convenience fee for ${methodLabel})` : "";
@@ -144,6 +148,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
         selectedOption: selectedOption || '',
         paymentMethod,
         surchargeAmount: surchargeAmount.toFixed(2),
+        baseDepositAmount: baseDepositAmount.toFixed(2),
       },
       after_completion: {
         type: 'redirect',
@@ -546,7 +551,14 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
               continue; // Deposit was reversed (partial or full)
             }
             
-            const depositAmountNum = (paymentIntent.amount_received ?? session.amount_total ?? 0) / 100;
+            const chargedNum = (paymentIntent.amount_received ?? session.amount_total ?? 0) / 100;
+            // Record the CONTRACT deposit, never charge+fee — the balance
+            // invoice subtracts this number.
+            const depositAmountNum = contractDepositFrom(
+              session.metadata as Record<string, string> | null,
+              chargedNum,
+              parseFloat(quote.total || "0"),
+            );
             const sessionSelectedOption = (session.metadata?.selectedOption as string) || null;
             
             await db.update(crmQuotes)
@@ -600,7 +612,12 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
         continue; // Deposit was reversed, skip
       }
       
-      const depositAmountNum = (pi.amount_received ?? pi.amount) / 100;
+      const chargedNum = (pi.amount_received ?? pi.amount) / 100;
+      const depositAmountNum = contractDepositFrom(
+        pi.metadata as Record<string, string> | null,
+        chargedNum,
+        parseFloat(quote.total || "0"),
+      );
       const piSelectedOption = (pi.metadata?.selectedOption as string) || null;
       
       await db.update(crmQuotes)
