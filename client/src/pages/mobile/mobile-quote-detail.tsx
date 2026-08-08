@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { format } from "date-fns";
 import { generateQuotePdf } from "@/lib/quote-pdf";
 import {
@@ -31,6 +31,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import MobileQuotes from "./mobile-quotes";
+// Lazy so the job-detail chunk isn't bundled in here; when the quote was
+// opened FROM a job the chunk is already loaded, so the underlay is instant.
+const MobileJobDetailUnderlay = lazy(() => import("./mobile-job-detail"));
 import ghvacLogo from "@assets/ghvac-logo.png";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 
@@ -95,12 +98,18 @@ export default function MobileQuoteDetail() {
   const [showUnderlay, setShowUnderlay] = useState(false);
   const swipeDrag = useRef<{ id: number; x: number; y: number; engaged: boolean; active: boolean } | null>(null);
 
+  // Opened from a job's Quote tab (?job=<id>): back returns to THAT tab,
+  // and the back-swipe reveals the job page — not the quotes list.
+  const searchString = useSearch();
+  const fromJobId = new URLSearchParams(searchString).get("job");
+  const backTarget = fromJobId ? `/mobile/jobs/${fromJobId}?tab=quote` : "/mobile/quotes";
+
   const goBackAnimated = (fromDx = 0) => {
-    // The quotes list is already on screen as the underlay — its remount
+    // The back target is already on screen as the underlay — its remount
     // after navigation must not fade in again (the post-swipe "flash").
     markSkipEntrance();
     const el = pageRef.current;
-    if (!el) return navigate("/mobile/quotes");
+    if (!el) return navigate(backTarget);
     const w = el.clientWidth || window.innerWidth;
     const startP = Math.max(0, Math.min(1, fromDx / w));
     const dur = 200 * (1 - startP) + 40;
@@ -124,7 +133,7 @@ export default function MobileQuoteDetail() {
         [{ opacity: String(0.18 * (1 - startP)) }, { opacity: "0" }],
         { duration: dur, easing: "linear", fill: "forwards" },
       );
-      setTimeout(() => navigate("/mobile/quotes"), dur - 10);
+      setTimeout(() => navigate(backTarget), dur - 10);
     });
   };
 
@@ -368,12 +377,19 @@ export default function MobileQuoteDetail() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-slate-50">
-      {/* Real quotes list beneath the detail — the whole screen slides over
-          it so the back-swipe reveals where you're headed */}
+      {/* The real back target beneath the detail — the whole screen slides
+          over it so the back-swipe reveals where you're headed: the job's
+          Quote tab when we came from a job, the quotes list otherwise */}
       {showUnderlay && (
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden data-underlay>
           <div ref={underlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
-            <MobileQuotes />
+            {fromJobId ? (
+              <Suspense fallback={null}>
+                <MobileJobDetailUnderlay idOverride={fromJobId} tabOverride="quote" />
+              </Suspense>
+            ) : (
+              <MobileQuotes />
+            )}
           </div>
           <div ref={scrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
         </div>

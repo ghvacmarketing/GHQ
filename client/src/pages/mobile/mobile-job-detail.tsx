@@ -48,6 +48,7 @@ import {
   MessageSquare,
   Navigation,
   ChevronLeft,
+  ChevronRight,
   ImagePlus,
 } from "lucide-react";
 import { statusDotColor } from "@/components/ui/status-dot";
@@ -1388,12 +1389,8 @@ const quoteStatusConfig: Record<string, { label: string; className: string }> = 
 };
 
 function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
-  const { toast } = useToast();
   const [, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
-  const [showEmailDialog, setShowEmailDialog] = useState(false);
-  const [emailRecipient, setEmailRecipient] = useState("");
-  const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
 
   // Fetch existing quotes for this work order
   const { data: quotesData, isLoading: quotesLoading, error: quotesError } = useQuery<{ quotes: CrmQuote[] }>({
@@ -1407,45 +1404,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   });
 
   const quotes = quotesData?.quotes || [];
-
-  // Send quote email mutation
-  const sendQuoteEmailMutation = useMutation({
-    mutationFn: async ({ quoteId, recipientEmail }: { quoteId: string; recipientEmail: string }) => {
-      const response = await apiRequest("POST", `/api/crm/quotes/${quoteId}/send-email`, {
-        recipientEmail,
-      });
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || error.error || "Failed to send quote email");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Email Sent", description: "Quote email has been sent successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { workOrderId: workOrder.id }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      setShowEmailDialog(false);
-      setEmailQuoteId(null);
-      setEmailRecipient("");
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send quote email", variant: "destructive" });
-    },
-  });
-
-  const openEmailDialog = (quoteId: string) => {
-    setEmailQuoteId(quoteId);
-    setEmailRecipient(workOrder.customer?.email || "");
-    setShowEmailDialog(true);
-  };
-
-  const handleSendEmail = () => {
-    if (!emailQuoteId || !emailRecipient.trim()) {
-      toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
-      return;
-    }
-    sendQuoteEmailMutation.mutate({ quoteId: emailQuoteId, recipientEmail: emailRecipient.trim() });
-  };
 
   const formatCurrency = (amount: number | string) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -1475,68 +1433,39 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               No quotes linked to this work order yet.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {quotes.map((quote) => {
                 const statusInfo = quoteStatusConfig[quote.status] || quoteStatusConfig.draft;
                 return (
-                  <div
+                  // The whole row is the tap target — chevron + press state
+                  // say "this opens"; everything else lives in quote detail.
+                  <button
+                    type="button"
                     key={quote.id}
-                    className="border rounded-lg p-3 space-y-2"
+                    onClick={() => navigate(`/mobile/quotes/${quote.id}?job=${workOrder.id}`)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors active:bg-slate-100"
                     data-testid={`quote-item-${quote.id}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm" data-testid={`quote-number-${quote.id}`}>
-                        {quote.quoteNumber || `Quote`}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900" data-testid={`quote-title-${quote.id}`}>
+                        {quote.title || quote.quoteNumber || "Quote"}
+                      </p>
+                      {quote.createdAt && (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          Created {format(new Date(quote.createdAt), "MMM d, yyyy")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-sm font-semibold tabular-nums text-slate-900" data-testid={`quote-total-${quote.id}`}>
+                        {formatCurrency(quote.total)}
                       </span>
                       <Badge variant="outline" className={statusInfo.className} data-testid={`quote-status-${quote.id}`}>
                         {statusInfo.label}
                       </Badge>
                     </div>
-                    {quote.title && (
-                      <p className="text-sm text-slate-600 truncate" data-testid={`quote-title-${quote.id}`}>
-                        {quote.title}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold text-green-700" data-testid={`quote-total-${quote.id}`}>
-                        {formatCurrency(quote.total)}
-                      </span>
-                      <div className="flex gap-2">
-                        {quote.status === "draft" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="min-h-[44px] border-blue-200 text-blue-700 hover:bg-blue-50"
-                            onClick={() => openEmailDialog(quote.id)}
-                            disabled={sendQuoteEmailMutation.isPending}
-                            data-testid={`button-send-quote-${quote.id}`}
-                          >
-                            {sendQuoteEmailMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                            ) : (
-                              <Mail className="h-4 w-4 mr-1" />
-                            )}
-                            Send Email
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="min-h-[44px]"
-                          onClick={() => navigate(`/mobile/quotes/${quote.id}`)}
-                          data-testid={`button-view-quote-${quote.id}`}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                    {quote.createdAt && (
-                      <p className="text-xs text-slate-400">
-                        Created {format(new Date(quote.createdAt), "MMM d, yyyy")}
-                      </p>
-                    )}
-                  </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  </button>
                 );
               })}
             </div>
@@ -1566,60 +1495,6 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           document.body,
         )}
 
-      {/* Send Quote Email Dialog */}
-      <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Quote Email</DialogTitle>
-            <DialogDescription>
-              Enter the email address where you want to send this quote.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="email-recipient" className="text-sm font-medium">
-                Recipient Email
-              </Label>
-              <Input
-                id="email-recipient"
-                type="email"
-                placeholder="customer@example.com"
-                value={emailRecipient}
-                onChange={(e) => setEmailRecipient(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-quote-email-recipient"
-              />
-            </div>
-          </div>
-          <DialogFooter className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => { setShowEmailDialog(false); setEmailQuoteId(null); setEmailRecipient(""); }}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
-              onClick={handleSendEmail}
-              disabled={sendQuoteEmailMutation.isPending || !emailRecipient.trim()}
-              data-testid="button-confirm-send-quote-email"
-            >
-              {sendQuoteEmailMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Email
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -2411,7 +2286,10 @@ function InvoiceTab({
   );
 }
 
-export default function MobileJobDetail() {
+// idOverride/tabOverride let another page mount this one as a back-swipe
+// UNDERLAY (e.g. quote detail revealing the job's Quote tab) — the route
+// params belong to the page on top, so they can't be read here.
+export default function MobileJobDetail({ idOverride, tabOverride }: { idOverride?: string; tabOverride?: TabType } = {}) {
   useRequireCrmAuth();
   const entered = usePushEntrance();
   // Arriving as the tail end of a sheet-close (create quote/invoice ghost
@@ -2419,7 +2297,7 @@ export default function MobileJobDetail() {
   // playing under the descending sheet.
   const [skipEnter] = useState(() => skipEntranceOnce());
   const params = useParams<{ id: string }>();
-  const workOrderId = parseInt(params.id || "0", 10);
+  const workOrderId = parseInt(idOverride ?? params.id ?? "0", 10);
   const [, navigate] = useLocation();
   const searchString = useSearch();
   const { toast } = useToast();
@@ -2429,6 +2307,7 @@ export default function MobileJobDetail() {
 
   // Parse tab from query string
   const initialTab = (): TabType => {
+    if (tabOverride) return tabOverride;
     const params = new URLSearchParams(searchString);
     const tab = params.get("tab");
     if (tab === "work" || tab === "quote" || tab === "invoice") {
