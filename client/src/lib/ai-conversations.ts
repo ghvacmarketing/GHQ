@@ -5,7 +5,7 @@
 export type AiProposedAction = {
   // "fill_form" is create-copilot only: applied straight to the open form,
   // never rendered as an approval card and never persisted.
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_checklist" | "create_item" | "fill_form";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -36,6 +36,8 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   create_invoice: "New invoice — draft",
   delete_quote: "Delete quote — permanent",
   log_call: "Log a call",
+  create_lead: "New sales lead",
+  update_lead: "Update sales lead",
   create_checklist: "New checklist template",
   create_item: "New price book item",
   fill_form: "Filled the form",
@@ -58,6 +60,8 @@ export const AI_ACTION_CATEGORIES: Record<string, { key: "ops" | "outbound" | "b
   create_invoice: { key: "ops", label: "Day-to-day" },
   delete_quote: { key: "ops", label: "Day-to-day" },
   log_call: { key: "ops", label: "Day-to-day" },
+  create_lead: { key: "ops", label: "Day-to-day" },
+  update_lead: { key: "ops", label: "Day-to-day" },
   send_sms: { key: "outbound", label: "Sends to customer" },
   send_email: { key: "outbound", label: "Sends to customer" },
   create_checklist: { key: "builder", label: "Company setup" },

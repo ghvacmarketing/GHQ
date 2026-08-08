@@ -280,6 +280,23 @@ async function runTaggedCommentMigrations() {
         ON crm_messaging_messages (external_message_id)
         WHERE external_message_id IS NOT NULL
     `);
+    // Repair deposits recorded BEFORE the contract-deposit fix (2026-08-07):
+    // verify-deposit used to store the CHARGED amount (incl. the card/ACH
+    // convenience fee), so balance invoices under-billed. Rewrite paid Stripe
+    // deposits back to the 50% contract amount — but only rows sitting in the
+    // fee-inflation band above it (>50%, ≤ ~5% over), so already-correct rows
+    // and any custom/manual deposits are never touched. Idempotent: repaired
+    // rows land at exactly 50% and stop matching.
+    await db.execute(sql`
+      UPDATE crm_quotes
+         SET deposit_amount = ROUND(total::numeric * 0.5, 2)
+       WHERE deposit_paid_at IS NOT NULL
+         AND stripe_payment_link_id IS NOT NULL
+         AND total IS NOT NULL AND total::numeric > 0
+         AND deposit_amount IS NOT NULL
+         AND deposit_amount::numeric > ROUND(total::numeric * 0.5, 2) + 0.01
+         AND deposit_amount::numeric <= ROUND(total::numeric * 0.5, 2) * 1.05 + 1
+    `);
   } catch (err) {
     console.error("Tagged comment migration error (non-fatal):", err);
   }

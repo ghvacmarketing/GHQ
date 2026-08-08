@@ -2937,6 +2937,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             billable: z.boolean().optional(),
           }).strict(),
         }),
+        z.object({
+          type: z.literal("create_lead"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            potentialValue: z.number().min(0).max(10_000_000).optional(),
+            interestLevel: z.enum(["hot", "warm", "cold"]).optional(),
+            // A brand-new lead can't start won/lost — those are outcomes.
+            salesStage: z.enum(["new", "contacted", "quote_sent", "negotiating"]).optional(),
+            assignTo: z.string().trim().max(100).optional(),
+            assignedSalesRepId: z.string().trim().min(1).max(64).optional(),
+            notes: z.string().trim().max(2000).optional(),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("update_lead"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            leadId: z.string().trim().min(1).max(64).optional(),
+            // Disambiguation retries patch the chosen rep id in at the top level.
+            assignedSalesRepId: z.string().trim().min(1).max(64).optional(),
+            changes: z.object({
+              salesStage: z.enum(["new", "contacted", "quote_sent", "negotiating", "won", "lost"]).optional(),
+              interestLevel: z.enum(["hot", "warm", "cold"]).optional(),
+              potentialValue: z.number().min(0).max(10_000_000).optional(),
+              assignTo: z.string().trim().max(100).optional(),
+              notes: z.string().trim().max(2000).optional(),
+              lostReason: z.string().trim().max(300).optional(),
+            }).strict().refine((c) => Object.keys(c).length > 0, { message: "No changes given." }),
+            // Display-only: the model's snapshot so the card shows before/after.
+            current: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+          }).strict(),
+        }),
         // ── Builder actions (company setup — supervisor+ only, gated below) ──
         z.object({
           type: z.literal("create_checklist"),
@@ -3108,6 +3142,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const label = `Price book item "${newItem.name}" — $${action.params.rate}${action.params.unit ? `/${action.params.unit}` : ""}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "item", id: newItem.id, label, url: "/crm/items" });
         return res.status(201).json({ ok: true, entity: "item", id: newItem.id, label, url: "/crm/items" });
+      }
+
+      // create_lead / update_lead — the sales funnel. A lead hangs off a
+      // customer, so both resolve the customer with the same fuzzy matching
+      // as every other action; the sales rep resolves like work-order techs.
+      if (action.type === "create_lead" || action.type === "update_lead") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const leadCustomer = resolved.customer;
+
+        const assignToName = action.type === "create_lead" ? action.params.assignTo : action.params.changes.assignTo;
+        let salesRep: { id: string; name: string | null } | null = null;
+        if (action.params.assignedSalesRepId) {
+          const [picked] = await db
+            .select({ id: crmUsers.id, name: crmUsers.name })
+            .from(crmUsers)
+            .where(eq(crmUsers.id, action.params.assignedSalesRepId));
+          if (!picked) return res.status(422).json({ message: "That salesperson no longer exists." });
+          salesRep = picked;
+        } else if (assignToName) {
+          const staff = await db
+            .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
+            .from(crmUsers)
+            .where(inArray(crmUsers.role, ["sales", "supervisor", "owner", "admin"]));
+          const scored = staff
+            .map((s) => ({ id: s.id, name: s.name, score: aiNameSimilarity(s.name || "", assignToName) }))
+            .sort((x, y) => y.score - x.score);
+          const best = scored[0];
+          const second = scored[1];
+          if (best && best.score >= 0.8 && (!second || best.score - second.score >= 0.15)) {
+            salesRep = { id: best.id, name: best.name };
+          } else {
+            const shortlist = scored.some((s) => s.score >= 0.3) ? scored.filter((s) => s.score >= 0.3) : scored;
+            return res.status(422).json({
+              message: `Not sure who you meant by "${assignToName}" — pick the right salesperson:`,
+              candidateParam: "assignedSalesRepId",
+              candidates: shortlist.slice(0, 6).map((c) => ({ id: c.id, name: c.name })),
+            });
+          }
+        }
+
+        if (action.type === "create_lead") {
+          const openStages = ["new", "contacted", "quote_sent", "negotiating"];
+          const existingLeads = await db.select().from(crmLeads)
+            .where(and(eq(crmLeads.customerId, leadCustomer.id), inArray(crmLeads.salesStage, openStages as any)));
+          if (existingLeads.length > 0) {
+            return res.status(409).json({ message: `${leadCustomer.name} already has an open lead in the funnel — ask me to update it instead.` });
+          }
+          const [lead] = await db.insert(crmLeads).values({
+            customerId: leadCustomer.id,
+            salesStage: (action.params.salesStage || "new") as any,
+            interestLevel: (action.params.interestLevel ?? null) as any,
+            potentialValue: action.params.potentialValue != null ? Math.round(action.params.potentialValue) : null,
+            assignedSalesRepId: salesRep?.id ?? null,
+            notes: action.params.notes ?? null,
+          }).returning();
+          await logCrmAudit(user.id, "ai_action.create_lead", "crm_lead", lead.id, { customerId: leadCustomer.id, params: action.params }, req.ip);
+          const leadLabel = `Lead added for ${leadCustomer.name}`;
+          const leadUrl = `/crm/prospect-funnel`;
+          await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "lead", id: lead.id, label: leadLabel, url: leadUrl });
+          return res.status(201).json({ ok: true, entity: "lead", id: lead.id, label: leadLabel, url: leadUrl });
+        }
+
+        // update_lead: target the given lead, else the customer's open lead
+        // (fall back to the newest one so won/lost leads can still be edited).
+        let lead: typeof crmLeads.$inferSelect | null = null;
+        if (action.params.leadId) {
+          const [byId] = await db.select().from(crmLeads).where(eq(crmLeads.id, action.params.leadId));
+          lead = byId && byId.customerId === leadCustomer.id ? byId : null;
+        } else {
+          const rows = await db.select().from(crmLeads)
+            .where(eq(crmLeads.customerId, leadCustomer.id))
+            .orderBy(desc(crmLeads.createdAt));
+          lead = rows.find((l) => !["won", "lost"].includes(l.salesStage)) || rows[0] || null;
+        }
+        if (!lead) {
+          return res.status(404).json({ message: `${leadCustomer.name} has no lead in the funnel yet — ask me to create one instead.` });
+        }
+
+        const changes = action.params.changes;
+        const updateData: Record<string, any> = { updatedAt: new Date() };
+        if (changes.salesStage !== undefined) {
+          updateData.salesStage = changes.salesStage;
+          if (changes.salesStage === "won" && lead.salesStage !== "won") updateData.wonAt = new Date();
+          if (changes.salesStage === "lost" && lead.salesStage !== "lost") updateData.lostAt = new Date();
+        }
+        if (changes.interestLevel !== undefined) updateData.interestLevel = changes.interestLevel;
+        if (changes.potentialValue !== undefined) updateData.potentialValue = Math.round(changes.potentialValue);
+        if (changes.notes !== undefined) updateData.notes = changes.notes;
+        if (changes.lostReason !== undefined) updateData.lostReason = changes.lostReason;
+        if (salesRep) updateData.assignedSalesRepId = salesRep.id;
+
+        const [updatedLead] = await db.update(crmLeads).set(updateData).where(eq(crmLeads.id, lead.id)).returning();
+        await logCrmAudit(user.id, "ai_action.update_lead", "crm_lead", lead.id, { customerId: leadCustomer.id, changes }, req.ip);
+        const updLabel = `Lead updated for ${leadCustomer.name}`;
+        const updUrl = `/crm/prospect-funnel`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "lead", id: updatedLead.id, label: updLabel, url: updUrl });
+        return res.json({ ok: true, entity: "lead", id: updatedLead.id, label: updLabel, url: updUrl });
       }
 
       // send_sms — text a customer through the CRM messaging line (Textline).
