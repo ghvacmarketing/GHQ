@@ -14686,6 +14686,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // the tech's phone and SIGNED. Records the signature + selection on the
   // quote and creates the invoice from EXACTLY the chosen items, ready to
   // collect on the spot.
+  // ── Boot beacon: every device reports its launch stages (inline script in
+  // index.html), so native-only failures — webview reload loops, dead chunk
+  // hashes, storage wedges — are debuggable from the office. POST is public
+  // on purpose: the boots that matter happen before anyone can log in.
+  const bootBeacons: Array<Record<string, unknown>> = [];
+  app.post("/api/mobile/boot-beacon", express.text({ type: "*/*", limit: "8kb" }), (req, res) => {
+    try {
+      const raw = typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
+      const data = JSON.parse(raw || "{}");
+      if (data && typeof data === "object") {
+        const entry = { ...data, ip: req.ip, seenAt: new Date().toISOString() };
+        bootBeacons.push(entry);
+        if (bootBeacons.length > 300) bootBeacons.splice(0, bootBeacons.length - 300);
+        console.log("[BootBeacon]", JSON.stringify(entry).slice(0, 600));
+      }
+    } catch {}
+    res.status(204).end();
+  });
+  app.get("/api/mobile/boot-beacon", requireCrmAuth, (_req, res) => {
+    res.json({ beacons: bootBeacons.slice(-120) });
+  });
+
   app.post("/api/mobile/quotes/:id/present-accept", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);

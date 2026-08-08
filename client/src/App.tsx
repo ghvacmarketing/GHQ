@@ -172,6 +172,7 @@ class ErrorBoundary extends Component<
   }
 
   componentDidMount() {
+    (window as any).__ghqBeacon?.({ stage: "react-mounted" });
     // A healthy stretch of runtime means the shell is good — reset the
     // recovery counter so a LATER mid-session deploy gets its own attempts.
     setTimeout(() => {
@@ -179,6 +180,7 @@ class ErrorBoundary extends Component<
         try {
           sessionStorage.removeItem("chunk-reload-attempted");
         } catch {}
+        (window as any).__ghqBeacon?.({ stage: "healthy-15s" });
       }
     }, 15000);
   }
@@ -205,6 +207,7 @@ class ErrorBoundary extends Component<
         try {
           sessionStorage.setItem("chunk-reload-attempted", String(attempts + 1));
         } catch {}
+        (window as any).__ghqBeacon?.({ stage: "chunk-error-reload", attempt: attempts + 1, message: text.slice(0, 300) });
         const nukeStaleLayers = async () => {
           try {
             const regs = (await navigator.serviceWorker?.getRegistrations?.()) || [];
@@ -215,8 +218,17 @@ class ErrorBoundary extends Component<
             await Promise.all(keys.map((k) => caches.delete(k)));
           } catch {}
         };
-        nukeStaleLayers().finally(() => window.location.reload());
+        // The 1.2s pause means even a worst-case recovery cycle can never
+        // rapid-flash the screen — and if storage is broken (attempt counter
+        // can't persist), the loop stays slow enough to see and report.
+        nukeStaleLayers().finally(() => {
+          setTimeout(() => window.location.reload(), 1200);
+        });
+      } else {
+        (window as any).__ghqBeacon?.({ stage: "chunk-error-gaveup", message: text.slice(0, 300) });
       }
+    } else {
+      (window as any).__ghqBeacon?.({ stage: "app-error", message: text.slice(0, 300) });
     }
   }
 
