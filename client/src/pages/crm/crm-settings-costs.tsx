@@ -20,6 +20,7 @@ import type { CrmUser } from "@shared/schema";
 type AiRow = { provider: string; source: string; day: string; cost_micro: string; input_tokens: string; output_tokens: string; audio_seconds: number; calls: number };
 type SnapRow = { provider: string; day: string; metric: string; value: number | null; cost_micro: string };
 type ManualRow = { id: string; label: string; monthly_cost_cents: number; notes: string | null };
+type UserRow = { user_id: string | null; user_name: string | null; cost_micro: string; calls: number; input_tokens: string; output_tokens: string; audio_seconds: number };
 
 const usd = (micro: number) => `$${(micro / 1_000_000).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -32,7 +33,7 @@ export default function CrmSettingsCosts() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data, isLoading, refetch } = useQuery<{ ai: AiRow[]; snapshots: SnapRow[]; manual: ManualRow[] }>({
+  const { data, isLoading, refetch } = useQuery<{ ai: AiRow[]; snapshots: SnapRow[]; manual: ManualRow[]; users: UserRow[] }>({
     queryKey: ["/api/crm/costs/summary"],
     enabled: !!currentUser,
   });
@@ -79,6 +80,21 @@ export default function CrmSettingsCosts() {
       const d = new Date(Date.now() - i * 86400_000).toISOString().slice(0, 10);
       days.push({ day: d, micro: byDay.get(d) || 0 });
     }
+    // Gibbs day-by-day (last 14 days): asks, tokens, and spend per day
+    const gibbsDay = new Map<string, { micro: number; calls: number; tin: number; tout: number }>();
+    for (const r of gibbsRows) {
+      const g = gibbsDay.get(r.day) || { micro: 0, calls: 0, tin: 0, tout: 0 };
+      g.micro += Number(r.cost_micro);
+      g.calls += r.calls;
+      g.tin += Number(r.input_tokens);
+      g.tout += Number(r.output_tokens);
+      gibbsDay.set(r.day, g);
+    }
+    const gibbsDays: Array<{ day: string; micro: number; calls: number; tin: number; tout: number }> = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400_000).toISOString().slice(0, 10);
+      gibbsDays.push({ day: d, ...(gibbsDay.get(d) || { micro: 0, calls: 0, tin: 0, tout: 0 }) });
+    }
     const manualMonthlyCents = (data?.manual || []).reduce((s, m) => s + m.monthly_cost_cents, 0);
     const renderLatest = renderRows[renderRows.length - 1];
     const neonToday = neonRows.filter((r) => r.day === renderLatest?.day || true).reduce((s, r) => (r.day === neonRows[neonRows.length - 1]?.day ? s + (r.value || 0) : s), 0);
@@ -91,6 +107,7 @@ export default function CrmSettingsCosts() {
       neonGb: neonToday,
       neonMtd: mtd(neonRows),
       days,
+      gibbsDays,
       maxDay: Math.max(1, ...days.map((d) => d.micro)),
       gibbsCalls: gibbsRows.filter((r) => r.day >= monthStart).reduce((s, r) => s + r.calls, 0),
       voiceMinutes: voiceRows.filter((r) => r.day >= monthStart).reduce((s, r) => s + r.audio_seconds, 0) / 60,
@@ -196,6 +213,66 @@ export default function CrmSettingsCosts() {
                     </span>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Gibbs day-by-day + per-user breakdowns */}
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className={card} data-testid="costs-gibbs-days">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Gibbs — day by day (last 14 days)</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                      <th className="py-1 font-semibold">Day</th>
+                      <th className="py-1 text-right font-semibold">Calls</th>
+                      <th className="py-1 text-right font-semibold">Tokens in</th>
+                      <th className="py-1 text-right font-semibold">Tokens out</th>
+                      <th className="py-1 text-right font-semibold">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agg.gibbsDays.map((d) => (
+                      <tr key={d.day} className={`border-t border-slate-100 ${d.calls === 0 ? "text-slate-300" : ""}`}>
+                        <td className="py-1.5 text-slate-700 tabular-nums">{d.day.slice(5)}</td>
+                        <td className="py-1.5 text-right tabular-nums text-slate-600">{d.calls ? d.calls.toLocaleString() : "—"}</td>
+                        <td className="py-1.5 text-right tabular-nums text-slate-600">{d.tin ? d.tin.toLocaleString() : "—"}</td>
+                        <td className="py-1.5 text-right tabular-nums text-slate-600">{d.tout ? d.tout.toLocaleString() : "—"}</td>
+                        <td className="py-1.5 text-right font-semibold tabular-nums">{d.micro ? usd(d.micro) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className={card} data-testid="costs-by-user">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">AI spend by user — last 31 days</p>
+                {(data?.users || []).length === 0 ? (
+                  <p className="text-sm text-slate-400">No metered usage yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                        <th className="py-1 font-semibold">User</th>
+                        <th className="py-1 text-right font-semibold">Calls</th>
+                        <th className="py-1 text-right font-semibold">Tokens</th>
+                        <th className="py-1 text-right font-semibold">Voice min</th>
+                        <th className="py-1 text-right font-semibold">Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data?.users || []).map((u) => (
+                        <tr key={u.user_id || "untracked"} className="border-t border-slate-100">
+                          <td className="py-1.5 text-slate-700">{u.user_name || (u.user_id ? "Former user" : "Not attributed (before user tracking)")}</td>
+                          <td className="py-1.5 text-right tabular-nums text-slate-600">{u.calls.toLocaleString()}</td>
+                          <td className="py-1.5 text-right tabular-nums text-slate-600">{(Number(u.input_tokens) + Number(u.output_tokens)).toLocaleString()}</td>
+                          <td className="py-1.5 text-right tabular-nums text-slate-600">{u.audio_seconds > 0 ? (u.audio_seconds / 60).toFixed(1) : "—"}</td>
+                          <td className="py-1.5 text-right font-semibold tabular-nums">{usd(Number(u.cost_micro))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                <p className="mt-2 text-[11px] text-slate-400">Gibbs exchanges are attributed to whoever asked; usage recorded before today's update shows as "Not attributed".</p>
               </div>
             </div>
 

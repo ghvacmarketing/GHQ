@@ -11,7 +11,7 @@ const API_URL = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
 /** Meter a successful Anthropic response (fire-and-forget). */
-function meter(data: any, source: string) {
+function meter(data: any, source: string, userId?: string | null) {
   const u = data?.usage;
   if (!u) return;
   recordAiUsage({
@@ -21,6 +21,7 @@ function meter(data: any, source: string) {
     inputTokens: (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0),
     outputTokens: u.output_tokens || 0,
     source,
+    userId,
   });
 }
 
@@ -180,6 +181,8 @@ export async function claudeChatWithTools(opts: {
   maxTokens?: number;
   maxIterations?: number;
   onTextDelta?: (text: string) => void;
+  /** Attribute this exchange's token spend to a user (cost tracker). */
+  meterUserId?: string | null;
 }): Promise<string> {
   const messages: { role: "user" | "assistant"; content: string | unknown[] }[] = [...opts.messages];
   const maxIterations = opts.maxIterations ?? 8;
@@ -217,7 +220,7 @@ export async function claudeChatWithTools(opts: {
         throw err;
       }
     }
-    meter(data, "gibbs");
+    meter(data, "gibbs", opts.meterUserId);
 
     if (!finalTurn && data.stop_reason === "tool_use") {
       messages.push({ role: "assistant", content: data.content });

@@ -2975,7 +2975,7 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
     },
   });
 
-  const isSupervisor = currentUser?.role === "supervisor";
+  const isSupervisor = ["supervisor", "owner", "admin"].includes(currentUser?.role || "");
   const isAssignedToMe = workOrder?.assignedTechId === currentUser?.id;
 
   type EditWorkOrderFormData = {

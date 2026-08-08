@@ -353,6 +353,8 @@ async function runInstallPlannerMigrations() {
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_usage_events_created_idx ON ai_usage_events (created_at)`);
+    // Per-user cost breakdown: who ran each Gibbs exchange.
+    await db.execute(sql`ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS user_id varchar`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS provider_usage_snapshots (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

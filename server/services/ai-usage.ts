@@ -38,13 +38,14 @@ export function recordAiUsage(e: {
   outputTokens?: number;
   audioSeconds?: number;
   source?: string; // which feature: gibbs, search, voice, …
+  userId?: string | null; // who ran it — powers the per-user cost breakdown
 }): void {
   const costMicro =
     e.kind === "transcription"
       ? Math.round(((e.audioSeconds || 0) / 60) * WHISPER_PER_MINUTE * 1_000_000)
       : tokenCostMicro(e.model, e.inputTokens || 0, e.outputTokens || 0);
   db.execute(sql`
-    INSERT INTO ai_usage_events (provider, kind, model, input_tokens, output_tokens, audio_seconds, cost_micro, source)
-    VALUES (${e.provider}, ${e.kind}, ${e.model}, ${e.inputTokens ?? 0}, ${e.outputTokens ?? 0}, ${e.audioSeconds ?? 0}, ${costMicro}, ${e.source ?? "unknown"})
+    INSERT INTO ai_usage_events (provider, kind, model, input_tokens, output_tokens, audio_seconds, cost_micro, source, user_id)
+    VALUES (${e.provider}, ${e.kind}, ${e.model}, ${e.inputTokens ?? 0}, ${e.outputTokens ?? 0}, ${e.audioSeconds ?? 0}, ${costMicro}, ${e.source ?? "unknown"}, ${e.userId ?? null})
   `).catch((err) => console.error("[AI usage] record failed (non-fatal):", err?.message || err));
 }

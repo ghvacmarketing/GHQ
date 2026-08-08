@@ -14289,7 +14289,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY snapshot_date
       `);
       const manual = await db.execute(sql`SELECT id, label, monthly_cost_cents, notes FROM manual_provider_costs ORDER BY label`);
-      res.json({ ai: ai.rows, snapshots: snapshots.rows, manual: manual.rows });
+      // Who's spending it — per-user totals for the same 31-day window
+      // (rows metered before user tracking land under a null user).
+      const users = await db.execute(sql`
+        SELECT e.user_id, u.name AS user_name,
+               SUM(e.cost_micro)::bigint AS cost_micro, COUNT(*)::int AS calls,
+               SUM(e.input_tokens)::bigint AS input_tokens, SUM(e.output_tokens)::bigint AS output_tokens,
+               SUM(e.audio_seconds)::float AS audio_seconds
+        FROM ai_usage_events e
+        LEFT JOIN crm_users u ON u.id = e.user_id
+        WHERE e.created_at > now() - interval '31 days'
+        GROUP BY e.user_id, u.name
+        ORDER BY cost_micro DESC
+      `);
+      res.json({ ai: ai.rows, snapshots: snapshots.rows, manual: manual.rows, users: users.rows });
     } catch (error) {
       console.error("Error building cost summary:", error);
       res.status(500).json({ message: "Failed to load cost summary" });
@@ -30374,9 +30387,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Only supervisors can self-assign from mobile
-      if (!isSupervisor(user.role)) {
-        return res.status(403).json({ message: "Only supervisors can assign work orders to themselves" });
+      // Supervisors and up can self-assign from mobile (owner runs the same
+      // field playbook as a supervisor — never fewer powers).
+      if (!["supervisor", "owner", "admin"].includes(user.role)) {
+        return res.status(403).json({ message: "Only supervisors and up can assign work orders to themselves" });
       }
 
       const workOrder = await storage.getWorkOrder(req.params.id);
@@ -30418,9 +30432,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Work order not found" });
       }
 
-      // Only supervisors can edit work orders from mobile, and only their assigned ones
-      if (!isSupervisor(user.role)) {
-        return res.status(403).json({ message: "Only supervisors can edit work orders from mobile" });
+      // Supervisors and up can edit work orders from mobile, and only their assigned ones
+      if (!["supervisor", "owner", "admin"].includes(user.role)) {
+        return res.status(403).json({ message: "Only supervisors and up can edit work orders from mobile" });
       }
 
       if (workOrder.assignedTechId !== user.id) {

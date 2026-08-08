@@ -1103,6 +1103,7 @@ Return JSON with:
           maxTokens: 3500,
           maxIterations: 8,
           onTextDelta: onAnswerDelta ? makeAnswerExtractor(onAnswerDelta) : undefined,
+          meterUserId: currentUser?.id ?? null,
         }),
       );
     } else {
