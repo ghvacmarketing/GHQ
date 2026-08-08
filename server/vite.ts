@@ -76,10 +76,25 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        // Hashed build assets never change — cache hard, forever. The shell
+        // (index.html) and the service worker must NEVER be reused stale: a
+        // cached shell pointing at purged chunk hashes bricks the app into a
+        // reload loop after a deploy.
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (filePath.endsWith(".html") || filePath.endsWith("service-worker.js")) {
+          res.setHeader("Cache-Control", "no-store");
+        }
+      },
+    }),
+  );
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

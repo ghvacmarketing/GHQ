@@ -1,4 +1,7 @@
-const CACHE_NAME = 'ghvac-quotes-v1';
+// v2: bumping CACHE_NAME purges every device's old static cache on activate —
+// the v1 cache could hand back a stale index.html whose chunk hashes were
+// purged by a deploy, reload-looping the app dead.
+const CACHE_NAME = 'ghvac-static-v2';
 const API_CACHE_NAME = 'ghvac-api-cache-v1';
 const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
@@ -12,10 +15,11 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  
+
   // Skip caching for dev server HMR and other dev endpoints
-  if (url.pathname.includes('/@vite') || 
+  if (url.pathname.includes('/@vite') ||
       url.pathname.includes('/@fs/') ||
       url.pathname.includes('/__replco') ||
       url.pathname.includes('/src/')) {
@@ -33,7 +37,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle static assets with network-first, cache-fallback
+  // Hashed build assets are immutable — cache-first. A cached shell's chunks
+  // stay servable offline even after later deploys purge them server-side.
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(event.request).then((hit) => {
+        if (hit) return hit;
+        return fetch(event.request).then((response) => {
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Everything else (the shell, manifest, icons): network-first so a deploy
+  // is picked up on the very next launch; cache only as an offline fallback.
   event.respondWith(
     fetch(event.request)
       .then((response) => {

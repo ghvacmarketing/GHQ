@@ -171,20 +171,52 @@ class ErrorBoundary extends Component<
     return { hasError: true, error };
   }
 
+  componentDidMount() {
+    // A healthy stretch of runtime means the shell is good — reset the
+    // recovery counter so a LATER mid-session deploy gets its own attempts.
+    setTimeout(() => {
+      if (!this.state.hasError) {
+        try {
+          sessionStorage.removeItem("chunk-reload-attempted");
+        } catch {}
+      }
+    }, 15000);
+  }
+
   componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
     console.error("App Error:", error, errorInfo);
     // Auto-recover from stale-deploy chunk failures. A new deploy changes the
     // hashed asset filenames, so an already-open tab (or one served a stale
-    // shell by the service worker) can fail to lazy-load a route chunk. Reload
-    // once to pull the fresh index.html/assets instead of showing an error.
+    // shell by the service worker) can fail to lazy-load a route chunk. A
+    // plain reload is NOT enough: the stale shell can come back out of the
+    // service worker / Cache Storage and loop the app dead — clear every
+    // cache layer first, then reload (twice at most).
     const text = `${error?.name || ""} ${error?.message || ""}`;
     const isChunkError =
       /ChunkLoadError|Loading chunk|dynamically imported module|module script failed|error loading dynamically/i.test(
         text,
       );
-    if (isChunkError && !sessionStorage.getItem("chunk-reload-attempted")) {
-      sessionStorage.setItem("chunk-reload-attempted", "1");
-      window.location.reload();
+    if (isChunkError) {
+      let attempts = 0;
+      try {
+        attempts = Number(sessionStorage.getItem("chunk-reload-attempted") || "0") || 0;
+      } catch {}
+      if (attempts < 2) {
+        try {
+          sessionStorage.setItem("chunk-reload-attempted", String(attempts + 1));
+        } catch {}
+        const nukeStaleLayers = async () => {
+          try {
+            const regs = (await navigator.serviceWorker?.getRegistrations?.()) || [];
+            await Promise.all(regs.map((r) => r.unregister()));
+          } catch {}
+          try {
+            const keys = (await caches.keys()) || [];
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          } catch {}
+        };
+        nukeStaleLayers().finally(() => window.location.reload());
+      }
     }
   }
 
