@@ -102,7 +102,7 @@ export default function MobileQuoteDetail() {
   // and the back-swipe reveals the job page — not the quotes list.
   const searchString = useSearch();
   const fromJobId = new URLSearchParams(searchString).get("job");
-  const backTarget = fromJobId ? `/mobile/jobs/${fromJobId}?tab=quote` : "/mobile/quotes";
+  const backTarget = fromJobId ? `/mobile/job/${fromJobId}?tab=quote` : "/mobile/quotes";
 
   const goBackAnimated = (fromDx = 0) => {
     // The back target is already on screen as the underlay — its remount

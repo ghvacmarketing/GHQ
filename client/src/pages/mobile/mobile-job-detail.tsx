@@ -1379,13 +1379,14 @@ function calculateLineTotal(item: { quantity: number; unitPrice: number; isMaint
   return item.quantity * item.unitPrice;
 }
 
+// Plain colored text — the quote rows show status as a word, not a pill.
 const quoteStatusConfig: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-300" },
-  sent: { label: "Sent", className: "bg-blue-100 text-blue-700 border-blue-300" },
-  accepted: { label: "Accepted", className: "bg-green-100 text-green-700 border-green-300" },
-  declined: { label: "Declined", className: "bg-red-100 text-red-700 border-red-300" },
-  expired: { label: "Expired", className: "bg-orange-100 text-orange-700 border-orange-300" },
-  converted: { label: "Converted", className: "bg-purple-100 text-purple-700 border-purple-300" },
+  draft: { label: "Draft", className: "text-slate-500" },
+  sent: { label: "Sent", className: "text-blue-600" },
+  accepted: { label: "Accepted", className: "text-green-600" },
+  declined: { label: "Declined", className: "text-red-500" },
+  expired: { label: "Expired", className: "text-orange-500" },
+  converted: { label: "Converted", className: "text-purple-600" },
 };
 
 function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
@@ -1456,13 +1457,13 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                         </p>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
+                    <div className="flex shrink-0 flex-col items-end gap-0.5">
                       <span className="text-sm font-semibold tabular-nums text-slate-900" data-testid={`quote-total-${quote.id}`}>
                         {formatCurrency(quote.total)}
                       </span>
-                      <Badge variant="outline" className={statusInfo.className} data-testid={`quote-status-${quote.id}`}>
+                      <span className={`text-xs font-medium ${statusInfo.className}`} data-testid={`quote-status-${quote.id}`}>
                         {statusInfo.label}
-                      </Badge>
+                      </span>
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
                   </button>
