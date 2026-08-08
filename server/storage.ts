@@ -2102,7 +2102,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMessage(message: InsertCrmMessagingMessage, opts?: { skipConversationBump?: boolean }): Promise<CrmMessagingMessage> {
-    const [created] = await db.insert(crmMessagingMessages).values(message as any).returning();
+    // The Textline webhook can fire BEFORE the sender's own local insert
+    // commits, so the same outbound text used to land twice (webhook row +
+    // send-path row). The unique index on external_message_id turns whoever
+    // loses that race into a no-op; the loser hands back the winner's row.
+    const [created] = await db.insert(crmMessagingMessages)
+      .values(message as any)
+      .onConflictDoNothing()
+      .returning();
+    if (!created) {
+      const existing = message.externalMessageId
+        ? (
+            await db.select().from(crmMessagingMessages)
+              .where(eq(crmMessagingMessages.externalMessageId, message.externalMessageId))
+              .limit(1)
+          )[0]
+        : undefined;
+      if (existing) return existing;
+      throw new Error("Duplicate message insert with no retrievable original row");
+    }
 
     // Backfilled history (e.g. Textline catch-up) must not re-order the inbox
     // or re-mark conversations unread — only genuinely new messages do that.

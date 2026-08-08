@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isBefore, startOfDay } from "date-fns";
@@ -63,6 +63,143 @@ function describePinPath(path: string): string {
   if (tab) parts.push(tab.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
   return parts.join(" → ") || path;
 }
+
+// Row hoisted OUT of the page component and memoized. Defined inline it was
+// recreated every render, so React remounted EVERY row on each keystroke or
+// state change — the source of the list's lag, and fatal to row animations
+// (a remount restarts them). Stable identity keeps the DOM nodes alive so
+// the check-pop and collapse transitions actually play.
+type TaskRowProps = {
+  t: Task & { assignedToUser?: CrmUser | null };
+  scope: string;
+  assigneeName: string | null;
+  counts: { total: number; done: number } | undefined;
+  isExpanded: boolean;
+  checking: boolean;
+  leaving: boolean;
+  entrance?: boolean;
+  onToggle: (t: Task) => void;
+  onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+  onToggleExpanded: (id: string) => void;
+  onToggleSubtask: (taskId: string, id: string, isCompleted: boolean) => void;
+};
+
+const TaskRow = memo(function TaskRow({
+  t, scope, assigneeName, counts, isExpanded, checking, leaving, entrance,
+  onToggle, onOpen, onDelete, onToggleExpanded, onToggleSubtask,
+}: TaskRowProps) {
+  const completed = t.status === "completed";
+  // The row wears its "done" face the instant the circle is tapped — the
+  // cache only flips after the collapse has played (see completeWithAnimation).
+  const showDone = completed || checking;
+  const overdue = !showDone && t.dueAt && isBefore(new Date(t.dueAt), startOfDay(new Date()));
+  const priority = (t.priority || "normal") as string;
+  // Same cache key as the detail panel, so expanding is instant after
+  // either has loaded once.
+  const { data: rowSubtasks = [] } = useQuery<Array<{ id: string; title: string; isCompleted: boolean }>>({
+    queryKey: ["/api/tasks", t.id, "subtasks"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${t.id}/subtasks`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isExpanded,
+  });
+  return (
+    <div
+      className={`grid border-b border-slate-100 transition-[grid-template-rows,opacity] duration-300 ease-in-out last:border-0 ${
+        leaving ? "[grid-template-rows:0fr] opacity-0" : "[grid-template-rows:1fr] opacity-100"
+      } ${entrance ? "animate-in fade-in slide-in-from-top-1 duration-300" : ""}`}
+      data-testid={`task-${t.id}`}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <div className={`group flex items-start gap-3 px-4 py-3 transition-colors duration-300 ${checking ? "bg-emerald-50/70" : "hover:bg-slate-50"}`}>
+          <button
+            onClick={() => onToggle(t)}
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              showDone ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419] hover:text-slate-300"
+            } ${checking ? "animate-[task-check-pop_300ms_cubic-bezier(0.34,1.56,0.64,1)]" : ""}`}
+            data-testid={`task-toggle-${t.id}`}
+            aria-label={showDone ? "Mark incomplete" : "Mark complete"}
+          >
+            <Check className="h-3 w-3" strokeWidth={3} />
+          </button>
+          {/* Whole row body opens the detail panel — that's where all editing lives */}
+          <button
+            onClick={() => onOpen(t.id)}
+            className="min-w-0 flex-1 text-left"
+            data-testid={`task-open-${t.id}`}
+          >
+            <p className={`text-sm ${showDone ? "text-slate-400 line-through" : "font-medium text-slate-900"}`}>{t.title}</p>
+            {t.description && <p className={`mt-0.5 line-clamp-2 text-xs ${showDone ? "text-slate-300" : "text-slate-500"}`}>{t.description}</p>}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {t.dueAt && (
+                <span className={`flex items-center gap-1 text-[11px] ${overdue ? "font-semibold text-red-600" : "text-slate-400"}`}>
+                  <CalendarDays className="h-3 w-3" />
+                  {format(new Date(t.dueAt), "EEE, MMM d")}
+                </span>
+              )}
+              {priority !== "normal" && !showDone && (
+                <span className={`flex items-center gap-1 text-[11px] font-semibold ${priority === "high" ? "text-red-600" : "text-slate-400"}`}>
+                  <Flag className="h-3 w-3" />
+                  {priority === "high" ? "High" : "Low"}
+                </span>
+              )}
+              {assigneeName && scope === "everyone" && (
+                <span className="text-[11px] text-slate-400">{assigneeName}</span>
+              )}
+            </div>
+          </button>
+          {counts && counts.total > 0 && (
+            <button
+              onClick={() => onToggleExpanded(t.id)}
+              className={`mt-0.5 flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                counts.done === counts.total ? "text-emerald-600 hover:bg-emerald-50" : "text-slate-500 hover:bg-slate-100"
+              }`}
+              title={isExpanded ? "Hide subtasks" : "Show subtasks"}
+              data-testid={`task-subtask-chip-${t.id}`}
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              {counts.done}/{counts.total}
+              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(t.id)}
+            className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+            title="Delete"
+            data-testid={`task-delete-${t.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+        {/* Subtasks, indented under their parent — check off right from the list */}
+        {isExpanded && rowSubtasks.length > 0 && (
+          <div className="border-t border-slate-100 bg-slate-50/60 py-1" data-testid={`task-subtasks-${t.id}`}>
+            {rowSubtasks.map((s) => (
+              <div key={s.id} className="flex items-center gap-2.5 py-1.5 pl-12 pr-4">
+                <button
+                  onClick={() => onToggleSubtask(t.id, s.id, !s.isCompleted)}
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                    s.isCompleted ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419]"
+                  }`}
+                  aria-label={s.isCompleted ? "Mark incomplete" : "Mark complete"}
+                  data-testid={`row-subtask-toggle-${s.id}`}
+                >
+                  <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                </button>
+                <span className={`min-w-0 flex-1 truncate text-[13px] ${s.isCompleted ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                  {s.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 /**
  * Tasks, Google-Tasks style: one list, a quick-add bar, round check-off
@@ -152,47 +289,136 @@ export default function CrmTasksSimple() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
 
+  // ── Optimistic plumbing: actions land on screen instantly; the server
+  // round-trip reconciles afterwards. Snapshot + surgically edit every cached
+  // /api/tasks list (all scopes share the prefix; non-list entries pass through).
+  const snapshotTasks = async () => {
+    await queryClient.cancelQueries({ queryKey: ["/api/tasks"] });
+    return queryClient.getQueriesData({ queryKey: ["/api/tasks"] });
+  };
+  const restoreTasks = (snapshot: Array<[readonly unknown[], unknown]> | undefined) => {
+    (snapshot || []).forEach(([key, data]) => queryClient.setQueryData(key as any, data as any));
+  };
+  const patchTaskLists = (fn: (tasks: any[]) => any[]) =>
+    queryClient.setQueriesData({ queryKey: ["/api/tasks"] }, (old: any) =>
+      old && Array.isArray(old.tasks) ? { ...old, tasks: fn(old.tasks) } : old,
+    );
+
+  // Rows mid-animation: "checking" = circle just tapped (pop + green linger),
+  // "leaving" = collapsing out of the list (completed or deleted).
+  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
+  const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set());
+
   // ── Quick add ──
   const [newTitle, setNewTitle] = useState("");
   const [newDue, setNewDue] = useState("");
   const [newAssignee, setNewAssignee] = useState("");
   const createTask = useMutation({
-    mutationFn: async () =>
-      apiRequest("POST", "/api/tasks", {
-        title: newTitle.trim(),
-        dueAt: newDue ? new Date(`${newDue}T09:00:00`).toISOString() : undefined,
-        assignedToUserId: newAssignee || currentUser?.id,
-        isAllDay: true,
-      }),
-    onSuccess: () => {
-      setNewTitle("");
-      setNewDue("");
-      invalidate();
-      toast({ title: "Task added" });
+    mutationFn: async (payload: { title: string; dueAt?: string; assignedToUserId?: string }) =>
+      apiRequest("POST", "/api/tasks", { ...payload, isAllDay: true }),
+    onMutate: async (payload) => {
+      const snapshot = await snapshotTasks();
+      patchTaskLists((tasks) => [
+        ...tasks,
+        {
+          id: `temp-${Date.now()}`,
+          title: payload.title,
+          status: "pending",
+          dueAt: payload.dueAt || null,
+          assignedToUserId: payload.assignedToUserId || null,
+          priority: "normal",
+          description: null,
+        },
+      ]);
+      return { snapshot };
     },
-    onError: (e: any) => toast({ title: e?.message || "Couldn't add the task", variant: "destructive" }),
+    onSuccess: () => toast({ title: "Task added" }),
+    onError: (e: any, payload, ctx) => {
+      restoreTasks(ctx?.snapshot);
+      setNewTitle(payload.title); // hand their typing back
+      toast({ title: e?.message || "Couldn't add the task", variant: "destructive" });
+    },
+    onSettled: () => invalidate(),
   });
+  const submitNewTask = () => {
+    if (!newTitle.trim()) return;
+    const payload = {
+      title: newTitle.trim(),
+      dueAt: newDue ? new Date(`${newDue}T09:00:00`).toISOString() : undefined,
+      assignedToUserId: newAssignee || currentUser?.id,
+    };
+    setNewTitle("");
+    setNewDue("");
+    createTask.mutate(payload);
+  };
 
   const toggleTask = useMutation({
     mutationFn: async (t: Task) =>
       apiRequest("PUT", `/api/tasks/${t.id}`, {
         status: t.status === "completed" ? "pending" : "completed",
       }),
-    onSuccess: (_data, t) => {
-      invalidate();
-      toast({ title: t.status === "completed" ? "Task reopened" : "Task completed" });
+    onMutate: async (t) => {
+      const snapshot = await snapshotTasks();
+      const next = t.status === "completed" ? "pending" : "completed";
+      patchTaskLists((tasks) =>
+        tasks.map((x) =>
+          x.id === t.id
+            ? { ...x, status: next, completedAt: next === "completed" ? new Date().toISOString() : null }
+            : x,
+        ),
+      );
+      return { snapshot };
     },
-    onError: (e: any) => toast({ title: e?.message || "Couldn't update the task", variant: "destructive" }),
+    onSuccess: (_data, t) => toast({ title: t.status === "completed" ? "Task reopened" : "Task completed" }),
+    onError: (e: any, _t, ctx) => {
+      restoreTasks(ctx?.snapshot);
+      toast({ title: e?.message || "Couldn't update the task", variant: "destructive" });
+    },
+    onSettled: () => invalidate(),
   });
+
+  // Check-off choreography: the circle fills and pops immediately, the row
+  // tints green for a beat, collapses shut, and only THEN does the cache
+  // flip — so the task re-materializes under Completed with no jump cut.
+  const completeWithAnimation = (t: Task) => {
+    if (checkingIds.has(t.id) || leavingIds.has(t.id)) return;
+    setCheckingIds((p) => new Set(p).add(t.id));
+    window.setTimeout(() => setLeavingIds((p) => new Set(p).add(t.id)), 450);
+    window.setTimeout(() => {
+      toggleTask.mutate(t);
+      setCheckingIds((p) => { const n = new Set(p); n.delete(t.id); return n; });
+      setLeavingIds((p) => { const n = new Set(p); n.delete(t.id); return n; });
+    }, 780);
+  };
+  const toggleFromRow = (t: Task) => {
+    if (t.status === "completed") toggleTask.mutate(t); // reopen: instant
+    else completeWithAnimation(t);
+  };
 
   const deleteTask = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/tasks/${id}`),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: "Task deleted" });
+    onMutate: async (id) => {
+      const snapshot = await snapshotTasks();
+      patchTaskLists((tasks) => tasks.filter((x) => x.id !== id));
+      return { snapshot };
     },
-    onError: (e: any) => toast({ title: e?.message || "Couldn't delete the task", variant: "destructive" }),
+    onSuccess: () => toast({ title: "Task deleted" }),
+    onError: (e: any, _id, ctx) => {
+      restoreTasks(ctx?.snapshot);
+      toast({ title: e?.message || "Couldn't delete the task", variant: "destructive" });
+    },
+    onSettled: () => invalidate(),
   });
+
+  // Row delete: slide the task closed first, then commit.
+  const deleteWithAnimation = (id: string) => {
+    if (leavingIds.has(id)) return;
+    setLeavingIds((p) => new Set(p).add(id));
+    window.setTimeout(() => {
+      deleteTask.mutate(id);
+      setLeavingIds((p) => { const n = new Set(p); n.delete(id); return n; });
+    }, 280);
+  };
 
   const updateTask = useMutation({
     mutationFn: async ({ id, ...body }: { id: string } & Record<string, unknown>) =>
@@ -319,111 +545,6 @@ export default function CrmTasksSimple() {
   const userName = (id: string | null | undefined) => users.find((u) => u.id === id)?.name || null;
   const today = startOfDay(new Date());
 
-  const TaskRow = ({ t }: { t: Task }) => {
-    const completed = t.status === "completed";
-    const overdue = !completed && t.dueAt && isBefore(new Date(t.dueAt), today);
-    const assignee = userName(t.assignedToUserId);
-    const counts = subCounts.get(t.id);
-    const priority = (t.priority || "normal") as string;
-    const isExpanded = expandedTasks.has(t.id);
-    // Same cache key as the detail panel, so expanding is instant after
-    // either has loaded once.
-    const { data: rowSubtasks = [] } = useQuery<Array<{ id: string; title: string; isCompleted: boolean }>>({
-      queryKey: ["/api/tasks", t.id, "subtasks"],
-      queryFn: async () => {
-        const res = await fetch(`/api/tasks/${t.id}/subtasks`, { credentials: "include" });
-        if (!res.ok) return [];
-        return res.json();
-      },
-      enabled: isExpanded,
-    });
-    return (
-      <>
-      <div className="group flex items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-0 hover:bg-slate-50" data-testid={`task-${t.id}`}>
-        <button
-          onClick={() => toggleTask.mutate(t)}
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            completed ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419] hover:text-slate-300"
-          }`}
-          data-testid={`task-toggle-${t.id}`}
-          aria-label={completed ? "Mark incomplete" : "Mark complete"}
-        >
-          <Check className="h-3 w-3" strokeWidth={3} />
-        </button>
-        {/* Whole row body opens the detail panel — that's where all editing lives */}
-        <button
-          onClick={() => setDetailId(t.id)}
-          className="min-w-0 flex-1 text-left"
-          data-testid={`task-open-${t.id}`}
-        >
-          <p className={`text-sm ${completed ? "text-slate-400 line-through" : "font-medium text-slate-900"}`}>{t.title}</p>
-          {t.description && <p className={`mt-0.5 line-clamp-2 text-xs ${completed ? "text-slate-300" : "text-slate-500"}`}>{t.description}</p>}
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            {t.dueAt && (
-              <span className={`flex items-center gap-1 text-[11px] ${overdue ? "font-semibold text-red-600" : "text-slate-400"}`}>
-                <CalendarDays className="h-3 w-3" />
-                {format(new Date(t.dueAt), "EEE, MMM d")}
-              </span>
-            )}
-            {priority !== "normal" && !completed && (
-              <span className={`flex items-center gap-1 text-[11px] font-semibold ${priority === "high" ? "text-red-600" : "text-slate-400"}`}>
-                <Flag className="h-3 w-3" />
-                {priority === "high" ? "High" : "Low"}
-              </span>
-            )}
-            {assignee && scope === "everyone" && (
-              <span className="text-[11px] text-slate-400">{assignee}</span>
-            )}
-          </div>
-        </button>
-        {counts && counts.total > 0 && (
-          <button
-            onClick={() => toggleExpanded(t.id)}
-            className={`mt-0.5 flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${
-              counts.done === counts.total ? "text-emerald-600 hover:bg-emerald-50" : "text-slate-500 hover:bg-slate-100"
-            }`}
-            title={isExpanded ? "Hide subtasks" : "Show subtasks"}
-            data-testid={`task-subtask-chip-${t.id}`}
-          >
-            <ListChecks className="h-3.5 w-3.5" />
-            {counts.done}/{counts.total}
-            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          </button>
-        )}
-        <button
-          onClick={() => deleteTask.mutate(t.id)}
-          className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-          title="Delete"
-          data-testid={`task-delete-${t.id}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-      {/* Subtasks, indented under their parent — check off right from the list */}
-      {isExpanded && rowSubtasks.length > 0 && (
-        <div className="border-b border-slate-100 bg-slate-50/60 py-1 last:border-0" data-testid={`task-subtasks-${t.id}`}>
-          {rowSubtasks.map((s) => (
-            <div key={s.id} className="flex items-center gap-2.5 py-1.5 pl-12 pr-4">
-              <button
-                onClick={() => patchSubtask.mutate({ taskId: t.id, id: s.id, isCompleted: !s.isCompleted })}
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                  s.isCompleted ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent hover:border-[#711419]"
-                }`}
-                aria-label={s.isCompleted ? "Mark incomplete" : "Mark complete"}
-                data-testid={`row-subtask-toggle-${s.id}`}
-              >
-                <Check className="h-2.5 w-2.5" strokeWidth={3} />
-              </button>
-              <span className={`min-w-0 flex-1 truncate text-[13px] ${s.isCompleted ? "text-slate-400 line-through" : "text-slate-700"}`}>
-                {s.title}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      </>
-    );
-  };
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -523,7 +644,7 @@ export default function CrmTasksSimple() {
           <Input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && newTitle.trim() && createTask.mutate()}
+            onKeyDown={(e) => { if (e.key === "Enter") submitNewTask(); }}
             placeholder="Add a task — press Enter to save"
             className="h-8 flex-1 border-0 px-0 text-sm shadow-none focus-visible:ring-0"
             data-testid="task-add-input"
@@ -555,7 +676,23 @@ export default function CrmTasksSimple() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="task-list">
-            {open.map((t) => <TaskRow key={t.id} t={t} />)}
+            {open.map((t) => (
+              <TaskRow
+                key={t.id}
+                t={t}
+                scope={scope}
+                assigneeName={userName(t.assignedToUserId)}
+                counts={subCounts.get(t.id)}
+                isExpanded={expandedTasks.has(t.id)}
+                checking={checkingIds.has(t.id)}
+                leaving={leavingIds.has(t.id)}
+                onToggle={toggleFromRow}
+                onOpen={setDetailId}
+                onDelete={deleteWithAnimation}
+                onToggleExpanded={toggleExpanded}
+                onToggleSubtask={(taskId, id, isCompleted) => patchSubtask.mutate({ taskId, id, isCompleted })}
+              />
+            ))}
           </div>
         )}
 
@@ -572,7 +709,24 @@ export default function CrmTasksSimple() {
             </button>
             {completedOpen && (
               <div className="mt-2 overflow-hidden rounded-[4px] border border-slate-200 bg-white/60" data-testid="task-completed-list">
-                {done.slice(0, 50).map((t) => <TaskRow key={t.id} t={t} />)}
+                {done.slice(0, 50).map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    t={t}
+                    scope={scope}
+                    assigneeName={userName(t.assignedToUserId)}
+                    counts={subCounts.get(t.id)}
+                    isExpanded={expandedTasks.has(t.id)}
+                    checking={false}
+                    leaving={leavingIds.has(t.id)}
+                    entrance
+                    onToggle={toggleFromRow}
+                    onOpen={setDetailId}
+                    onDelete={deleteWithAnimation}
+                    onToggleExpanded={toggleExpanded}
+                    onToggleSubtask={(taskId, id, isCompleted) => patchSubtask.mutate({ taskId, id, isCompleted })}
+                  />
+                ))}
               </div>
             )}
           </div>

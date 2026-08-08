@@ -262,6 +262,24 @@ async function runTaggedCommentMigrations() {
     // were picked at the in-person signing.
     await db.execute(sql`ALTER TABLE crm_quote_line_items ADD COLUMN IF NOT EXISTS is_optional boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE crm_quotes ADD COLUMN IF NOT EXISTS accepted_line_item_ids jsonb`);
+    // SMS duplicates: the Textline webhook races the send paths, so the same
+    // outbound text could insert twice. Purge existing dupes (keep the
+    // earliest row per external id), then enforce uniqueness so every future
+    // race collapses into one row (createMessage inserts ON CONFLICT DO NOTHING).
+    await db.execute(sql`
+      DELETE FROM crm_messaging_messages a
+        USING crm_messaging_messages b
+        WHERE a.external_message_id IS NOT NULL
+          AND b.external_message_id = a.external_message_id
+          AND b.id <> a.id
+          AND (b.created_at < a.created_at
+               OR (b.created_at = a.created_at AND b.id < a.id))
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS crm_messaging_messages_external_id_uniq
+        ON crm_messaging_messages (external_message_id)
+        WHERE external_message_id IS NOT NULL
+    `);
   } catch (err) {
     console.error("Tagged comment migration error (non-fatal):", err);
   }
