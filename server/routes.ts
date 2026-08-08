@@ -10246,11 +10246,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const updateData: { name?: string; email?: string; phone?: string | null; role?: "owner" | "admin" | "supervisor" | "sales" | "tech" } = {};
+      const updateData: { name?: string; email?: string; phone?: string | null; role?: "owner" | "admin" | "supervisor" | "sales" | "tech"; onDispatchBoard?: boolean } = {};
       if (name) updateData.name = name;
       if (email) updateData.email = email.toLowerCase();
       if (phone !== undefined) updateData.phone = phone || null;
       if (role) updateData.role = role as "owner" | "admin" | "supervisor" | "sales" | "tech";
+
+      // Techs and supervisors sit on the dispatch board BY ROLE (a null flag
+      // means "on"). Promoting one to owner/admin/sales would silently drop
+      // their column and schedulability — materialize the membership so their
+      // schedule carries straight over; the board settings can still remove
+      // them deliberately afterwards.
+      if (
+        role && role !== existingUser.role &&
+        ["tech", "supervisor"].includes(existingUser.role) &&
+        !["tech", "supervisor"].includes(role) &&
+        existingUser.onDispatchBoard == null
+      ) {
+        updateData.onDispatchBoard = true;
+      }
 
       const [updatedUser] = await db.update(crmUsers).set(updateData).where(eq(crmUsers.id, userId)).returning();
 
