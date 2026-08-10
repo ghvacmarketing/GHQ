@@ -39,6 +39,12 @@ let updateWallCache: boolean | null = null;
 // The AI assistant popup — loaded on first open, then kept mounted so the
 // conversation survives closing and reopening the sheet.
 const AssistantOverlay = lazy(() => import("@/components/mobile/assistant-overlay"));
+// Create pages, mounted as overlays over the CURRENT page (no route change):
+// they rise as bottom sheets over live content; saving slides them down over
+// the destination they navigate to.
+const CustomerNewOverlay = lazy(() => import("@/pages/mobile/mobile-customer-new"));
+const JobNewOverlay = lazy(() => import("@/pages/mobile/mobile-job-new"));
+const TaskNewOverlay = lazy(() => import("@/pages/mobile/mobile-task-new"));
 
 interface MobileShellProps {
   children: ReactNode;
@@ -130,6 +136,13 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantLoaded, setAssistantLoaded] = useState(false);
   const go = (path: string) => { setCreateOpen(false); navigate(path); };
+  // Create flows rise as OVERLAYS over wherever you are — the page beneath
+  // stays live; saving rides the sheet down over the destination.
+  const [createOverlay, setCreateOverlay] = useState<null | "customer" | "job" | "task">(null);
+  const openCreateOverlay = (kind: "customer" | "job" | "task") => {
+    setCreateOpen(false);
+    setCreateOverlay(kind);
+  };
   const openAssistant = () => {
     setCreateOpen(false);
     setAssistantLoaded(true);
@@ -542,15 +555,15 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
           </button>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Create</p>
           <div className="grid grid-cols-4 gap-3">
-            <SheetTile icon={CheckSquare} img={createTask} label="New Task" onClick={() => go("/mobile/tasks/new")} testid="create-new-task" />
+            <SheetTile icon={CheckSquare} img={createTask} label="New Task" onClick={() => openCreateOverlay("task")} testid="create-new-task" />
             <SheetTile icon={Camera} img={createPhoto} label="Add Media" onClick={() => { setCreateOpen(false); setPhotoTargetOpen(true); }} testid="create-add-photo" />
             {/* Techs quote in the field too — quick quotes are for everyone;
                 the rest of the create actions stay supervisor-only. */}
             <SheetTile icon={FileText} img={plateQuote} label="New Quote" onClick={() => go("/mobile/quotes/new")} testid="create-new-quote" />
             {isSupervisor && (
               <>
-                <SheetTile icon={UserRoundPlus} img={createCustomer} label="New Customer" onClick={() => go("/mobile/customers/new")} testid="create-new-customer" />
-                <SheetTile icon={Briefcase} img={createJob} label="New Job" onClick={() => go("/mobile/job/new")} testid="create-new-job" />
+                <SheetTile icon={UserRoundPlus} img={createCustomer} label="New Customer" onClick={() => openCreateOverlay("customer")} testid="create-new-customer" />
+                <SheetTile icon={Briefcase} img={createJob} label="New Job" onClick={() => openCreateOverlay("job")} testid="create-new-job" />
                 <SheetTile icon={Receipt} img={plateInvoice} label="New Invoice" onClick={() => go("/mobile/invoices/new")} testid="create-new-invoice" />
               </>
             )}
@@ -627,6 +640,14 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
       </DraggableSheet>
 
       {/* AI assistant popup — slides up over the current screen */}
+      {createOverlay && (
+        <Suspense fallback={null}>
+          {createOverlay === "customer" && <CustomerNewOverlay onClose={() => setCreateOverlay(null)} />}
+          {createOverlay === "job" && <JobNewOverlay onClose={() => setCreateOverlay(null)} />}
+          {createOverlay === "task" && <TaskNewOverlay onClose={() => setCreateOverlay(null)} />}
+        </Suspense>
+      )}
+
       {assistantLoaded && (
         <Suspense fallback={null}>
           <AssistantOverlay open={assistantOpen} onClose={() => setAssistantOpen(false)} />

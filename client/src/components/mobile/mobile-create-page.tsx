@@ -28,6 +28,7 @@ export function MobileCreatePage({
   assistant,
   children,
   testid,
+  exitRef,
 }: {
   title: string;
   /** Whether the form holds unsaved input — gates the discard confirmation. */
@@ -47,6 +48,10 @@ export function MobileCreatePage({
   assistant?: import("@/lib/ai-conversations").AiCreateCopilot;
   children: ReactNode;
   testid?: string;
+  /** The page's save-success handler calls exitRef.current(dest) to ride the
+   *  sheet DOWN over the destination (which paints beneath) instead of a
+   *  hard navigate — the "save → section loads → sheet closes over it" feel. */
+  exitRef?: React.MutableRefObject<((dest?: string) => void) | null>;
 }) {
   const [, navigate] = useLocation();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -68,12 +73,19 @@ export function MobileCreatePage({
     if (keyboardInset === 0) window.scrollTo(0, 0);
   }, [keyboardInset]);
 
-  const leave = () => {
+  const leave = (dest?: string) => {
+    // A save-exit navigates to the destination AND unmounts the overlay —
+    // the ghost (already on <body>) rides down over the new page.
+    if (dest) {
+      navigate(dest);
+      if (onClose) onClose();
+      return;
+    }
     if (onClose) onClose();
     else if (exitTo) navigate(exitTo);
     else window.history.back();
   };
-  const doExit = () => {
+  const doExit = (dest?: string) => {
     // Bottom-sheet exit with the REAL page beneath: clone the sheet as a
     // static ghost, navigate immediately (destination paints under it right
     // away, entrance fade suppressed), then glide the ghost down over it.
@@ -106,7 +118,7 @@ export function MobileCreatePage({
       });
       el.style.visibility = "hidden";
       markSkipEntrance();
-      leave();
+      leave(dest);
       requestAnimationFrame(() => {
         ghost.style.transform = "translateY(100%)";
       });
@@ -114,8 +126,14 @@ export function MobileCreatePage({
       return;
     }
     setClosing(true);
-    setTimeout(leave, 190);
+    setTimeout(() => leave(dest), 190);
   };
+
+  // Hand the animated exit to the page so save-success can ride the sheet
+  // down over its destination instead of hard-navigating.
+  useEffect(() => {
+    if (exitRef) exitRef.current = doExit;
+  });
 
   const handleClose = () => {
     if (dirty) setConfirmOpen(true);

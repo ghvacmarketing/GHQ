@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MapView } from "@/components/mobile/address-autocomplete";
 import { useLocation } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,9 +70,10 @@ export const SCHEDULE_CAL_CLASSNAMES = {
   day_today: "font-bold text-[#711419] aria-selected:text-white",
 };
 
-export default function MobileJobNew() {
+export default function MobileJobNew({ onClose }: { onClose?: () => void } = {}) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const sheetExit = useRef<((dest?: string) => void) | null>(null);
 
   // Create Work Order form state
   const [customerSearch, setCustomerSearch] = useState("");
@@ -224,7 +225,8 @@ export default function MobileJobNew() {
         description: assigneeName ? `The job has been scheduled to ${assigneeName}` : "The job has been scheduled to you",
       });
       if (data?.id) {
-        navigate(`/mobile/job/${data.id}`);
+        if (sheetExit.current) sheetExit.current(`/mobile/job/${data.id}`);
+        else navigate(`/mobile/job/${data.id}`);
       }
     },
     onError: (error: any) => {
@@ -344,6 +346,8 @@ export default function MobileJobNew() {
       title="New job"
       dirty={dirty}
       exitTo="/mobile/job"
+      onClose={onClose}
+      exitRef={sheetExit}
       onSave={() => createWorkOrderMutation.mutate()}
       saveLabel="Create job"
       saveDisabled={!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim() || !selectedSlot}

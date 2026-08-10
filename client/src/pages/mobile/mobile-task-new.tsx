@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,10 @@ import type { CrmUser } from "@shared/schema";
 /** New Task — the same full-page bottom sheet as creating a customer or job:
  *  grab handle, floating X, bottom Create button. Assign to anyone on the
  *  team (defaults to yourself). */
-export default function MobileTaskNew() {
+export default function MobileTaskNew({ onClose }: { onClose?: () => void } = {}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const sheetExit = useRef<((dest?: string) => void) | null>(null);
 
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -57,7 +58,8 @@ export default function MobileTaskNew() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({ title: "Task created" });
-      navigate("/mobile/tasks");
+      if (sheetExit.current) sheetExit.current(onClose ? undefined : "/mobile/tasks");
+      else navigate("/mobile/tasks");
     },
     onError: (e: any) => toast({ title: "Couldn't add the task", description: e?.message, variant: "destructive" }),
   });
@@ -69,6 +71,8 @@ export default function MobileTaskNew() {
       title="New task"
       dirty={dirty}
       exitTo="/mobile/tasks"
+      onClose={onClose}
+      exitRef={sheetExit}
       onSave={() => createMutation.mutate()}
       saveLabel="Create task"
       saveDisabled={title.trim().length === 0 || !currentUser}

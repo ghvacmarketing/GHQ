@@ -42,9 +42,10 @@ const CUSTOMER_TYPE_BY_ACCOUNT: Record<AccountType, string> = {
   PROPERTY_MANAGER: "Property Manager",
 };
 
-export default function MobileCustomerNew() {
+export default function MobileCustomerNew({ onClose }: { onClose?: () => void } = {}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const sheetExit = useRef<((dest?: string) => void) | null>(null);
 
   const [accountType, setAccountType] = useState<AccountType>("RESIDENTIAL");
   const [firstName, setFirstName] = useState("");
@@ -113,8 +114,11 @@ export default function MobileCustomerNew() {
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"], exact: false });
       toast({ title: "Customer created", description: `${displayName.trim()} is in the CRM.` });
-      if (data?.customer?.id) navigate(`/mobile/customers/${data.customer.id}`);
-      else navigate("/mobile/customers");
+      {
+        const dest = data?.customer?.id ? `/mobile/customers/${data.customer.id}` : "/mobile/customers";
+        if (sheetExit.current) sheetExit.current(dest);
+        else navigate(dest);
+      }
     },
     onError: (e: any) =>
       toast({ title: "Couldn't create the customer", description: e?.message, variant: "destructive" }),
@@ -242,6 +246,8 @@ export default function MobileCustomerNew() {
       title="New customer"
       dirty={dirty}
       exitTo="/mobile/customers"
+      onClose={onClose}
+      exitRef={sheetExit}
       onSave={submit}
       saveLabel="Create customer"
       saveDisabled={missing.length > 0}
