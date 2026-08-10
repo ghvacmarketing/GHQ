@@ -792,7 +792,7 @@ The Settings page at /crm/settings contains these sub-sections:
 - **Lead Classification** — set up lead temperature and driver classifications
 - **Work Order Subtypes** — customize work order sub-categories
 - **Service Checklists** — configure service call questionnaires by service type (opens the Checklist Canvas)
-- **Package Pricing** (/crm/settings/packages) — configure maintenance package tiers and pricing
+- **Package Pricing** (/crm/settings/packages) — three tabs. "Packages & Pricing": bulk % adjustments, the price table, and COST DRIFT (live component cost vs the baseline snapshot behind each package's price — prices never change themselves; owners "Keep price" to accept new costs or set a new price, and an eye icon shows a live preview of the package exactly as the proposal builder presents it). "Equipment Catalog": every supplier model + cost (searchable, inline cost edits, retire/restore; new brands are just rows — no development per brand). "Price File Update": upload the supplier flat file (CSV/Excel, brand·model·cost, columns mapped on screen) and review a four-bucket diff — price changes, new models, missing/discontinued models, and suggested MODEL SUCCESSIONS (old→new model number with a confidence score; confirming swaps the model inside every package that used it while names, images, and prices stay untouched). Every import is journaled with history.
 - **Dispatch Board** — set the dispatch grid time increment and choose which staff appear on the board
 - **Proposal Templates** — reusable proposal templates with merge fields and image library
 

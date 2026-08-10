@@ -55,6 +55,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, PackagePriceAdjustment } from "@shared/schema";
 import { format } from "date-fns";
+import { EquipmentCatalogCard, PriceFileWizardCard, CostDriftCard } from "@/pages/crm/packages-pricing-tools";
 
 const HVAC_UNIT_TYPES = ["PHP", "GP", "SGA", "SHP", "Mini-Split", "Ducting"] as const;
 const HVAC_TIERS = ["Packaged", "Essential", "Premium", "Ultimate", "Standard"] as const;
@@ -64,6 +65,7 @@ export default function CrmSettingsPackages() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
+  const [pageTab, setPageTab] = useState<"pricing" | "catalog" | "pricefile">("pricing");
   const [adjustmentType, setAdjustmentType] = useState<"hvac" | "crawlspace">("hvac");
   const [unitTypeFilter, setUnitTypeFilter] = useState<string>("all");
   const [tierFilter, setTierFilter] = useState<string>("all");
@@ -306,11 +308,35 @@ export default function CrmSettingsPackages() {
           </Button>
           <div>
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Package Pricing Management</h1>
-            <p className="text-sm text-slate-500">Adjust HVAC and Crawlspace package prices by percentage</p>
+            <p className="text-sm text-slate-500">Packages, the equipment catalog behind them, and supplier price-file updates</p>
           </div>
         </div>
 
-        <div className="space-y-6">
+        {/* The three layers of the pricing system: your curated packages,
+            the equipment catalog they're costed against, and the supplier
+            price-file wizard that keeps the catalog current. */}
+        <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as typeof pageTab)} className="mb-4">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
+            <TabsTrigger value="pricing" data-testid="tab-page-pricing">Packages &amp; Pricing</TabsTrigger>
+            <TabsTrigger value="catalog" data-testid="tab-page-catalog">Equipment Catalog</TabsTrigger>
+            <TabsTrigger value="pricefile" data-testid="tab-page-pricefile">Price File Update</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {pageTab === "catalog" && (
+          <div className="space-y-6">
+            <EquipmentCatalogCard />
+          </div>
+        )}
+
+        {pageTab === "pricefile" && (
+          <div className="space-y-6">
+            <PriceFileWizardCard />
+          </div>
+        )}
+
+        <div className={pageTab === "pricing" ? "space-y-6" : "hidden"}>
+          <CostDriftCard packages={packages} />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

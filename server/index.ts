@@ -359,6 +359,46 @@ async function runInstallPlannerMigrations() {
     // (125%) are stored apart from regular input tokens.
     await db.execute(sql`ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS cache_read_tokens integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS cache_write_tokens integer NOT NULL DEFAULT 0`);
+    // Equipment catalog + supplier price-file imports (package pricing revamp)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS equipment_models (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        brand varchar(80) NOT NULL,
+        model varchar(120) NOT NULL,
+        description text,
+        category varchar(40),
+        cost_cents integer NOT NULL DEFAULT 0,
+        is_discontinued boolean DEFAULT false,
+        superseded_by_model varchar(120),
+        last_seen_at timestamp,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS equipment_models_brand_model_uniq ON equipment_models (lower(brand), lower(model))`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS price_file_imports (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        filename text,
+        supplier varchar(80),
+        uploaded_by varchar,
+        row_count integer DEFAULT 0,
+        summary jsonb,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS equipment_cost_history (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        model_id varchar NOT NULL,
+        old_cost_cents integer,
+        new_cost_cents integer,
+        import_id varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE pricebook_packages ADD COLUMN IF NOT EXISTS cost_basis_cents integer`);
+    await db.execute(sql`ALTER TABLE pricebook_packages ADD COLUMN IF NOT EXISTS cost_basis_at timestamp`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS provider_usage_snapshots (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

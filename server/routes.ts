@@ -48,7 +48,7 @@ function effectiveVisitFrequency(record: {
 }
 
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, checklistPhotoSteps, insertChecklistPhotoStepSchema, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, checklistPhotoSteps, insertChecklistPhotoStepSchema, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum, equipmentModels, priceFileImports, equipmentCostHistory } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
 import { dispatchBlackouts, crmTimeEntries, companycamProjectLinks, taskSubtasks, pushDeviceTokens, notificationTemplates } from "@shared/schema";
@@ -32798,6 +32798,337 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // ===============================
 
   // GET /api/pricebook/packages - List all active pricebook packages
+  // ── Equipment catalog + supplier price-file wizard (package pricing
+  // revamp). The catalog is the cost layer UNDER the hand-curated packages:
+  // packages keep their own prices; the catalog powers drift warnings and
+  // makes supplier updates a reviewed diff instead of a manual hunt. ──
+
+  app.get("/api/crm/equipment-catalog", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const search = String(req.query.search || "").trim().toLowerCase();
+      const rows = await db.select().from(equipmentModels).orderBy(asc(equipmentModels.brand), asc(equipmentModels.model));
+      const filtered = search
+        ? rows.filter((r) =>
+            r.model.toLowerCase().includes(search) ||
+            r.brand.toLowerCase().includes(search) ||
+            (r.description || "").toLowerCase().includes(search))
+        : rows;
+      const brands = Array.from(new Set(rows.map((r) => r.brand))).sort();
+      res.json({ models: filtered, brands });
+    } catch (error) {
+      console.error("Error listing equipment catalog:", error);
+      res.status(500).json({ message: "Failed to load the equipment catalog" });
+    }
+  });
+
+  app.post("/api/crm/equipment-catalog", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const brand = String(req.body?.brand || "").trim();
+      const model = String(req.body?.model || "").trim();
+      const costCents = Math.round(Number(req.body?.costCents));
+      if (!brand || !model || !Number.isFinite(costCents) || costCents < 0) {
+        return res.status(400).json({ message: "brand, model, and costCents are required" });
+      }
+      const [existing] = await db.select().from(equipmentModels)
+        .where(and(sql`lower(${equipmentModels.brand}) = ${brand.toLowerCase()}`, sql`lower(${equipmentModels.model}) = ${model.toLowerCase()}`));
+      if (existing) return res.status(409).json({ message: `${brand} ${model} is already in the catalog.` });
+      const [row] = await db.insert(equipmentModels).values({
+        brand, model,
+        description: String(req.body?.description || "").trim() || null,
+        category: String(req.body?.category || "").trim() || null,
+        costCents,
+        lastSeenAt: new Date(),
+      }).returning();
+      res.status(201).json(row);
+    } catch (error) {
+      console.error("Error adding equipment model:", error);
+      res.status(500).json({ message: "Failed to add the model" });
+    }
+  });
+
+  app.patch("/api/crm/equipment-catalog/:id", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const [existing] = await db.select().from(equipmentModels).where(eq(equipmentModels.id, req.params.id));
+      if (!existing) return res.status(404).json({ message: "Model not found" });
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (req.body?.costCents !== undefined) {
+        const c = Math.round(Number(req.body.costCents));
+        if (!Number.isFinite(c) || c < 0) return res.status(400).json({ message: "Invalid cost" });
+        if (c !== existing.costCents) {
+          await db.insert(equipmentCostHistory).values({ modelId: existing.id, oldCostCents: existing.costCents, newCostCents: c });
+        }
+        updates.costCents = c;
+      }
+      if (req.body?.description !== undefined) updates.description = String(req.body.description).trim() || null;
+      if (req.body?.category !== undefined) updates.category = String(req.body.category).trim() || null;
+      if (req.body?.isDiscontinued !== undefined) updates.isDiscontinued = !!req.body.isDiscontinued;
+      const [row] = await db.update(equipmentModels).set(updates).where(eq(equipmentModels.id, req.params.id)).returning();
+      res.json(row);
+    } catch (error) {
+      console.error("Error updating equipment model:", error);
+      res.status(500).json({ message: "Failed to update the model" });
+    }
+  });
+
+  // Model-succession heuristic: shared leading characters weighted toward the
+  // family prefix, so 4TTR6036J vs 4TTR6037K scores high and unrelated
+  // models score low. Pure + deterministic — suggestions only, humans confirm.
+  const modelSimilarity = (a: string, b: string): number => {
+    const x = a.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const y = b.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!x || !y) return 0;
+    let prefix = 0;
+    while (prefix < Math.min(x.length, y.length) && x[prefix] === y[prefix]) prefix++;
+    const longer = Math.max(x.length, y.length);
+    const lengthPenalty = Math.abs(x.length - y.length) / longer;
+    return Math.max(0, prefix / longer - lengthPenalty * 0.2);
+  };
+
+  // Preview: diff parsed rows against the catalog — nothing is written.
+  app.post("/api/crm/pricebook-import/preview", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const rows: Array<{ brand?: string; model?: string; cost?: number; description?: string }> = Array.isArray(req.body?.rows) ? req.body.rows : [];
+      const clean = rows
+        .map((r) => ({
+          brand: String(r.brand || "").trim(),
+          model: String(r.model || "").trim(),
+          costCents: Math.round(Number(r.cost) * 100),
+          description: String(r.description || "").trim() || null,
+        }))
+        .filter((r) => r.brand && r.model && Number.isFinite(r.costCents) && r.costCents >= 0);
+      if (clean.length === 0) return res.status(400).json({ message: "No usable rows — check the column mapping." });
+
+      const catalog = await db.select().from(equipmentModels);
+      const byKey = new Map(catalog.map((c) => [`${c.brand.toLowerCase()}|${c.model.toLowerCase()}`, c]));
+      const fileKeys = new Set(clean.map((r) => `${r.brand.toLowerCase()}|${r.model.toLowerCase()}`));
+      const fileBrands = new Set(clean.map((r) => r.brand.toLowerCase()));
+
+      const priceChanges: any[] = [];
+      const unchanged: any[] = [];
+      const newModels: any[] = [];
+      for (const r of clean) {
+        const hit = byKey.get(`${r.brand.toLowerCase()}|${r.model.toLowerCase()}`);
+        if (!hit) newModels.push(r);
+        else if (hit.costCents !== r.costCents) priceChanges.push({ id: hit.id, brand: hit.brand, model: hit.model, oldCostCents: hit.costCents, newCostCents: r.costCents });
+        else unchanged.push({ id: hit.id, brand: hit.brand, model: hit.model });
+      }
+      // Missing = catalog rows for brands PRESENT in this file that the file
+      // no longer lists (other brands' rows are simply out of scope).
+      const missingModels = catalog.filter(
+        (c) => fileBrands.has(c.brand.toLowerCase()) && !c.isDiscontinued && !fileKeys.has(`${c.brand.toLowerCase()}|${c.model.toLowerCase()}`),
+      );
+      // Succession suggestions: pair each missing model with its best-scoring
+      // new model of the same brand.
+      const successions: any[] = [];
+      const takenNew = new Set<string>();
+      for (const miss of missingModels) {
+        let best: { row: (typeof newModels)[number]; score: number } | null = null;
+        for (const n of newModels) {
+          if (n.brand.toLowerCase() !== miss.brand.toLowerCase()) continue;
+          if (takenNew.has(`${n.brand}|${n.model}`)) continue;
+          const score = modelSimilarity(miss.model, n.model);
+          if (!best || score > best.score) best = { row: n, score };
+        }
+        if (best && best.score >= 0.55) {
+          takenNew.add(`${best.row.brand}|${best.row.model}`);
+          successions.push({
+            fromId: miss.id,
+            fromModel: miss.model,
+            brand: miss.brand,
+            toModel: best.row.model,
+            toCostCents: best.row.costCents,
+            oldCostCents: miss.costCents,
+            confidence: Math.round(best.score * 100) / 100,
+          });
+        }
+      }
+      const suggestedNewKeys = new Set(successions.map((s) => `${s.brand.toLowerCase()}|${s.toModel.toLowerCase()}`));
+      res.json({
+        totals: { rows: clean.length, priceChanges: priceChanges.length, unchanged: unchanged.length, newModels: newModels.length, missing: missingModels.length, successions: successions.length },
+        priceChanges,
+        newModels: newModels.filter((n) => !suggestedNewKeys.has(`${n.brand.toLowerCase()}|${n.model.toLowerCase()}`)),
+        missingModels: missingModels
+          .filter((m) => !successions.some((s) => s.fromId === m.id))
+          .map((m) => ({ id: m.id, brand: m.brand, model: m.model, costCents: m.costCents })),
+        successions,
+      });
+    } catch (error) {
+      console.error("Error previewing price file:", error);
+      res.status(500).json({ message: "Failed to preview the price file" });
+    }
+  });
+
+  // Apply: the REVIEWED decisions only — every change journaled, packages
+  // whose components superseded get their model references swapped in place
+  // (curation, names, images, and PRICES untouched).
+  app.post("/api/crm/pricebook-import/apply", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const d = req.body || {};
+      const [imp] = await db.insert(priceFileImports).values({
+        filename: String(d.filename || "").slice(0, 300) || null,
+        supplier: String(d.supplier || "").slice(0, 80) || null,
+        uploadedBy: user?.id || null,
+        rowCount: Math.round(Number(d.rowCount)) || 0,
+        summary: null,
+      }).returning();
+
+      let priced = 0, added = 0, discontinued = 0, succeeded = 0, packagesTouched = 0;
+
+      for (const ch of Array.isArray(d.priceUpdates) ? d.priceUpdates : []) {
+        const [row] = await db.select().from(equipmentModels).where(eq(equipmentModels.id, String(ch.id)));
+        if (!row) continue;
+        const c = Math.round(Number(ch.newCostCents));
+        if (!Number.isFinite(c) || c < 0 || c === row.costCents) continue;
+        await db.insert(equipmentCostHistory).values({ modelId: row.id, oldCostCents: row.costCents, newCostCents: c, importId: imp.id });
+        await db.update(equipmentModels).set({ costCents: c, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(equipmentModels.id, row.id));
+        priced++;
+      }
+
+      for (const n of Array.isArray(d.addModels) ? d.addModels : []) {
+        const brand = String(n.brand || "").trim();
+        const model = String(n.model || "").trim();
+        const c = Math.round(Number(n.costCents));
+        if (!brand || !model || !Number.isFinite(c) || c < 0) continue;
+        const [existing] = await db.select().from(equipmentModels)
+          .where(and(sql`lower(${equipmentModels.brand}) = ${brand.toLowerCase()}`, sql`lower(${equipmentModels.model}) = ${model.toLowerCase()}`));
+        if (existing) continue;
+        await db.insert(equipmentModels).values({ brand, model, costCents: c, description: String(n.description || "").trim() || null, lastSeenAt: new Date() });
+        added++;
+      }
+
+      for (const id of Array.isArray(d.discontinueIds) ? d.discontinueIds : []) {
+        const r = await db.update(equipmentModels).set({ isDiscontinued: true, updatedAt: new Date() }).where(eq(equipmentModels.id, String(id))).returning({ id: equipmentModels.id });
+        if (r.length) discontinued++;
+      }
+
+      for (const s of Array.isArray(d.successions) ? d.successions : []) {
+        const [fromRow] = await db.select().from(equipmentModels).where(eq(equipmentModels.id, String(s.fromId)));
+        const toModel = String(s.toModel || "").trim();
+        const toCost = Math.round(Number(s.toCostCents));
+        if (!fromRow || !toModel || !Number.isFinite(toCost)) continue;
+        // New model joins the catalog (or is repriced if already there)
+        const [existingTo] = await db.select().from(equipmentModels)
+          .where(and(sql`lower(${equipmentModels.brand}) = ${fromRow.brand.toLowerCase()}`, sql`lower(${equipmentModels.model}) = ${toModel.toLowerCase()}`));
+        if (existingTo) {
+          if (existingTo.costCents !== toCost) {
+            await db.insert(equipmentCostHistory).values({ modelId: existingTo.id, oldCostCents: existingTo.costCents, newCostCents: toCost, importId: imp.id });
+            await db.update(equipmentModels).set({ costCents: toCost, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(equipmentModels.id, existingTo.id));
+          }
+        } else {
+          await db.insert(equipmentModels).values({ brand: fromRow.brand, model: toModel, category: fromRow.category, description: fromRow.description, costCents: toCost, lastSeenAt: new Date() });
+        }
+        await db.update(equipmentModels).set({ isDiscontinued: true, supersededByModel: toModel, updatedAt: new Date() }).where(eq(equipmentModels.id, fromRow.id));
+        // Swap the model number in every package that references it — names,
+        // images, and prices stay exactly as curated.
+        const oldModel = fromRow.model;
+        const swaps = await db.execute(sql`
+          UPDATE pricebook_packages SET
+            outdoor_model = CASE WHEN lower(outdoor_model) = ${oldModel.toLowerCase()} THEN ${toModel} ELSE outdoor_model END,
+            coil_model = CASE WHEN lower(coil_model) = ${oldModel.toLowerCase()} THEN ${toModel} ELSE coil_model END,
+            indoor_heat_model = CASE WHEN lower(indoor_heat_model) = ${oldModel.toLowerCase()} THEN ${toModel} ELSE indoor_heat_model END,
+            thermostat_model = CASE WHEN lower(thermostat_model) = ${oldModel.toLowerCase()} THEN ${toModel} ELSE thermostat_model END,
+            updated_at = now()
+          WHERE lower(outdoor_model) = ${oldModel.toLowerCase()}
+             OR lower(coil_model) = ${oldModel.toLowerCase()}
+             OR lower(indoor_heat_model) = ${oldModel.toLowerCase()}
+             OR lower(thermostat_model) = ${oldModel.toLowerCase()}
+        `);
+        packagesTouched += Number((swaps as any)?.rowCount || 0);
+        succeeded++;
+      }
+
+      // Everything in the file was "seen" — stamp matched models
+      const summary = { priced, added, discontinued, successions: succeeded, packagesTouched };
+      await db.update(priceFileImports).set({ summary }).where(eq(priceFileImports.id, imp.id));
+      await logCrmAudit(user?.id || null, "pricebook.price_file_applied", "price_file_import", imp.id, summary, req.ip);
+      res.json({ ok: true, importId: imp.id, ...summary });
+    } catch (error) {
+      console.error("Error applying price file:", error);
+      res.status(500).json({ message: "Failed to apply the price file" });
+    }
+  });
+
+  app.get("/api/crm/pricebook-import/history", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    try {
+      const rows = await db.select().from(priceFileImports).orderBy(desc(priceFileImports.createdAt)).limit(30);
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load import history" });
+    }
+  });
+
+  // Cost drift per package: live catalog component cost vs the snapshot taken
+  // when the price was last set/acknowledged. Warn-only by design.
+  app.get("/api/crm/pricebook-drift", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    try {
+      const [packages, catalog] = await Promise.all([
+        db.select().from(pricebookPackages).where(eq(pricebookPackages.isActive, true)),
+        db.select().from(equipmentModels),
+      ]);
+      const byModel = new Map(catalog.map((c) => [c.model.toLowerCase(), c]));
+      const out = packages.map((p) => {
+        const parts = [p.outdoorModel, p.coilModel, p.indoorHeatModel, p.thermostatModel].filter(Boolean) as string[];
+        let cost = 0;
+        const matched: string[] = [];
+        const unmatched: string[] = [];
+        for (const m of parts) {
+          const hit = byModel.get(m.toLowerCase());
+          if (hit) { cost += hit.costCents; matched.push(m); }
+          else unmatched.push(m);
+        }
+        return {
+          id: p.id,
+          unitType: p.unitType, tier: p.tier, tonnage: p.tonnage, packageLevel: p.packageLevel,
+          totalInvestment: p.totalInvestment,
+          currentComponentCostCents: cost,
+          costBasisCents: p.costBasisCents,
+          costBasisAt: p.costBasisAt,
+          driftCents: p.costBasisCents != null ? cost - p.costBasisCents : null,
+          matchedCount: matched.length,
+          unmatchedModels: unmatched,
+        };
+      });
+      res.json(out);
+    } catch (error) {
+      console.error("Error computing pricebook drift:", error);
+      res.status(500).json({ message: "Failed to compute cost drift" });
+    }
+  });
+
+  // Acknowledge drift: re-baseline the snapshot (optionally with a new price
+  // set by the human — never computed for them).
+  app.post("/api/crm/pricebook-drift/:packageId/rebaseline", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const [p] = await db.select().from(pricebookPackages).where(eq(pricebookPackages.id, req.params.packageId));
+      if (!p) return res.status(404).json({ message: "Package not found" });
+      const catalog = await db.select().from(equipmentModels);
+      const byModel = new Map(catalog.map((c) => [c.model.toLowerCase(), c]));
+      let cost = 0;
+      for (const m of [p.outdoorModel, p.coilModel, p.indoorHeatModel, p.thermostatModel]) {
+        if (!m) continue;
+        const hit = byModel.get(m.toLowerCase());
+        if (hit) cost += hit.costCents;
+      }
+      const updates: Record<string, any> = { costBasisCents: cost, costBasisAt: new Date(), updatedAt: new Date() };
+      if (req.body?.totalInvestmentCents !== undefined) {
+        const t = Math.round(Number(req.body.totalInvestmentCents));
+        if (!Number.isFinite(t) || t <= 0) return res.status(400).json({ message: "Invalid price" });
+        updates.totalInvestment = t;
+      }
+      if (req.body?.monthlyPaymentCents !== undefined) {
+        const mnth = Math.round(Number(req.body.monthlyPaymentCents));
+        if (!Number.isFinite(mnth) || mnth <= 0) return res.status(400).json({ message: "Invalid monthly payment" });
+        updates.monthlyPayment = mnth;
+      }
+      const [row] = await db.update(pricebookPackages).set(updates).where(eq(pricebookPackages.id, p.id)).returning();
+      res.json(row);
+    } catch (error) {
+      console.error("Error rebaselining package:", error);
+      res.status(500).json({ message: "Failed to update the package" });
+    }
+  });
+
   app.get("/api/pricebook/packages", requireCrmAuth, async (req, res) => {
     try {
       const packages = await db

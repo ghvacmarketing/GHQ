@@ -3651,9 +3651,55 @@ export const pricebookPackages = pgTable("pricebook_packages", {
   baseTotalInvestment: integer("base_total_investment"),
   // Cumulative adjustment in basis points (500 = +5%, -200 = -2%). Default 0 = no adjustment.
   adjustmentBasisPoints: integer("adjustment_basis_points").default(0),
+  // Cost-drift baseline: the summed catalog cost of this package's components
+  // the last time its price was set/acknowledged. Uploading a new supplier
+  // price file moves the LIVE component cost; the gap to this snapshot is the
+  // drift warning shown in Settings. Prices never auto-change.
+  costBasisCents: integer("cost_basis_cents"),
+  costBasisAt: timestamp("cost_basis_at"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── Equipment catalog: every supplier model the packages are built from.
+// Supplier flat files (brand / model / cost) land HERE via the price-file
+// wizard; packages reference these rows by model number. New brands are
+// pure data — no code per brand, ever.
+export const equipmentModels = pgTable("equipment_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  brand: varchar("brand", { length: 80 }).notNull(),
+  model: varchar("model", { length: 120 }).notNull(),
+  description: text("description"),
+  // condenser | coil | furnace | air_handler | thermostat | accessory | other
+  category: varchar("category", { length: 40 }),
+  costCents: integer("cost_cents").notNull().default(0),
+  isDiscontinued: boolean("is_discontinued").default(false),
+  supersededByModel: varchar("superseded_by_model", { length: 120 }),
+  lastSeenAt: timestamp("last_seen_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// One row per uploaded supplier price file — the raw rows and the applied
+// decision summary stay auditable forever.
+export const priceFileImports = pgTable("price_file_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename"),
+  supplier: varchar("supplier", { length: 80 }),
+  uploadedBy: varchar("uploaded_by"),
+  rowCount: integer("row_count").default(0),
+  summary: json("summary").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const equipmentCostHistory = pgTable("equipment_cost_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  modelId: varchar("model_id").notNull(),
+  oldCostCents: integer("old_cost_cents"),
+  newCostCents: integer("new_cost_cents"),
+  importId: varchar("import_id"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertPricebookPackageSchema = createInsertSchema(pricebookPackages).omit({
