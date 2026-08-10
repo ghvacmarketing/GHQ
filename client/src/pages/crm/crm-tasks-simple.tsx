@@ -554,7 +554,7 @@ export default function CrmTasksSimple() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="mx-auto w-full max-w-2xl space-y-4">
+      <div className="mx-auto w-full max-w-4xl space-y-4">
         {/* Title + scope tabs. 1fr | auto | 1fr grid keeps the tabs pinned to
             the true center — with mx-auto they re-centered against the
             subtitle, whose width changes per tab, so switching tabs made the

@@ -840,6 +840,7 @@ function TechsDayView({
     byCat: Map<string, number>;
     active: TechDayEntry | null;
     lastOut: number;
+    dayEntries: TechDayEntry[];
   };
   const byTech = new Map<string, Agg>();
   for (const e of entries) {
@@ -851,6 +852,7 @@ function TechsDayView({
       byCat: new Map(),
       active: null,
       lastOut: 0,
+      dayEntries: [],
     };
     const mins = e.clockOutAt
       ? e.durationMinutes ?? Math.max(0, Math.round((new Date(e.clockOutAt).getTime() - new Date(e.clockInAt).getTime()) / 60000))
@@ -860,9 +862,28 @@ function TechsDayView({
     a.byCat.set(cat, (a.byCat.get(cat) || 0) + mins);
     if (!e.clockOutAt) a.active = e;
     else a.lastOut = Math.max(a.lastOut, new Date(e.clockOutAt).getTime());
+    a.dayEntries.push(e);
     byTech.set(e.technicianId, a);
   }
   const aggs = Array.from(byTech.values());
+
+  // Shared ruler for every card's timeline: from the first clock-in of the
+  // day (floored to the hour) to now / the last clock-out (ceiled) — so
+  // reading DOWN the cards compares apples to apples.
+  const HOUR_MS = 3_600_000;
+  let firstIn = Infinity;
+  let lastAct = 0;
+  for (const e of entries) {
+    firstIn = Math.min(firstIn, new Date(e.clockInAt).getTime());
+    lastAct = Math.max(lastAct, e.clockOutAt ? new Date(e.clockOutAt).getTime() : Date.now());
+  }
+  const hasAxis = Number.isFinite(firstIn) && lastAct > 0;
+  const axisStart = hasAxis ? Math.floor(firstIn / HOUR_MS) * HOUR_MS : 0;
+  const axisEnd = hasAxis ? Math.max(Math.ceil(lastAct / HOUR_MS) * HOUR_MS, axisStart + 4 * HOUR_MS) : 0;
+  const axisSpan = Math.max(1, axisEnd - axisStart);
+  const tickStep = axisSpan > 10 * HOUR_MS ? 2 * HOUR_MS : HOUR_MS;
+  const axisTicks: number[] = [];
+  for (let t = axisStart + tickStep; t < axisEnd; t += tickStep) axisTicks.push(t);
   const onClock = aggs
     .filter((a) => a.active)
     .sort((x, y) => new Date(x.active!.clockInAt).getTime() - new Date(y.active!.clockInAt).getTime());
@@ -898,13 +919,46 @@ function TechsDayView({
           </div>
           {a.active && cat && <img src={cat.img} alt={cat.label} className="h-9 w-9 shrink-0 select-none" draggable={false} />}
         </div>
-        <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-          {TECH_TIME_CATS.map((c) => {
-            const m = a.byCat.get(c.key) || 0;
-            if (m <= 0 || a.total <= 0) return null;
-            return <div key={c.key} style={{ width: `${(m / a.total) * 100}%`, background: c.color }} title={`${c.label}: ${fmtClockMins(m)}`} />;
-          })}
-        </div>
+        {/* The day as it actually happened: a real time axis (shared across
+            every card), colored segments where they were on the clock, blank
+            track where they weren't, and the live segment running to now. */}
+        {hasAxis && (
+          <div className="mt-3">
+            <div className="relative h-4 w-full overflow-hidden rounded-[3px] bg-slate-100">
+              {axisTicks.map((t) => (
+                <div key={t} className="absolute inset-y-0 w-px bg-white" style={{ left: `${((t - axisStart) / axisSpan) * 100}%` }} />
+              ))}
+              {[...a.dayEntries]
+                .sort((x, y) => new Date(x.clockInAt).getTime() - new Date(y.clockInAt).getTime())
+                .map((e) => {
+                  const s = new Date(e.clockInAt).getTime();
+                  const en = e.clockOutAt ? new Date(e.clockOutAt).getTime() : Date.now();
+                  const left = ((Math.max(s, axisStart) - axisStart) / axisSpan) * 100;
+                  const width = Math.max(0.75, ((Math.max(en, s) - Math.max(s, axisStart)) / axisSpan) * 100);
+                  const c = techTimeCat(e.category);
+                  const live = !e.clockOutAt;
+                  const mins = Math.max(0, Math.round((en - s) / 60000));
+                  return (
+                    <div
+                      key={e.id}
+                      className="absolute inset-y-0 rounded-[2px]"
+                      style={{ left: `${left}%`, width: `${Math.min(width, 100 - left)}%`, background: c.color }}
+                      title={`${c.label} · ${format(new Date(s), "h:mm a")}–${live ? "now" : format(new Date(en), "h:mm a")} (${fmtClockMins(mins)})`}
+                    >
+                      {live && <span className="absolute inset-y-0 right-0 w-[3px] animate-pulse bg-white/90" />}
+                    </div>
+                  );
+                })}
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] font-medium tabular-nums text-slate-400">
+              <span>{format(new Date(axisStart), "h a")}</span>
+              {axisTicks.length > 0 && (
+                <span className="hidden sm:inline">{format(new Date(axisTicks[Math.floor(axisTicks.length / 2)]), "h a")}</span>
+              )}
+              <span>{isToday && a.active ? `now · ${format(new Date(), "h:mm a")}` : format(new Date(axisEnd), "h a")}</span>
+            </div>
+          </div>
+        )}
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {TECH_TIME_CATS.map((c) => {
             const m = a.byCat.get(c.key) || 0;
