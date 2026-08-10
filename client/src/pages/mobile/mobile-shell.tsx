@@ -228,9 +228,12 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
       }
       const s = spinEl();
       if (s) {
+        // The dial rides the finger: fades in, grows from a dot, and winds
+        // with the pull — hitting full size exactly at the commit threshold.
+        const p = Math.min(1, dist / 58);
         s.style.transition = "none";
-        s.style.opacity = String(Math.min(1, dist / 55));
-        s.style.transform = `translateY(${Math.max(0, dist - 40)}px) rotate(${dist * 3}deg)`;
+        s.style.opacity = String(Math.min(1, dist / 42));
+        s.style.transform = `translateY(${Math.max(0, dist - 40)}px) rotate(${dist * 2.6}deg) scale(${0.55 + 0.45 * p})`;
       }
     };
     const onEnd = () => {
@@ -249,8 +252,9 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
           }, 260);
         }
         if (s) {
-          s.style.transition = "opacity 0.15s ease-out";
+          s.style.transition = "opacity 0.15s ease-out, transform 0.2s ease-in";
           s.style.opacity = "0";
+          s.style.transform = "scale(0.55)";
         }
         return;
       }
@@ -266,9 +270,10 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
         w.style.transform = "translateY(48px)";
       }
       if (s) {
-        s.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s";
+        // Settle with a tiny overshoot pop — the "engaged" moment.
+        s.style.transition = "transform 0.3s cubic-bezier(0.34, 1.45, 0.64, 1), opacity 0.2s";
         s.style.opacity = "1";
-        s.style.transform = "translateY(8px)";
+        s.style.transform = "translateY(8px) scale(1)";
       }
       queryClient
         .refetchQueries({ type: "active" })
@@ -284,9 +289,10 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
             }, 300);
           }
           if (s) {
-            s.style.transition = "transform 0.22s ease-in, opacity 0.18s";
+            // Done: shrink away upward instead of a flat fade.
+            s.style.transition = "transform 0.24s cubic-bezier(0.4, 0, 1, 1), opacity 0.18s";
             s.style.opacity = "0";
-            s.style.transform = "translateY(-40px)";
+            s.style.transform = "translateY(-40px) scale(0.5)";
           }
         });
     };
@@ -397,15 +403,31 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
           nav fill the shell with their own scroll layers and handle their own
           bottom clearance — reserving padding here would end their container
           in a visible band above the tabs. */}
-      {/* Pull-to-refresh spinner chip — floats over the top of the scroller */}
+      {/* Pull-to-refresh chip — a machined tick dial in a squared hairline
+          glass chip. It scales/rotates WITH the pull (drag handler drives the
+          inline transform), spins smoothly once committed. */}
       {pullToRefresh && (
         <div
           ref={ptrSpinRef}
-          className="pointer-events-none absolute left-1/2 z-30 -ml-4 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md"
-          style={{ top: "calc(env(safe-area-inset-top) + 10px)", opacity: 0 }}
+          className="pointer-events-none absolute left-1/2 z-30 -ml-[19px] flex h-[38px] w-[38px] items-center justify-center rounded-[10px] border border-slate-300/70 bg-white/90 shadow-[0_6px_20px_rgba(15,23,42,0.16)] backdrop-blur-md"
+          style={{ top: "calc(env(safe-area-inset-top) + 10px)", opacity: 0, transform: "scale(0.55)" }}
           aria-hidden
         >
-          <Loader2 className={`h-4 w-4 text-[#711419] ${ptrRefreshing ? "animate-spin" : ""}`} />
+          <svg viewBox="0 0 24 24" className={`h-5 w-5 ${ptrRefreshing ? "animate-spin" : ""}`} style={{ animationDuration: "0.9s" }}>
+            {Array.from({ length: 12 }).map((_, i) => (
+              <rect
+                key={i}
+                x="11.3"
+                y="2.2"
+                width="1.4"
+                height="5.2"
+                rx="0.7"
+                fill="#711419"
+                opacity={0.18 + (i / 11) * 0.82}
+                transform={`rotate(${i * 30} 12 12)`}
+              />
+            ))}
+          </svg>
         </div>
       )}
       <main
