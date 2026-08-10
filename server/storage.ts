@@ -2323,26 +2323,31 @@ export class DatabaseStorage implements IStorage {
     return mapped;
   }
 
-  async searchCrmCustomers(search: string, limit: number = 20): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]> {
+  async searchCrmCustomers(search: string, limit: number = 20): Promise<{ id: string; name: string; phone: string | null; email: string | null; fullAddress: string | null; customerType: string | null }[]> {
     if (!search || search.trim().length < 2) {
       return [];
     }
     const searchTerm = `%${search.trim()}%`;
-    
+
+    // fullAddress/customerType ride along for the mobile pickers (address
+    // under the name, type badge) — and the address is searchable too.
     const results = await db.select({
       id: crmCustomers.id,
       name: crmCustomers.name,
       phone: crmCustomers.phone,
       email: crmCustomers.email,
+      fullAddress: crmCustomers.fullAddress,
+      customerType: crmCustomers.customerType,
     })
     .from(crmCustomers)
     .where(or(
       ilike(crmCustomers.name, searchTerm),
-      ilike(crmCustomers.phone, searchTerm)
+      ilike(crmCustomers.phone, searchTerm),
+      ilike(crmCustomers.fullAddress, searchTerm)
     ))
     .limit(limit);
 
-    return results;
+    return results as any;
   }
 
   async getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined> {

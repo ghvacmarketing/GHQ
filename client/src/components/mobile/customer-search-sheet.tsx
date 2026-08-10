@@ -89,7 +89,7 @@ export function CustomerSearchSheet({
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Recent customers</p>
           )}
           {shown.length > 0 ? (
-            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-slate-300/70 bg-white shadow-sm">
               {shown.map((c, i) => (
                 <button
                   key={c.id}
@@ -104,7 +104,7 @@ export function CustomerSearchSheet({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-slate-900">{c.name}</span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {[c.phone, c.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
+                      {c.fullAddress || c.phone || "No address on file"}
                     </span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />

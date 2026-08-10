@@ -4,7 +4,7 @@ import { CustomerCamera } from "@/components/mobile/customer-camera";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
 import { fmt12, SCHEDULE_CAL_CLASSNAMES } from "@/pages/mobile/mobile-job-new";
-import { isNativeApp, pickNativeLibraryPhotos } from "@/lib/native";
+import { isNativeApp, pickNativeLibraryPhotos, useKeyboardInset } from "@/lib/native";
 import createPhoto from "@/assets/create-photo.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
@@ -2938,6 +2938,7 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
   const [editSelectedSlot, setEditSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   // Schedule editing mirrors the create-job flow: a nested sheet with the
   // inline calendar + revolving time wheels (not slots/popovers).
+  const editKeyboardInset = useKeyboardInset();
   const [editScheduleOpen, setEditScheduleOpen] = useState(false);
   const [editStartTime, setEditStartTime] = useState("");
   const [editEndTime, setEditEndTime] = useState("");
@@ -3555,9 +3556,11 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
         </button>
       </DraggableSheet>
 
-      {/* Edit rides in as a bottom sheet like every other in-job flow */}
+      {/* Edit rides in as a bottom sheet like every other in-job flow —
+          FULL height (same architecture as the create pages), so nothing at
+          the tail of the form ever sits under the sheet's bottom edge. */}
       <DraggableSheet
-        tall
+        full
         open={showEditDialog}
         onOpenChange={(open) => {
           setShowEditDialog(open);
@@ -3575,7 +3578,13 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
         </div>
         <p className="mb-4 mt-0.5 text-sm text-slate-500">Update work order details below.</p>
         <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+            <form
+              onSubmit={editForm.handleSubmit(handleEditSubmit)}
+              className="space-y-4"
+              // Full sheets pad their own content clear of the keyboard —
+              // otherwise typing in the notes buried the fields beneath it.
+              style={{ paddingBottom: editKeyboardInset > 0 ? editKeyboardInset + 16 : 8 }}
+            >
               <FormField
                 control={editForm.control}
                 name="title"
