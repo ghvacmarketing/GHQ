@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { format, isBefore, startOfDay } from "date-fns";
+import { format, isBefore, isSameDay, startOfDay } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -185,6 +185,7 @@ export default function MobileTasks() {
   const [view, setView] = useState<"open" | "done">("open");
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [who, setWho] = useState<WhoFilter>("me");
+  const [show, setShow] = useState<"all" | "overdue" | "today" | "high">("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
@@ -251,7 +252,13 @@ export default function MobileTasks() {
   const doneTasks = mine
     .filter((t) => t.status === "completed")
     .sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
-  const shown = view === "open" ? openTasks : doneTasks;
+  const matchesShow = (t: TaskRow) => {
+    if (show === "overdue") return !!t.dueAt && t.status !== "completed" && isBefore(new Date(t.dueAt), startOfDay(new Date()));
+    if (show === "today") return !!t.dueAt && isSameDay(new Date(t.dueAt), new Date());
+    if (show === "high") return t.priority === "high";
+    return true;
+  };
+  const shown = (view === "open" ? openTasks : doneTasks).filter(matchesShow);
 
   // ── Optimistic plumbing (ported from the CRM Activity page) ──
   const snapshotTasks = async () => {
@@ -343,7 +350,10 @@ export default function MobileTasks() {
       return n;
     });
 
+  const SHOW_LABELS = { all: "", overdue: "Overdue", today: "Due today", high: "High priority" } as const;
   const whoLabel = who === "me" ? "My tasks" : who === "all" ? "Everyone" : firstNameOf(userName(who)) || "Person";
+  const pillLabel = show === "all" ? whoLabel : `${whoLabel} · ${SHOW_LABELS[show]}`;
+  const filterActive = who !== "me" || show !== "all";
 
   return (
     <MobileShell>
@@ -367,13 +377,13 @@ export default function MobileTasks() {
           <button
             onClick={() => setFilterOpen(true)}
             className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium shadow-sm transition-transform active:scale-95 ${
-              who === "me" ? "border-slate-300/70 bg-white text-slate-700" : "border-[#711419]/30 bg-[#711419]/5 text-[#711419]"
+              filterActive ? "border-[#711419]/30 bg-[#711419]/5 text-[#711419]" : "border-slate-300/70 bg-white text-slate-700"
             }`}
             aria-label="Filter tasks"
             data-testid="button-task-filter"
           >
             <SlidersHorizontal className="h-4 w-4" />
-            {whoLabel}
+            <span className="max-w-[38vw] truncate">{pillLabel}</span>
           </button>
         </div>
 
@@ -426,36 +436,103 @@ export default function MobileTasks() {
         )}
       </div>
 
-      {/* ── Filter sheet: whose tasks am I looking at? ── */}
-      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
-        <h2 className="text-lg font-semibold text-slate-900">Whose tasks?</h2>
-        <div className="mt-3 overflow-hidden rounded-2xl border border-slate-300/70 bg-white">
+      {/* ── Filter sheet: whose tasks + what to show. People render as the
+          same tile grid as Assign-to, so a big roster stays one screen. ── */}
+      <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
+        <h2 className="text-lg font-semibold text-slate-900">Filter tasks</h2>
+
+        <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Whose tasks</p>
+        <div className="mt-2 grid grid-cols-3 gap-2">
           {[
-            { key: "me" as WhoFilter, label: "My tasks" },
-            { key: "all" as WhoFilter, label: "Everyone" },
-            ...users.map((u) => ({ key: u.id as WhoFilter, label: firstNameOf(u.name) || u.name })),
-          ].map((opt, i) => (
-            <button
-              key={String(opt.key)}
-              onClick={() => {
-                setWho(opt.key);
-                setFilterOpen(false);
-              }}
-              className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-              data-testid={`task-filter-${String(opt.key)}`}
-            >
-              {opt.key !== "me" && opt.key !== "all" ? (
-                <AvatarWithRole name={users.find((u) => u.id === opt.key)?.name} size={28} />
-              ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100">
-                  <ListChecks className="h-4 w-4 text-slate-500" />
+            { key: "me" as WhoFilter, label: "My tasks", sub: "You + created" },
+            { key: "all" as WhoFilter, label: "Everyone", sub: "Whole team" },
+          ].map((opt) => {
+            const selected = who === opt.key;
+            return (
+              <button
+                key={String(opt.key)}
+                onClick={() => setWho(opt.key)}
+                className={`relative flex flex-col items-center rounded-[4px] border px-1.5 pb-2.5 pt-3 transition-transform active:scale-95 ${
+                  selected ? "border-[#711419] bg-[#711419]/5" : "border-slate-300/70 bg-white"
+                }`}
+                data-testid={`task-filter-${String(opt.key)}`}
+              >
+                {selected && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#711419] text-white shadow-sm">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                  <ListChecks className="h-6 w-6 text-slate-500" />
                 </span>
-              )}
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{opt.label}</span>
-              {who === opt.key && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+                <span className="mt-1.5 w-full truncate text-center text-xs font-semibold text-slate-900">{opt.label}</span>
+                <span className="w-full truncate text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">{opt.sub}</span>
+              </button>
+            );
+          })}
+          {users
+            .filter((u) => u.isActive !== false)
+            .sort((a, b) => {
+              const rank: Record<string, number> = { owner: 0, admin: 1, supervisor: 2, sales: 3, tech: 4 };
+              const ra = rank[a.role] ?? 9;
+              const rb = rank[b.role] ?? 9;
+              if (ra !== rb) return ra - rb;
+              return (a.name || "").localeCompare(b.name || "");
+            })
+            .map((u) => {
+              const selected = who === u.id;
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => setWho(u.id)}
+                  className={`relative flex flex-col items-center rounded-[4px] border px-1.5 pb-2.5 pt-3 transition-transform active:scale-95 ${
+                    selected ? "border-[#711419] bg-[#711419]/5" : "border-slate-300/70 bg-white"
+                  }`}
+                  data-testid={`task-filter-${u.id}`}
+                >
+                  {selected && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#711419] text-white shadow-sm">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  )}
+                  <AvatarWithRole name={u.name} role={u.role} size={56} />
+                  <span className="mt-1.5 w-full truncate text-center text-xs font-semibold text-slate-900">{firstNameOf(u.name) || "—"}</span>
+                  <span className="w-full truncate text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                    {u.id === currentUser?.id ? "You" : u.role}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+
+        <p className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Show</p>
+        <div className="mt-2 flex flex-wrap gap-1.5 pb-2">
+          {([
+            { key: "all", label: "Everything" },
+            { key: "overdue", label: "Overdue" },
+            { key: "today", label: "Due today" },
+            { key: "high", label: "High priority" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setShow(opt.key)}
+              className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-transform active:scale-95 ${
+                show === opt.key ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300/70 bg-white text-slate-700"
+              }`}
+              data-testid={`task-show-${opt.key}`}
+            >
+              {opt.label}
             </button>
           ))}
         </div>
+
+        <button
+          onClick={() => setFilterOpen(false)}
+          className="mb-2 mt-5 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98]"
+          data-testid="task-filter-done"
+        >
+          Done
+        </button>
       </DraggableSheet>
 
       {/* ── Task detail — a full bottom sheet, no top bar ── */}
@@ -643,7 +720,7 @@ function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; use
               }}
               placeholder="Add details…"
               rows={3}
-              className="w-full resize-y rounded-[4px] border border-slate-300/70 bg-white px-3 py-2.5 text-[15px] leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#711419]"
+              className="w-full resize-y rounded-[4px] border border-slate-300/70 bg-white px-3 py-2.5 text-[15px] leading-relaxed text-slate-800 outline-none placeholder:text-slate-400"
               data-testid="task-detail-notes"
             />
           </div>
@@ -718,8 +795,10 @@ function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; use
             mode="single"
             selected={task?.dueAt ? new Date(task.dueAt) : undefined}
             onSelect={(date) => {
+              // Patch optimistically so the picked day LIGHTS UP, linger a
+              // beat so the choice reads, then the sheet rides down normally.
               patchTask.mutate({ dueAt: date ? `${format(date, "yyyy-MM-dd")}T12:00:00` : null });
-              setDueOpen(false);
+              window.setTimeout(() => setDueOpen(false), 450);
             }}
             numberOfMonths={1}
             className="w-full p-0"
