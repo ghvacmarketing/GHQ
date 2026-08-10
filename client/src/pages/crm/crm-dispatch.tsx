@@ -867,9 +867,10 @@ function TechsDayView({
   }
   const aggs = Array.from(byTech.values());
 
-  // Shared ruler for every card's timeline: from the first clock-in of the
-  // day (floored to the hour) to now / the last clock-out (ceiled) — so
-  // reading DOWN the cards compares apples to apples.
+  // Shared ruler for every card's timeline, anchored to the DISPATCH
+  // BOARD's day (6 AM - 10 PM) so the cards read on the same clock as the
+  // board. Real time outside that window still shows — the axis extends and
+  // those stretches sit on a red-tinted track (early starts / running over).
   const HOUR_MS = 3_600_000;
   let firstIn = Infinity;
   let lastAct = 0;
@@ -878,19 +879,20 @@ function TechsDayView({
     lastAct = Math.max(lastAct, e.clockOutAt ? new Date(e.clockOutAt).getTime() : Date.now());
   }
   const hasAxis = Number.isFinite(firstIn) && lastAct > 0;
-  const axisStart = hasAxis ? Math.floor(firstIn / HOUR_MS) * HOUR_MS : 0;
-  // Today's ruler runs first-clock-in -> NOW exactly, so the live segment
-  // reaches the right edge and there's never a dead zone after it. Past
-  // days close out at the hour after the last clock-out.
+  const boardStart = new Date(selectedDate); boardStart.setHours(START_HOUR, 0, 0, 0);
+  const boardEnd = new Date(selectedDate); boardEnd.setHours(END_HOUR, 0, 0, 0);
+  const axisStart = hasAxis ? Math.min(boardStart.getTime(), Math.floor(firstIn / HOUR_MS) * HOUR_MS) : 0;
   const axisEnd = hasAxis
-    ? (isToday
-        ? Math.max(lastAct, Date.now(), axisStart + 30 * 60_000)
-        : Math.max(Math.ceil(lastAct / HOUR_MS) * HOUR_MS, axisStart + 4 * HOUR_MS))
+    ? Math.max(boardEnd.getTime(), isToday ? Math.max(lastAct, Date.now()) : Math.ceil(lastAct / HOUR_MS) * HOUR_MS)
     : 0;
   const axisSpan = Math.max(1, axisEnd - axisStart);
   const tickStep = axisSpan > 10 * HOUR_MS ? 2 * HOUR_MS : HOUR_MS;
   const axisTicks: number[] = [];
   for (let t = axisStart + tickStep; t < axisEnd; t += tickStep) axisTicks.push(t);
+  const nowMs = Date.now();
+  const nowPct = isToday && nowMs > axisStart && nowMs < axisEnd ? ((nowMs - axisStart) / axisSpan) * 100 : null;
+  const preBoardPct = axisStart < boardStart.getTime() ? ((boardStart.getTime() - axisStart) / axisSpan) * 100 : 0;
+  const postBoardPct = axisEnd > boardEnd.getTime() ? ((axisEnd - boardEnd.getTime()) / axisSpan) * 100 : 0;
   const onClock = aggs
     .filter((a) => a.active)
     .sort((x, y) => new Date(x.active!.clockInAt).getTime() - new Date(y.active!.clockInAt).getTime());
@@ -907,7 +909,12 @@ function TechsDayView({
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate font-semibold text-slate-900">{firstNameOf(a.name)}</span>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{fmtClockMins(a.total)}</span>
+              <span
+                className={`shrink-0 text-sm font-semibold tabular-nums ${a.total > 480 ? "text-red-600" : "text-slate-700"}`}
+                title={a.total > 480 ? `${fmtClockMins(a.total - 480)} over 8 hours` : undefined}
+              >
+                {fmtClockMins(a.total)}
+              </span>
             </div>
             {a.active && cat ? (
               <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-600">
@@ -931,6 +938,14 @@ function TechsDayView({
         {hasAxis && (
           <div className="mt-3">
             <div className="relative h-4 w-full overflow-hidden rounded-[3px] bg-slate-100">
+              {/* Outside the board's 6a-10p window: red-tinted track — time
+                  landing here is an early start or running over */}
+              {preBoardPct > 0 && (
+                <div className="absolute inset-y-0 left-0 bg-red-100/80" style={{ width: `${preBoardPct}%` }} />
+              )}
+              {postBoardPct > 0 && (
+                <div className="absolute inset-y-0 right-0 bg-red-100/80" style={{ width: `${postBoardPct}%` }} />
+              )}
               {axisTicks.map((t) => (
                 <div key={t} className="absolute inset-y-0 w-px bg-white" style={{ left: `${((t - axisStart) / axisSpan) * 100}%` }} />
               ))}
@@ -955,13 +970,16 @@ function TechsDayView({
                     </div>
                   );
                 })}
+              {nowPct !== null && (
+                <div className="absolute inset-y-0 w-[2px] bg-[#711419]" style={{ left: `${nowPct}%` }} title={`now · ${format(new Date(), "h:mm a")}`} />
+              )}
             </div>
             <div className="mt-1 flex justify-between text-[10px] font-medium tabular-nums text-slate-400">
               <span>{format(new Date(axisStart), "h a")}</span>
               {axisTicks.length > 0 && (
                 <span className="hidden sm:inline">{format(new Date(axisTicks[Math.floor(axisTicks.length / 2)]), "h a")}</span>
               )}
-              <span>{isToday ? `now · ${format(new Date(), "h:mm a")}` : format(new Date(axisEnd), "h a")}</span>
+              <span className={postBoardPct > 0 ? "text-red-500" : undefined}>{format(new Date(axisEnd), "h a")}</span>
             </div>
           </div>
         )}
@@ -974,7 +992,7 @@ function TechsDayView({
                 key={c.key}
                 className="inline-flex items-center gap-1.5 rounded-[4px] border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600"
               >
-                <img src={c.img} alt="" className="h-4 w-4 select-none" draggable={false} />
+                <span className="h-2 w-2 rounded-full" style={{ background: c.color }} />
                 {c.label} <span className="tabular-nums text-slate-500">{fmtClockMins(m)}</span>
               </span>
             );

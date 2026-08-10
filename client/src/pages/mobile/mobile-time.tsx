@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  Clock, Square, Loader2, Briefcase, Plus,
+  Clock, Square, Loader2, Briefcase, Plus, Check, ChevronDown,
   Car, Warehouse, GraduationCap, Users, Coffee, MoreHorizontal, Wrench,
   ListFilter,
 } from "lucide-react";
@@ -67,6 +67,7 @@ export default function MobileTime() {
 
   // Timesheet filters — lifted here so the filter sheet can drive them
   const [filterOpen, setFilterOpen] = useState(false);
+  const [tsCatOpen, setTsCatOpen] = useState(false);
   const [tsPreset, setTsPreset] = useState<"this-week" | "last-week" | "this-month" | "custom">("this-week");
   const [tsFrom, setTsFrom] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [tsTo, setTsTo] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -393,16 +394,55 @@ export default function MobileTime() {
               testid="timesheet-filter-calendar"
             />
           )}
-          <SheetSelect
-            label="Category"
-            value={tsCat}
-            onChange={setTsCat}
-            options={[
-              { key: "all", label: "All" },
-              ...TIME_CATEGORIES.map((c) => ({ key: c.key, label: c.label, img: c.img })),
-            ]}
-            testid="timesheet-cat"
-          />
+          <button
+            onClick={() => setTsCatOpen(true)}
+            className="flex w-full items-center justify-between gap-3 px-1 py-4 text-left"
+            data-testid="timesheet-cat"
+          >
+            <span className="text-sm font-medium text-slate-700">Category</span>
+            <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-slate-500">
+              {tsCat !== "all" && (() => {
+                const c = TIME_CATEGORIES.find((x) => x.key === tsCat);
+                return c ? <img src={c.img} alt="" className="h-5 w-5 select-none" draggable={false} /> : null;
+              })()}
+              <span className="truncate">{tsCat === "all" ? "All" : TIME_CATEGORIES.find((x) => x.key === tsCat)?.label || tsCat}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+            </span>
+          </button>
+        </div>
+      </DraggableSheet>
+
+      {/* Category picker — the same tile grid as assigning a task */}
+      <DraggableSheet nested tall open={tsCatOpen} onOpenChange={setTsCatOpen} title="Category" testid="sheet-timesheet-cat">
+        <h2 className="text-lg font-semibold text-slate-900">Which category?</h2>
+        <div className="mt-3 grid grid-cols-3 gap-2 pb-2">
+          {[{ key: "all", label: "All", img: null as string | null }, ...TIME_CATEGORIES.map((c) => ({ key: c.key, label: c.label, img: c.img as string | null }))].map((opt) => {
+            const selected = tsCat === opt.key;
+            return (
+              <button
+                key={opt.key}
+                onClick={() => { setTsCat(opt.key); setTsCatOpen(false); }}
+                className={`relative flex flex-col items-center rounded-[4px] border px-1.5 pb-2.5 pt-3 transition-transform active:scale-95 ${
+                  selected ? "border-[#711419] bg-[#711419]/5" : "border-slate-300/70 bg-white"
+                }`}
+                data-testid={`timesheet-cat-${opt.key}`}
+              >
+                {selected && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#711419] text-white shadow-sm">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+                {opt.img ? (
+                  <img src={opt.img} alt="" className="h-14 w-14 select-none" draggable={false} />
+                ) : (
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                    <Clock className="h-6 w-6 text-slate-500" />
+                  </span>
+                )}
+                <span className="mt-1.5 w-full truncate text-center text-xs font-semibold text-slate-900">{opt.label}</span>
+              </button>
+            );
+          })}
         </div>
       </DraggableSheet>
 
