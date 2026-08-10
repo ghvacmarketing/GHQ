@@ -47,7 +47,7 @@ function apnsJwt(): string {
  *  hardcoded 1. */
 function apnsSend(
   deviceToken: string,
-  alert: { title: string; body?: string; link?: string } | null,
+  alert: { title: string; body?: string; link?: string; notificationId?: string } | null,
   badge: number,
 ): Promise<"ok" | "gone" | "error"> {
   return new Promise((resolve) => {
@@ -81,6 +81,9 @@ function apnsSend(
             ? {
                 aps: { alert: { title: alert.title, body: alert.body || "" }, sound: "default", badge },
                 link: alert.link || null,
+                // Tapping the banner marks THIS row read in GHQ (the client
+                // PATCHes it before following the link)
+                notificationId: alert.notificationId || null,
               }
             : { aps: { badge } }, // badge-only: updates the icon, no banner
         ),
@@ -102,7 +105,7 @@ async function unreadCount(userId: string): Promise<number> {
 }
 
 /** Push an alert to every device a CRM user has registered. */
-export async function sendPushToUser(userId: string, alert: { title: string; body?: string; link?: string }): Promise<void> {
+export async function sendPushToUser(userId: string, alert: { title: string; body?: string; link?: string; notificationId?: string }): Promise<void> {
   if (!pushConfigured()) return;
   const devices = await db.select().from(pushDeviceTokens).where(eq(pushDeviceTokens.userId, userId));
   if (devices.length === 0) return;
@@ -200,6 +203,7 @@ export function startPushNotificationBridge(): void {
           title: n.title,
           body: n.preview || undefined,
           link: notificationLink(n),
+          notificationId: n.id,
         }).catch(() => {});
       }
       if (pushed.size > 4_000) {

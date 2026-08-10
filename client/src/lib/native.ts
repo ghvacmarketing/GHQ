@@ -68,7 +68,14 @@ export async function initNativePush(): Promise<void> {
     });
     // Tapping a notification deep-links to the entity it's about
     await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-      const link = (action.notification?.data as any)?.link;
+      const data = action.notification?.data as any;
+      // Tapped = seen: mark the GHQ notification read (fire-and-forget) so
+      // the bell and badge agree with what the user just acted on.
+      const nid = data?.notificationId;
+      if (typeof nid === "string" && nid) {
+        fetch(`/api/crm/notifications/${nid}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
+      }
+      const link = data?.link;
       if (typeof link === "string" && link.startsWith("/")) window.location.assign(link);
     });
     let perm = await PushNotifications.checkPermissions();
