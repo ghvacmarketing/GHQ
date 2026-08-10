@@ -677,16 +677,13 @@ export default function MobileMessages() {
             className={`min-h-0 flex-1 overflow-y-auto px-4 ${!conversations || conversations.length === 0 ? "flex flex-col justify-end" : ""}`}
             style={{
               paddingTop: "calc(env(safe-area-inset-top) + 12px)",
-              paddingBottom: `calc(env(safe-area-inset-bottom) + 84px + ${kbInset}px)`,
-              transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+              paddingBottom: "8px",
             }}
           >
             {conversations && conversations.length > 0 ? (
-              <div className="space-y-2 pb-2">
+              <div className="divide-y divide-slate-200/80 overflow-hidden rounded-2xl border border-slate-300/70 bg-white shadow-sm mb-2">
                 {conversations.map((conversation) => (
-                  <div key={conversation.id} className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm">
-                    {renderConversation(conversation, true)}
-                  </div>
+                  <div key={conversation.id}>{renderConversation(conversation, true)}</div>
                 ))}
               </div>
             ) : (
@@ -695,11 +692,13 @@ export default function MobileMessages() {
               </p>
             )}
           </div>
+          {/* IN-FLOW bar (like jobs history) — the list ends above it, so
+              nothing ever scrolls behind the pill */}
           <div
-            className="absolute inset-x-0 z-10 flex items-center gap-2 px-4"
+            className="flex items-center gap-2 px-4 pt-2"
             style={{
-              bottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)",
-              transition: "bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+              paddingBottom: kbInset > 0 ? `${kbInset + 10}px` : "calc(env(safe-area-inset-bottom) + 12px)",
+              transition: "padding-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-slate-300/70 bg-white px-4 shadow-sm">

@@ -16,7 +16,7 @@ const ToastViewport = React.forwardRef<
     className={cn(
       // Phones: centered and nearly full-width (confirmations like "address
       // saved" read as a proper banner); desktop keeps bottom-right.
-      "fixed bottom-0 inset-x-0 z-[100] mx-auto flex max-h-screen w-full max-w-[calc(100%-24px)] flex-col p-3 md:inset-x-auto md:right-0 md:mx-0 md:max-w-[380px]",
+      "fixed z-[100] flex max-h-screen flex-col p-3 max-md:inset-x-0 max-md:top-[calc(env(safe-area-inset-top)+8px)] max-md:bottom-auto max-md:mx-auto max-md:w-auto max-md:items-center md:bottom-0 md:right-0 md:max-w-[380px]",
       className
     )}
     {...props}
@@ -25,7 +25,7 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center justify-between space-x-3 overflow-hidden rounded-md border p-3.5 pr-8 shadow-lg transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-bottom-full",
+  "group pointer-events-auto relative flex w-full items-center justify-between space-x-3 overflow-hidden rounded-md border p-3.5 pr-8 shadow-lg transition-all max-md:w-[50vw] max-md:justify-center max-md:space-x-0 max-md:rounded-full max-md:border-slate-300/70 max-md:px-4 max-md:py-2.5 max-md:pr-4 max-md:text-center max-md:shadow-[0_8px_28px_rgba(15,23,42,0.18)] data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 max-md:data-[state=closed]:slide-out-to-top-full max-md:data-[state=open]:slide-in-from-top-full md:data-[state=closed]:slide-out-to-right-full md:data-[state=open]:slide-in-from-bottom-full",
   {
     variants: {
       variant: {

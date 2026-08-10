@@ -11,6 +11,7 @@ import {
   Loader2, SlidersHorizontal, Trash2, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { SheetSelect } from "@/components/mobile/sheet-select";
+import { Switch } from "@/components/ui/switch";
 import { DateRangeSheet } from "@/components/mobile/date-range-calendar";
 import { Calendar } from "@/components/ui/calendar";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
@@ -467,7 +468,7 @@ export default function MobileTasks() {
       {/* ── Filter sheet: one row per filter, each opening its OWN sheet
           so nothing is crowded — people as the Assign-to grid, dates as a
           select with the app's shared custom-range calendar. ── */}
-      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
+      <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
         <h2 className="text-lg font-semibold text-slate-900">Filter tasks</h2>
         <div className="mt-1 divide-y divide-slate-200/80">
           <button
@@ -508,20 +509,10 @@ export default function MobileTasks() {
               testid="task-filter-calendar"
             />
           )}
-          <button
-            onClick={() => setHighOnly((v) => !v)}
-            className="flex w-full items-center justify-between gap-3 px-1 py-4 text-left"
-            data-testid="task-filter-high"
-          >
+          <div className="flex w-full items-center justify-between gap-3 px-1 py-4" data-testid="task-filter-high">
             <span className="text-sm font-medium text-slate-700">High priority only</span>
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors ${
-                highOnly ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent"
-              }`}
-            >
-              <Check className="h-3.5 w-3.5" strokeWidth={3} />
-            </span>
-          </button>
+            <Switch checked={highOnly} onCheckedChange={setHighOnly} data-testid="task-filter-high-toggle" />
+          </div>
         </div>
         <button
           onClick={() => setFilterOpen(false)}

@@ -58,15 +58,16 @@ export function SheetSelect({
 
       <DraggableSheet nested open={open} onOpenChange={setOpen} title={label} testid={testid ? `${testid}-options` : undefined}>
         <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
-        <div className="mt-3 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-          {options.map((o, i) => (
+        <div className="mt-2 divide-y divide-slate-200/80">
+          {options.map((o) => (
             <button
               key={o.key}
               onClick={() => {
                 onChange(o.key);
                 setOpen(false);
               }}
-              className={`flex w-full items-center gap-2.5 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+              className="flex w-full items-center gap-2.5 px-1 py-3.5 text-left active:bg-slate-50"
+
               data-testid={testid ? `${testid}-${o.key}` : undefined}
             >
               {o.img && <img src={o.img} alt="" className="h-6 w-6 shrink-0 select-none" draggable={false} />}
