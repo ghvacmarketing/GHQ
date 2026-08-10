@@ -5,7 +5,7 @@
 export type AiProposedAction = {
   // "fill_form" is create-copilot only: applied straight to the open form,
   // never rendered as an approval card and never persisted.
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "fill_form";
+  type: "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -26,6 +26,7 @@ export type AiCreateCopilot = {
 export const AI_ACTION_LABELS: Record<string, string> = {
   create_task: "New task",
   create_work_order: "New work order",
+  update_work_order: "Update work order",
   send_sms: "Text message",
   send_email: "Email",
   create_customer: "New customer",
@@ -52,6 +53,7 @@ export const AI_ACTION_LABELS: Record<string, string> = {
 export const AI_ACTION_CATEGORIES: Record<string, { key: "ops" | "outbound" | "builder"; label: string }> = {
   create_task: { key: "ops", label: "Day-to-day" },
   create_work_order: { key: "ops", label: "Day-to-day" },
+  update_work_order: { key: "ops", label: "Day-to-day" },
   create_customer: { key: "ops", label: "Day-to-day" },
   update_customer: { key: "ops", label: "Day-to-day" },
   delete_customer: { key: "ops", label: "Day-to-day" },

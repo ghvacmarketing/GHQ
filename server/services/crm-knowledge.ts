@@ -563,6 +563,10 @@ The Phone page keeps a shared day-by-day call log: each entry records who called
 ### Logging a call through Gibbs
 Gibbs can add an entry to TODAY's call log as an approval-gated action (log_call) — useful when someone on the road answers the phone and dictates what the call was about right after hanging up ("log a call from Mrs. Jenkins, her heat pump is icing up again"). Gibbs prepares the entry (caller, summary, optional phone/tag/billable) and nothing is saved until the user approves the card. The entry lands on the Phone page's log for today under the approving user's name.
 
+### Work orders through Gibbs (create, edit, checklists)
+- Gibbs sees EVERY checklist template live (a list_checklists lookup: name, visit type, subtype, including the "ANY" general bucket) and pins the right one onto work orders he creates — when several templates fit the job's type/subtype (e.g. "Repair AC" vs "No Cool") he asks which one, exactly like the dispatch UI does; he never silently picks the first
+- Gibbs can also EDIT existing work orders (update_work_order, approval-gated like everything else): retitle, reschedule (Eastern times), change priority or subtype, reassign (exact teammate pinned), swap the checklist, or update dispatch notes. Completed and cancelled work orders are frozen — the server refuses edits on them, matching the app's own rules. Schedule/assignee changes notify the assigned tech like normal dispatch moves
+
 ### Sales leads through Gibbs
 Gibbs can put customers into the Lead Funnel and keep their leads current — both approval-gated:
 - create_lead — adds a customer to the funnel with deal value, temperature (hot/warm/cold), stage, assigned salesperson ("assign me" works — Gibbs knows who it's talking to), and notes. The customer must exist in the CRM first (Gibbs can propose creating the customer and the lead together). If the customer already has an open lead, Gibbs updates it instead of stacking a duplicate.

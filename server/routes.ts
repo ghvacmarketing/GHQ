@@ -2795,6 +2795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assignTo: z.string().trim().max(100).optional(),
             assignedTechId: z.string().trim().min(1).max(64).optional(),
             scheduledStart: z.string().max(40).optional(),
+            assignedChecklistId: z.string().trim().min(1).max(64).optional(),
           }).strict(),
         }),
         z.object({
@@ -2876,6 +2877,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerId: z.string().trim().min(1).max(64).optional(),
             workOrderId: z.string().trim().min(1).max(64).optional(),
             workOrderTitle: z.string().trim().max(200).optional(),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("update_work_order"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            workOrderId: z.string().trim().min(1).max(64).optional(),
+            workOrderTitle: z.string().trim().max(200).optional(),
+            changes: z.object({
+              title: z.string().trim().min(1).max(200).optional(),
+              description: z.string().trim().max(2000).optional(),
+              priority: z.enum(["low", "normal", "high", "emergency"]).optional(),
+              workSubtype: z.string().trim().max(60).optional(),
+              scheduledStart: z.string().max(40).optional(),
+              scheduledEnd: z.string().max(40).optional(),
+              assignTo: z.string().trim().max(100).optional(),
+              assignedTechId: z.string().trim().min(1).max(64).optional(),
+              assignedChecklistId: z.string().trim().min(1).max(64).optional(),
+              dispatchNotes: z.string().trim().max(2000).optional(),
+            }).strict().refine((c) => Object.keys(c).length > 0, { message: "No changes given." }),
+            // Display-only snapshot for the before/after card
+            current: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
           }).strict(),
         }),
         z.object({
@@ -3503,6 +3527,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(201).json({ ok: true, entity: "work_order", id: target.id, label: woLabel, url: "/crm/dispatch" });
       }
 
+      // update_work_order — edits an existing job (title/schedule/priority/
+      // subtype/assignee/checklist/notes). Finished jobs are frozen: the
+      // same completed/cancelled guideline the UI enforces.
+      if (action.type === "update_work_order") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const uwoCustomer = resolved.customer;
+        const orders = await storage.getWorkOrdersByCustomerId(uwoCustomer.id);
+        if (orders.length === 0) {
+          return res.status(422).json({ message: `${uwoCustomer.name} has no work orders on file.` });
+        }
+        let target = action.params.workOrderId ? orders.find((w) => w.id === action.params.workOrderId) : undefined;
+        if (!target && action.params.workOrderTitle) {
+          const t = action.params.workOrderTitle.toLowerCase();
+          const matches = orders.filter((w) => (w.title || "").toLowerCase().includes(t) || t.includes((w.title || "").toLowerCase()));
+          if (matches.length === 1) target = matches[0];
+        }
+        if (!target && orders.length === 1) target = orders[0];
+        if (!target) {
+          const describe = (w: (typeof orders)[number]) => {
+            const when = w.scheduledStart
+              ? ` — ${new Date(w.scheduledStart).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}`
+              : "";
+            return `${w.title || "Work order"}${when} (${w.status})`;
+          };
+          return res.status(422).json({
+            message: `Which of ${uwoCustomer.name}'s work orders should be updated?`,
+            candidateParam: "workOrderId",
+            candidates: orders.slice(0, 6).map((w) => ({ id: w.id, name: describe(w) })),
+          });
+        }
+        if (target.status === "completed" || target.status === "cancelled") {
+          return res.status(422).json({ message: `That work order is ${target.status} — finished jobs can't be edited.` });
+        }
+        const ch = action.params.changes;
+        const updates: Record<string, any> = {};
+        if (ch.title !== undefined) updates.title = ch.title;
+        if (ch.description !== undefined) updates.description = ch.description;
+        if (ch.priority !== undefined) updates.priority = ch.priority;
+        if (ch.workSubtype !== undefined) updates.workSubtype = ch.workSubtype;
+        if (ch.dispatchNotes !== undefined) updates.dispatchNotes = ch.dispatchNotes;
+        // Schedule: Eastern wall-clock strings, same parsing as creation
+        const parseWall = (raw: string): Date | null => {
+          const trimmed = raw.trim();
+          const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(trimmed);
+          const d = hasZone ? new Date(trimmed) : fromZonedTime(trimmed, "America/New_York");
+          return isNaN(d.getTime()) ? null : d;
+        };
+        if (ch.scheduledStart !== undefined) {
+          const d = parseWall(String(ch.scheduledStart));
+          if (!d) return res.status(400).json({ message: "The proposed start time isn't a valid date." });
+          updates.scheduledStart = d;
+          if (ch.scheduledEnd === undefined) updates.scheduledEnd = new Date(d.getTime() + 60 * 60 * 1000);
+        }
+        if (ch.scheduledEnd !== undefined) {
+          const d = parseWall(String(ch.scheduledEnd));
+          if (!d) return res.status(400).json({ message: "The proposed end time isn't a valid date." });
+          updates.scheduledEnd = d;
+        }
+        if (ch.assignedTechId) {
+          const [picked] = await db.select({ id: crmUsers.id, name: crmUsers.name }).from(crmUsers).where(eq(crmUsers.id, ch.assignedTechId));
+          if (!picked) return res.status(422).json({ message: "That teammate no longer exists." });
+          updates.assignedTechId = picked.id;
+        } else if (ch.assignTo) {
+          const staff = await db
+            .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
+            .from(crmUsers)
+            .where(inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales"]));
+          const scored = staff
+            .map((t) => ({ id: t.id, name: t.name, score: aiNameSimilarity(t.name || "", String(ch.assignTo)) }))
+            .sort((x, y) => y.score - x.score);
+          const best = scored[0];
+          const second = scored[1];
+          if (best && best.score >= 0.8 && (!second || best.score - second.score >= 0.15)) {
+            updates.assignedTechId = best.id;
+          } else {
+            const shortlist = scored.some((s) => s.score >= 0.3) ? scored.filter((s) => s.score >= 0.3) : scored;
+            return res.status(422).json({
+              message: `Not sure which teammate you meant by "${ch.assignTo}" — pick the right one:`,
+              candidateParam: "assignedTechId",
+              candidates: shortlist.slice(0, 6).map((c) => ({ id: c.id, name: c.name })),
+            });
+          }
+        }
+        // Checklist: a pinned template wins; a subtype change re-runs the
+        // auto-assign only when the fit is unambiguous
+        if (ch.assignedChecklistId) {
+          const [cl] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, ch.assignedChecklistId));
+          if (!cl) return res.status(422).json({ message: "That checklist template no longer exists — run list_checklists again." });
+          updates.assignedChecklistId = cl.id;
+        } else if (ch.workSubtype !== undefined) {
+          const matches = await checklistsForSubtype(String(target.visitType || "SERVICE"), String(ch.workSubtype));
+          if (matches.length === 1) updates.assignedChecklistId = matches[0].id;
+          else if (matches.length > 1) {
+            return res.status(422).json({
+              message: `Several checklists fit ${ch.workSubtype} — pick the right one:`,
+              candidateParam: "assignedChecklistId",
+              candidates: matches.map((c) => ({ id: c.id, name: c.name })),
+            });
+          }
+        }
+        if (Object.keys(updates).length === 0) {
+          return res.status(400).json({ message: "No valid changes were given." });
+        }
+        await storage.updateWorkOrder(target.id, updates as any);
+        // Tell the assigned tech when the job moved or landed on them
+        const notifyTechId = (updates.assignedTechId as string | undefined) ?? target.assignedTechId ?? null;
+        if (notifyTechId && notifyTechId !== user.id && (updates.scheduledStart || updates.scheduledEnd || updates.assignedTechId)) {
+          try {
+            const when = updates.scheduledStart
+              ? (updates.scheduledStart as Date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })
+              : null;
+            await db.insert(crmNotifications).values({
+              userId: notifyTechId,
+              type: "task_assigned" as any,
+              title: updates.assignedTechId ? "Job assigned to you" : "Job updated",
+              preview: `${(updates.title as string) || target.title || "Work order"}${when ? ` — ${when}` : ""}`,
+              entityType: "work_order",
+              entityId: target.id,
+              actorId: user.id,
+            });
+          } catch (e) {
+            console.error("AI action WO update notification failed:", e);
+          }
+        }
+        await logCrmAudit(user.id, "ai_action.update_work_order", "work_order", target.id, { customerId: uwoCustomer.id, changes: ch }, req.ip);
+        const uwoLabel = `Work order "${(updates.title as string) || target.title || "untitled"}" updated`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "work_order", id: target.id, label: uwoLabel, url: `/crm/work-orders/${target.id}` });
+        return res.status(201).json({ ok: true, entity: "work_order", id: target.id, label: uwoLabel, url: `/crm/work-orders/${target.id}` });
+      }
+
       // create_quote — DRAFT only: nothing goes to the customer until someone
       // opens it in Quotes and sends it themselves.
       if (action.type === "create_quote") {
@@ -3811,7 +3966,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const existingWorkOrders = await storage.getWorkOrdersByCustomerId(customer.id);
+      // Checklist: an explicitly pinned template wins; otherwise auto-assign
+      // ONLY when the match is unambiguous — several fits ask for a pick
+      // (the same rule the dispatch UI enforces, never a silent first-pick).
       const checklistMatches = await checklistsForSubtype(visitType, workSubtype);
+      let chosenChecklistId: string | null = checklistMatches[0]?.id ?? null;
+      if (action.params.assignedChecklistId) {
+        const [cl] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, action.params.assignedChecklistId));
+        if (!cl) return res.status(422).json({ message: "That checklist template no longer exists — run list_checklists again." });
+        chosenChecklistId = cl.id;
+      } else if (checklistMatches.length > 1) {
+        return res.status(422).json({
+          message: `Several checklists fit ${visitType} / ${workSubtype} — pick the right one:`,
+          candidateParam: "assignedChecklistId",
+          candidates: checklistMatches.map((c) => ({ id: c.id, name: c.name })),
+        });
+      }
       const workOrder = await storage.createWorkOrder({
         customerId: customer.id,
         propertyId: property.id,
@@ -3824,7 +3994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scheduledEnd: scheduledEnd || undefined,
         assignedTechId: assignedTech?.id ?? null,
         workOrderNumber: existingWorkOrders.length + 1,
-        assignedChecklistId: checklistMatches[0]?.id ?? null,
+        assignedChecklistId: chosenChecklistId,
       } as any);
 
       // Tell the assigned tech about their new job (mirrors the normal flow)

@@ -88,7 +88,7 @@ export default function MobileMore() {
   ];
 
   return (
-    <MobileShell pullToRefresh>
+    <MobileShell>
       <div className="p-4 space-y-5" data-testid="mobile-more-page">
         {sections.map((section) => (
           <div key={section.title}>

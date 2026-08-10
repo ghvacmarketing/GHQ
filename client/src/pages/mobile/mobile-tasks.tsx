@@ -514,12 +514,21 @@ export default function MobileTasks() {
             <Switch checked={highOnly} onCheckedChange={setHighOnly} data-testid="task-filter-high-toggle" />
           </div>
         </div>
+        {/* Filters apply LIVE behind the sheet — the only action left is
+            resetting them; drag down or tap the scrim to leave. */}
         <button
-          onClick={() => setFilterOpen(false)}
-          className="mb-2 mt-4 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98]"
-          data-testid="task-filter-done"
+          onClick={() => {
+            setWho("me");
+            setDueFilter("any");
+            setRangeFrom("");
+            setRangeTo("");
+            setHighOnly(false);
+          }}
+          disabled={!filterActive}
+          className="mb-2 mt-4 h-12 w-full rounded-[4px] border border-slate-300/70 bg-white text-base font-semibold text-slate-700 transition-transform active:scale-[0.98] disabled:opacity-40"
+          data-testid="task-filter-clear"
         >
-          Done
+          Clear filters
         </button>
       </DraggableSheet>
 

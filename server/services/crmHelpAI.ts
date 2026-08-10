@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
-import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders } from "@shared/schema";
-import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull, ilike, ne, inArray } from "drizzle-orm";
+import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders, serviceCallChecklists } from "@shared/schema";
+import { eq, gte, lte, and, or, sql, desc, asc, isNull, isNotNull, ilike, ne, inArray } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { nameSimilarity } from "./customer-match";
@@ -367,7 +367,7 @@ export interface ProposedAction {
   // "fill_form" is create-copilot only: it patches the form on the user's
   // screen (nothing saves until they tap Create) and is never persisted or
   // executable through /execute-action.
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "fill_form";
+  type: "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -415,7 +415,7 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["create_task", "create_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call", "create_lead", "update_lead", "create_checklist", "create_item"] },
+            type: { type: "string", enum: ["create_task", "create_work_order", "update_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call", "create_lead", "update_lead", "create_checklist", "create_item"] },
             summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
             params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
           },
@@ -498,6 +498,17 @@ const CRM_TOOLS: ClaudeTool[] = [
     name: "list_tasks",
     description: "Internal team tasks (open tasks by default).",
     input_schema: { type: "object", properties: { includeCompleted: { type: "boolean" }, limit: { type: "number" } }, required: [] },
+  },
+  {
+    name: "list_checklists",
+    description: "Every ACTIVE checklist template: id, name, visit type, and work-order subtype ('ANY' = applies to every subtype of its visit type). Run this before creating or editing a work order whenever a checklist matters — to pin assignedChecklistId when several templates fit the job or the user names one.",
+    input_schema: {
+      type: "object",
+      properties: {
+        visitType: { type: "string", description: "Optional filter: SERVICE | MAINTENANCE | INSTALL | SALES" },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: "business_stats",
@@ -663,6 +674,21 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
     if (packages.length === 0) return "No pricebook packages match those filters — ask the user to clarify unit type, tonnage, or package level.";
     // Money is stored in cents — hand the model dollars so it can't slip.
     return JSON.stringify(packages.map((p) => ({ ...p, totalInvestment: (p.totalInvestment ?? 0) / 100, monthlyPayment: (p.monthlyPayment ?? 0) / 100 })));
+  }
+
+  if (name === "list_checklists") {
+    const vt = String((input as any)?.visitType || "").trim().toUpperCase();
+    const conds = [eq(serviceCallChecklists.isActive, true)];
+    if (vt) conds.push(eq(serviceCallChecklists.visitType, vt as any));
+    const rows = await db
+      .select({ id: serviceCallChecklists.id, name: serviceCallChecklists.name, visitType: serviceCallChecklists.visitType, serviceType: serviceCallChecklists.serviceType })
+      .from(serviceCallChecklists)
+      .where(and(...conds))
+      .orderBy(asc(serviceCallChecklists.visitType), asc(serviceCallChecklists.name));
+    return JSON.stringify({
+      checklists: rows,
+      note: "serviceType ANY applies to every subtype of that visit type. Pin assignedChecklistId in create_work_order/update_work_order params whenever more than one template fits the job's visit type + subtype, or the user names a specific checklist.",
+    });
   }
 
   if (name === "list_work_orders") {
@@ -1006,7 +1032,7 @@ When the lookup confidently matched one customer, put that record's exact name i
 Steps that target a customer being CREATED earlier in the same chain are the one exception — no id exists yet, so they carry the exact same customerName as the create_customer step (per DEPENDENT ACTIONS below). Only pass an existing customer's name WITHOUT a lookup when the lookup itself failed twice; in that case pass the name as the user said it — the server fuzzy-matches at approval time as a safety net.
 Action types and their params:
 1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
-2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — the staff member's name as the user said it), "assignedTechId": string (REQUIRED whenever assigning — the exact id from team_roster; a card without it will make the user re-pick at approval, which violates the pinned-card rule), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00") }
+2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "workSubtype": string (optional — for SERVICE use one of: No Cool, No Heat, Water Leak, Electrical, Thermostat, Airflow, Noise, IAQ, Other; for MAINTENANCE: Preventative Maintenance; for INSTALL: Full System, Changeout, Add Ducts, Replace Ducts, IAQ Install, Mini-split, Crawlspace; for SALES: Comfort Consultation), "assignTo": string (optional — the staff member's name as the user said it), "assignedTechId": string (REQUIRED whenever assigning — the exact id from team_roster; a card without it will make the user re-pick at approval, which violates the pinned-card rule), "scheduledStart": "YYYY-MM-DDTHH:mm" (optional — the visit's wall-clock time in Eastern time exactly as the user means it, NO timezone suffix and NO "Z"; e.g. tomorrow at 10 AM = "${formatInTimeZone(addDays(new Date(), 1), BUSINESS_TIMEZONE, "yyyy-MM-dd")}T10:00"), "assignedChecklistId": string (optional — the exact template id from list_checklists. REQUIRED whenever MORE THAN ONE checklist fits the visit type + subtype (run list_checklists to check) or the user names a specific checklist ("use the no cool checklist"); with zero or one match omit it and the server auto-assigns) }
 3. send_sms — texts a customer through the CRM's messaging line. params: { "customerName": string (required), "customerPhone": string (optional but strongly preferred — the customer's phone from your customer_profile lookup, so the approval card shows exactly which number the text goes to), "message": string (required — write the COMPLETE, ready-to-send text exactly as it should go out: friendly, professional, concise, signed "— Giesbrecht HVAC"; no placeholders like [time] unless the user left the detail out) }
 4. send_email — emails someone from the approving user's connected Gmail. Recipient — set EXACTLY ONE: pass "customerName" when the user names a customer (the CRM looks up the email on their file; it errors if none is on file), OR pass "toEmail" when the user gives a literal email address (use it verbatim, never invent one). params: { "customerName": string (optional — the customer whose on-file email to use), "customerEmail": string (optional but strongly preferred with customerName — the customer's email from your customer_profile lookup, so the approval card shows exactly where the email goes), "toEmail": string (optional — an actual email address the user provided), "subject": string (required), "body": string (required — the COMPLETE plain-text email body, ready to send: professional and warm, proper greeting and sign-off as Giesbrecht HVAC, no markdown, no placeholders unless a detail is genuinely unknown) }
 5. create_customer — adds a new customer to the CRM. Before proposing you MUST run customer_profile on the name — it fuzzy-matches, so a misheard "Rio Martin" surfaces the real "Ryo Martin". If the lookup finds that person or anyone similar (a match, an ambiguous candidate list, or similarExistingCustomers): do NOT propose create — ask whether they mean that existing customer or truly a new person, naming the match(es), with the existing name(s) in relatedTopics. Propose create_customer only when the lookup found no close match, or the user has explicitly confirmed this is a different person from the similar customer you named — in that confirmed case include "confirmedNew": true in params (NEVER include it otherwise; the server refuses near-duplicate creates without it). Include every detail the user gave. params: { "name": string (required — the customer's full name), "phone": string (optional), "email": string (optional), "fullAddress": string (optional — street, city, state ZIP on one line), "customerType": "residential" | "commercial" (optional, default residential), "leadSource": string (optional — where they came from if mentioned, e.g. Google, referral, door hanger), "notes": string (optional — anything else worth keeping, e.g. "has an old gas furnace, interested in a heat pump"), "confirmedNew": true (ONLY after the user explicitly confirmed the similar existing customer is someone else) }
@@ -1032,13 +1058,14 @@ Action types and their params:
 BUILDER ACTIONS — the two below change COMPANY SETUP (templates and the catalog the whole team runs on), not day-to-day records. Only supervisors, admins, and the owner can approve them — if the current user is a tech or sales, say so instead of proposing. Design them with care and show your plan in the answer before the card: these shape how every future job runs.
 15. create_checklist — builds a complete service checklist template (what techs fill on jobs; lands in Settings → Checklists, editable on the canvas). Compose the checklist YOURSELF from what the user describes plus your HVAC knowledge: group steps into logical sections (e.g. "Client Greeting", "Diagnostics — Indoor Unit", "Visit Wrap-Up"), pick the right questionType per step (yes_no for confirmations, select with options for graded/branching readings — include "N/A" where a step can be skipped, text for readings and notes, multi_select for pick-many), mark truly critical steps isRequired, and put scripts/guidance in helpText. Add photoSteps for anything worth documenting visually. In your answer, sketch the section outline BEFORE the card so the user can adjust. params: { "name": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (required), "serviceType": string (required — the work order subtype exactly as dispatch uses it, e.g. "Repair AC", "No Heat"; or "ANY" for a GENERAL checklist that applies to every subtype of the visit type; ask which if unclear), "description": string (optional), "questions": array of { "section": string (optional — group label), "question": string, "questionType": "yes_no" | "text" | "number" | "select" | "multi_select", "options": string[] (required for select/multi_select), "isRequired": boolean (optional), "helpText": string (optional — scripts, expected ranges) } (required, in order), "photoSteps": array of { "label": string, "instructions": string (optional), "isRequired": boolean (optional, default true) } (optional) }
 16. create_item — adds an item to the price book (the catalog quotes and invoices pull from). Confirm the sell price before proposing if the user didn't give one — never invent prices. params: { "name": string (required), "rate": number (required — sell price in dollars), "costPrice": number (optional — our cost), "itemType": "parts" | "equipment" | "material" | "service" | "discount" | "agreement" | "residential" | "commercial" | "crawlspace" (optional), "category": "install" | "service" | "maintenance" | "discount" | "protection" | "field_edge" (optional), "unit": string (optional, default "each"), "partNumber": string (optional), "description": string (optional) }
+17. update_work_order — edits an EXISTING work order (day-to-day, not builder). Ground it in a customer_profile lookup and pin customerId; resolve WHICH job (pass workOrderId from your lookup, or workOrderTitle — when several could match, ask the user first). GUIDELINE: completed or cancelled work orders are FROZEN — the server refuses; if the lookup shows the job is done, say so instead of proposing. Only include the fields actually changing. Checklist: run list_checklists and pin "assignedChecklistId" when several templates fit or the user names one (changing workSubtype re-runs the auto-assign only when exactly one fits). Reassigning follows the same rule as creating: team_roster + assignedTechId pinned. Times are Eastern wall-clock ("YYYY-MM-DDTHH:mm", no zone suffix); changing scheduledStart without scheduledEnd keeps a 1-hour block. params: { "customerName": string (required), "customerId": string (required — pinned), "workOrderId": string (optional — exact id from a lookup), "workOrderTitle": string (optional), "changes": { "title"?: string, "description"?: string, "priority"?: "low" | "normal" | "high" | "emergency", "workSubtype"?: string (same subtype lists as create_work_order), "scheduledStart"?: string, "scheduledEnd"?: string, "assignTo"?: string, "assignedTechId"?: string, "assignedChecklistId"?: string, "dispatchNotes"?: string } (required — at least one field), "current": object (optional — the job's current values for the fields being changed, so the card shows before-and-after) }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
 - replacesPrevious: true ONLY when proposedActions replaces earlier still-un-approved proposal(s) per the ADJUSTMENTS rules — omit otherwise${modeSection}${copilotSection}`;
     
     // Build message array: system + prior turns + current question.
@@ -1063,7 +1090,7 @@ Return JSON with:
     // pinned customerId is refused wholesale; the model gets told how to
     // fix it and re-registers before the user ever sees a card.
     const CUSTOMER_PINNED_ACTIONS = new Set([
-      "create_work_order", "send_sms", "send_email", "update_customer", "delete_customer",
+      "create_work_order", "update_work_order", "send_sms", "send_email", "update_customer", "delete_customer",
       "delete_work_order", "create_quote", "create_invoice", "delete_quote", "create_lead", "update_lead",
     ]);
     // Why is this card unpinned? Empty array = fully pinned and allowed.
@@ -1088,6 +1115,12 @@ Return JSON with:
       if (pa.type === "create_work_order" && p.assignTo && !p.assignedTechId) {
         reasons.push(`create_work_order assigns to "${String(p.assignTo)}" without assignedTechId — run team_roster and pin the exact id`);
       }
+      if (pa.type === "update_work_order") {
+        const ch = (p.changes || {}) as Record<string, unknown>;
+        if (ch.assignTo && !ch.assignedTechId) {
+          reasons.push(`update_work_order reassigns to "${String(ch.assignTo)}" without assignedTechId — run team_roster and pin the exact id`);
+        }
+      }
       return reasons;
     };
     const pinnedCardProblems = (arr: any[]): string[] =>
@@ -1103,7 +1136,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "update_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -1274,7 +1307,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "update_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&
