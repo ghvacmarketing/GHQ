@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, isBefore, isSameDay, startOfDay } from "date-fns";
@@ -10,6 +10,8 @@ import {
   ArrowUp, CalendarDays, Check, ClipboardList, ListChecks, ListPlus,
   Loader2, SlidersHorizontal, Trash2, ChevronDown, ChevronRight,
 } from "lucide-react";
+import { SheetSelect } from "@/components/mobile/sheet-select";
+import { DateRangeSheet } from "@/components/mobile/date-range-calendar";
 import { Calendar } from "@/components/ui/calendar";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { AssigneeSheet } from "@/components/mobile/assignee-sheet";
@@ -185,11 +187,31 @@ export default function MobileTasks() {
   const [view, setView] = useState<"open" | "done">("open");
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [who, setWho] = useState<WhoFilter>("me");
-  const [show, setShow] = useState<"all" | "overdue" | "today" | "high">("all");
+  const [whoOpen, setWhoOpen] = useState(false);
+  const [dueFilter, setDueFilter] = useState<"any" | "overdue" | "today" | "custom">("any");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [datesOpen, setDatesOpen] = useState(false);
+  const [highOnly, setHighOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set());
+
+  // Deep links: a push tap carries ?task=<id> (open that detail sheet);
+  // the older ?new=1 link still lands on the create page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("task");
+    if (t) {
+      window.history.replaceState({}, "", "/mobile/tasks");
+      setDetailTaskId(t);
+    } else if (params.get("new") === "1") {
+      window.history.replaceState({}, "", "/mobile/tasks");
+      navigate("/mobile/tasks/new");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -252,13 +274,19 @@ export default function MobileTasks() {
   const doneTasks = mine
     .filter((t) => t.status === "completed")
     .sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
-  const matchesShow = (t: TaskRow) => {
-    if (show === "overdue") return !!t.dueAt && t.status !== "completed" && isBefore(new Date(t.dueAt), startOfDay(new Date()));
-    if (show === "today") return !!t.dueAt && isSameDay(new Date(t.dueAt), new Date());
-    if (show === "high") return t.priority === "high";
+  const matchesFilters = (t: TaskRow) => {
+    if (highOnly && t.priority !== "high") return false;
+    if (dueFilter === "overdue") return !!t.dueAt && t.status !== "completed" && isBefore(new Date(t.dueAt), startOfDay(new Date()));
+    if (dueFilter === "today") return !!t.dueAt && isSameDay(new Date(t.dueAt), new Date());
+    if (dueFilter === "custom") {
+      if (!rangeFrom) return true;
+      if (!t.dueAt) return false;
+      const d = format(new Date(t.dueAt), "yyyy-MM-dd");
+      return d >= rangeFrom && d <= (rangeTo || rangeFrom);
+    }
     return true;
   };
-  const shown = (view === "open" ? openTasks : doneTasks).filter(matchesShow);
+  const shown = (view === "open" ? openTasks : doneTasks).filter(matchesFilters);
 
   // ── Optimistic plumbing (ported from the CRM Activity page) ──
   const snapshotTasks = async () => {
@@ -350,10 +378,10 @@ export default function MobileTasks() {
       return n;
     });
 
-  const SHOW_LABELS = { all: "", overdue: "Overdue", today: "Due today", high: "High priority" } as const;
+  const DUE_LABELS = { any: "Any time", overdue: "Overdue", today: "Due today", custom: "Custom range" } as const;
   const whoLabel = who === "me" ? "My tasks" : who === "all" ? "Everyone" : firstNameOf(userName(who)) || "Person";
-  const pillLabel = show === "all" ? whoLabel : `${whoLabel} · ${SHOW_LABELS[show]}`;
-  const filterActive = who !== "me" || show !== "all";
+  const pillLabel = [whoLabel, dueFilter !== "any" ? DUE_LABELS[dueFilter] : "", highOnly ? "High" : ""].filter(Boolean).join(" · ");
+  const filterActive = who !== "me" || dueFilter !== "any" || highOnly;
 
   return (
     <MobileShell>
@@ -436,13 +464,78 @@ export default function MobileTasks() {
         )}
       </div>
 
-      {/* ── Filter sheet: whose tasks + what to show. People render as the
-          same tile grid as Assign-to, so a big roster stays one screen. ── */}
-      <DraggableSheet tall open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
+      {/* ── Filter sheet: one row per filter, each opening its OWN sheet
+          so nothing is crowded — people as the Assign-to grid, dates as a
+          select with the app's shared custom-range calendar. ── */}
+      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
         <h2 className="text-lg font-semibold text-slate-900">Filter tasks</h2>
+        <div className="mt-1 divide-y divide-slate-200/80">
+          <button
+            onClick={() => setWhoOpen(true)}
+            className="flex w-full items-center justify-between gap-3 px-1 py-4 text-left"
+            data-testid="task-filter-who"
+          >
+            <span className="text-sm font-medium text-slate-700">Assigned to</span>
+            <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-slate-500">
+              {who !== "me" && who !== "all" && <AvatarWithRole name={userName(who)} size={20} />}
+              <span className="truncate">{whoLabel}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+            </span>
+          </button>
+          <SheetSelect
+            label="Due"
+            value={dueFilter}
+            onChange={(k) => {
+              setDueFilter(k as typeof dueFilter);
+              if (k === "custom") setDatesOpen(true);
+            }}
+            options={[
+              { key: "any", label: "Any time" },
+              { key: "overdue", label: "Overdue" },
+              { key: "today", label: "Due today" },
+              { key: "custom", label: "Custom range" },
+            ]}
+            testid="task-filter-due"
+          />
+          {dueFilter === "custom" && (
+            <DateRangeSheet
+              label="Dates"
+              from={rangeFrom}
+              to={rangeTo}
+              onChange={(f, t) => { setRangeFrom(f); setRangeTo(t); }}
+              open={datesOpen}
+              onOpenChange={setDatesOpen}
+              testid="task-filter-calendar"
+            />
+          )}
+          <button
+            onClick={() => setHighOnly((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 px-1 py-4 text-left"
+            data-testid="task-filter-high"
+          >
+            <span className="text-sm font-medium text-slate-700">High priority only</span>
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors ${
+                highOnly ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent"
+              }`}
+            >
+              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+            </span>
+          </button>
+        </div>
+        <button
+          onClick={() => setFilterOpen(false)}
+          className="mb-2 mt-4 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98]"
+          data-testid="task-filter-done"
+        >
+          Done
+        </button>
+      </DraggableSheet>
 
-        <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Whose tasks</p>
-        <div className="mt-2 grid grid-cols-3 gap-2">
+      {/* Assigned-to picker — the same tile grid as assigning a task */}
+      <DraggableSheet nested tall open={whoOpen} onOpenChange={setWhoOpen} title="Assigned to" testid="sheet-task-filter-who">
+        <h2 className="text-lg font-semibold text-slate-900">Whose tasks?</h2>
+        <div className="mt-3 grid grid-cols-3 gap-2 pb-2">
           {[
             { key: "me" as WhoFilter, label: "My tasks", sub: "You + created" },
             { key: "all" as WhoFilter, label: "Everyone", sub: "Whole team" },
@@ -451,7 +544,7 @@ export default function MobileTasks() {
             return (
               <button
                 key={String(opt.key)}
-                onClick={() => setWho(opt.key)}
+                onClick={() => { setWho(opt.key); setWhoOpen(false); }}
                 className={`relative flex flex-col items-center rounded-[4px] border px-1.5 pb-2.5 pt-3 transition-transform active:scale-95 ${
                   selected ? "border-[#711419] bg-[#711419]/5" : "border-slate-300/70 bg-white"
                 }`}
@@ -484,7 +577,7 @@ export default function MobileTasks() {
               return (
                 <button
                   key={u.id}
-                  onClick={() => setWho(u.id)}
+                  onClick={() => { setWho(u.id); setWhoOpen(false); }}
                   className={`relative flex flex-col items-center rounded-[4px] border px-1.5 pb-2.5 pt-3 transition-transform active:scale-95 ${
                     selected ? "border-[#711419] bg-[#711419]/5" : "border-slate-300/70 bg-white"
                   }`}
@@ -504,35 +597,6 @@ export default function MobileTasks() {
               );
             })}
         </div>
-
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Show</p>
-        <div className="mt-2 flex flex-wrap gap-1.5 pb-2">
-          {([
-            { key: "all", label: "Everything" },
-            { key: "overdue", label: "Overdue" },
-            { key: "today", label: "Due today" },
-            { key: "high", label: "High priority" },
-          ] as const).map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setShow(opt.key)}
-              className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-transform active:scale-95 ${
-                show === opt.key ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300/70 bg-white text-slate-700"
-              }`}
-              data-testid={`task-show-${opt.key}`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setFilterOpen(false)}
-          className="mb-2 mt-5 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98]"
-          data-testid="task-filter-done"
-        >
-          Done
-        </button>
       </DraggableSheet>
 
       {/* ── Task detail — a full bottom sheet, no top bar ── */}
@@ -798,7 +862,7 @@ function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; use
               // Patch optimistically so the picked day LIGHTS UP, linger a
               // beat so the choice reads, then the sheet rides down normally.
               patchTask.mutate({ dueAt: date ? `${format(date, "yyyy-MM-dd")}T12:00:00` : null });
-              window.setTimeout(() => setDueOpen(false), 450);
+              window.setTimeout(() => setDueOpen(false), 250);
             }}
             numberOfMonths={1}
             className="w-full p-0"

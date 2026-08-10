@@ -144,19 +144,19 @@ export function queueBadgeSync(userId: string): void {
   );
 }
 
-/** Deep link for a notification row — mirrors the web notification drawer. */
+/** Deep link for a notification row. These pushes land ONLY on phones, so
+ *  the links are MOBILE routes — the old /crm/... desktop paths made every
+ *  tap bounce back to the agenda instead of the thing the push was about. */
 function notificationLink(n: { entityType: string | null; entityId: string | null }): string | undefined {
   if (!n.entityType || !n.entityId) return undefined;
   const map: Record<string, string> = {
-    customer: "/crm/customers",
-    work_order: "/crm/work-orders",
-    quote: "/crm/quotes",
-    invoice: "/crm/invoices",
-    project: "/crm/projects",
-    task: "/crm/tasks",
+    customer: `/mobile/customers/${n.entityId}`,
+    work_order: `/mobile/job/${n.entityId}`,
+    quote: `/mobile/quotes/${n.entityId}`,
+    invoice: `/mobile/invoices/${n.entityId}`,
+    task: `/mobile/tasks?task=${n.entityId}`,
   };
-  const base = map[n.entityType];
-  return base ? `${base}/${n.entityId}` : undefined;
+  return map[n.entityType];
 }
 
 let bridgeStarted = false;

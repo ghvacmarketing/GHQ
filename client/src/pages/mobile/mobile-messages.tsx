@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import MobileShell from "./mobile-shell";
+import { customerTypeBadge } from "@/pages/mobile/mobile-quote-new";
 import { InboxSwitcher } from "@/components/mobile/inbox-switcher";
 import { Input } from "@/components/ui/input";
 import { useKeyboardInset } from "@/lib/native";
@@ -1102,7 +1103,8 @@ export default function MobileMessages() {
               />
             </div>
             {contacts && contacts.length > 0 ? (
-              <div className="divide-y divide-slate-100 overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              /* One card, hairline dividers — same look as the media search */
+              <div className="divide-y divide-slate-200/80 overflow-hidden rounded-2xl border border-slate-300/70 bg-white shadow-sm">
                 {contacts.map((contact) => (
                   <button
                     key={contact.id}
@@ -1111,12 +1113,17 @@ export default function MobileMessages() {
                     data-testid={`contact-${contact.id}`}
                     disabled={startConversationMutation.isPending}
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#711419] font-semibold text-white">
-                      {contact.customerName?.charAt(0).toUpperCase() || "?"}
-                    </div>
+                    <img
+                      src={customerTypeBadge((contact as any).customerType)}
+                      alt=""
+                      className="h-9 w-9 shrink-0 select-none"
+                      draggable={false}
+                    />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-800">{contact.customerName}</p>
-                      <p className="truncate text-sm text-slate-500">{contact.phone}</p>
+                      <p className="truncate text-sm font-semibold text-slate-900">{(contact as any).name || contact.customerName}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {(contact as any).fullAddress || contact.phone || "No address on file"}
+                      </p>
                     </div>
                   </button>
                 ))}
