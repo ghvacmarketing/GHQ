@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { CustomerCamera } from "@/components/mobile/customer-camera";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { isNativeApp, pickNativeLibraryPhotos } from "@/lib/native";
@@ -2504,12 +2504,20 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
     switchTab(prev);
   };
 
+  // A back-swipe fully REVEALS the destination as the under copy before the
+  // real tab swaps in — replaying the tab-enter animation on that swap was
+  // the post-swipe blink. The commit sets this flag; the swap paints static.
+  const revealDoneRef = useRef(false);
+  const [tabEnterAnim, setTabEnterAnim] = useState(true);
+
   // Switch tabs preserving each section's scroll position. Every tab-bar
   // switch is a shell-style crossfade: the incoming layer fades in over a
   // static page (the inner wrappers carry the same 0.2s fade via CSS).
   const switchTab = (next: TabType) => {
     if (next === activeTab) return;
     if (layerBusy.current) return; // one transition at a time
+    setTabEnterAnim(!revealDoneRef.current);
+    revealDoneRef.current = false;
     // Remember where you came FROM — unless this switch IS a back-pop
     if (!tabBackPop.current) tabHistory.current.push(activeTab);
     tabBackPop.current = false;
@@ -2599,7 +2607,15 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
           // as a parked under-layer; the overview reveal stays for the
           // trail's end.
           const prev = peekPrevTabRef.current();
-          if (prev !== "overview") setSectionUnderRef.current(prev);
+          if (prev !== "overview") {
+            setSectionUnderRef.current(prev);
+            // Park the copy at the destination's remembered scroll — a copy
+            // at the top would visibly jump when the real tab restores it.
+            window.setTimeout(() => {
+              const u = sectionUnderRef.current;
+              if (u) u.scrollTop = tabScroll.current[prev] || 0;
+            }, 30);
+          }
           // Heading to the Overview: a copy left by a just-finished swipe
           // (its drop timer still pending) would hijack the reveal, then
           // vanish mid-drag when the timer fired — the overview jitter on
@@ -2660,9 +2676,16 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
           window.setTimeout(() => {
             layerBusy.current = false; // release BEFORE the guarded switch
             tabBackPop.current = true;
-            switchTabRef.current(prev);
+            // The copy IS the destination, fully revealed — swap the real tab
+            // in SYNCHRONOUSLY (async render left one frame of the old tab
+            // when the transform reset below snapped the card back: the
+            // post-swipe flash), with its enter animation suppressed and its
+            // scroll restored before the frame paints.
+            revealDoneRef.current = true;
+            flushSync(() => switchTabRef.current(prev));
             el.style.transition = "none";
             el.style.transform = "";
+            el.scrollTop = tabScroll.current[prev] || 0;
             restoreChrome();
             requestAnimationFrame(() => {
               el.style.transition = "";
@@ -3461,13 +3484,13 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
         {/* 1px over-height keeps short tabs scrollable, so every section
             rubber-bands under your thumb instead of feeling pinned. */}
         <div className="min-h-[calc(100%+1px)]">
-          <div className={activeTab === "work" ? "job-tab-enter block" : "hidden"}>
+          <div className={activeTab === "work" ? `${tabEnterAnim ? "job-tab-enter " : ""}block` : "hidden"}>
             <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
           </div>
-          <div className={activeTab === "quote" ? "job-tab-enter block" : "hidden"}>
+          <div className={activeTab === "quote" ? `${tabEnterAnim ? "job-tab-enter " : ""}block` : "hidden"}>
             <QuoteTab workOrder={workOrder} />
           </div>
-          <div className={activeTab === "invoice" ? "job-tab-enter block" : "hidden"}>
+          <div className={activeTab === "invoice" ? `${tabEnterAnim ? "job-tab-enter " : ""}block` : "hidden"}>
             <InvoiceTab
               workOrder={workOrder}
               renewalInfo={renewalInfo}
@@ -3515,24 +3538,26 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
         </button>
       </DraggableSheet>
 
-      <Dialog open={showEditDialog} onOpenChange={(open) => {
-        setShowEditDialog(open);
-        if (!open) {
-          setEditSelectedDate(undefined);
-          setEditSelectedSlot(null);
-        }
-      }}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="edit-work-order-modal">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5 text-slate-600" />
-              Edit Work Order
-            </DialogTitle>
-            <DialogDescription>
-              Update work order details below.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...editForm}>
+      {/* Edit rides in as a bottom sheet like every other in-job flow */}
+      <DraggableSheet
+        tall
+        open={showEditDialog}
+        onOpenChange={(open) => {
+          setShowEditDialog(open);
+          if (!open) {
+            setEditSelectedDate(undefined);
+            setEditSelectedSlot(null);
+          }
+        }}
+        title="Edit work order"
+        testid="edit-work-order-modal"
+      >
+        <div className="flex items-center gap-2">
+          <Pencil className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Edit Work Order</h2>
+        </div>
+        <p className="mb-4 mt-0.5 text-sm text-slate-500">Update work order details below.</p>
+        <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
               <FormField
                 control={editForm.control}
@@ -3567,7 +3592,7 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                       {editSelectedDate ? format(editSelectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="z-[100] w-auto p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={editSelectedDate}
@@ -3643,7 +3668,7 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                           <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="z-[100]">
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="normal">Normal</SelectItem>
                         <SelectItem value="high">High</SelectItem>
@@ -3712,13 +3737,13 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                 )}
               />
 
-              <DialogFooter className="flex gap-2 pt-4">
+              <div className="flex gap-2 pb-2 pt-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowEditDialog(false)}
                   disabled={editWorkOrderMutation.isPending}
-                  className="min-h-[44px]"
+                  className="min-h-[48px] flex-1"
                   data-testid="button-cancel-edit"
                 >
                   Cancel
@@ -3726,7 +3751,7 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                 <Button
                   type="submit"
                   disabled={editWorkOrderMutation.isPending}
-                  className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+                  className="min-h-[48px] flex-[2] bg-[#711419] hover:bg-[#5a1014]"
                   data-testid="button-save-edit"
                 >
                   {editWorkOrderMutation.isPending ? (
@@ -3736,11 +3761,10 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                   )}
                   Save Changes
                 </Button>
-              </DialogFooter>
+              </div>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
+      </DraggableSheet>
 
       <Dialog open={showCollectRenewalDialog} onOpenChange={setShowCollectRenewalDialog}>
         <DialogContent className="sm:max-w-md" data-testid="collect-renewal-dialog">
