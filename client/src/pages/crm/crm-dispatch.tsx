@@ -1,4 +1,4 @@
-import { firstNameOf } from "@/components/user-avatar-badge";
+import { AvatarWithRole, firstNameOf } from "@/components/user-avatar-badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreIcon } from "@/components/crm/more-icon";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
@@ -879,7 +879,14 @@ function TechsDayView({
   }
   const hasAxis = Number.isFinite(firstIn) && lastAct > 0;
   const axisStart = hasAxis ? Math.floor(firstIn / HOUR_MS) * HOUR_MS : 0;
-  const axisEnd = hasAxis ? Math.max(Math.ceil(lastAct / HOUR_MS) * HOUR_MS, axisStart + 4 * HOUR_MS) : 0;
+  // Today's ruler runs first-clock-in -> NOW exactly, so the live segment
+  // reaches the right edge and there's never a dead zone after it. Past
+  // days close out at the hour after the last clock-out.
+  const axisEnd = hasAxis
+    ? (isToday
+        ? Math.max(lastAct, Date.now(), axisStart + 30 * 60_000)
+        : Math.max(Math.ceil(lastAct / HOUR_MS) * HOUR_MS, axisStart + 4 * HOUR_MS))
+    : 0;
   const axisSpan = Math.max(1, axisEnd - axisStart);
   const tickStep = axisSpan > 10 * HOUR_MS ? 2 * HOUR_MS : HOUR_MS;
   const axisTicks: number[] = [];
@@ -896,7 +903,7 @@ function TechsDayView({
     return (
       <Card className="p-4 bg-white" data-testid={`techs-card-${a.id}`}>
         <div className="flex items-center gap-3">
-          <img src={roleBadgeSrc(a.role)} alt="" className="h-10 w-10 shrink-0 select-none" draggable={false} />
+          <AvatarWithRole name={a.name} size={40} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate font-semibold text-slate-900">{firstNameOf(a.name)}</span>
@@ -917,7 +924,6 @@ function TechsDayView({
               </p>
             )}
           </div>
-          {a.active && cat && <img src={cat.img} alt={cat.label} className="h-9 w-9 shrink-0 select-none" draggable={false} />}
         </div>
         {/* The day as it actually happened: a real time axis (shared across
             every card), colored segments where they were on the clock, blank
@@ -955,7 +961,7 @@ function TechsDayView({
               {axisTicks.length > 0 && (
                 <span className="hidden sm:inline">{format(new Date(axisTicks[Math.floor(axisTicks.length / 2)]), "h a")}</span>
               )}
-              <span>{isToday && a.active ? `now · ${format(new Date(), "h:mm a")}` : format(new Date(axisEnd), "h a")}</span>
+              <span>{isToday ? `now · ${format(new Date(), "h:mm a")}` : format(new Date(axisEnd), "h a")}</span>
             </div>
           </div>
         )}
@@ -1008,10 +1014,7 @@ function TechsDayView({
   return (
     <div className="space-y-5 pb-4" data-testid="techs-day-view">
       <section>
-        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
-          On the clock
-          <span className="rounded-[4px] bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-green-700">{onClock.length}</span>
-        </h2>
+        <h2 className="mb-2 text-sm font-semibold text-slate-700">On the clock</h2>
         {onClock.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {onClock.map((a) => (
@@ -1045,7 +1048,7 @@ function TechsDayView({
           <div className="flex flex-wrap gap-1.5">
             {noTime.map((t) => (
               <span key={t.id} className="inline-flex items-center gap-1.5 rounded-[4px] border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500">
-                <img src={roleBadgeSrc(String(roleFor.get(t.id) || "tech"))} alt="" className="h-4 w-4 select-none" draggable={false} />
+                <AvatarWithRole name={t.name} size={16} />
                 {t.name}
               </span>
             ))}
