@@ -16,6 +16,13 @@ export function sessionDurationFor(deviceClass: string | null | undefined): numb
   return deviceClass === "mobile" ? MOBILE_SESSION_DURATION_MS : SESSION_DURATION_MS;
 }
 
+// The COOKIE must outlive the sliding server expiry: stamped only at login,
+// a 7-day cookie logged phones out on day 7 even when used daily. The server
+// session (7d sliding) stays the authority on when access actually ends.
+export function cookieMaxAgeFor(deviceClass: string | null | undefined): number {
+  return deviceClass === "mobile" ? 30 * 24 * 60 * 60 * 1000 : SESSION_DURATION_MS;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;

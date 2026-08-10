@@ -85,7 +85,7 @@ import { fieldEdgeCustomerService, type FieldEdgeCustomer } from "./services/fie
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { recordUserActivity } from "./activity-tracker";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, revokeOtherCrmSessions, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, sessionDurationFor, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, revokeOtherCrmSessions, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, sessionDurationFor, cookieMaxAgeFor, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import { startGoogleOAuth, handleGoogleOAuthCallback, handleNativeGoogleLogin, isGoogleOAuthConfigured } from "./crm-google-auth";
 import { startGmailConnect, handleGmailConnectCallback } from "./crm-gmail-auth";
 import {
@@ -7077,7 +7077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: sessionDurationFor(session.deviceClass), // phones: a week, sliding server-side
+        maxAge: cookieMaxAgeFor(session.deviceClass), // cookie outlives the sliding 7d server expiry
       });
 
       const { passwordHash, ...userWithoutPassword } = user;

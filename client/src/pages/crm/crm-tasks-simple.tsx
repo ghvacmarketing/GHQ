@@ -267,7 +267,13 @@ export default function CrmTasksSimple() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/pins"] }),
   });
 
-  const tasks = tasksData?.tasks ?? [];
+  // Everyone tab: narrow the list to one person's tasks.
+  const [personFilter, setPersonFilter] = useState<string>("all");
+  const tasks = useMemo(() => {
+    const all = tasksData?.tasks ?? [];
+    if (scope !== "everyone" || personFilter === "all") return all;
+    return all.filter((t) => t.assignedToUserId === personFilter);
+  }, [tasksData, scope, personFilter]);
   const open = useMemo(
     () =>
       tasks
@@ -578,7 +584,24 @@ export default function CrmTasksSimple() {
               ]}
             />
           </div>
-          <div className="hidden lg:block" />
+          {/* Everyone tab: person filter — jump to one teammate's list */}
+          <div className="flex lg:justify-end">
+            {scope === "everyone" ? (
+              <Select value={personFilter} onValueChange={setPersonFilter}>
+                <SelectTrigger className="h-8 w-44 text-xs" data-testid="tasks-person-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Everyone's tasks</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="hidden lg:block" />
+            )}
+          </div>
         </div>
 
         {/* Comments across the CRM — open pin comments, click through to the spot */}
