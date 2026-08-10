@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format, isBefore, startOfDay } from "date-fns";
@@ -7,18 +7,23 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardInset } from "@/lib/native";
 import {
-  ArrowLeft, ArrowUp, Calendar, Check, ClipboardList, ListPlus,
-  Loader2, Plus, Trash2,
+  ArrowUp, CalendarDays, Check, ClipboardList, ListChecks, ListPlus,
+  Loader2, SlidersHorizontal, Trash2, ChevronDown, ChevronRight,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { AssigneeSheet } from "@/components/mobile/assignee-sheet";
+import { AvatarWithRole, firstNameOf } from "@/components/user-avatar-badge";
+import { SCHEDULE_CAL_CLASSNAMES } from "@/pages/mobile/mobile-job-new";
 import type { CrmUser } from "@shared/schema";
 
-/** My Tasks.
+/** My Tasks — Google-Tasks feel, matched to the CRM Activity page.
  *
- *  Create: the full-page bottom sheet at /mobile/tasks/new — same shell as
- *  creating a customer or job.
- *  Detail: tap any task for the fullscreen view — status, assignee, due
- *  date, notes, and subtasks, all editable in place. */
+ *  Create: the shell "+" mounts the create page as an overlay.
+ *  Check-off: same choreography as the CRM — the circle pops, the row
+ *  tints and collapses, the task re-materializes under Done.
+ *  Detail: a full bottom sheet (no top bar) with inline title/complete,
+ *  assignee, the app-standard calendar for due dates, notes, subtasks. */
 
 type TaskRow = {
   id: string;
@@ -39,11 +44,151 @@ type Subtask = {
   isCompleted: boolean;
 };
 
+type WhoFilter = "me" | "all" | string; // string = a specific user id
+
+// ── Row: top-level + memoized so parent state changes never remount it
+// (remounts restart the collapse/pop animations — the CRM lesson). ──
+const TaskListRow = memo(function TaskListRow({
+  task,
+  checking,
+  leaving,
+  entrance,
+  showAssignee,
+  assigneeName,
+  counts,
+  isExpanded,
+  onToggle,
+  onOpen,
+  onToggleExpanded,
+  onToggleSubtask,
+}: {
+  task: TaskRow;
+  checking: boolean;
+  leaving: boolean;
+  entrance?: boolean;
+  showAssignee: boolean;
+  assigneeName: string | null;
+  counts: { total: number; done: number } | undefined;
+  isExpanded: boolean;
+  onToggle: (t: TaskRow) => void;
+  onOpen: (id: string) => void;
+  onToggleExpanded: (id: string) => void;
+  onToggleSubtask: (taskId: string, st: Subtask) => void;
+}) {
+  const done = task.status === "completed";
+  const showDone = done || checking;
+  const overdue = !showDone && task.dueAt && isBefore(new Date(task.dueAt), startOfDay(new Date()));
+  const { data: rowSubtasks = [] } = useQuery<Subtask[]>({
+    queryKey: ["/api/tasks", task.id, "subtasks"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${task.id}/subtasks`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isExpanded,
+  });
+  return (
+    <div
+      className={`grid border-b border-slate-200/80 transition-[grid-template-rows,opacity] duration-300 ease-in-out last:border-0 ${
+        leaving ? "[grid-template-rows:0fr] opacity-0" : "[grid-template-rows:1fr] opacity-100"
+      } ${entrance ? "animate-in fade-in slide-in-from-top-1 duration-300" : ""}`}
+      data-testid={`task-row-${task.id}`}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <div className={`flex items-start gap-3 px-3.5 py-3 transition-colors duration-300 ${checking ? "bg-emerald-50/70" : ""}`}>
+          <button
+            onClick={() => onToggle(task)}
+            className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              showDone ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent active:border-[#711419]"
+            } ${checking ? "animate-[task-check-pop_300ms_cubic-bezier(0.34,1.56,0.64,1)]" : ""}`}
+            aria-label={showDone ? "Mark as open" : "Mark as done"}
+            data-testid={`task-toggle-${task.id}`}
+          >
+            <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          </button>
+          <button
+            onClick={() => onOpen(task.id)}
+            className="min-w-0 flex-1 text-left"
+            data-testid={`task-open-${task.id}`}
+          >
+            <p className={`text-sm font-medium ${showDone ? "text-slate-400 line-through" : "text-slate-900"}`}>
+              {task.title}
+            </p>
+            {task.description && (
+              <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{task.description}</p>
+            )}
+            <span className="mt-1 flex flex-wrap items-center gap-2">
+              {task.dueAt && !showDone && (
+                <span
+                  className={`inline-block rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    overdue ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {overdue ? "Overdue · " : "Due "}
+                  {format(new Date(task.dueAt), "EEE, MMM d")}
+                </span>
+              )}
+              {done && task.completedAt && (
+                <span className="inline-block text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  Done {format(new Date(task.completedAt), "MMM d")}
+                </span>
+              )}
+              {showAssignee && assigneeName && (
+                <span className="text-[10px] font-medium text-slate-400">{assigneeName}</span>
+              )}
+            </span>
+          </button>
+          {counts && counts.total > 0 && (
+            <button
+              onClick={() => onToggleExpanded(task.id)}
+              className={`mt-0.5 flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                counts.done === counts.total ? "text-emerald-600" : "text-slate-500"
+              }`}
+              aria-label={isExpanded ? "Hide subtasks" : "Show subtasks"}
+              data-testid={`task-subtask-chip-${task.id}`}
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              {counts.done}/{counts.total}
+              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </button>
+          )}
+        </div>
+        {/* Subtasks, right on the main screen — check them off in place */}
+        {isExpanded && rowSubtasks.length > 0 && (
+          <div className="border-t border-slate-100 bg-slate-50/60 py-1 animate-in fade-in duration-200" data-testid={`task-subtasks-${task.id}`}>
+            {rowSubtasks.map((st) => (
+              <div key={st.id} className="flex items-center gap-2.5 py-1.5 pl-12 pr-4">
+                <button
+                  onClick={() => onToggleSubtask(task.id, st)}
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                    st.isCompleted ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent"
+                  }`}
+                  data-testid={`row-subtask-toggle-${st.id}`}
+                >
+                  <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                </button>
+                <span className={`min-w-0 flex-1 truncate text-[13px] ${st.isCompleted ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                  {st.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export default function MobileTasks() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [view, setView] = useState<"open" | "done">("open");
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [who, setWho] = useState<WhoFilter>("me");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
+  const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set());
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -64,20 +209,15 @@ export default function MobileTasks() {
       return Array.isArray(data) ? data : data.users || [];
     },
   });
-
-  // Deep link: "+" → the full-page create sheet
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("new") === "1") {
-      window.history.replaceState({}, "", "/mobile/tasks");
-      navigate("/mobile/tasks/new");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const userName = (id: string | null | undefined) => users.find((u) => u.id === id)?.name || null;
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
-    queryKey: ["/api/tasks", "mine", currentUser?.id],
+    queryKey: ["/api/tasks", "mobile", who, currentUser?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/tasks?assignedTo=${currentUser!.id}`, { credentials: "include" });
+      const params = new URLSearchParams({ limit: "300" });
+      if (who === "me" && currentUser) params.set("assignedTo", currentUser.id);
+      else if (who !== "all" && who !== "me") params.set("assignedTo", who);
+      const res = await fetch(`/api/tasks?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load tasks");
       const data = await res.json();
       return Array.isArray(data) ? data : data.tasks || [];
@@ -85,7 +225,21 @@ export default function MobileTasks() {
     enabled: !!currentUser,
   });
 
-  const mine = tasks.filter((t) => t.assignedToUserId === currentUser?.id || t.createdByUserId === currentUser?.id);
+  // Subtask progress chips — one grouped query, same as the CRM
+  const { data: subCountRows = [] } = useQuery<Array<{ taskId: string; total: number; done: number }>>({
+    queryKey: ["/api/tasks", "subtask-counts"],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks/subtask-counts", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+  const subCounts = new Map(subCountRows.map((r) => [r.taskId, r]));
+
+  const mine = who === "me"
+    ? tasks.filter((t) => t.assignedToUserId === currentUser?.id || t.createdByUserId === currentUser?.id)
+    : tasks;
   const openTasks = mine
     .filter((t) => t.status === "pending" || t.status === "in_progress")
     .sort((a, b) => {
@@ -99,21 +253,102 @@ export default function MobileTasks() {
     .sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
   const shown = view === "open" ? openTasks : doneTasks;
 
+  // ── Optimistic plumbing (ported from the CRM Activity page) ──
+  const snapshotTasks = async () => {
+    await queryClient.cancelQueries({ queryKey: ["/api/tasks"] });
+    return queryClient.getQueriesData({ queryKey: ["/api/tasks"] });
+  };
+  const restoreTasks = (snapshot: Array<[readonly unknown[], unknown]> | undefined) => {
+    (snapshot || []).forEach(([key, data]) => queryClient.setQueryData(key as any, data as any));
+  };
+  const patchTaskLists = (fn: (tasks: any[]) => any[]) =>
+    queryClient.setQueriesData({ queryKey: ["/api/tasks"] }, (old: any) => {
+      if (Array.isArray(old)) return fn(old);
+      if (old && Array.isArray(old.tasks)) return { ...old, tasks: fn(old.tasks) };
+      return old;
+    });
+
   const toggleMutation = useMutation({
     mutationFn: async (task: TaskRow) =>
       apiRequest("PUT", `/api/tasks/${task.id}`, {
         status: task.status === "completed" ? "pending" : "completed",
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] }),
-    onError: (e: any) => toast({ title: "Couldn't update the task", description: e?.message, variant: "destructive" }),
+    onMutate: async (task) => {
+      const snapshot = await snapshotTasks();
+      const next = task.status === "completed" ? "pending" : "completed";
+      patchTaskLists((rows) =>
+        rows.map((x: any) =>
+          x.id === task.id
+            ? { ...x, status: next, completedAt: next === "completed" ? new Date().toISOString() : null }
+            : x,
+        ),
+      );
+      return { snapshot };
+    },
+    onError: (e: any, _t, ctx) => {
+      restoreTasks(ctx?.snapshot);
+      toast({ title: "Couldn't update the task", description: e?.message, variant: "destructive" });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] }),
   });
 
-  const today = startOfDay(new Date());
+  // Check-off choreography: pop, green linger, collapse, THEN flip the cache
+  const completeWithAnimation = (t: TaskRow) => {
+    if (checkingIds.has(t.id) || leavingIds.has(t.id)) return;
+    setCheckingIds((p) => new Set(p).add(t.id));
+    window.setTimeout(() => setLeavingIds((p) => new Set(p).add(t.id)), 450);
+    window.setTimeout(() => {
+      toggleMutation.mutate(t);
+      setCheckingIds((p) => { const n = new Set(p); n.delete(t.id); return n; });
+      setLeavingIds((p) => { const n = new Set(p); n.delete(t.id); return n; });
+    }, 780);
+  };
+  const toggleFromRow = (t: TaskRow) => {
+    if (t.status === "completed") toggleMutation.mutate(t);
+    else completeWithAnimation(t);
+  };
+
+  // Subtask toggles from the list — optimistic, no lag
+  const rowSubtaskMutation = useMutation({
+    mutationFn: async ({ taskId, st }: { taskId: string; st: Subtask }) =>
+      apiRequest("PUT", `/api/tasks/${taskId}/subtasks/${st.id}`, { isCompleted: !st.isCompleted }),
+    onMutate: async ({ taskId, st }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      const prev = queryClient.getQueryData(["/api/tasks", taskId, "subtasks"]);
+      queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], (old: any) =>
+        Array.isArray(old) ? old.map((x: Subtask) => (x.id === st.id ? { ...x, isCompleted: !st.isCompleted } : x)) : old,
+      );
+      queryClient.setQueryData(["/api/tasks", "subtask-counts"], (old: any) =>
+        Array.isArray(old)
+          ? old.map((r: any) => (r.taskId === taskId ? { ...r, done: r.done + (st.isCompleted ? -1 : 1) } : r))
+          : old,
+      );
+      return { prev };
+    },
+    onError: (_e, { taskId }, ctx) => {
+      queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], ctx?.prev as any);
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", "subtask-counts"] });
+    },
+    onSettled: (_d, _e, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", "subtask-counts"] });
+    },
+  });
+
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
+  const whoLabel = who === "me" ? "My tasks" : who === "all" ? "Everyone" : firstNameOf(userName(who)) || "Person";
 
   return (
     <MobileShell>
       <div className="p-4 space-y-4" data-testid="mobile-tasks-page">
-        {/* Open | Done switcher — full width, New inline right */}
+        {/* Open | Done switcher + the filter pill (people filter sheet) */}
         <div className="flex items-center gap-2">
           <div className="flex flex-1 items-center gap-1 rounded-lg bg-slate-200/70 p-1">
             {(["open", "done"] as const).map((v) => (
@@ -130,17 +365,19 @@ export default function MobileTasks() {
             ))}
           </div>
           <button
-            onClick={() => navigate("/mobile/tasks/new")}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[4px] bg-[#711419] text-white shadow-sm transition-transform active:scale-95"
-            aria-label="New task"
-            data-testid="button-new-task"
+            onClick={() => setFilterOpen(true)}
+            className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium shadow-sm transition-transform active:scale-95 ${
+              who === "me" ? "border-slate-300/70 bg-white text-slate-700" : "border-[#711419]/30 bg-[#711419]/5 text-[#711419]"
+            }`}
+            aria-label="Filter tasks"
+            data-testid="button-task-filter"
           >
-            <Plus className="h-5 w-5" />
+            <SlidersHorizontal className="h-4 w-4" />
+            {whoLabel}
           </button>
         </div>
 
         {isLoading ? (
-          /* Task-row skeletons — circle toggle + title/due lines */
           <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className={`flex items-start gap-3 px-3.5 py-3 ${i > 1 ? "border-t border-slate-200/80" : ""}`}>
@@ -156,8 +393,8 @@ export default function MobileTasks() {
           <div className="rounded-[4px] border border-slate-300/70 bg-white py-10 text-center">
             {view === "open" ? (
               <>
-                <p className="text-sm font-medium text-slate-600">Nothing on your list</p>
-                <p className="mt-0.5 text-xs text-slate-400">Tap + to add a task.</p>
+                <p className="text-sm font-medium text-slate-600">Nothing on the list</p>
+                <p className="mt-0.5 text-xs text-slate-400">Tap + below to add a task.</p>
               </>
             ) : (
               <>
@@ -168,63 +405,62 @@ export default function MobileTasks() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-            {shown.map((task, i) => {
-              const done = task.status === "completed";
-              const overdue = !done && task.dueAt && isBefore(new Date(task.dueAt), today);
-              return (
-                <div
-                  key={task.id}
-                  className={`flex items-start gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
-                  data-testid={`task-row-${task.id}`}
-                >
-                  <button
-                    onClick={() => toggleMutation.mutate(task)}
-                    disabled={toggleMutation.isPending}
-                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                      done ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent active:border-[#711419]"
-                    }`}
-                    aria-label={done ? "Mark as open" : "Mark as done"}
-                    data-testid={`task-toggle-${task.id}`}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDetailTaskId(task.id)}
-                    className="min-w-0 flex-1 text-left"
-                    data-testid={`task-open-${task.id}`}
-                  >
-                    <p className={`text-sm font-medium ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>
-                      {task.title}
-                    </p>
-                    {task.description && (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{task.description}</p>
-                    )}
-                    {task.dueAt && !done && (
-                      <span
-                        className={`mt-1 inline-block rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          overdue ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {overdue ? "Overdue · " : "Due "}
-                        {format(new Date(task.dueAt), "EEE, MMM d")}
-                      </span>
-                    )}
-                    {done && task.completedAt && (
-                      <span className="mt-1 inline-block text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                        Done {format(new Date(task.completedAt), "MMM d")}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
+            {shown.map((task) => (
+              <TaskListRow
+                key={task.id}
+                task={task}
+                checking={checkingIds.has(task.id)}
+                leaving={leavingIds.has(task.id)}
+                entrance={view === "done"}
+                showAssignee={who !== "me"}
+                assigneeName={firstNameOf(userName(task.assignedToUserId))}
+                counts={subCounts.get(task.id)}
+                isExpanded={expanded.has(task.id)}
+                onToggle={toggleFromRow}
+                onOpen={setDetailTaskId}
+                onToggleExpanded={toggleExpanded}
+                onToggleSubtask={(taskId, st) => rowSubtaskMutation.mutate({ taskId, st })}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      {/* ── Fullscreen task detail — everything the CRM has ── */}
+      {/* ── Filter sheet: whose tasks am I looking at? ── */}
+      <DraggableSheet open={filterOpen} onOpenChange={setFilterOpen} title="Filter tasks" testid="sheet-task-filter">
+        <h2 className="text-lg font-semibold text-slate-900">Whose tasks?</h2>
+        <div className="mt-3 overflow-hidden rounded-2xl border border-slate-300/70 bg-white">
+          {[
+            { key: "me" as WhoFilter, label: "My tasks" },
+            { key: "all" as WhoFilter, label: "Everyone" },
+            ...users.map((u) => ({ key: u.id as WhoFilter, label: firstNameOf(u.name) || u.name })),
+          ].map((opt, i) => (
+            <button
+              key={String(opt.key)}
+              onClick={() => {
+                setWho(opt.key);
+                setFilterOpen(false);
+              }}
+              className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+              data-testid={`task-filter-${String(opt.key)}`}
+            >
+              {opt.key !== "me" && opt.key !== "all" ? (
+                <AvatarWithRole name={users.find((u) => u.id === opt.key)?.name} size={28} />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100">
+                  <ListChecks className="h-4 w-4 text-slate-500" />
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{opt.label}</span>
+              {who === opt.key && <Check className="h-4 w-4 shrink-0 text-[#711419]" />}
+            </button>
+          ))}
+        </div>
+      </DraggableSheet>
+
+      {/* ── Task detail — a full bottom sheet, no top bar ── */}
       {detailTaskId && (
-        <TaskDetail
+        <TaskDetailSheet
           taskId={detailTaskId}
           users={users}
           meId={currentUser?.id}
@@ -235,11 +471,12 @@ export default function MobileTasks() {
   );
 }
 
-function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: CrmUser[]; meId?: string; onClose: () => void }) {
+function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; users: CrmUser[]; meId?: string; onClose: () => void }) {
   const { toast } = useToast();
   const [newSubtask, setNewSubtask] = useState("");
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
-  const dueRef = useRef<HTMLInputElement | null>(null);
+  const [dueOpen, setDueOpen] = useState(false);
+  const [checkPop, setCheckPop] = useState(false);
   const keyboardInset = useKeyboardInset();
 
   const { data: task, isLoading } = useQuery<TaskRow>({
@@ -262,86 +499,118 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
 
   const patchTask = useMutation({
     mutationFn: async (changes: Record<string, unknown>) => apiRequest("PUT", `/api/tasks/${taskId}`, changes),
-    onSuccess: () => {
+    onMutate: async (changes) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId] });
+      const prev = queryClient.getQueryData(["/api/tasks", taskId]);
+      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => (old ? { ...old, ...changes } : old));
+      return { prev };
+    },
+    onError: (e: any, _c, ctx) => {
+      queryClient.setQueryData(["/api/tasks", taskId], ctx?.prev as any);
+      toast({ title: "Couldn't save", description: e?.message, variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
     },
-    onError: (e: any) => toast({ title: "Couldn't save", description: e?.message, variant: "destructive" }),
   });
 
   const addSubtask = useMutation({
-    mutationFn: async () => apiRequest("POST", `/api/tasks/${taskId}/subtasks`, { title: newSubtask.trim() }),
-    onSuccess: () => {
+    mutationFn: async (title: string) => apiRequest("POST", `/api/tasks/${taskId}/subtasks`, { title }),
+    onMutate: async (title) => {
       setNewSubtask("");
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      const prev = queryClient.getQueryData(["/api/tasks", taskId, "subtasks"]);
+      queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], (old: any) =>
+        Array.isArray(old) ? [...old, { id: `temp-${Date.now()}`, taskId, title, isCompleted: false }] : old,
+      );
+      return { prev, title };
     },
-    onError: (e: any) => toast({ title: "Couldn't add the subtask", description: e?.message, variant: "destructive" }),
+    onError: (e: any, _t, ctx) => {
+      queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], ctx?.prev as any);
+      setNewSubtask(ctx?.title || "");
+      toast({ title: "Couldn't add the subtask", description: e?.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", "subtask-counts"] });
+    },
   });
 
   const toggleSubtask = useMutation({
     mutationFn: async (st: Subtask) =>
       apiRequest("PUT", `/api/tasks/${taskId}/subtasks/${st.id}`, { isCompleted: !st.isCompleted }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] }),
+    onMutate: async (st) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      const prev = queryClient.getQueryData(["/api/tasks", taskId, "subtasks"]);
+      queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], (old: any) =>
+        Array.isArray(old) ? old.map((x: Subtask) => (x.id === st.id ? { ...x, isCompleted: !st.isCompleted } : x)) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _st, ctx) => queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], ctx?.prev as any),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", "subtask-counts"] });
+    },
   });
 
   const deleteSubtask = useMutation({
     mutationFn: async (st: Subtask) => apiRequest("DELETE", `/api/tasks/${taskId}/subtasks/${st.id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] }),
+    onMutate: async (st) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      const prev = queryClient.getQueryData(["/api/tasks", taskId, "subtasks"]);
+      queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], (old: any) =>
+        Array.isArray(old) ? old.filter((x: Subtask) => x.id !== st.id) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _st, ctx) => queryClient.setQueryData(["/api/tasks", taskId, "subtasks"], ctx?.prev as any),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", "subtask-counts"] });
+    },
   });
 
   const done = task?.status === "completed";
+  const toggleDone = () => {
+    if (!task) return;
+    setCheckPop(true);
+    window.setTimeout(() => setCheckPop(false), 350);
+    patchTask.mutate({ status: done ? "pending" : "completed" });
+  };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-slate-50 animate-in slide-in-from-right duration-200" data-testid="task-detail">
-      <div
-        className="flex items-center gap-2 border-b bg-white px-2 py-2"
-        style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}
-      >
-        <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:bg-slate-100" data-testid="task-detail-back">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-slate-900">Task</p>
-        {task && (
-          <button
-            onClick={() => patchTask.mutate({ status: done ? "pending" : "completed" })}
-            disabled={patchTask.isPending}
-            className={`mr-2 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-              done ? "bg-slate-100 text-slate-600" : "bg-[#711419] text-white"
-            }`}
-            data-testid="task-detail-complete"
-          >
-            {done ? "Reopen" : "Complete"}
-          </button>
-        )}
-      </div>
-
+    <DraggableSheet full open onOpenChange={(o) => { if (!o) onClose(); }} title="Task" testid="task-detail">
       {isLoading || !task ? (
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex h-40 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
         </div>
       ) : (
         <div
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4"
-          style={{
-            paddingBottom: `calc(40px + ${keyboardInset}px)`,
-            transition: "padding-bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
-          }}
-          onFocusCapture={(e) => {
-            const t = e.target as HTMLElement;
-            if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") {
-              setTimeout(() => {
-                window.scrollTo(0, 0);
-                t.scrollIntoView({ block: "center", behavior: "smooth" });
-              }, 300);
-              setTimeout(() => window.scrollTo(0, 0), 650);
-            }
-          }}
+          className="space-y-4"
+          style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : 24 }}
         >
-          <h2 className={`text-xl font-semibold leading-snug ${done ? "text-slate-400 line-through" : "text-slate-900"}`} data-testid="task-detail-title">
-            {task.title}
-          </h2>
+          {/* Title row: the complete circle lives right beside the title —
+              no top bar, the sheet handle is the chrome */}
+          <div className="flex items-start gap-3">
+            <button
+              onClick={toggleDone}
+              disabled={patchTask.isPending}
+              className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                done ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent active:border-[#711419]"
+              } ${checkPop ? "animate-[task-check-pop_300ms_cubic-bezier(0.34,1.56,0.64,1)]" : ""}`}
+              aria-label={done ? "Reopen" : "Complete"}
+              data-testid="task-detail-complete"
+            >
+              <Check className="h-4 w-4" strokeWidth={3} />
+            </button>
+            <h2 className={`min-w-0 flex-1 text-xl font-semibold leading-snug ${done ? "text-slate-400 line-through" : "text-slate-900"}`} data-testid="task-detail-title">
+              {task.title}
+            </h2>
+          </div>
 
-          {/* Assignee + due — assignee chip opens the teammate grid to reassign */}
+          {/* Assignee + due date */}
           <div className="flex flex-wrap items-center gap-2">
             <AssigneeSheet
               variant="chip"
@@ -352,20 +621,12 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
               testid="task-detail-assignee"
             />
             <button
-              onClick={() => dueRef.current?.showPicker?.() || dueRef.current?.click()}
-              className="relative flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+              onClick={() => setDueOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
               data-testid="task-detail-due"
             >
-              <Calendar className="h-4 w-4 text-slate-400" />
+              <CalendarDays className="h-4 w-4 text-slate-400" />
               {task.dueAt ? format(new Date(task.dueAt), "EEE, MMM d") : "Add due date"}
-              <input
-                ref={dueRef}
-                type="date"
-                value={task.dueAt ? format(new Date(task.dueAt), "yyyy-MM-dd") : ""}
-                onChange={(e) => patchTask.mutate({ dueAt: e.target.value ? `${e.target.value}T12:00:00` : null })}
-                className="absolute inset-0 opacity-0"
-                tabIndex={-1}
-              />
             </button>
           </div>
 
@@ -387,14 +648,18 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
             />
           </div>
 
-          {/* Subtasks */}
+          {/* Subtasks — optimistic add/toggle/delete, new rows ease in */}
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
               Subtasks{subtasks.length > 0 ? ` · ${subtasks.filter((s) => s.isCompleted).length}/${subtasks.length}` : ""}
             </p>
             <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
               {subtasks.map((st, i) => (
-                <div key={st.id} className={`flex items-center gap-2.5 px-3 py-2.5 ${i > 0 ? "border-t border-slate-200/80" : ""}`} data-testid={`subtask-${st.id}`}>
+                <div
+                  key={st.id}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 animate-in fade-in duration-200 ${i > 0 ? "border-t border-slate-200/80" : ""}`}
+                  data-testid={`subtask-${st.id}`}
+                >
                   <button
                     onClick={() => toggleSubtask.mutate(st)}
                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -402,7 +667,7 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
                     }`}
                     data-testid={`subtask-toggle-${st.id}`}
                   >
-                    <Check className="h-3 w-3" />
+                    <Check className="h-3 w-3" strokeWidth={3} />
                   </button>
                   <span className={`min-w-0 flex-1 text-sm ${st.isCompleted ? "text-slate-400 line-through" : "text-slate-800"}`}>
                     {st.title}
@@ -423,7 +688,7 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
                   value={newSubtask}
                   onChange={(e) => setNewSubtask(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && newSubtask.trim()) addSubtask.mutate();
+                    if (e.key === "Enter" && newSubtask.trim()) addSubtask.mutate(newSubtask.trim());
                   }}
                   placeholder="Add a subtask…"
                   className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
@@ -431,13 +696,12 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
                 />
                 {newSubtask.trim() && (
                   <button
-                    onClick={() => addSubtask.mutate()}
-                    disabled={addSubtask.isPending}
-                    className="rounded-full bg-[#711419] p-1.5 text-white"
+                    onClick={() => addSubtask.mutate(newSubtask.trim())}
+                    className="rounded-full bg-[#711419] p-1.5 text-white transition-transform active:scale-90"
                     aria-label="Add subtask"
                     data-testid="subtask-add"
                   >
-                    {addSubtask.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
+                    <ArrowUp className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
@@ -445,6 +709,37 @@ function TaskDetail({ taskId, users, meId, onClose }: { taskId: string; users: C
           </div>
         </div>
       )}
-    </div>
+
+      {/* Due date — the app-standard calendar in a nested sheet */}
+      <DraggableSheet nested tall open={dueOpen} onOpenChange={setDueOpen} title="Due date" testid="sheet-task-due">
+        <h2 className="text-lg font-semibold text-slate-900">When is it due?</h2>
+        <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300 ease-out px-0.5" style={{ touchAction: "pan-y" }}>
+          <Calendar
+            mode="single"
+            selected={task?.dueAt ? new Date(task.dueAt) : undefined}
+            onSelect={(date) => {
+              patchTask.mutate({ dueAt: date ? `${format(date, "yyyy-MM-dd")}T12:00:00` : null });
+              setDueOpen(false);
+            }}
+            numberOfMonths={1}
+            className="w-full p-0"
+            fixedWeeks
+            classNames={SCHEDULE_CAL_CLASSNAMES}
+          />
+        </div>
+        {task?.dueAt && (
+          <button
+            onClick={() => {
+              patchTask.mutate({ dueAt: null });
+              setDueOpen(false);
+            }}
+            className="mb-2 mt-4 h-11 w-full rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-600 active:bg-slate-50"
+            data-testid="task-due-clear"
+          >
+            Clear due date
+          </button>
+        )}
+      </DraggableSheet>
+    </DraggableSheet>
   );
 }
