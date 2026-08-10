@@ -14290,7 +14290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ai = await db.execute(sql`
         SELECT provider, source, date_trunc('day', created_at)::date::text AS day,
                SUM(cost_micro)::bigint AS cost_micro,
-               SUM(input_tokens)::bigint AS input_tokens, SUM(output_tokens)::bigint AS output_tokens,
+               SUM(input_tokens + cache_read_tokens + cache_write_tokens)::bigint AS input_tokens, SUM(output_tokens)::bigint AS output_tokens,
                SUM(audio_seconds)::float AS audio_seconds, COUNT(*)::int AS calls
         FROM ai_usage_events
         WHERE created_at > now() - interval '31 days'
@@ -14308,7 +14308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = await db.execute(sql`
         SELECT e.user_id, u.name AS user_name,
                SUM(e.cost_micro)::bigint AS cost_micro, COUNT(*)::int AS calls,
-               SUM(e.input_tokens)::bigint AS input_tokens, SUM(e.output_tokens)::bigint AS output_tokens,
+               SUM(e.input_tokens + e.cache_read_tokens + e.cache_write_tokens)::bigint AS input_tokens, SUM(e.output_tokens)::bigint AS output_tokens,
                SUM(e.audio_seconds)::float AS audio_seconds
         FROM ai_usage_events e
         LEFT JOIN crm_users u ON u.id = e.user_id

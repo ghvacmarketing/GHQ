@@ -23,9 +23,15 @@ const TOKEN_RATES: Array<{ prefix: string; inPerM: number; outPerM: number }> = 
 ];
 const WHISPER_PER_MINUTE = 0.006; // dollars
 
-function tokenCostMicro(model: string, inputTokens: number, outputTokens: number): number {
+// Prompt-cache pricing: reads bill at 10% of the input rate, writes at 125%.
+function tokenCostMicro(model: string, inputTokens: number, outputTokens: number, cacheReadTokens = 0, cacheWriteTokens = 0): number {
   const rate = TOKEN_RATES.find((r) => model.startsWith(r.prefix)) || TOKEN_RATES[4];
-  return Math.round((inputTokens * rate.inPerM + outputTokens * rate.outPerM));
+  return Math.round(
+    inputTokens * rate.inPerM +
+    cacheReadTokens * rate.inPerM * 0.1 +
+    cacheWriteTokens * rate.inPerM * 1.25 +
+    outputTokens * rate.outPerM,
+  );
   // tokens × $/Mtok = millionths of a dollar exactly — no further scaling needed.
 }
 
@@ -36,6 +42,8 @@ export function recordAiUsage(e: {
   model: string;
   inputTokens?: number;
   outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   audioSeconds?: number;
   source?: string; // which feature: gibbs, search, voice, …
   userId?: string | null; // who ran it — powers the per-user cost breakdown
@@ -43,9 +51,9 @@ export function recordAiUsage(e: {
   const costMicro =
     e.kind === "transcription"
       ? Math.round(((e.audioSeconds || 0) / 60) * WHISPER_PER_MINUTE * 1_000_000)
-      : tokenCostMicro(e.model, e.inputTokens || 0, e.outputTokens || 0);
+      : tokenCostMicro(e.model, e.inputTokens || 0, e.outputTokens || 0, e.cacheReadTokens || 0, e.cacheWriteTokens || 0);
   db.execute(sql`
-    INSERT INTO ai_usage_events (provider, kind, model, input_tokens, output_tokens, audio_seconds, cost_micro, source, user_id)
-    VALUES (${e.provider}, ${e.kind}, ${e.model}, ${e.inputTokens ?? 0}, ${e.outputTokens ?? 0}, ${e.audioSeconds ?? 0}, ${costMicro}, ${e.source ?? "unknown"}, ${e.userId ?? null})
+    INSERT INTO ai_usage_events (provider, kind, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, audio_seconds, cost_micro, source, user_id)
+    VALUES (${e.provider}, ${e.kind}, ${e.model}, ${e.inputTokens ?? 0}, ${e.outputTokens ?? 0}, ${e.cacheReadTokens ?? 0}, ${e.cacheWriteTokens ?? 0}, ${e.audioSeconds ?? 0}, ${costMicro}, ${e.source ?? "unknown"}, ${e.userId ?? null})
   `).catch((err) => console.error("[AI usage] record failed (non-fatal):", err?.message || err));
 }

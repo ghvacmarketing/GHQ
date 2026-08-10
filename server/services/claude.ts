@@ -10,7 +10,9 @@ import { recordAiUsage } from "./ai-usage";
 const API_URL = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
-/** Meter a successful Anthropic response (fire-and-forget). */
+/** Meter a successful Anthropic response (fire-and-forget). Cache reads and
+ *  writes are split out so the tracker prices them at their REAL rates
+ *  (reads 10%, writes 125% of the input rate) instead of full price. */
 function meter(data: any, source: string, userId?: string | null) {
   const u = data?.usage;
   if (!u) return;
@@ -18,11 +20,30 @@ function meter(data: any, source: string, userId?: string | null) {
     provider: "anthropic",
     kind: "chat",
     model: String(data?.model || DEFAULT_MODEL),
-    inputTokens: (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0),
+    inputTokens: u.input_tokens || 0,
     outputTokens: u.output_tokens || 0,
+    cacheReadTokens: u.cache_read_input_tokens || 0,
+    cacheWriteTokens: u.cache_creation_input_tokens || 0,
     source,
     userId,
   });
+}
+
+/** System prompt as a cache-marked block: the whole prefix up to and
+ *  including it (tools + system) is written to Anthropic's prompt cache and
+ *  read back at 10% price on every later round of a tool loop — and on any
+ *  request within 5 minutes that shares the prefix. Behavior is identical;
+ *  only the billing changes. */
+function cachedSystem(system: string) {
+  return [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+}
+
+/** Mark the LAST tool as a cache breakpoint: the tools block is static
+ *  across every exchange, so it stays cached even when the system prompt's
+ *  live-data sections change between questions. */
+function cacheMarkTools(tools: ClaudeTool[]): ClaudeTool[] {
+  if (tools.length === 0) return tools;
+  return tools.map((t, i) => (i === tools.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t));
 }
 
 export function claudeConfigured(): boolean {
@@ -46,7 +67,7 @@ export async function claudeChat(opts: {
     body: JSON.stringify({
       model: DEFAULT_MODEL,
       max_tokens: opts.maxTokens ?? 2000,
-      system: opts.system,
+      system: cachedSystem(opts.system),
       messages: opts.messages,
     }),
   });
@@ -67,6 +88,8 @@ export type ClaudeTool = {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
+  /** Prompt-cache breakpoint marker (set internally by cacheMarkTools). */
+  cache_control?: { type: "ephemeral" };
 };
 
 /** Streaming variant of a Messages API call: consumes the SSE stream,
@@ -195,8 +218,8 @@ export async function claudeChatWithTools(opts: {
     const requestBody = {
       model: DEFAULT_MODEL,
       max_tokens: opts.maxTokens ?? 2000,
-      system: opts.system,
-      tools: opts.tools,
+      system: cachedSystem(opts.system),
+      tools: cacheMarkTools(opts.tools),
       ...(finalTurn ? { tool_choice: { type: "none" } } : {}),
       messages,
     };
