@@ -327,12 +327,6 @@ function OverviewTab({
           {nextStatus === "completed" && "Complete Job"}
         </button>
       )}
-      {displayStatus === "completed" && (
-        <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 py-3.5 text-sm font-bold text-green-700" data-testid="job-completed-banner">
-          <CheckCircle2 className="h-5 w-5" /> Job Completed
-        </div>
-      )}
-
       {/* Waiting toggle */}
       {displayStatus !== "completed" && displayStatus !== "scheduled" && (
         <div className="rounded-lg border border-slate-100 bg-white p-3.5 shadow-sm" data-testid="pending-toggle-section">
@@ -3485,55 +3479,41 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
       </div>
       </div>
 
-      <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
-        <DialogContent className="sm:max-w-md" data-testid="completion-modal">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Complete Job
-            </DialogTitle>
-            <DialogDescription>
-              Please provide a summary of the work completed before marking this job as done.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="completion-summary">Work Summary *</Label>
-              <Textarea
-                id="completion-summary"
-                placeholder="Describe what work was performed, parts used, and any follow-up needed..."
-                value={completionSummary}
-                onChange={(e) => setCompletionSummary(e.target.value)}
-                className="min-h-[120px]"
-                data-testid="input-completion-summary"
-              />
-            </div>
-          </div>
-          <DialogFooter className="flex gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setShowCompletionModal(false)}
-              disabled={updateStatusMutation.isPending}
-              data-testid="button-cancel-completion"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCompleteJob}
-              disabled={!completionSummary.trim() || updateStatusMutation.isPending}
-              className="bg-green-600 hover:bg-green-700"
-              data-testid="button-confirm-completion"
-            >
-              {updateStatusMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-              )}
-              Complete Job
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Completion summary rides in as a bottom sheet, like every other
+          in-job flow — drag down or tap the scrim to bail out. */}
+      <DraggableSheet tall open={showCompletionModal} onOpenChange={setShowCompletionModal} title="Complete job" testid="completion-modal">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Complete Job</h2>
+        </div>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Sum up the visit before marking it done.
+        </p>
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="completion-summary">Work Summary *</Label>
+          <Textarea
+            id="completion-summary"
+            placeholder="Describe what work was performed, parts used, and any follow-up needed..."
+            value={completionSummary}
+            onChange={(e) => setCompletionSummary(e.target.value)}
+            className="min-h-[140px]"
+            data-testid="input-completion-summary"
+          />
+        </div>
+        <button
+          onClick={handleCompleteJob}
+          disabled={!completionSummary.trim() || updateStatusMutation.isPending}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50"
+          data-testid="button-confirm-completion"
+        >
+          {updateStatusMutation.isPending ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5" />
+          )}
+          Complete Job
+        </button>
+      </DraggableSheet>
 
       <Dialog open={showEditDialog} onOpenChange={(open) => {
         setShowEditDialog(open);
