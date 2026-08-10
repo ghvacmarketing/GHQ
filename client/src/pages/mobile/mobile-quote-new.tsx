@@ -348,7 +348,7 @@ export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: 
                 ))}
               </div>
             ) : shownCustomers.length > 0 ? (
-              <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="customer-results">
+              <div className="overflow-hidden rounded-xl border border-slate-300/70 bg-white" data-testid="customer-results">
                 {shownCustomers.map((customer, i) => (
                   <button
                     key={customer.id}
@@ -365,7 +365,7 @@ export default function MobileQuoteNew({ jobId: jobIdProp, onClose }: { jobId?: 
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">{customer.name}</span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">
-                        {[customer.phone, customer.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
+                        {customer.fullAddress || customer.phone || "No address on file"}
                       </span>
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />

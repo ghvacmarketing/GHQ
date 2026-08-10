@@ -1044,7 +1044,7 @@ export default function MobilePhotos() {
                 ) : searchResults.length === 0 ? (
                   <p className="pt-9 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
                 ) : (
-                  <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white shadow-sm" data-testid="customer-search-results">
+                  <div className="overflow-hidden rounded-2xl border border-slate-300/70 bg-white shadow-sm" data-testid="customer-search-results">
                     {searchResults.map((c, i) => (
                       <button
                         key={c.id}
@@ -1061,7 +1061,7 @@ export default function MobilePhotos() {
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-slate-900">{c.name}</span>
                           <span className="block truncate text-xs text-slate-500">
-                            {[c.phone, c.fullAddress].filter(Boolean).join(" · ") || "No contact info"}
+                            {c.fullAddress || c.phone || "No address on file"}
                           </span>
                         </span>
                       </button>

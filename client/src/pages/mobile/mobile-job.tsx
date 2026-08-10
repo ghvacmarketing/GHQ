@@ -1059,8 +1059,8 @@ export default function MobileJob() {
                           data-testid={`customer-option-${customer.id}`}
                         >
                           <p className="font-medium text-sm">{customer.name}</p>
-                          {customer.phone && (
-                            <p className="text-xs text-slate-500">{customer.phone}</p>
+                          {((customer as any).fullAddress || customer.phone) && (
+                            <p className="truncate text-xs text-slate-500">{(customer as any).fullAddress || customer.phone}</p>
                           )}
                         </button>
                       ))}
