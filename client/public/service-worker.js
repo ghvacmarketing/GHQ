@@ -1,7 +1,7 @@
-// v2: bumping CACHE_NAME purges every device's old static cache on activate —
-// the v1 cache could hand back a stale index.html whose chunk hashes were
-// purged by a deploy, reload-looping the app dead.
-const CACHE_NAME = 'ghvac-static-v2';
+// v3: purges v2 caches poisoned during a deploy window — the SPA fallback
+// used to answer missing /assets/ paths with 200 HTML, which cache-first
+// then served AS the main bundle forever (the desktop white screen).
+const CACHE_NAME = 'ghvac-static-v3';
 const API_CACHE_NAME = 'ghvac-api-cache-v1';
 const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
@@ -39,12 +39,19 @@ self.addEventListener('fetch', (event) => {
 
   // Hashed build assets are immutable — cache-first. A cached shell's chunks
   // stay servable offline even after later deploys purge them server-side.
+  // GUARDS: an HTML response is NEVER a real asset (it's the SPA fallback
+  // answering a mid-deploy 404) — never cache it, and evict any cached one.
   if (url.pathname.startsWith('/assets/')) {
+    const isHtml = (resp) => ((resp && resp.headers.get('content-type')) || '').includes('text/html');
     event.respondWith(
       caches.match(event.request).then((hit) => {
-        if (hit) return hit;
+        if (hit && !isHtml(hit)) return hit;
+        if (hit) {
+          // Poisoned entry from a deploy window — drop it and refetch
+          caches.open(CACHE_NAME).then((cache) => cache.delete(event.request));
+        }
         return fetch(event.request).then((response) => {
-          if (response.status === 200) {
+          if (response.status === 200 && !isHtml(response)) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseClone);

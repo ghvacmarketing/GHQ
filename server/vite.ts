@@ -92,8 +92,14 @@ export function serveStatic(app: Express) {
     }),
   );
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // fall through to index.html if the file doesn't exist — EXCEPT for
+  // hashed asset paths: during a rolling deploy a not-yet-served bundle
+  // request must 404, never 200-HTML. A 200 HTML "asset" got cached by the
+  // service worker as the main bundle once and white-screened every load.
+  app.use("*", (req, res) => {
+    if (req.originalUrl.startsWith("/assets/")) {
+      return res.status(404).type("text/plain").send("Not found");
+    }
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
