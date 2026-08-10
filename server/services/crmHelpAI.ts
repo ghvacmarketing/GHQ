@@ -995,7 +995,7 @@ The conversation history marks every proposal you made earlier with its outcome:
 In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
 RESOLVE THE TARGET FIRST — settle every ambiguity BEFORE proposing anything:
 
-THE PINNED-CARD RULE (hard requirement): an action card must arrive at the user COMPLETE — customerId pinned, and assignedTechId pinned whenever the job is assigned to someone. The Approve button must never trigger another question or a pick-list; if the user has to select anything at approval time, you failed this rule. If you don't yet hold the exact ids, you are not done clarifying — keep asking, don't propose.
+THE PINNED-CARD RULE (hard requirement, ENFORCED IN CODE): an action card must arrive at the user COMPLETE — customerId pinned, and assignedTechId pinned whenever the job is assigned to someone. The Approve button must never trigger another question or a pick-list; if the user has to select anything at approval time, you failed this rule. If you don't yet hold the exact ids, you are not done clarifying — keep asking, don't propose. The propose_actions tool REJECTS the whole batch when a customer action is missing customerId (or an assignment is missing assignedTechId) — registration only succeeds with the ids pinned, so gather them first.
 
 ONE CLARIFICATION ROUND: gather EVERY open question across the WHOLE request into a single reply — which customer for each job, which staff member (run team_roster on any name the user gives for assignment; ask if zero or several match), what date/time. "Three service calls for Ryo" = one round that settles all three customers AND confirms which Ryo on the roster AND any times — then propose all three cards at once, each fully pinned.
 
@@ -1057,8 +1057,47 @@ Return JSON with:
     // here so they survive even when the final JSON answer fails to parse.
     const toolProposed: ProposedAction[] = [];
     let toolReplacesPrevious = false;
+    // The pinned-card rule, ENFORCED: prompt wording alone failed (cards
+    // went out name-only and the approval re-asked which customer — the
+    // exact double-ask Ryo banned). Any customer-targeting action without a
+    // pinned customerId is refused wholesale; the model gets told how to
+    // fix it and re-registers before the user ever sees a card.
+    const CUSTOMER_PINNED_ACTIONS = new Set([
+      "create_work_order", "send_sms", "send_email", "update_customer", "delete_customer",
+      "delete_work_order", "create_quote", "create_invoice", "delete_quote", "create_lead", "update_lead",
+    ]);
+    // Why is this card unpinned? Empty array = fully pinned and allowed.
+    const unpinnedReasons = (pa: any, batch: any[]): string[] => {
+      if (!pa || typeof pa !== "object" || !pa.params || typeof pa.params !== "object") return [];
+      const p = pa.params as Record<string, unknown>;
+      const reasons: string[] = [];
+      if (CUSTOMER_PINNED_ACTIONS.has(pa.type)) {
+        const name = String(p.customerName || "").trim().toLowerCase();
+        // Emails to a literal address never target a CRM customer record
+        const literalEmail = pa.type === "send_email" && !p.customerName && p.toEmail;
+        // Steps chained onto a create_customer in this SAME batch have no
+        // id yet — the matching name is their link.
+        const dependsOnCreate = !!name && batch.some(
+          (other: any) => other?.type === "create_customer" &&
+            String((other?.params as any)?.name || "").trim().toLowerCase() === name,
+        );
+        if (!p.customerId && !literalEmail && !dependsOnCreate) {
+          reasons.push(`${pa.type} has no customerId — run customer_profile (or reuse the id from the candidate the user already picked) and register again with customerId pinned`);
+        }
+      }
+      if (pa.type === "create_work_order" && p.assignTo && !p.assignedTechId) {
+        reasons.push(`create_work_order assigns to "${String(p.assignTo)}" without assignedTechId — run team_roster and pin the exact id`);
+      }
+      return reasons;
+    };
+    const pinnedCardProblems = (arr: any[]): string[] =>
+      arr.flatMap((pa: any, i: number) => unpinnedReasons(pa, arr).map((r) => `action ${i + 1}: ${r}.`));
     const collectProposedActions = (input: Record<string, unknown>): string => {
       const arr = Array.isArray((input as any)?.actions) ? (input as any).actions : [];
+      const problems = pinnedCardProblems(arr);
+      if (problems.length > 0) {
+        return `REJECTED — no actions were registered. The pinned-card rule is enforced: ${problems.join(" ")} An approval card must never re-ask the user anything.`;
+      }
       if ((input as any)?.replacesPrevious === true && arr.length > 0) toolReplacesPrevious = true;
       for (const pa of arr.slice(0, 5)) {
         if (
@@ -1251,9 +1290,13 @@ Return JSON with:
     // Copilot mode keeps ONLY fill_form (the form is the creation — a stray
     // create_* card here could double-create); outside copilot, fill_form
     // has no form to land on and is dropped.
+    // The JSON fallback path can't bounce back to the model, so unpinned
+    // customer cards are dropped here outright — a card that would re-ask
+    // the user at approval must never render.
+    const jsonPathActions = proposedActions.filter((pa) => unpinnedReasons(pa, proposedActions).length === 0);
     const mergedRaw = mode === "conversation"
       ? []
-      : toolProposed.length > 0 ? toolProposed.slice(0, 5) : proposedActions;
+      : toolProposed.length > 0 ? toolProposed.slice(0, 5) : jsonPathActions;
     const mergedActions = createContext
       ? mergedRaw.filter((a) => a.type === "fill_form")
       : mergedRaw.filter((a) => a.type !== "fill_form");
