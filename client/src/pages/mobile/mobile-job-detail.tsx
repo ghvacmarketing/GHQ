@@ -2,6 +2,8 @@
 import { createPortal, flushSync } from "react-dom";
 import { CustomerCamera } from "@/components/mobile/customer-camera";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
+import { fmt12, SCHEDULE_CAL_CLASSNAMES } from "@/pages/mobile/mobile-job-new";
 import { isNativeApp, pickNativeLibraryPhotos } from "@/lib/native";
 import createPhoto from "@/assets/create-photo.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -2934,6 +2936,30 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editSelectedDate, setEditSelectedDate] = useState<Date | undefined>(undefined);
   const [editSelectedSlot, setEditSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+  // Schedule editing mirrors the create-job flow: a nested sheet with the
+  // inline calendar + revolving time wheels (not slots/popovers).
+  const [editScheduleOpen, setEditScheduleOpen] = useState(false);
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
+  const { data: editDispatchSettings } = useQuery<{ stepMinutes: number }>({
+    queryKey: ["/api/crm/dispatch-settings"],
+    enabled: !!currentUser,
+  });
+  const editStepMinutes = editDispatchSettings?.stepMinutes === 15 ? 15 : 30;
+  const addMinutesToHHMM = (hhmm: string, minutes: number) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const t = Math.min(h * 60 + m + minutes, 23 * 60 + 30);
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
+  const buildEditSlot = (date: Date, start: string, end: string) => {
+    const mk = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      const d = new Date(date);
+      d.setHours(h, m, 0, 0);
+      return d.toISOString();
+    };
+    return { start: mk(start), end: mk(end) };
+  };
 
   const [showCollectRenewalDialog, setShowCollectRenewalDialog] = useState(false);
   const [showDeclineRenewalDialog, setShowDeclineRenewalDialog] = useState(false);
@@ -3034,6 +3060,8 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
       });
       if (workOrder.scheduledStart) {
         setEditSelectedDate(new Date(workOrder.scheduledStart));
+        setEditStartTime(format(new Date(workOrder.scheduledStart), "HH:mm"));
+        setEditEndTime(workOrder.scheduledEnd ? format(new Date(workOrder.scheduledEnd), "HH:mm") : "");
         if (workOrder.scheduledEnd) {
           setEditSelectedSlot({
             start: new Date(workOrder.scheduledStart).toISOString(),
@@ -3042,23 +3070,12 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
         }
       } else {
         setEditSelectedDate(undefined);
+        setEditStartTime("");
+        setEditEndTime("");
         setEditSelectedSlot(null);
       }
     }
   }, [workOrder, showEditDialog, editForm]);
-
-  const { data: editAvailableSlots = [], isLoading: editSlotsLoading } = useQuery<TimeSlot[]>({
-    queryKey: ["/api/mobile/work-orders/available-slots", { date: editSelectedDate ? format(editSelectedDate, "yyyy-MM-dd") : null, techId: currentUser?.id }],
-    queryFn: async () => {
-      if (!editSelectedDate || !currentUser?.id) return [];
-      const dateStr = format(editSelectedDate, "yyyy-MM-dd");
-      const res = await fetch(`/api/mobile/work-orders/available-slots?date=${dateStr}&techId=${currentUser.id}`, { credentials: "include" });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.slots || [];
-    },
-    enabled: !!editSelectedDate && showEditDialog && !!currentUser?.id,
-  });
 
   const assignToMeMutation = useMutation({
     mutationFn: async () => {
@@ -3578,82 +3595,29 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                 )}
               />
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Label>Schedule</Label>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal min-h-[44px]"
-                      data-testid="button-edit-date-picker"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {editSelectedDate ? format(editSelectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="z-[100] w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={editSelectedDate}
-                      onSelect={(date) => {
-                        setEditSelectedDate(date);
-                        setEditSelectedSlot(null);
-                      }}
-                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-
-                {editSelectedDate && (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-500">Available Time Slots</Label>
-                    {editSlotsLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                        <span className="ml-2 text-sm text-slate-500">Loading slots...</span>
-                      </div>
-                    ) : editAvailableSlots.length === 0 ? (
-                      <p className="text-sm text-slate-500 py-2">No time slots available for this date</p>
+                {/* Same pattern as creating a job: the trigger doubles as the
+                    summary; picking happens in a nested sheet with the
+                    calendar + revolving time wheels. */}
+                <button
+                  type="button"
+                  onClick={() => setEditScheduleOpen(true)}
+                  className="flex h-11 w-full items-center justify-between rounded-md border border-input bg-white px-3.5 text-left shadow-xs"
+                  data-testid="button-edit-date-picker"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                    {editSelectedDate && editStartTime && editEndTime ? (
+                      <span className="truncate text-base text-slate-900">
+                        {format(editSelectedDate, "EEE, MMM d")} · {fmt12(editStartTime)} – {fmt12(editEndTime)}
+                      </span>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        {editAvailableSlots.map((slot, idx) => {
-                          const isSelected = editSelectedSlot?.start === slot.start && editSelectedSlot?.end === slot.end;
-                          return (
-                            <Button
-                              key={idx}
-                              type="button"
-                              variant={isSelected ? "default" : "outline"}
-                              size="sm"
-                              disabled={!slot.available}
-                              onClick={() => setEditSelectedSlot({ start: slot.start, end: slot.end })}
-                              className={`text-xs ${
-                                isSelected
-                                  ? "bg-[#711419] hover:bg-[#5a1014] text-white"
-                                  : slot.available
-                                  ? "hover:bg-slate-100"
-                                  : "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400"
-                              }`}
-                              data-testid={`edit-time-slot-${idx}`}
-                            >
-                              {slot.label}
-                            </Button>
-                          );
-                        })}
-                      </div>
+                      <span className="text-base text-muted-foreground">Pick a date &amp; time…</span>
                     )}
-                  </div>
-                )}
-
-                {editSelectedSlot && (
-                  <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {format(new Date(editSelectedSlot.start), "h:mm a")} - {format(new Date(editSelectedSlot.end), "h:mm a")}
-                    </span>
-                  </div>
-                )}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                </button>
               </div>
 
               <FormField
@@ -3737,33 +3701,81 @@ export default function MobileJobDetail({ idOverride, tabOverride }: { idOverrid
                 )}
               />
 
-              <div className="flex gap-2 pb-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowEditDialog(false)}
-                  disabled={editWorkOrderMutation.isPending}
-                  className="min-h-[48px] flex-1"
-                  data-testid="button-cancel-edit"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={editWorkOrderMutation.isPending}
-                  className="min-h-[48px] flex-[2] bg-[#711419] hover:bg-[#5a1014]"
-                  data-testid="button-save-edit"
-                >
-                  {editWorkOrderMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
-                  Save Changes
-                </Button>
-              </div>
+              {/* One action, styled exactly like the create pages' save —
+                  the sheet itself (drag down / scrim) is the cancel. */}
+              <button
+                type="submit"
+                disabled={editWorkOrderMutation.isPending}
+                className="mb-2 mt-6 flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#711419] py-3.5 text-base font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:bg-slate-300"
+                data-testid="button-save-edit"
+              >
+                {editWorkOrderMutation.isPending && <Loader2 className="h-5 w-5 animate-spin" />}
+                Save Changes
+              </button>
             </form>
           </Form>
+      </DraggableSheet>
+
+      {/* Nested schedule sheet — the same calendar + revolving wheels as
+          creating a job, with a micro ease on the calendar's entrance. */}
+      <DraggableSheet nested tall open={editScheduleOpen} onOpenChange={setEditScheduleOpen} title="Schedule" testid="sheet-edit-schedule">
+        <h2 className="text-lg font-semibold text-slate-900">When's the visit?</h2>
+        <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300 ease-out px-0.5" style={{ touchAction: "pan-y" }}>
+          <Calendar
+            mode="single"
+            selected={editSelectedDate}
+            onSelect={(date) => {
+              setEditSelectedDate(date ?? undefined);
+              setEditStartTime((t) => t || "09:00");
+              setEditEndTime((t) => t || "10:00");
+            }}
+            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+            numberOfMonths={1}
+            className="w-full p-0"
+            fixedWeeks
+            classNames={SCHEDULE_CAL_CLASSNAMES}
+          />
+        </div>
+
+        {editSelectedDate && (
+          <div className="mt-5 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 ease-out">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Start time</p>
+              <WheelTimePicker
+                value={editStartTime}
+                stepMinutes={editStepMinutes}
+                onChange={(v) => {
+                  setEditStartTime(v);
+                  setEditEndTime(addMinutesToHHMM(v, 60));
+                }}
+                testId="wheel-edit-start-time"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">End time</p>
+              <WheelTimePicker
+                value={editEndTime}
+                stepMinutes={editStepMinutes}
+                onChange={setEditEndTime}
+                testId="wheel-edit-end-time"
+              />
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            if (editSelectedDate && editStartTime && editEndTime) {
+              setEditSelectedSlot(buildEditSlot(editSelectedDate, editStartTime, editEndTime));
+            }
+            setEditScheduleOpen(false);
+          }}
+          disabled={!editSelectedDate}
+          className="mb-2 mt-6 h-12 w-full rounded-[4px] bg-[#711419] text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-50"
+          data-testid="edit-schedule-done"
+        >
+          Done
+        </button>
       </DraggableSheet>
 
       <Dialog open={showCollectRenewalDialog} onOpenChange={setShowCollectRenewalDialog}>

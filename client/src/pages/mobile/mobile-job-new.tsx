@@ -32,7 +32,7 @@ function formatSubtype(subtype: string | null | undefined): string {
  * job's detail page. Supervisor/admin/owner only.
  */
 // "09:00" -> "9:00 AM"
-function fmt12(t: string): string {
+export function fmt12(t: string): string {
   const m = /^(\d{1,2}):(\d{2})$/.exec(t || "");
   if (!m) return t || "";
   let h = parseInt(m[1], 10);
@@ -53,7 +53,7 @@ function durationLabel(start: string, end: string): string {
 }
 
 // The house full-width calendar look (mirrors the mobile date sheets)
-const SCHEDULE_CAL_CLASSNAMES = {
+export const SCHEDULE_CAL_CLASSNAMES = {
   months: "w-full",
   month: "w-full space-y-4",
   caption: "relative flex items-center justify-center py-1.5",
