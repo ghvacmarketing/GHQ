@@ -207,6 +207,20 @@ function assetUrl(u?: string | null): string | undefined {
   return `/assets/${u.replace(/^\/+/, "")}`;
 }
 
+
+// Component descriptions ride the quote line so the client sees what's
+// inside the package — only components that actually HAVE a description
+// (set on the package cards in Settings) get a line; never bare models.
+function packageComponentLines(item: { coilName?: string | null; indoorHeatName?: string | null; thermostatName?: string | null }): string[] {
+  return ([
+    ["Coil", item.coilName],
+    ["Indoor heat", item.indoorHeatName],
+    ["Thermostat", item.thermostatName],
+  ] as Array<[string, string | null | undefined]>)
+    .filter(([, n]) => n && String(n).trim())
+    .map(([slot, n]) => `${slot}: ${String(n).trim()}`);
+}
+
 // Transform API packages to frontend format (cents to dollars as strings)
 function transformApiPackages(apiPackages: ApiPricebookPackage[]): PricebookPackage[] {
   return apiPackages.map(pkg => ({
@@ -1422,7 +1436,10 @@ export default function CrmProposalBuilder() {
           : undefined;
         
         lineItems.push({
-          description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
+          description: [
+            `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
+            ...packageComponentLines(item),
+          ].join("\n"),
           quantity: item.quantity,
           unitPrice: price,
           taxable: true,

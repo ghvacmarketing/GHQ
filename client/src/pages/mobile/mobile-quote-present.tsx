@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { QuoteLineDescription } from "@/components/crm/quote-line-description";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { X, FileText, Check, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff, Plus } from "lucide-react";
@@ -549,7 +550,7 @@ export default function MobileQuotePresent() {
                                     )}
                                     <div className="flex-1 min-w-0">
                                       {!whatsIncluded.categoryTitle && (
-                                        <div className="font-medium text-slate-800 text-sm">{item.description}</div>
+                                        <QuoteLineDescription text={item.description} titleClassName="font-medium text-slate-800 text-sm" />
                                       )}
                                       {item.partNumber && (
                                         <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
@@ -619,7 +620,7 @@ export default function MobileQuotePresent() {
                                 <Check className="h-3.5 w-3.5 text-slate-500" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-slate-800 break-words">{item.description}</p>
+                                <QuoteLineDescription text={item.description} titleClassName="text-sm font-medium text-slate-800 break-words" />
                                 <div className="mt-1 flex items-center justify-between text-sm">
                                   <span className="text-slate-500">Qty: {parseFloat(item.quantity || "1")}</span>
                                   <span className="font-semibold text-slate-800">{formatPresentationCurrency(item.lineTotal || "0")}</span>
@@ -654,7 +655,7 @@ export default function MobileQuotePresent() {
                                 {picked ? <Check className="h-3.5 w-3.5 text-white" /> : <Plus className="h-3.5 w-3.5 text-slate-400" />}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-slate-800 break-words">{item.description}</p>
+                                <QuoteLineDescription text={item.description} titleClassName="text-sm font-medium text-slate-800 break-words" />
                                 <div className="mt-1 flex items-center justify-between text-sm">
                                   <span className="text-slate-500">Qty: {parseFloat(item.quantity || "1")}</span>
                                   <span className="font-bold" style={{ color: BRAND_COLOR }}>+{formatPresentationCurrency(item.lineTotal || "0")}</span>
@@ -696,7 +697,7 @@ export default function MobileQuotePresent() {
                             className="border rounded-lg p-3 bg-slate-50"
                             data-testid={`line-item-${item.id}`}
                           >
-                            <p className="font-medium text-slate-800 text-sm mb-2 break-words">{item.description}</p>
+                            <div className="mb-2"><QuoteLineDescription text={item.description} titleClassName="font-medium text-slate-800 text-sm break-words" /></div>
                             <div className="flex justify-between items-center text-sm text-slate-600">
                               <span>Qty: {item.quantity || 1}</span>
                               {item.unitPrice && (

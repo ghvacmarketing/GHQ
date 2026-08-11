@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { QuoteLineDescription } from "@/components/crm/quote-line-description";
 import { MoreIcon } from "@/components/crm/more-icon";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
@@ -5142,7 +5143,7 @@ export default function CrmQuoteDetail() {
                                         <div className="flex-1 min-w-0">
                                           {/* Only show line item description if no AI category title */}
                                           {!whatsIncluded.categoryTitle && (
-                                            <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                            <QuoteLineDescription text={item.description} titleClassName="font-medium text-slate-800 text-sm sm:text-base" />
                                           )}
                                           {item.partNumber && (
                                             <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
@@ -5252,7 +5253,7 @@ export default function CrmQuoteDetail() {
                       <TableBody>
                         {internalLineItems.map((item) => (
                           <TableRow key={item.id}>
-                            <TableCell className="text-slate-700">{item.description}</TableCell>
+                            <TableCell className="text-slate-700"><QuoteLineDescription text={item.description} titleClassName="" /></TableCell>
                             <TableCell className="text-right">{item.quantity}</TableCell>
                             <TableCell className="text-right">{formatPresentationCurrency(item.lineTotal)}</TableCell>
                           </TableRow>

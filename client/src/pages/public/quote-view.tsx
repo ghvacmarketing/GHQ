@@ -1,4 +1,5 @@
 import { monthlyFinancing } from "@/lib/financing";
+import { QuoteLineDescription } from "@/components/crm/quote-line-description";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -810,7 +811,7 @@ export default function PublicQuoteView() {
                                   <div className="flex-1 min-w-0">
                                     {/* Only show line item description if no AI category title */}
                                     {!whatsIncluded.categoryTitle && (
-                                      <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                      <QuoteLineDescription text={item.description} titleClassName="font-medium text-slate-800 text-sm sm:text-base" />
                                     )}
                                     {item.partNumber && (
                                       <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
@@ -899,7 +900,7 @@ export default function PublicQuoteView() {
                                       </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-slate-900">{item.description}</div>
+                                      <QuoteLineDescription text={item.description} titleClassName="font-medium text-slate-900" />
                                       {item.partNumber && (
                                         <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
                                       )}

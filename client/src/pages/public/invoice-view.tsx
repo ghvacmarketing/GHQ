@@ -342,7 +342,7 @@ export default function PublicInvoiceView() {
                     className="flex justify-between items-start py-2 border-b border-slate-100 last:border-0"
                   >
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{item.description}</p>
+                      <p className="whitespace-pre-line text-sm font-medium text-slate-900">{item.description}</p>
                       {item.partNumber && (
                         <p className="text-xs text-slate-500">Part #: {item.partNumber}</p>
                       )}

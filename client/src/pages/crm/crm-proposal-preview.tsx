@@ -262,6 +262,20 @@ function calculateCustomBuildEstimate(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+
+// Component descriptions ride the quote line so the client sees what's
+// inside the package — only components that actually HAVE a description
+// (set on the package cards in Settings) get a line; never bare models.
+function packageComponentLines(item: { coilName?: string | null; indoorHeatName?: string | null; thermostatName?: string | null }): string[] {
+  return ([
+    ["Coil", item.coilName],
+    ["Indoor heat", item.indoorHeatName],
+    ["Thermostat", item.thermostatName],
+  ] as Array<[string, string | null | undefined]>)
+    .filter(([, n]) => n && String(n).trim())
+    .map(([slot, n]) => `${slot}: ${String(n).trim()}`);
+}
+
 export default function CrmProposalPreview() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -357,7 +371,10 @@ export default function CrmProposalPreview() {
         if (item.furnaceImageUrl) equipmentImages.furnace = item.furnaceImageUrl;
         const uniqueOptionTag = quoteMode === "options" ? `${item.packageLevel} - ${item.extractedTonnage}` : undefined;
         lineItems.push({
-          description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
+          description: [
+            `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
+            ...packageComponentLines(item),
+          ].join("\n"),
           quantity: item.quantity, unitPrice: price, taxable: true,
           optionTag: uniqueOptionTag,
           imageUrl: Object.keys(equipmentImages).length > 0 ? JSON.stringify(equipmentImages) : undefined,
