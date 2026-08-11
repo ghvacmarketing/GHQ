@@ -6,6 +6,7 @@ import { eq, gte, lte, and, or, sql, desc, asc, isNull, isNotNull, ilike, ne, in
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { nameSimilarity } from "./customer-match";
+import { computeUnmatchedPackageModels } from "./pricebook-matching";
 
 // All business scheduling happens in the shop's local timezone.
 const BUSINESS_TIMEZONE = "America/New_York";
@@ -367,7 +368,7 @@ export interface ProposedAction {
   // "fill_form" is create-copilot only: it patches the form on the user's
   // screen (nothing saves until they tap Create) and is never persisted or
   // executable through /execute-action.
-  type: "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "fill_form";
+  type: "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "remap_package_models" | "fill_form";
   summary: string;
   params: Record<string, unknown>;
 }
@@ -415,7 +416,7 @@ const PROPOSE_ACTIONS_TOOL: ClaudeTool = {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["create_task", "create_work_order", "update_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call", "create_lead", "update_lead", "create_checklist", "create_item"] },
+            type: { type: "string", enum: ["create_task", "create_work_order", "update_work_order", "send_sms", "send_email", "create_customer", "update_customer", "delete_customer", "delete_work_order", "create_quote", "create_invoice", "delete_quote", "log_call", "create_lead", "update_lead", "create_checklist", "create_item", "remap_package_models"] },
             summary: { type: "string", description: "One plain sentence describing exactly what will happen" },
             params: { type: "object", description: "The action's params exactly as specified in PROPOSING ACTIONS" },
           },
@@ -509,6 +510,11 @@ const CRM_TOOLS: ClaudeTool[] = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: "unmatched_package_models",
+    description: "Every model string referenced by proposal-builder packages that does NOT match the Equipment Catalog: the exact string, how many packages use it, which slots, sample packages, and up to 3 scored catalog suggestions (score 0-1). ALWAYS run this before proposing remap_package_models. Money in dollars.",
+    input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "package_economics",
@@ -717,6 +723,18 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
     return JSON.stringify({
       checklists: rows,
       note: "serviceType ANY applies to every subtype of that visit type. Pin assignedChecklistId in create_work_order/update_work_order params whenever more than one template fits the job's visit type + subtype, or the user names a specific checklist.",
+    });
+  }
+
+  if (name === "unmatched_package_models") {
+    const rows = await computeUnmatchedPackageModels();
+    return JSON.stringify({
+      note: "Suggestions are heuristic — only map when genuinely confident, and toModel must be one of these EXACT catalog model strings. Junk placeholders (not real model numbers) should be cleared. Models that are genuinely missing from the catalog (other brands, accessories) can NOT be mapped — the user adds them in the Equipment Catalog with real costs, after which they match automatically.",
+      totalUnmatched: rows.length,
+      unmatched: rows.map((r) => ({
+        ...r,
+        suggestions: r.suggestions.map((s) => ({ brand: s.brand, model: s.model, description: s.description, cost: s.costCents / 100, score: s.score })),
+      })),
     });
   }
 
@@ -1170,17 +1188,18 @@ Action types and their params:
 13. create_lead — puts a customer into the SALES FUNNEL (the Lead Funnel / Prospect Funnel page) as a lead. The lead attaches to an existing CRM customer — if they're brand new, propose create_customer AND create_lead together in one round. The server refuses when the customer already has an open lead (update it instead). params: { "customerName": string (required), "potentialValue": number (optional, dollars — the expected deal size), "interestLevel": "hot" | "warm" | "cold" (optional), "salesStage": "new" | "contacted" | "quote_sent" | "negotiating" (optional — default "new"), "assignTo": string (optional — the salesperson's name; when the user says "assign me" use THEIR name, you know who you're talking to), "notes": string (optional) }
 14. update_lead — edits a customer's lead in the funnel: move stages (including marking it "won" or "lost"), change temperature, deal value, salesperson, or notes. Only include the fields actually changing. When marking "lost", ask for the reason if the user didn't give one. params: { "customerName": string (required), "changes": { "salesStage": "new" | "contacted" | "quote_sent" | "negotiating" | "won" | "lost" (optional), "interestLevel": "hot" | "warm" | "cold" (optional), "potentialValue": number (optional, dollars), "assignTo": string (optional), "notes": string (optional), "lostReason": string (optional — why it fell through, for lost leads) } (required — at least one field) }
 
-BUILDER ACTIONS — the two below change COMPANY SETUP (templates and the catalog the whole team runs on), not day-to-day records. Only supervisors, admins, and the owner can approve them — if the current user is a tech or sales, say so instead of proposing. Design them with care and show your plan in the answer before the card: these shape how every future job runs.
+BUILDER ACTIONS — items 15, 16, and 18 change COMPANY SETUP (templates, the price book, and the proposal-builder packages the whole team runs on), not day-to-day records. Only supervisors, admins, and the owner can approve them — if the current user is a tech or sales, say so instead of proposing. Design them with care and show your plan in the answer before the card: these shape how every future job runs.
 15. create_checklist — builds a complete service checklist template (what techs fill on jobs; lands in Settings → Checklists, editable on the canvas). Compose the checklist YOURSELF from what the user describes plus your HVAC knowledge: group steps into logical sections (e.g. "Client Greeting", "Diagnostics — Indoor Unit", "Visit Wrap-Up"), pick the right questionType per step (yes_no for confirmations, select with options for graded/branching readings — include "N/A" where a step can be skipped, text for readings and notes, multi_select for pick-many), mark truly critical steps isRequired, and put scripts/guidance in helpText. Add photoSteps for anything worth documenting visually. In your answer, sketch the section outline BEFORE the card so the user can adjust. params: { "name": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (required), "serviceType": string (required — the work order subtype exactly as dispatch uses it, e.g. "Repair AC", "No Heat"; or "ANY" for a GENERAL checklist that applies to every subtype of the visit type; ask which if unclear), "description": string (optional), "questions": array of { "section": string (optional — group label), "question": string, "questionType": "yes_no" | "text" | "number" | "select" | "multi_select", "options": string[] (required for select/multi_select), "isRequired": boolean (optional), "helpText": string (optional — scripts, expected ranges) } (required, in order), "photoSteps": array of { "label": string, "instructions": string (optional), "isRequired": boolean (optional, default true) } (optional) }
 16. create_item — adds an item to the price book (the catalog quotes and invoices pull from). Confirm the sell price before proposing if the user didn't give one — never invent prices. params: { "name": string (required), "rate": number (required — sell price in dollars), "costPrice": number (optional — our cost), "itemType": "parts" | "equipment" | "material" | "service" | "discount" | "agreement" | "residential" | "commercial" | "crawlspace" (optional), "category": "install" | "service" | "maintenance" | "discount" | "protection" | "field_edge" (optional), "unit": string (optional, default "each"), "partNumber": string (optional), "description": string (optional) }
 17. update_work_order — edits an EXISTING work order (day-to-day, not builder). Ground it in a customer_profile lookup and pin customerId; resolve WHICH job (pass workOrderId from your lookup, or workOrderTitle — when several could match, ask the user first). GUIDELINE: completed or cancelled work orders are FROZEN — the server refuses; if the lookup shows the job is done, say so instead of proposing. Only include the fields actually changing. Checklist: run list_checklists and pin "assignedChecklistId" when several templates fit or the user names one (changing workSubtype re-runs the auto-assign only when exactly one fits). Reassigning follows the same rule as creating: team_roster + assignedTechId pinned. Times are Eastern wall-clock ("YYYY-MM-DDTHH:mm", no zone suffix); changing scheduledStart without scheduledEnd keeps a 1-hour block. params: { "customerName": string (required), "customerId": string (required — pinned), "workOrderId": string (optional — exact id from a lookup), "workOrderTitle": string (optional), "changes": { "title"?: string, "description"?: string, "priority"?: "low" | "normal" | "high" | "emergency", "workSubtype"?: string (same subtype lists as create_work_order), "scheduledStart"?: string, "scheduledEnd"?: string, "assignTo"?: string, "assignedTechId"?: string, "assignedChecklistId"?: string, "dispatchNotes"?: string } (required — at least one field), "current": object (optional — the job's current values for the fields being changed, so the card shows before-and-after) }
+18. remap_package_models — BUILDER action (supervisor+, like 15/16): fixes proposal-builder packages whose component MODEL NUMBERS don't match the Equipment Catalog (typos, format drift, renamed models, junk placeholder text like "Complete System"). ALWAYS run the unmatched_package_models tool FIRST — it returns every unmatched string with usage counts and scored catalog suggestions. Batch the whole cleanup into ONE action (one approval card). Each mapping either maps an old string to a catalog model ("toModel" MUST be an exact model string from the tool's suggestions or one the user names that exists in the catalog — NEVER invented) or clears a junk placeholder ("clear": true). Models genuinely missing from the catalog (other brands, accessories like thermostats and heat strips) can NOT be fixed by mapping — in your answer tell the user to add those in the Equipment Catalog with real costs (they match automatically once added), and do NOT map them to a wrong lookalike. Only the model strings change — package names, images, and prices stay untouched. In your answer BEFORE the card, lay out the plan in plain groups: confident mappings (with the % score), placeholders to clear, and what's still missing from the catalog. params: { "mappings": array of 1-50 { "fromModel": string (required — exactly as the tool returned it), "toModel": string (optional — the catalog model to write), "clear": boolean (optional — remove the string from packages instead) } — every entry needs toModel OR clear }
 When the user says things like "text John that we're running 30 minutes late" or "email Sarah a reminder about her maintenance visit", DRAFT the full message for them and propose the action — the message text shows on the approval card so they review the exact wording before anything sends. Nothing is ever sent without their approval.
 
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
-- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
+- proposedActions: OMIT this field entirely unless the user explicitly asked you to create something. When present: an ARRAY with one entry per thing to create (max 5) — [{ "type": "create_task" | "create_work_order" | "update_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer" | "delete_customer" | "delete_work_order" | "create_quote" | "create_invoice" | "delete_quote" | "log_call" | "create_lead" | "update_lead" | "create_checklist" | "create_item" | "remap_package_models", "summary": one plain sentence describing exactly what will be created, "params": {...} }, ...]
 - replacesPrevious: true ONLY when proposedActions replaces earlier still-un-approved proposal(s) per the ADJUSTMENTS rules — omit otherwise${modeSection}${copilotSection}`;
     
     // Build message array: system + prior turns + current question.
@@ -1251,7 +1270,7 @@ Return JSON with:
         if (
           pa &&
           typeof pa === "object" &&
-          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "update_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
+          (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "update_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "remap_package_models" || pa.type === "fill_form") &&
           typeof pa.summary === "string" &&
           pa.params &&
           typeof pa.params === "object" &&
@@ -1422,7 +1441,7 @@ Return JSON with:
       if (
         pa &&
         typeof pa === "object" &&
-        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "update_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "fill_form") &&
+        (pa.type === "create_task" || pa.type === "create_work_order" || pa.type === "update_work_order" || pa.type === "send_sms" || pa.type === "send_email" || pa.type === "create_customer" || pa.type === "update_customer" || pa.type === "delete_customer" || pa.type === "delete_work_order" || pa.type === "create_quote" || pa.type === "create_invoice" || pa.type === "delete_quote" || pa.type === "log_call" || pa.type === "create_lead" || pa.type === "update_lead" || pa.type === "create_checklist" || pa.type === "create_item" || pa.type === "remap_package_models" || pa.type === "fill_form") &&
         typeof pa.summary === "string" &&
         pa.params &&
         typeof pa.params === "object" &&

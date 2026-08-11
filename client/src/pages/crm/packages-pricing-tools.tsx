@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -824,6 +824,8 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const [pricingOpen, setPricingOpen] = useState(false);
   const [priceInput, setPriceInput] = useState("");
   const [monthlyInput, setMonthlyInput] = useState("");
+  const [fixOpen, setFixOpen] = useState(false);
+  const [fixFilter, setFixFilter] = useState("");
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
@@ -876,6 +878,11 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const selPkg = selected ? byId.get(selected.id) : null;
   const unbaselined = drift.filter((d) => d.costBasisCents == null && d.matchedCount > 0);
   const drifted = !!selected && selected.driftCents != null && Math.abs(selected.driftCents) >= 100;
+  const unmatchedDistinct = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of drift) for (const m of d.unmatchedModels) s.add(m.toLowerCase());
+    return s.size;
+  }, [drift]);
 
   const slotImage = (slot: string) =>
     slot === "Outdoor" ? selPkg?.outdoorImageUrl :
@@ -958,6 +965,16 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-60 pl-8" data-testid="pkgequip-search" />
               </div>
+              {unmatchedDistinct > 0 && (
+                <Button
+                  size="sm" variant="outline"
+                  className="h-9 border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                  onClick={() => { setFixFilter(""); setFixOpen(true); }}
+                  data-testid="pkgequip-fixmatches"
+                >
+                  Fix matches ({unmatchedDistinct})
+                </Button>
+              )}
               <span className="ml-auto text-xs text-slate-400">{shown.length} package{shown.length === 1 ? "" : "s"}</span>
             </div>
 
@@ -1056,7 +1073,13 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                                 {part.costCents != null ? (
                                   <p className="tabular-nums text-sm font-semibold text-slate-800">{usd(part.costCents)}</p>
                                 ) : (
-                                  <p className="text-[11px] font-medium text-amber-600">not in catalog</p>
+                                  <button
+                                    onClick={() => { setFixFilter(part.model); setFixOpen(true); }}
+                                    className="text-[11px] font-medium text-amber-600 hover:underline"
+                                    title="Fix this model's catalog match"
+                                  >
+                                    not in catalog
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -1303,7 +1326,249 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
           {previewPkg && <PackagePreviewCard pkg={previewPkg} />}
         </DialogContent>
       </Dialog>
+
+      <FixMatchesDialog open={fixOpen} onClose={() => setFixOpen(false)} initialFilter={fixFilter} />
     </Card>
+  );
+}
+
+// ─────────────────────────── Fix matches workbench ───────────────────────────
+
+type UnmatchedRow = {
+  fromModel: string; count: number; slots: string[]; samplePackages: string[];
+  suggestions: Array<{ id: string; brand: string; model: string; description: string | null; costCents: number; score: number }>;
+};
+type FixChoice = { include: boolean; kind: "map" | "clear" | "add" | "skip" | "search"; toModel?: string; addBrand?: string; addCost?: string; search?: string };
+
+/** Every unmatched model string, one clear decision per row — map it to a
+ *  catalog model, add it to the catalog, clear junk, or skip. One Apply
+ *  runs the whole batch. Names, images, and prices never change. */
+function FixMatchesDialog({ open, onClose, initialFilter }: { open: boolean; onClose: () => void; initialFilter: string }) {
+  const { toast } = useToast();
+  const [filter, setFilter] = useState("");
+  const [choices, setChoices] = useState<Record<string, FixChoice>>({});
+  const { data: rows = [], isLoading } = useQuery<UnmatchedRow[]>({
+    queryKey: ["/api/crm/package-unmatched-models"],
+    enabled: open,
+  });
+  const { data: catalogData } = useQuery<{ models: CatalogModel[]; brands: string[] }>({
+    queryKey: ["/api/crm/equipment-catalog"],
+    enabled: open,
+  });
+  const catalog = catalogData?.models || [];
+
+  useEffect(() => { if (open) setFilter(initialFilter); }, [open, initialFilter]);
+
+  // Default decisions: a confident suggestion arrives pre-checked; a weaker
+  // one is pre-picked but unchecked; no suggestion starts at Skip.
+  useEffect(() => {
+    if (rows.length === 0) return;
+    setChoices((prev) => {
+      const next = { ...prev };
+      for (const r of rows) {
+        const k = r.fromModel.toLowerCase();
+        if (next[k]) continue;
+        const top = r.suggestions[0];
+        if (top && top.score >= 0.75) next[k] = { include: true, kind: "map", toModel: top.model };
+        else if (top) next[k] = { include: false, kind: "map", toModel: top.model };
+        else next[k] = { include: false, kind: "skip" };
+      }
+      return next;
+    });
+  }, [rows]);
+
+  const setChoice = (key: string, patch: Partial<FixChoice>) =>
+    setChoices((p) => ({ ...p, [key]: { ...(p[key] || { include: false, kind: "skip" as const }), ...patch } }));
+
+  const shownRows = rows.filter((r) => !filter.trim() || r.fromModel.toLowerCase().includes(filter.trim().toLowerCase()));
+
+  const rowValid = (r: UnmatchedRow, c: FixChoice | undefined): boolean => {
+    if (!c || !c.include) return false;
+    if (c.kind === "map") return !!c.toModel;
+    if (c.kind === "clear") return true;
+    if (c.kind === "add") return !!(c.addBrand || "").trim() && parseFloat(c.addCost || "") > 0;
+    return false;
+  };
+  const selected = rows.filter((r) => rowValid(r, choices[r.fromModel.toLowerCase()]));
+  const kindOf = (r: UnmatchedRow) => choices[r.fromModel.toLowerCase()]?.kind;
+  const counts = {
+    map: selected.filter((r) => kindOf(r) === "map").length,
+    clear: selected.filter((r) => kindOf(r) === "clear").length,
+    add: selected.filter((r) => kindOf(r) === "add").length,
+  };
+
+  const applyFixes = useMutation({
+    mutationFn: async () => {
+      // Adds first — a model added under the exact same string matches
+      // every package automatically, no remap needed.
+      for (const r of selected) {
+        const c = choices[r.fromModel.toLowerCase()];
+        if (c.kind === "add") {
+          await apiRequest("POST", "/api/crm/equipment-catalog", {
+            brand: (c.addBrand || "").trim(),
+            model: r.fromModel,
+            costCents: Math.round(parseFloat(c.addCost || "0") * 100),
+          });
+        }
+      }
+      const mappings = selected
+        .map((r) => ({ r, c: choices[r.fromModel.toLowerCase()] }))
+        .filter(({ c }) => c.kind === "map" || c.kind === "clear")
+        .map(({ r, c }) => (c.kind === "clear" ? { fromModel: r.fromModel, clear: true } : { fromModel: r.fromModel, toModel: c.toModel }));
+      if (mappings.length > 0) {
+        const res = await apiRequest("POST", "/api/crm/package-model-remap", { mappings });
+        return res.json();
+      }
+      return null;
+    },
+    onSuccess: () => {
+      setChoices({});
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/package-unmatched-models"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook-drift"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/equipment-catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
+      toast({ title: "Matches fixed", description: "Those packages now cost their equipment from the catalog." });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't apply the fixes", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Fix unmatched models</DialogTitle>
+        </DialogHeader>
+        <p className="-mt-2 text-sm text-slate-500">
+          Each row is a model your packages reference that the catalog doesn't know. Pick what to do —
+          the fix applies to every package using it. Names, images, and prices never change.
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter models" className="h-9 pl-8" data-testid="fixmatches-filter" />
+          </div>
+          <span className="text-xs tabular-nums text-slate-400">{shownRows.length} of {rows.length}</span>
+        </div>
+        {isLoading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : rows.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
+            Everything matches — every package model is in the catalog.
+          </p>
+        ) : (
+          <div className="max-h-[52vh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+            {shownRows.map((r) => {
+              const key = r.fromModel.toLowerCase();
+              const c = choices[key] || { include: false, kind: "skip" as const };
+              const selectValue = c.kind === "map" && c.toModel ? `map:${c.toModel}` : c.kind;
+              const searchTerm = (c.search || "").trim().toLowerCase();
+              const searchResults = searchTerm
+                ? catalog.filter((m) => !m.isDiscontinued && (m.model.toLowerCase().includes(searchTerm) || (m.description || "").toLowerCase().includes(searchTerm))).slice(0, 8)
+                : [];
+              const mapTarget = c.kind === "map" && c.toModel ? catalog.find((m) => m.model === c.toModel) : null;
+              return (
+                <div key={key} className="px-3.5 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Checkbox
+                      checked={c.include}
+                      disabled={c.kind === "skip" || c.kind === "search"}
+                      onCheckedChange={() => setChoice(key, { include: !c.include })}
+                      data-testid={`fixmatch-check-${r.fromModel}`}
+                    />
+                    <span className="font-mono text-xs font-medium">{r.fromModel}</span>
+                    <span className="text-[11px] text-slate-400" title={r.samplePackages.join(", ")}>
+                      {r.count} package{r.count === 1 ? "" : "s"} · {r.slots.join(", ")}
+                    </span>
+                    <div className="ml-auto w-72 max-sm:w-full">
+                      <Select
+                        value={selectValue}
+                        onValueChange={(v) => {
+                          if (v.startsWith("map:")) setChoice(key, { kind: "map", toModel: v.slice(4), include: true });
+                          else if (v === "clear") setChoice(key, { kind: "clear", include: true });
+                          else if (v === "add") setChoice(key, { kind: "add", include: true });
+                          else if (v === "search") setChoice(key, { kind: "search", include: false });
+                          else setChoice(key, { kind: "skip", include: false });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs" data-testid={`fixmatch-select-${r.fromModel}`}><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {r.suggestions.map((s) => (
+                            <SelectItem key={s.model} value={`map:${s.model}`}>
+                              {s.model} · {Math.round(s.score * 100)}% match
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="search">Search the catalog…</SelectItem>
+                          <SelectItem value="add">Add to catalog as a new model…</SelectItem>
+                          <SelectItem value="clear">Remove from packages (not equipment)</SelectItem>
+                          <SelectItem value="skip">Skip for now</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {mapTarget && (
+                    <p className="ml-7 mt-1 text-[11px] text-slate-400">
+                      → {mapTarget.brand}{mapTarget.description ? ` · ${mapTarget.description}` : ""} · {usd(mapTarget.costCents)}
+                    </p>
+                  )}
+                  {c.kind === "search" && (
+                    <div className="ml-7 mt-2 space-y-1">
+                      <Input
+                        value={c.search || ""}
+                        onChange={(e) => setChoice(key, { search: e.target.value })}
+                        placeholder="Type a model number or description"
+                        className="h-8 text-xs"
+                        autoFocus
+                        data-testid={`fixmatch-search-${r.fromModel}`}
+                      />
+                      {searchResults.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => setChoice(key, { kind: "map", toModel: m.model, include: true })}
+                          className="flex w-full items-baseline gap-2 rounded px-2 py-1 text-left text-xs hover:bg-slate-50"
+                        >
+                          <span className="shrink-0 font-mono font-medium">{m.model}</span>
+                          <span className="min-w-0 flex-1 truncate text-slate-400">{m.brand}{m.description ? ` · ${m.description}` : ""}</span>
+                          <span className="shrink-0 tabular-nums text-slate-500">{usd(m.costCents)}</span>
+                        </button>
+                      ))}
+                      {searchTerm && searchResults.length === 0 && (
+                        <p className="px-2 py-1 text-[11px] text-slate-400">Nothing in the catalog matches — try "Add to catalog" instead.</p>
+                      )}
+                    </div>
+                  )}
+                  {c.kind === "add" && (
+                    <div className="ml-7 mt-2 flex flex-wrap items-center gap-2">
+                      <Input value={c.addBrand || ""} onChange={(e) => setChoice(key, { addBrand: e.target.value })} placeholder="Brand (e.g. ecobee)" className="h-8 w-40 text-xs" data-testid={`fixmatch-addbrand-${r.fromModel}`} />
+                      <Input value={c.addCost || ""} onChange={(e) => setChoice(key, { addCost: e.target.value })} type="number" min="0" step="0.01" placeholder="Cost $" className="h-8 w-28 text-xs" data-testid={`fixmatch-addcost-${r.fromModel}`} />
+                      <span className="text-[11px] text-slate-400">adds "{r.fromModel}" to the catalog — its packages match automatically</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {shownRows.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-slate-400">No unmatched models match that filter.</p>
+            )}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs tabular-nums text-slate-500">
+            {counts.map} map{counts.map === 1 ? "" : "s"} · {counts.add} add{counts.add === 1 ? "" : "s"} · {counts.clear} clear{counts.clear === 1 ? "" : "s"} selected
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              disabled={applyFixes.isPending || selected.length === 0}
+              onClick={() => applyFixes.mutate()}
+              data-testid="fixmatches-apply"
+            >
+              {applyFixes.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying…</> : `Apply ${selected.length} fix${selected.length === 1 ? "" : "es"}`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

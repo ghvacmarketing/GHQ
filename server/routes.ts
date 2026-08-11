@@ -65,6 +65,7 @@ import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
 import { sendCrmQuoteEmail, buildQuoteEmailContent } from "./services/crmQuoteEmail";
+import { computeUnmatchedPackageModels, applyModelRemaps } from "./services/pricebook-matching";
 import { sendCrmInvoiceEmail } from "./services/crmInvoiceEmail";
 import { sendQuoteSms, sendInvoiceSms } from "./services/documentSmsService";
 import { twilioService } from "./sms";
@@ -3035,6 +3036,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             description: z.string().max(1000).optional(),
           }).strict(),
         }),
+        z.object({
+          type: z.literal("remap_package_models"),
+          params: z.object({
+            mappings: z.array(z.object({
+              fromModel: z.string().trim().min(1).max(120),
+              toModel: z.string().trim().min(1).max(120).optional(),
+              clear: z.boolean().optional(),
+            }).strict()).min(1).max(50),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -3046,8 +3057,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Builder actions change COMPANY SETUP — templates and catalog the
       // whole team runs on — so they take supervisor+ regardless of who can
       // chat with Gibbs. Day-to-day ops actions stay sales-and-up.
-      if ((action.type === "create_checklist" || action.type === "create_item") && !["supervisor", "owner", "admin"].includes(user.role)) {
-        return res.status(403).json({ message: "Only supervisors and up can change company setup (checklists, price book)." });
+      if ((action.type === "create_checklist" || action.type === "create_item" || action.type === "remap_package_models") && !["supervisor", "owner", "admin"].includes(user.role)) {
+        return res.status(403).json({ message: "Only supervisors and up can change company setup (checklists, price book, package models)." });
+      }
+
+      // remap_package_models — swap old model strings on proposal-builder
+      // packages for real catalog models (or clear junk placeholders).
+      // Names, images, and prices never change.
+      if (action.type === "remap_package_models") {
+        const valid = action.params.mappings.filter((m) => (m.toModel && m.toModel.trim()) || m.clear === true);
+        if (valid.length === 0) {
+          return res.status(400).json({ message: "Every mapping needs a target catalog model or clear: true." });
+        }
+        const summary = await applyModelRemaps(valid);
+        await logCrmAudit(user.id, "ai_action.remap_package_models", "pricebook_packages", "batch", summary, req.ip);
+        const mapped = summary.results.filter((r) => r.action === "mapped").length;
+        const cleared = summary.results.filter((r) => r.action === "cleared").length;
+        const skipped = summary.results.filter((r) => r.action === "skipped");
+        const label = `Fixed package models — ${mapped} remapped${cleared ? `, ${cleared} cleared` : ""} across ${summary.packagesTouched} package slot${summary.packagesTouched === 1 ? "" : "s"}${skipped.length ? ` (${skipped.length} skipped: ${skipped.map((s) => `${s.fromModel} — ${s.reason}`).join("; ").slice(0, 200)})` : ""}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "pricebook_packages", id: "batch", label, url: "/crm/settings/packages" });
+        return res.status(201).json({ ok: true, entity: "pricebook_packages", id: "batch", label, url: "/crm/settings/packages" });
       }
 
       if (action.type === "create_task") {
@@ -33298,6 +33327,32 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error saving cost model:", error);
       res.status(500).json({ message: "Failed to save the cost model" });
+    }
+  });
+
+  // ── Model matching: which package model strings miss the catalog, and the
+  // journaled remap that fixes them (individually or in bulk). Only the model
+  // strings change — package names, images, and prices are never touched.
+  app.get("/api/crm/package-unmatched-models", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    try {
+      res.json(await computeUnmatchedPackageModels());
+    } catch (error) {
+      console.error("Error computing unmatched package models:", error);
+      res.status(500).json({ message: "Failed to compute unmatched models" });
+    }
+  });
+
+  app.post("/api/crm/package-model-remap", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const mappings = Array.isArray(req.body?.mappings) ? req.body.mappings : [];
+      if (mappings.length === 0) return res.status(400).json({ message: "No mappings given" });
+      const summary = await applyModelRemaps(mappings);
+      await logCrmAudit(user?.id || null, "pricebook.model_remap", "pricebook_packages", "batch", summary, req.ip);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error remapping package models:", error);
+      res.status(500).json({ message: "Failed to remap models" });
     }
   });
 
