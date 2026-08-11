@@ -838,7 +838,9 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                             <div className="min-w-0 flex-1">
                               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</p>
                               <p className="truncate text-sm font-medium text-slate-800">{part.name || part.model}</p>
-                              <p className="truncate font-mono text-[11px] text-slate-400">{part.model}</p>
+                              {part.name && part.name !== part.model && (
+                                <p className="truncate font-mono text-[11px] text-slate-400">{part.model}</p>
+                              )}
                             </div>
                             <div className="shrink-0 text-right">
                               {part.costCents != null ? (
