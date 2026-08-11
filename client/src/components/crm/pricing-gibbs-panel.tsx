@@ -124,12 +124,20 @@ export default function PricingGibbsPanel({ onClose, boundaryRef }: {
       setPanelWidth(Math.max(420, Math.round(gutter)));
     };
     measure();
+    // The container recenters (position shift, same size) when the scrollbar
+    // appears after first paint — ResizeObserver misses pure position moves,
+    // so re-measure on a settle delay and watch the body's size too.
+    const raf = requestAnimationFrame(measure);
+    const settle = window.setTimeout(measure, 400);
     window.addEventListener("resize", measure);
-    const ro = boundaryRef?.current ? new ResizeObserver(measure) : null;
-    if (ro && boundaryRef?.current) ro.observe(boundaryRef.current);
+    const ro = new ResizeObserver(measure);
+    if (boundaryRef?.current) ro.observe(boundaryRef.current);
+    ro.observe(document.body);
     return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(settle);
       window.removeEventListener("resize", measure);
-      ro?.disconnect();
+      ro.disconnect();
     };
   }, [boundaryRef]);
 
