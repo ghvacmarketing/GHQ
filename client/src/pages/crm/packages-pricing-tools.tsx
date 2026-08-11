@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Layers, Loader2, Pencil, Plus,
-  Search, SlidersHorizontal, Upload, X,
+  ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
+  Search, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
@@ -50,8 +50,6 @@ export function EquipmentCatalogCard() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("all");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editCost, setEditCost] = useState("");
   const [adding, setAdding] = useState(false);
   const [newRow, setNewRow] = useState({ brand: "", model: "", description: "", cost: "" });
 
@@ -103,10 +101,11 @@ export function EquipmentCatalogCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Boxes className="h-5 w-5" /> Equipment Catalog</CardTitle>
+        <CardTitle>Equipment Catalog</CardTitle>
         <CardDescription>
           Every supplier model and its current cost — the layer your packages are priced against.
-          New brands live here as plain rows: no development needed, ever.
+          Costs update through supplier price files, never by hand here. New brands live here as
+          plain rows: no development needed, ever.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -173,37 +172,8 @@ export function EquipmentCatalogCard() {
                       )}
                     </TableCell>
                     <TableCell className="max-w-[280px] truncate text-sm text-slate-500">{m.description || "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {editingId === m.id ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Input
-                            autoFocus
-                            value={editCost}
-                            onChange={(e) => setEditCost(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && parseFloat(editCost) >= 0) {
-                                patchModel.mutate({ id: m.id, costCents: Math.round(parseFloat(editCost) * 100) });
-                                setEditingId(null);
-                              }
-                              if (e.key === "Escape") setEditingId(null);
-                            }}
-                            type="number" min="0" step="0.01" className="h-8 w-24 text-right"
-                            data-testid={`catalog-cost-input-${m.id}`}
-                          />
-                          <button onClick={() => { if (parseFloat(editCost) >= 0) { patchModel.mutate({ id: m.id, costCents: Math.round(parseFloat(editCost) * 100) }); } setEditingId(null); }} className="rounded p-1 text-emerald-600 hover:bg-emerald-50">
-                            <Check className="h-4 w-4" />
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => { setEditingId(m.id); setEditCost((m.costCents / 100).toFixed(2)); }}
-                          className="group inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-slate-100"
-                          data-testid={`catalog-cost-${m.id}`}
-                        >
-                          {usd(m.costCents)}
-                          <Pencil className="h-3 w-3 text-slate-300 group-hover:text-slate-500" />
-                        </button>
-                      )}
+                    <TableCell className="text-right tabular-nums" data-testid={`catalog-cost-${m.id}`}>
+                      {usd(m.costCents)}
                     </TableCell>
                     <TableCell className="text-right">
                       <button
@@ -706,7 +676,7 @@ export function JobCostModelCard({ packages, model, dirty, onChange, onSaved }: 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5" /> Job Cost Model</CardTitle>
+        <CardTitle>Job Cost Model</CardTitle>
         <CardDescription>
           The shop-level numbers behind the cost breakdowns above. Change one and the cards update
           instantly as a preview — Save makes it stick for everyone, including Gibbs. Estimates only:
@@ -817,6 +787,7 @@ export function CostsAndCatalogTab({ packages }: { packages: any[] | undefined }
 export function PackageEquipmentCard({ packages, costModel }: { packages: any[] | undefined; costModel: CostModel | null }) {
   const { toast } = useToast();
   const [previewPkg, setPreviewPkg] = useState<any | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [unitFilter, setUnitFilter] = useState("all");
   const [pkgSearch, setPkgSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -916,7 +887,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" /> Package Equipment</CardTitle>
+        <CardTitle>Package Equipment</CardTitle>
         <CardDescription>
           Every package your proposal builder can quote — the equipment inside it, the financing story,
           and the full cost breakdown, costed live from the catalog below. Cost drift shows here the
@@ -1014,15 +985,18 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                     <div className="space-y-4 rounded-lg border border-slate-200 p-4" data-testid={`pkgequip-detail-${selected.id}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{selected.unitType}</p>
+                          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                            {selected.unitType}
+                            <button
+                              onClick={() => { setPreviewPkg(selPkg || selected); setPreviewOpen(true); }}
+                              className="rounded p-0.5 text-slate-300 transition-colors hover:text-[#711419]"
+                              title="Preview as the proposal builder shows it"
+                              data-testid={`pkgequip-preview-${selected.id}`}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                          </p>
                           <p className="text-lg font-bold text-slate-900">{selected.tier} · {selected.tonnage} Ton · {selected.packageLevel}</p>
-                          <button
-                            onClick={() => setPreviewPkg(selPkg || selected)}
-                            className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#711419] hover:underline"
-                            data-testid={`pkgequip-preview-${selected.id}`}
-                          >
-                            <Eye className="h-3.5 w-3.5" /> Preview proposal card
-                          </button>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your price</p>
@@ -1171,7 +1145,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                             <p className="mt-0.5 text-[11px] text-slate-400">
                               Target {costModel.targetMarginPct}% · {econ.marginPct >= costModel.targetMarginPct ? "on target" : `${(costModel.targetMarginPct - econ.marginPct).toFixed(1)}% below target`}
                             </p>
-                            <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-emerald-300">
+                            <div className="mt-2 flex h-2.5 overflow-hidden bg-emerald-300">
                               {econ.segs.map((s) => (
                                 <div key={s.label} style={{ width: `${Math.max(0, (s.cents / Math.max(econ.price, econ.price - econ.profit)) * 100)}%`, background: s.color }} title={`${s.label} ${usd(s.cents)}`} />
                               ))}
@@ -1202,61 +1176,26 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                             </div>
                           )}
                           <div className="py-2.5">
-                            {!pricingOpen ? (
-                              <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                size="sm" variant="outline" className="h-8"
+                                onClick={() => { setPriceInput(((selected.totalInvestment || 0) / 100).toFixed(0)); setMonthlyInput(""); setPricingOpen(true); }}
+                                data-testid={`pkgequip-setprice-${selected.id}`}
+                              >
+                                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Set price…
+                              </Button>
+                              {drifted && (
                                 <Button
-                                  size="sm" variant="outline" className="h-8"
-                                  onClick={() => { setPricingOpen(true); setPriceInput(((selected.totalInvestment || 0) / 100).toFixed(0)); setMonthlyInput(""); }}
-                                  data-testid={`pkgequip-setprice-${selected.id}`}
+                                  size="sm" variant="ghost" className="h-8 text-slate-500"
+                                  onClick={() => rebaseline.mutate({ id: selected.id })}
+                                  disabled={rebaseline.isPending}
+                                  title="Keep the current price; accept today's costs as the new baseline"
+                                  data-testid={`pkgequip-keep-${selected.id}`}
                                 >
-                                  <Pencil className="mr-1.5 h-3.5 w-3.5" /> Set price…
+                                  Keep price
                                 </Button>
-                                {drifted && (
-                                  <Button
-                                    size="sm" variant="ghost" className="h-8 text-slate-500"
-                                    onClick={() => rebaseline.mutate({ id: selected.id })}
-                                    disabled={rebaseline.isPending}
-                                    title="Keep the current price; accept today's costs as the new baseline"
-                                    data-testid={`pkgequip-keep-${selected.id}`}
-                                  >
-                                    Keep price
-                                  </Button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <Input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" min="0" placeholder="Total $" className="h-8" data-testid={`pkgequip-price-input-${selected.id}`} />
-                                  <Input value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)} type="number" min="0" placeholder="Mo $" className="h-8 w-24" data-testid={`pkgequip-monthly-input-${selected.id}`} />
-                                </div>
-                                {parseFloat(priceInput) > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setMonthlyInput(String(monthlyFinancing(parseFloat(priceInput))))}
-                                    className="text-[10px] font-medium text-slate-400 hover:text-[#711419]"
-                                    data-testid={`pkgequip-suggest-${selected.id}`}
-                                  >
-                                    suggest ${monthlyFinancing(parseFloat(priceInput)).toLocaleString()}/mo ({FINANCING_LABEL})
-                                  </button>
-                                )}
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    size="sm" className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
-                                    disabled={rebaseline.isPending || !(parseFloat(priceInput) > 0)}
-                                    onClick={() => rebaseline.mutate({
-                                      id: selected.id,
-                                      totalInvestmentCents: Math.round(parseFloat(priceInput) * 100),
-                                      monthlyPaymentCents: monthlyInput ? Math.round(parseFloat(monthlyInput) * 100) : undefined,
-                                    })}
-                                    data-testid={`pkgequip-saveprice-${selected.id}`}
-                                  >
-                                    {rebaseline.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save price"}
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="h-8" onClick={() => setPricingOpen(false)}>Cancel</Button>
-                                </div>
-                                <p className="text-[10px] text-slate-400">Saving also re-baselines today's costs.</p>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1277,7 +1216,56 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
         )}
       </CardContent>
 
-      <Dialog open={!!previewPkg} onOpenChange={(o) => { if (!o) setPreviewPkg(null); }}>
+      {/* Set price — its own dialog so repricing never shifts the rail layout */}
+      <Dialog open={pricingOpen} onOpenChange={(o) => { if (!o) setPricingOpen(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set price{selected ? ` — ${selected.tier} · ${selected.tonnage}T · ${selected.packageLevel}` : ""}</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1 text-[11px] font-medium text-slate-500">Total investment ($)</p>
+                <Input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" min="0" className="h-9" autoFocus data-testid={`pkgequip-price-input-${selected.id}`} />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] font-medium text-slate-500">Monthly — "as low as" ($/mo)</p>
+                <Input value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)} type="number" min="0" placeholder="Leave blank to keep current" className="h-9" data-testid={`pkgequip-monthly-input-${selected.id}`} />
+                {parseFloat(priceInput) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMonthlyInput(String(monthlyFinancing(parseFloat(priceInput))))}
+                    className="mt-1 text-[11px] font-medium text-slate-400 hover:text-[#711419]"
+                    data-testid={`pkgequip-suggest-${selected.id}`}
+                  >
+                    suggest ${monthlyFinancing(parseFloat(priceInput)).toLocaleString()}/mo ({FINANCING_LABEL})
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400">Saving also re-baselines today's component costs, so drift starts fresh.</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setPricingOpen(false)}>Cancel</Button>
+                <Button
+                  className="bg-[#711419] hover:bg-[#8a1a1f]"
+                  disabled={rebaseline.isPending || !(parseFloat(priceInput) > 0)}
+                  onClick={() => rebaseline.mutate({
+                    id: selected.id,
+                    totalInvestmentCents: Math.round(parseFloat(priceInput) * 100),
+                    monthlyPaymentCents: monthlyInput ? Math.round(parseFloat(monthlyInput) * 100) : undefined,
+                  })}
+                  data-testid={`pkgequip-saveprice-${selected.id}`}
+                >
+                  {rebaseline.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save price"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* previewPkg stays set through the close animation so the card doesn't
+          blank out mid-exit */}
+      <Dialog open={previewOpen} onOpenChange={(o) => { if (!o) setPreviewOpen(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Proposal preview</DialogTitle>
