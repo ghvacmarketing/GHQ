@@ -54,16 +54,24 @@ export function EquipmentCatalogCard() {
   const [adding, setAdding] = useState(false);
   const [newRow, setNewRow] = useState({ brand: "", model: "", description: "", cost: "" });
 
+  const [visibleCount, setVisibleCount] = useState(100);
+
+  // One fetch, filter in the browser — refetching 1,300+ rows on every
+  // keystroke (and rendering them all) is what made this card feel slow.
   const { data, isLoading } = useQuery<{ models: CatalogModel[]; brands: string[] }>({
-    queryKey: ["/api/crm/equipment-catalog", search],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/equipment-catalog?search=${encodeURIComponent(search)}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load the catalog");
-      return res.json();
-    },
-    placeholderData: (prev) => prev,
+    queryKey: ["/api/crm/equipment-catalog"],
   });
-  const models = (data?.models || []).filter((m) => brandFilter === "all" || m.brand === brandFilter);
+  const models = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (data?.models || []).filter(
+      (m) =>
+        (brandFilter === "all" || m.brand === brandFilter) &&
+        (!q ||
+          m.model.toLowerCase().includes(q) ||
+          m.brand.toLowerCase().includes(q) ||
+          (m.description || "").toLowerCase().includes(q)),
+    );
+  }, [data, search, brandFilter]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/crm/equipment-catalog"] });
 
@@ -135,7 +143,9 @@ export function EquipmentCatalogCard() {
           <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
         ) : models.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
-            No models yet — upload a supplier price file or add models by hand.
+            {(data?.models || []).length === 0
+              ? "No models yet — upload a supplier price file or add models by hand."
+              : "Nothing matches that search."}
           </p>
         ) : (
           <div className="max-h-[480px] overflow-auto rounded-lg border border-slate-200">
@@ -150,7 +160,7 @@ export function EquipmentCatalogCard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {models.map((m) => (
+                {models.slice(0, visibleCount).map((m) => (
                   <TableRow key={m.id} className={m.isDiscontinued ? "opacity-55" : undefined}>
                     <TableCell className="font-medium">{m.brand}</TableCell>
                     <TableCell className="font-mono text-xs">
@@ -207,6 +217,17 @@ export function EquipmentCatalogCard() {
                 ))}
               </TableBody>
             </Table>
+            {models.length > visibleCount && (
+              <div className="border-t border-slate-100 bg-slate-50/60 py-2 text-center">
+                <button
+                  onClick={() => setVisibleCount((c) => c + 300)}
+                  className="text-xs font-medium text-[#711419] hover:underline"
+                  data-testid="catalog-show-more"
+                >
+                  Show more — {(models.length - visibleCount).toLocaleString()} remaining
+                </button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -642,12 +663,14 @@ type DriftRow = {
 // ─────────────────────────── Package equipment map ───────────────────────────
 
 /** The connective view: every proposal-builder package, the exact models
- *  inside it, and what each one costs from the catalog TODAY. This is where
- *  "a spreadsheet of Trane costs" turns into "what my packages are built
- *  from and what they cost me." */
+ *  inside it, and what each one costs from the catalog TODAY. Master-detail:
+ *  a light package list on the left, one rich breakdown (with the package's
+ *  own equipment images) on the right — not a thousand-row grid. */
 export function PackageEquipmentCard({ packages }: { packages: any[] | undefined }) {
   const [previewPkg, setPreviewPkg] = useState<any | null>(null);
   const [unitFilter, setUnitFilter] = useState("all");
+  const [pkgSearch, setPkgSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
@@ -666,7 +689,16 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
     [drift],
   );
   const unitTypes = useMemo(() => Array.from(new Set(sorted.map((d) => d.unitType))), [sorted]);
-  const shown = unitFilter === "all" ? sorted : sorted.filter((d) => d.unitType === unitFilter);
+  const shown = useMemo(() => {
+    const q = pkgSearch.trim().toLowerCase();
+    return sorted.filter(
+      (d) =>
+        (unitFilter === "all" || d.unitType === unitFilter) &&
+        (!q ||
+          `${d.unitType} ${d.tier} ${d.tonnage} ${d.packageLevel}`.toLowerCase().includes(q) ||
+          d.parts.some((pt) => pt.model.toLowerCase().includes(q) || (pt.name || "").toLowerCase().includes(q))),
+    );
+  }, [sorted, unitFilter, pkgSearch]);
   const groups = useMemo(() => {
     const m = new Map<string, DriftRow[]>();
     for (const d of shown) {
@@ -675,16 +707,28 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
     }
     return Array.from(m.entries());
   }, [shown]);
+  const selected = shown.find((d) => d.id === selectedId) || shown[0] || null;
+  const selPkg = selected ? byId.get(selected.id) : null;
   const anyCosts = drift.some((d) => d.matchedCount > 0);
+
+  const slotImage = (slot: string) =>
+    slot === "Outdoor" ? selPkg?.outdoorImageUrl :
+    slot === "Coil" ? selPkg?.coilImageUrl :
+    slot === "Indoor heat" ? selPkg?.furnaceImageUrl :
+    selPkg?.thermostatImageUrl;
+
+  const afterEquip = selected ? selected.totalInvestment - selected.currentComponentCostCents : 0;
+  const equipPct = selected && selected.totalInvestment > 0
+    ? Math.min(100, Math.round((selected.currentComponentCostCents / selected.totalInvestment) * 100))
+    : 0;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" /> Package Equipment</CardTitle>
         <CardDescription>
-          Every package your proposal builder can quote, and the exact equipment inside it. The models
-          come from the package setup — the costs come live from the catalog below, so when a supplier
-          file moves a cost, you see precisely which packages it touches.
+          Every package your proposal builder can quote, and the exact equipment inside it — costed live
+          from the catalog below. Pick a package on the left to see its full breakdown.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -696,86 +740,155 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
           </p>
         ) : (
           <>
-            <div className="flex items-center gap-2">
+            {!anyCosts && (
+              <p className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2 text-xs text-blue-800">
+                Costs show as "not in catalog" until the Equipment Catalog has models — upload a supplier
+                price file on the Price File Update tab and these link up automatically by model number.
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
               <Select value={unitFilter} onValueChange={setUnitFilter}>
-                <SelectTrigger className="h-9 w-48" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-44" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All system types</SelectItem>
                   {unitTypes.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-60 pl-8" data-testid="pkgequip-search" />
+              </div>
               <span className="ml-auto text-xs text-slate-400">{shown.length} package{shown.length === 1 ? "" : "s"}</span>
             </div>
-            {!anyCosts && (
-              <p className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2 text-xs text-blue-800">
-                Costs show as “not in catalog” until the Equipment Catalog has models — upload a supplier
-                price file on the Price File Update tab and these link up automatically by model number.
-              </p>
-            )}
-            <div className="max-h-[600px] space-y-4 overflow-y-auto pr-1">
-              {groups.map(([unit, rows]) => (
-                <div key={unit}>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{unit}</p>
-                  <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
-                    {rows.map((d) => {
-                      const afterEquip = d.totalInvestment - d.currentComponentCostCents;
-                      const pct = d.totalInvestment > 0 ? Math.round((afterEquip / d.totalInvestment) * 100) : null;
-                      return (
-                        <div key={d.id} className="px-3.5 py-3" data-testid={`pkgequip-${d.id}`}>
-                          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                            <p className="text-sm font-semibold text-slate-800">
-                              {d.tier} · {d.tonnage} ton · {d.packageLevel}
-                            </p>
-                            <button
-                              onClick={() => setPreviewPkg(byId.get(d.id) || d)}
-                              className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-600"
-                              title="Preview as the proposal builder shows it"
-                              data-testid={`pkgequip-preview-${d.id}`}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                            <div className="ml-auto flex items-baseline gap-4 tabular-nums">
-                              <span className="text-xs text-slate-400">
-                                Price <span className="text-sm font-semibold text-slate-800">{usd(d.totalInvestment)}</span>
+
+            <div className="flex gap-4 max-lg:flex-col">
+              {/* Package list */}
+              <div className="w-80 shrink-0 max-lg:w-full">
+                <div className="max-h-[600px] overflow-y-auto rounded-lg border border-slate-200 max-lg:max-h-72">
+                  {groups.map(([unit, rows]) => (
+                    <div key={unit}>
+                      <p className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{unit}</p>
+                      {rows.map((d) => {
+                        const active = selected?.id === d.id;
+                        return (
+                          <button
+                            key={d.id}
+                            onClick={() => setSelectedId(d.id)}
+                            className={`block w-full border-b border-slate-100 border-l-2 px-3 py-2 text-left transition-colors ${
+                              active ? "border-l-[#711419] bg-[#711419]/[0.04]" : "border-l-transparent hover:bg-slate-50"
+                            }`}
+                            data-testid={`pkgequip-item-${d.id}`}
+                          >
+                            <span className="flex items-baseline justify-between gap-2">
+                              <span className={`truncate text-sm ${active ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
+                                {d.tier} · {d.tonnage}T · {d.packageLevel}
                               </span>
-                              <span className="text-xs text-slate-400">
-                                Equipment{" "}
-                                <span className="text-sm font-semibold text-slate-800">
-                                  {d.matchedCount > 0 ? usd(d.currentComponentCostCents) : "—"}
-                                </span>
-                              </span>
-                              {d.matchedCount > 0 && d.unmatchedModels.length === 0 && (
-                                <span className="text-xs text-slate-400">
-                                  After equipment{" "}
-                                  <span className="text-sm font-semibold text-slate-800">{usd(afterEquip)}</span>
-                                  {pct != null && <span className="text-[11px] text-slate-400"> ({pct}%)</span>}
-                                </span>
+                              <span className="shrink-0 tabular-nums text-xs text-slate-500">{usd(d.totalInvestment)}</span>
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+                              {d.matchedCount > 0 ? <>Equipment {usd(d.currentComponentCostCents)}</> : "No catalog match yet"}
+                              {d.unmatchedModels.length > 0 && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title={`${d.unmatchedModels.length} component(s) not in catalog`} />
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  {shown.length === 0 && (
+                    <p className="px-3 py-8 text-center text-sm text-slate-400">No packages match.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Breakdown */}
+              <div className="min-w-0 flex-1">
+                {selected ? (
+                  <div className="space-y-4 rounded-lg border border-slate-200 p-4" data-testid={`pkgequip-detail-${selected.id}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{selected.unitType}</p>
+                        <p className="text-lg font-bold text-slate-900">{selected.tier} · {selected.tonnage} Ton · {selected.packageLevel}</p>
+                        <button
+                          onClick={() => setPreviewPkg(selPkg || selected)}
+                          className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#711419] hover:underline"
+                          data-testid={`pkgequip-preview-${selected.id}`}
+                        >
+                          <Eye className="h-3.5 w-3.5" /> Preview proposal card
+                        </button>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your price</p>
+                        <p className="text-2xl font-bold tabular-nums text-[#711419]">{usd(selected.totalInvestment)}</p>
+                        {selected.monthlyPayment != null && selected.monthlyPayment > 0 && (
+                          <p className="text-xs tabular-nums text-slate-500">as low as {usd(selected.monthlyPayment)}/mo</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {selected.parts.map((part) => {
+                        const img = slotImage(part.slot);
+                        return (
+                          <div key={part.slot} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-100 bg-slate-50">
+                              {img ? <img src={img} alt={part.slot} className="h-12 w-12 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</p>
+                              <p className="truncate text-sm font-medium text-slate-800">{part.name || part.model}</p>
+                              <p className="truncate font-mono text-[11px] text-slate-400">{part.model}</p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              {part.costCents != null ? (
+                                <p className="tabular-nums text-sm font-semibold text-slate-800">{usd(part.costCents)}</p>
+                              ) : (
+                                <p className="text-[11px] font-medium text-amber-600">not in catalog</p>
                               )}
                             </div>
                           </div>
-                          <div className="mt-2 space-y-1">
-                            {d.parts.map((part) => (
-                              <div key={part.slot} className="flex items-baseline gap-2 text-xs">
-                                <span className="w-20 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</span>
-                                <span className="shrink-0 font-mono text-slate-700">{part.model}</span>
-                                <span className="min-w-0 flex-1 truncate text-slate-400">{part.name || ""}</span>
-                                {part.costCents != null ? (
-                                  <span className="shrink-0 tabular-nums text-slate-600">{usd(part.costCents)}</span>
-                                ) : (
-                                  <span className="shrink-0 text-[11px] text-amber-600">not in catalog</span>
-                                )}
-                              </div>
-                            ))}
-                            {d.parts.length === 0 && (
-                              <p className="text-xs text-slate-400">No equipment models on this package.</p>
-                            )}
-                          </div>
+                        );
+                      })}
+                      {selected.parts.length === 0 && (
+                        <p className="text-sm text-slate-400 sm:col-span-2">No equipment models on this package.</p>
+                      )}
+                    </div>
+
+                    {selPkg?.accessoryModels && (
+                      <p className="text-xs text-slate-500">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Accessories</span>{" "}
+                        {selPkg.accessoryModels}
+                      </p>
+                    )}
+
+                    {selected.matchedCount > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+                          <div className="bg-[#711419]" style={{ width: `${equipPct}%` }} />
                         </div>
-                      );
-                    })}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs tabular-nums">
+                          <span className="flex items-center gap-1.5 text-slate-600">
+                            <span className="h-2 w-2 rounded-full bg-[#711419]" /> Equipment {usd(selected.currentComponentCostCents)} ({equipPct}%)
+                          </span>
+                          <span className="flex items-center gap-1.5 text-slate-600">
+                            <span className="h-2 w-2 rounded-full bg-slate-200" /> After equipment {usd(afterEquip)} ({100 - equipPct}%)
+                          </span>
+                        </div>
+                        {selected.unmatchedModels.length > 0 && (
+                          <p className="text-[11px] text-amber-600">
+                            Equipment total is missing {selected.unmatchedModels.length} component{selected.unmatchedModels.length === 1 ? "" : "s"} not in the catalog yet.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <p className="rounded-lg border border-dashed border-slate-300 py-16 text-center text-sm text-slate-400">
+                    Pick a package to see its breakdown.
+                  </p>
+                )}
+              </div>
             </div>
           </>
         )}

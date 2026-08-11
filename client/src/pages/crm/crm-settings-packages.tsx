@@ -296,7 +296,7 @@ export default function CrmSettingsPackages() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="mx-auto w-full max-w-4xl space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -314,14 +314,26 @@ export default function CrmSettingsPackages() {
 
         {/* The three layers of the pricing system: your curated packages,
             the equipment catalog they're costed against, and the supplier
-            price-file wizard that keeps the catalog current. */}
-        <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as typeof pageTab)} className="mb-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
-            <TabsTrigger value="pricing" data-testid="tab-page-pricing">Packages &amp; Pricing</TabsTrigger>
-            <TabsTrigger value="catalog" data-testid="tab-page-catalog">Equipment Catalog</TabsTrigger>
-            <TabsTrigger value="pricefile" data-testid="tab-page-pricefile">Price File Update</TabsTrigger>
-          </TabsList>
-        </Tabs>
+            price-file wizard that keeps the catalog current. Segmented
+            control matches the Inbox/Mail filter tabs. */}
+        <div className="mb-4 flex w-full max-w-xl items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
+          {([
+            ["pricing", "Packages & Pricing"],
+            ["catalog", "Equipment Catalog"],
+            ["pricefile", "Price File Update"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setPageTab(value)}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                pageTab === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+              data-testid={`tab-page-${value}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {pageTab === "catalog" && (
           <div className="space-y-6">
@@ -336,7 +348,11 @@ export default function CrmSettingsPackages() {
           </div>
         )}
 
-        <div className={pageTab === "pricing" ? "space-y-6" : "hidden"}>
+        {/* Conditionally mounted (was `hidden`) — keeping the 200+ package
+            price tables in the DOM made every tab feel slow. Filter state
+            lives up here, so nothing is lost switching tabs. */}
+        {pageTab === "pricing" && (
+        <div className="space-y-6">
           <CostDriftCard packages={packages} />
           <Card>
             <CardHeader>
@@ -685,6 +701,7 @@ export default function CrmSettingsPackages() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
           <AlertDialogContent>

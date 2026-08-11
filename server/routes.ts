@@ -33105,7 +33105,27 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         db.select().from(pricebookPackages).where(eq(pricebookPackages.isActive, true)),
         db.select().from(equipmentModels),
       ]);
-      const findModel = (m: string) => catalog.find((c) => modelsMatch(c.model, m));
+      // Normalize the catalog ONCE — the naive per-part catalog.find() was
+      // ~1M modelsMatch calls per request (200 packages × 4 slots × 1,350
+      // models, each re-running the normalize regex) and made the whole
+      // settings page feel slow. Exact hits are a Map lookup; only true
+      // misses fall back to the prefix scan.
+      const normedCatalog = catalog.map((c) => ({ c, n: normModel(c.model) }));
+      const exactByNorm = new Map<string, (typeof catalog)[number]>();
+      for (const { c, n } of normedCatalog) if (n && !exactByNorm.has(n)) exactByNorm.set(n, c);
+      const findModel = (m: string) => {
+        const n = normModel(m);
+        if (!n) return undefined;
+        const exact = exactByNorm.get(n);
+        if (exact) return exact;
+        for (const { c, n: cn } of normedCatalog) {
+          if (!cn) continue;
+          const shorter = cn.length < n.length ? cn : n;
+          const longer = cn.length < n.length ? n : cn;
+          if (shorter.length >= 8 && longer.startsWith(shorter)) return c;
+        }
+        return undefined;
+      };
       const out = packages.map((p) => {
         // Per-slot detail so the UI can show exactly which equipment makes up
         // each package and what each piece costs from the catalog today.
