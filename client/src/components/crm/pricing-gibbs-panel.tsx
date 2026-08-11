@@ -254,7 +254,7 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
   // fixed positioning and pin the drawer to the page instead of the viewport.
   return createPortal(
     <div
-      className="fixed inset-y-0 right-0 z-[65] flex w-[min(46vw,820px)] min-w-[440px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
+      className="fixed inset-y-0 right-0 z-[65] flex w-[max(420px,calc((100vw-80rem)/2-16px))] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
       data-testid="pricing-gibbs-panel"
     >
       {/* Header — who this Gibbs is */}

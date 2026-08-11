@@ -33362,6 +33362,38 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // Per-slot package editing: model, display name/description, and image for
+  // each equipment card (outdoor/coil/indoor-heat/thermostat). Prices and
+  // curation stay untouched — this edits what the card shows.
+  app.patch("/api/pricebook/packages/:id/slots", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const [pkg] = await db.select().from(pricebookPackages).where(eq(pricebookPackages.id, req.params.id));
+      if (!pkg) return res.status(404).json({ message: "Package not found" });
+      const SLOT_FIELDS = [
+        "outdoorModel", "outdoorName", "outdoorImageUrl",
+        "coilModel", "coilName", "coilImageUrl",
+        "indoorHeatModel", "indoorHeatName", "furnaceImageUrl",
+        "thermostatModel", "thermostatName", "thermostatImageUrl",
+      ] as const;
+      const updates: Record<string, any> = {};
+      for (const f of SLOT_FIELDS) {
+        if (req.body?.[f] !== undefined) {
+          const v = String(req.body[f] ?? "").trim();
+          updates[f] = v ? v.slice(0, f.toLowerCase().includes("image") ? 500 : 200) : null;
+        }
+      }
+      if (Object.keys(updates).length === 0) return res.status(400).json({ message: "Nothing to update" });
+      updates.updatedAt = new Date();
+      const [row] = await db.update(pricebookPackages).set(updates).where(eq(pricebookPackages.id, pkg.id)).returning();
+      await logCrmAudit(user?.id || null, "pricebook.package_slot_updated", "pricebook_package", pkg.id, updates, req.ip);
+      res.json(row);
+    } catch (error) {
+      console.error("Error updating package slot:", error);
+      res.status(500).json({ message: "Failed to update the package" });
+    }
+  });
+
   app.get("/api/pricebook/packages", requireCrmAuth, async (req, res) => {
     try {
       const packages = await db

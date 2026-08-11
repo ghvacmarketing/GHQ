@@ -837,6 +837,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const [monthlyInput, setMonthlyInput] = useState("");
   const [fixOpen, setFixOpen] = useState(false);
   const [fixFilter, setFixFilter] = useState("");
+  const [slotEdit, setSlotEdit] = useState<(typeof SLOT_DEFS)[number] | null>(null);
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
@@ -991,10 +992,6 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                   {unitTypes.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-60 pl-8" data-testid="pkgequip-search" />
-              </div>
               {unmatchedDistinct > 0 && (
                 <Button
                   size="sm" variant="outline"
@@ -1005,6 +1002,10 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                   Fix matches ({unmatchedDistinct})
                 </Button>
               )}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-60 pl-8" data-testid="pkgequip-search" />
+              </div>
               <span className="ml-auto text-xs text-slate-400">{shown.length} package{shown.length === 1 ? "" : "s"}</span>
             </div>
 
@@ -1085,10 +1086,31 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                       </div>
 
                       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                        {selected.parts.map((part) => {
+                        {SLOT_DEFS.map((def) => {
+                          const part = selected.parts.find((pt) => pt.slot === def.label);
+                          if (!part) {
+                            return (
+                              <button
+                                key={def.key}
+                                onClick={() => setSlotEdit(def)}
+                                className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-600"
+                                data-testid={`pkgequip-addslot-${def.key}`}
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Add {def.label.toLowerCase()}
+                              </button>
+                            );
+                          }
                           const img = slotImage(part.slot);
                           return (
-                            <div key={part.slot} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                            <div key={def.key} className="group relative flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                              <button
+                                onClick={() => setSlotEdit(def)}
+                                className="absolute right-1.5 top-1.5 rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100"
+                                title={`Edit the ${def.label.toLowerCase()} card`}
+                                data-testid={`pkgequip-editslot-${def.key}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
                               <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-100 bg-slate-50">
                                 {img ? <img src={img} alt={part.slot} className="h-12 w-12 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
                               </div>
@@ -1115,9 +1137,6 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                             </div>
                           );
                         })}
-                        {selected.parts.length === 0 && (
-                          <p className="text-sm text-slate-400 sm:col-span-2">No equipment models on this package.</p>
-                        )}
                       </div>
 
                       {selPkg?.accessoryModels && (
@@ -1358,7 +1377,135 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
       </Dialog>
 
       <FixMatchesDialog open={fixOpen} onClose={() => setFixOpen(false)} initialFilter={fixFilter} />
+
+      {slotEdit && selected && (
+        <SlotEditDialog
+          key={`${selected.id}-${slotEdit.key}`}
+          slot={slotEdit}
+          pkg={selPkg || selected}
+          packageId={selected.id}
+          onClose={() => setSlotEdit(null)}
+        />
+      )}
     </Card>
+  );
+}
+
+// ─────────────────────────── Per-slot card editor ───────────────────────────
+
+const SLOT_DEFS = [
+  { key: "outdoor", label: "Outdoor", modelField: "outdoorModel", nameField: "outdoorName", imageField: "outdoorImageUrl" },
+  { key: "coil", label: "Coil", modelField: "coilModel", nameField: "coilName", imageField: "coilImageUrl" },
+  { key: "indoorHeat", label: "Indoor heat", modelField: "indoorHeatModel", nameField: "indoorHeatName", imageField: "furnaceImageUrl" },
+  { key: "thermostat", label: "Thermostat", modelField: "thermostatModel", nameField: "thermostatName", imageField: "thermostatImageUrl" },
+] as const;
+
+/** Edit one equipment card on one package: the model number, the description
+ *  shown on proposals, and the image. Prices never change here. */
+function SlotEditDialog({ slot, pkg, packageId, onClose }: {
+  slot: (typeof SLOT_DEFS)[number];
+  pkg: any;
+  packageId: string;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [model, setModel] = useState(String(pkg?.[slot.modelField] || ""));
+  const [name, setName] = useState(String(pkg?.[slot.nameField] || ""));
+  const [imageUrl, setImageUrl] = useState(String(pkg?.[slot.imageField] || ""));
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    try {
+      const r = await apiRequest("POST", "/api/uploads/request-url", {
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+      });
+      const { uploadURL, objectPath } = await r.json();
+      const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!put.ok) throw new Error("Upload failed");
+      setImageUrl(objectPath);
+    } catch (e: any) {
+      toast({ title: e?.message || "Couldn't upload that image", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = useMutation({
+    mutationFn: async () =>
+      apiRequest("PATCH", `/api/pricebook/packages/${packageId}/slots`, {
+        [slot.modelField]: model,
+        [slot.nameField]: name,
+        [slot.imageField]: imageUrl,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook-drift"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/package-unmatched-models"] });
+      toast({ title: `${slot.label} card updated` });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save the card", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Edit {slot.label.toLowerCase()} card</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1 text-[11px] font-medium text-slate-500">Model number</p>
+            <Input value={model} onChange={(e) => setModel(e.target.value)} className="h-9 font-mono text-sm" placeholder="e.g. 4TWX8036A1000A" data-testid="slotedit-model" />
+            <p className="mt-1 text-[10px] text-slate-400">Costing comes from matching this against the Equipment Catalog.</p>
+          </div>
+          <div>
+            <p className="mb-1 text-[11px] font-medium text-slate-500">Description <span className="text-slate-400">(what proposals show)</span></p>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 text-sm" placeholder="e.g. XV18 Variable Speed Heat Pump" data-testid="slotedit-name" />
+          </div>
+          <div>
+            <p className="mb-1 text-[11px] font-medium text-slate-500">Image</p>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                {imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }}
+                data-testid="slotedit-file"
+              />
+              <Button size="sm" variant="outline" className="h-8" disabled={uploading} onClick={() => fileRef.current?.click()} data-testid="slotedit-upload">
+                {uploading ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Uploading…</> : imageUrl ? "Replace image" : "Upload image"}
+              </Button>
+              {imageUrl && (
+                <Button size="sm" variant="ghost" className="h-8 text-slate-500" onClick={() => setImageUrl("")} data-testid="slotedit-removeimg">
+                  Remove
+                </Button>
+              )}
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-400">Changes what this card shows here and on proposals — the package price never moves.</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              disabled={save.isPending || uploading}
+              onClick={() => save.mutate()}
+              data-testid="slotedit-save"
+            >
+              {save.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save card"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
