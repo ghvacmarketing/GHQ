@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +23,8 @@ export default function CrmSettingsPackages() {
   usePageTitle("Package Pricing Management");
   const [, navigate] = useLocation();
   const [pageTab, setPageTab] = useState<"costs" | "pricefile">("costs");
+  // The panel sizes itself to the gutter right of this container.
+  const boundaryRef = useRef<HTMLDivElement | null>(null);
   // The docked Pricing Gibbs panel — remembered across visits.
   const [gibbsOpen, setGibbsOpen] = useState(() => {
     try { return localStorage.getItem("pricing-gibbs-panel") === "1"; } catch { return false; }
@@ -78,7 +80,7 @@ export default function CrmSettingsPackages() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="mx-auto w-full max-w-7xl space-y-6">
+      <div ref={boundaryRef} className="mx-auto w-full max-w-7xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -134,7 +136,7 @@ export default function CrmSettingsPackages() {
 
         {/* True side panel — fixed to the right edge, slides over the page,
             never reflows the content. */}
-        {gibbsOpen && <PricingGibbsPanel onClose={toggleGibbs} />}
+        {gibbsOpen && <PricingGibbsPanel onClose={toggleGibbs} boundaryRef={boundaryRef} />}
       </div>
     </CrmLayout>
   );

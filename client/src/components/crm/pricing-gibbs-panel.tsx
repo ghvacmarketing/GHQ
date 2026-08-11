@@ -47,7 +47,10 @@ function stripMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, "$1");
 }
 
-export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) {
+export default function PricingGibbsPanel({ onClose, boundaryRef }: {
+  onClose: () => void;
+  boundaryRef?: React.RefObject<HTMLDivElement | null>;
+}) {
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -55,6 +58,9 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
   const [streamText, setStreamText] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
+  // Fill exactly the gutter right of the page content — measured live so the
+  // sidebar, zoom, and window size are all accounted for; never over content.
+  const [panelWidth, setPanelWidth] = useState(480);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const spaceIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -110,6 +116,22 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
       }
     })();
   }, [hydrated]);
+
+  useEffect(() => {
+    const measure = () => {
+      const edge = boundaryRef?.current?.getBoundingClientRect().right;
+      const gutter = edge != null ? window.innerWidth - edge - 12 : 480;
+      setPanelWidth(Math.max(420, Math.round(gutter)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    const ro = boundaryRef?.current ? new ResizeObserver(measure) : null;
+    if (ro && boundaryRef?.current) ro.observe(boundaryRef.current);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro?.disconnect();
+    };
+  }, [boundaryRef]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -254,7 +276,8 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
   // fixed positioning and pin the drawer to the page instead of the viewport.
   return createPortal(
     <div
-      className="fixed inset-y-0 right-0 z-[65] flex w-[max(420px,calc((100vw-80rem)/2-16px))] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
+      className="fixed inset-y-0 right-0 z-[65] flex flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
+      style={{ width: panelWidth }}
       data-testid="pricing-gibbs-panel"
     >
       {/* Header — who this Gibbs is */}
