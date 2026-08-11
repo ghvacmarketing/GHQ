@@ -18,7 +18,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Layers, Loader2, Pencil, Plus,
-  Search, TrendingUp, Upload, X,
+  Search, SlidersHorizontal, TrendingUp, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
@@ -661,6 +661,132 @@ type DriftRow = {
   parts: Array<{ slot: string; name: string | null; model: string; costCents: number | null }>;
 };
 
+// ─────────────────────────── Job cost model ───────────────────────────
+
+type CostModel = {
+  laborHours: number;
+  laborRatePerHour: number;
+  laborHoursByUnitType: Record<string, number>;
+  materialsPctOfEquipment: number;
+  commissionPctOfPrice: number;
+  buydownPctOfPrice: number;
+  overheadPctOfPrice: number;
+  targetMarginPct: number;
+};
+
+/** Six shop-level numbers — not a per-package spreadsheet. They turn every
+ *  package's price into the estimated waterfall in Package Equipment and
+ *  power Gibbs' package_economics answers. Estimates only: nothing here
+ *  ever changes a price. */
+export function JobCostModelCard({ packages }: { packages: any[] | undefined }) {
+  const { toast } = useToast();
+  const { data } = useQuery<CostModel>({ queryKey: ["/api/crm/cost-model"] });
+  const [form, setForm] = useState<CostModel | null>(null);
+  const model = form ?? data ?? null;
+  const unitTypes = useMemo(
+    () => Array.from(new Set((packages || []).map((p: any) => p.unitType).filter(Boolean))).sort() as string[],
+    [packages],
+  );
+
+  const save = useMutation({
+    mutationFn: async () => apiRequest("PUT", "/api/crm/cost-model", model),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/cost-model"] });
+      setForm(null);
+      toast({ title: "Cost model saved", description: "Package Equipment estimates now use the new numbers." });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save the cost model", variant: "destructive" }),
+  });
+
+  const set = (patch: Partial<CostModel>) => setForm({ ...(model as CostModel), ...patch });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5" /> Job Cost Model</CardTitle>
+        <CardDescription>
+          A handful of shop-level numbers that turn each package's price into the full estimated cost
+          waterfall in Package Equipment — equipment, labor, materials, commission, financing buydown,
+          overhead, profit. Estimates only: nothing here ever changes a price, and Gibbs uses the same
+          numbers when you ask him about package economics.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!model ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {([
+                ["laborHours", "Install labor — crew hours", "hrs"],
+                ["laborRatePerHour", "Loaded labor rate", "$/hr"],
+                ["materialsPctOfEquipment", "Materials & misc", "% of equipment"],
+                ["commissionPctOfPrice", "Sales commission", "% of price"],
+                ["buydownPctOfPrice", "Financing buydown (dealer fee)", "% of price"],
+                ["overheadPctOfPrice", "Overhead", "% of price"],
+                ["targetMarginPct", "Target profit margin", "% of price"],
+              ] as Array<[keyof CostModel, string, string]>).map(([key, label, unit]) => (
+                <div key={key}>
+                  <p className="mb-1 text-[11px] font-medium text-slate-500">{label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min="0" step="0.5"
+                      value={String(model[key] as number)}
+                      onChange={(e) => set({ [key]: parseFloat(e.target.value) || 0 } as Partial<CostModel>)}
+                      className="h-9 w-24"
+                      data-testid={`costmodel-${key}`}
+                    />
+                    <span className="text-[11px] text-slate-400">{unit}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {unitTypes.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-[11px] font-medium text-slate-500">
+                  Crew hours by system type <span className="text-slate-400">(blank = {model.laborHours} hrs default)</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {unitTypes.map((u) => (
+                    <div key={u} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5">
+                      <span className="text-xs font-medium text-slate-600">{u}</span>
+                      <Input
+                        type="number" min="0" step="0.5"
+                        value={model.laborHoursByUnitType[u] ?? ""}
+                        placeholder={String(model.laborHours)}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          const map = { ...model.laborHoursByUnitType };
+                          if (Number.isFinite(v) && v > 0) map[u] = v;
+                          else delete map[u];
+                          set({ laborHoursByUnitType: map });
+                        }}
+                        className="h-8 w-20"
+                        data-testid={`costmodel-hours-${u}`}
+                      />
+                      <span className="text-[10px] text-slate-400">hrs</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              onClick={() => save.mutate()}
+              disabled={save.isPending || !form}
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              data-testid="costmodel-save"
+            >
+              {save.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save cost model"}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─────────────────────────── Package equipment map ───────────────────────────
 
 /** The connective view: every proposal-builder package, the exact models
@@ -675,6 +801,7 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
+  const { data: costModel } = useQuery<CostModel>({ queryKey: ["/api/crm/cost-model"] });
   const byId = useMemo(() => new Map((packages || []).map((p: any) => [p.id, p])), [packages]);
 
   const LEVEL_ORDER: Record<string, number> = { Best: 0, Better: 1, Good: 2, Budget: 3 };
@@ -718,10 +845,36 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
     slot === "Indoor heat" ? selPkg?.furnaceImageUrl :
     selPkg?.thermostatImageUrl;
 
-  const afterEquip = selected ? selected.totalInvestment - selected.currentComponentCostCents : 0;
   const equipPct = selected && selected.totalInvestment > 0
     ? Math.min(100, Math.round((selected.currentComponentCostCents / selected.totalInvestment) * 100))
     : 0;
+
+  // Full estimated waterfall from the Job Cost Model. Mirrors the server math
+  // in Gibbs' package_economics tool — keep the two in step.
+  const econ = useMemo(() => {
+    if (!selected || !costModel) return null;
+    const price = selected.totalInvestment;
+    const equip = selected.currentComponentCostCents;
+    const hours = Number(costModel.laborHoursByUnitType?.[selected.unitType] ?? costModel.laborHours) || 0;
+    const labor = Math.round(hours * costModel.laborRatePerHour * 100);
+    const materials = Math.round((equip * costModel.materialsPctOfEquipment) / 100);
+    const commission = Math.round((price * costModel.commissionPctOfPrice) / 100);
+    const buydown = Math.round((price * costModel.buydownPctOfPrice) / 100);
+    const overhead = Math.round((price * costModel.overheadPctOfPrice) / 100);
+    const profit = price - equip - labor - materials - commission - buydown - overhead;
+    const marginPct = price > 0 ? Math.round((profit / price) * 1000) / 10 : 0;
+    const denom = 1 - (costModel.commissionPctOfPrice + costModel.buydownPctOfPrice + costModel.overheadPctOfPrice + costModel.targetMarginPct) / 100;
+    const suggested = denom > 0.05 ? Math.round((equip + labor + materials) / denom) : null;
+    const segs = [
+      { label: "Equipment", cents: equip, color: "#711419" },
+      { label: "Labor", cents: labor, color: "#475569" },
+      { label: "Materials", cents: materials, color: "#94a3b8" },
+      { label: "Commission", cents: commission, color: "#b45309" },
+      { label: "Buydown", cents: buydown, color: "#0369a1" },
+      { label: "Overhead", cents: overhead, color: "#cbd5e1" },
+    ];
+    return { price, hours, labor, materials, commission, buydown, overhead, profit, marginPct, suggested, segs };
+  }, [selected, costModel]);
 
   return (
     <Card>
@@ -871,43 +1024,70 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
 
                   {/* Money rail — cost breakdown + financing math */}
                   <div className="w-80 shrink-0 space-y-4 max-lg:w-full">
-                    {selected.matchedCount > 0 && (
+                    {selected.matchedCount > 0 && econ && costModel && (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
-                        <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cost breakdown</p>
+                        <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cost breakdown — estimate</p>
                         <div className="divide-y divide-slate-100 px-3.5 text-sm">
                           <div className="flex items-baseline justify-between gap-3 py-2.5">
                             <span className="text-slate-600">Your price</span>
-                            <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.totalInvestment)}</span>
+                            <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(econ.price)}</span>
                           </div>
-                          <div className="flex items-baseline justify-between gap-3 py-2.5">
-                            <span className="text-slate-600">Equipment (live from catalog)</span>
-                            <span className="shrink-0 tabular-nums text-slate-700">
-                              − {usd(selected.currentComponentCostCents)}<span className="ml-1.5 text-[11px] text-slate-400">{equipPct}%</span>
-                            </span>
-                          </div>
+                          {[
+                            { label: "Equipment", sub: `live from catalog · ${equipPct}%`, cents: selected.currentComponentCostCents },
+                            { label: "Labor", sub: `${econ.hours} hrs × $${costModel.laborRatePerHour}/hr`, cents: econ.labor },
+                            { label: "Materials & misc", sub: `${costModel.materialsPctOfEquipment}% of equipment`, cents: econ.materials },
+                            { label: "Commission", sub: `${costModel.commissionPctOfPrice}% of price`, cents: econ.commission },
+                            { label: "Financing buydown", sub: `${costModel.buydownPctOfPrice}% of price`, cents: econ.buydown },
+                            { label: "Overhead", sub: `${costModel.overheadPctOfPrice}% of price`, cents: econ.overhead },
+                          ].map((r) => (
+                            <div key={r.label} className="flex items-baseline justify-between gap-3 py-2">
+                              <span className="min-w-0">
+                                <span className="text-slate-600">{r.label}</span>
+                                <span className="ml-1.5 text-[10px] text-slate-400">{r.sub}</span>
+                              </span>
+                              <span className="shrink-0 tabular-nums text-slate-700">− {usd(r.cents)}</span>
+                            </div>
+                          ))}
                           <div className="py-2.5">
                             <div className="flex items-baseline justify-between gap-3">
-                              <span className="font-medium text-slate-800">Left after equipment</span>
-                              <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-                                {usd(afterEquip)}<span className="ml-1.5 text-[11px] font-normal text-slate-400">{100 - equipPct}%</span>
+                              <span className="font-medium text-slate-800">Estimated profit</span>
+                              <span className={`shrink-0 font-semibold tabular-nums ${econ.profit < 0 ? "text-red-600" : econ.marginPct >= costModel.targetMarginPct ? "text-emerald-700" : "text-amber-600"}`}>
+                                {usd(econ.profit)}<span className="ml-1.5 text-[11px] font-normal">({econ.marginPct}%)</span>
                               </span>
                             </div>
-                            <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                              Labor, materials, permits, overhead, and your margin all come out of this — it is not profit.
+                            <p className="mt-0.5 text-[11px] text-slate-400">
+                              Target {costModel.targetMarginPct}% · {econ.marginPct >= costModel.targetMarginPct ? "on target" : `${(costModel.targetMarginPct - econ.marginPct).toFixed(1)}% below target`}
                             </p>
-                            <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
-                              <div className="bg-[#711419]" style={{ width: `${equipPct}%` }} />
+                            <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-emerald-300">
+                              {econ.segs.map((s) => (
+                                <div key={s.label} style={{ width: `${Math.max(0, (s.cents / Math.max(econ.price, econ.price - econ.profit)) * 100)}%`, background: s.color }} title={`${s.label} ${usd(s.cents)}`} />
+                              ))}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-slate-500">
-                              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#711419]" /> Equipment {equipPct}%</span>
-                              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-slate-200" /> Everything else {100 - equipPct}%</span>
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                              {econ.segs.map((s) => (
+                                <span key={s.label} className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} /> {s.label}</span>
+                              ))}
+                              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> Profit</span>
                             </div>
                             {selected.unmatchedModels.length > 0 && (
                               <p className="mt-1.5 text-[11px] text-amber-600">
-                                {selected.unmatchedModels.length} component{selected.unmatchedModels.length === 1 ? " is" : "s are"} not in the catalog yet, so the real equipment number is higher than shown.
+                                {selected.unmatchedModels.length} component{selected.unmatchedModels.length === 1 ? " is" : "s are"} not in the catalog yet — equipment is understated and profit overstated.
                               </p>
                             )}
                           </div>
+                          {econ.suggested != null && (
+                            <div className="py-2.5">
+                              <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-slate-600">Suggested at {costModel.targetMarginPct}% margin</span>
+                                <span className="shrink-0 font-medium tabular-nums text-slate-800">{usd(econ.suggested)}</span>
+                              </div>
+                              <p className={`mt-0.5 text-[11px] ${econ.price >= econ.suggested ? "text-emerald-700" : "text-amber-600"}`}>
+                                {econ.price >= econ.suggested
+                                  ? `Your price sits ${usd(econ.price - econ.suggested)} above the suggested price.`
+                                  : `Your price sits ${usd(econ.suggested - econ.price)} below the suggested price.`}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

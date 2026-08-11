@@ -33197,6 +33197,71 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // ── Job Cost Model: a handful of shop-level numbers that turn a package's
+  // price into a full estimated waterfall (equipment → labor → materials →
+  // commission → buydown → overhead → profit). ESTIMATES ONLY — prices are
+  // never computed or changed from here. Consumed by the Package Equipment
+  // rail and Gibbs' package_economics tool.
+  const JOB_COST_MODEL_KEY = "job_cost_model";
+  const JOB_COST_MODEL_DEFAULTS = {
+    laborHours: 16,
+    laborRatePerHour: 85,
+    laborHoursByUnitType: {} as Record<string, number>,
+    materialsPctOfEquipment: 8,
+    commissionPctOfPrice: 4,
+    buydownPctOfPrice: 5,
+    overheadPctOfPrice: 10,
+    targetMarginPct: 20,
+  };
+
+  app.get("/api/crm/cost-model", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
+    try {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, JOB_COST_MODEL_KEY)).limit(1);
+      let saved: any = {};
+      try { saved = row?.value ? JSON.parse(row.value) : {}; } catch { saved = {}; }
+      res.json({ ...JOB_COST_MODEL_DEFAULTS, ...saved });
+    } catch (error) {
+      console.error("Error loading cost model:", error);
+      res.status(500).json({ message: "Failed to load the cost model" });
+    }
+  });
+
+  app.put("/api/crm/cost-model", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const b = req.body || {};
+      const num = (v: any, max: number) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(Math.max(n, 0), max) : 0;
+      };
+      const hoursMap: Record<string, number> = {};
+      if (b.laborHoursByUnitType && typeof b.laborHoursByUnitType === "object") {
+        for (const [k, v] of Object.entries(b.laborHoursByUnitType)) {
+          const n = Number(v);
+          if (String(k).trim() && Number.isFinite(n) && n > 0) hoursMap[String(k).trim()] = Math.min(n, 500);
+        }
+      }
+      const model = {
+        laborHours: num(b.laborHours, 500),
+        laborRatePerHour: num(b.laborRatePerHour, 10000),
+        laborHoursByUnitType: hoursMap,
+        materialsPctOfEquipment: num(b.materialsPctOfEquipment, 100),
+        commissionPctOfPrice: num(b.commissionPctOfPrice, 100),
+        buydownPctOfPrice: num(b.buydownPctOfPrice, 100),
+        overheadPctOfPrice: num(b.overheadPctOfPrice, 100),
+        targetMarginPct: num(b.targetMarginPct, 95),
+      };
+      await db.insert(appSettings)
+        .values({ key: JOB_COST_MODEL_KEY, value: JSON.stringify(model), updatedAt: new Date() })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: JSON.stringify(model), updatedAt: new Date() } });
+      await logCrmAudit(user?.id || null, "pricebook.cost_model_updated", "app_setting", JOB_COST_MODEL_KEY, model, req.ip);
+      res.json(model);
+    } catch (error) {
+      console.error("Error saving cost model:", error);
+      res.status(500).json({ message: "Failed to save the cost model" });
+    }
+  });
+
   app.get("/api/pricebook/packages", requireCrmAuth, async (req, res) => {
     try {
       const packages = await db

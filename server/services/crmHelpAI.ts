@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
-import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders, serviceCallChecklists } from "@shared/schema";
+import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders, serviceCallChecklists, appSettings, equipmentModels } from "@shared/schema";
 import { eq, gte, lte, and, or, sql, desc, asc, isNull, isNotNull, ilike, ne, inArray } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -511,6 +511,35 @@ const CRM_TOOLS: ClaudeTool[] = [
     },
   },
   {
+    name: "package_economics",
+    description: "Estimated job economics for proposal-builder packages, using the Job Cost Model (Settings → Package Pricing): price, live equipment cost from the catalog, labor, materials, commission, financing buydown, overhead → estimated profit and margin % vs the target. Filters: unitType, tier, tonnage, packageLevel, onlyBelowTarget. For what-if questions ('what if labor goes to $95/hr?') pass whatIf overrides. All money in DOLLARS. Estimates only — nothing here ever changes a price.",
+    input_schema: {
+      type: "object",
+      properties: {
+        unitType: { type: "string" },
+        tier: { type: "string" },
+        tonnage: { type: "string" },
+        packageLevel: { type: "string" },
+        onlyBelowTarget: { type: "boolean", description: "Only packages whose estimated margin is below the target margin" },
+        limit: { type: "number" },
+        whatIf: {
+          type: "object",
+          description: "Optional scenario overrides applied on top of the saved model",
+          properties: {
+            laborRatePerHour: { type: "number" },
+            laborHours: { type: "number" },
+            materialsPctOfEquipment: { type: "number" },
+            commissionPctOfPrice: { type: "number" },
+            buydownPctOfPrice: { type: "number" },
+            overheadPctOfPrice: { type: "number" },
+            targetMarginPct: { type: "number" },
+          },
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "business_stats",
     description: "Company-wide live totals: customer count, active agreements, upcoming scheduled work orders, unpaid invoice count and total balance due.",
     input_schema: { type: "object", properties: {}, required: [] },
@@ -688,6 +717,92 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
     return JSON.stringify({
       checklists: rows,
       note: "serviceType ANY applies to every subtype of that visit type. Pin assignedChecklistId in create_work_order/update_work_order params whenever more than one template fits the job's visit type + subtype, or the user names a specific checklist.",
+    });
+  }
+
+  if (name === "package_economics") {
+    // Saved Job Cost Model (Settings → Package Pricing) merged over defaults,
+    // then any whatIf scenario overrides on top. Mirrors the client math in
+    // packages-pricing-tools.tsx — keep the two in step.
+    const [stored] = await db.select().from(appSettings).where(eq(appSettings.key, "job_cost_model")).limit(1);
+    let saved: any = {};
+    try { saved = stored?.value ? JSON.parse(stored.value) : {}; } catch { saved = {}; }
+    const whatIf = typeof (input as any)?.whatIf === "object" && (input as any).whatIf ? (input as any).whatIf : {};
+    const model = {
+      laborHours: 16, laborRatePerHour: 85, laborHoursByUnitType: {} as Record<string, number>,
+      materialsPctOfEquipment: 8, commissionPctOfPrice: 4, buydownPctOfPrice: 5,
+      overheadPctOfPrice: 10, targetMarginPct: 20,
+      ...saved,
+      ...whatIf,
+    };
+    const conds: any[] = [eq(pricebookPackages.isActive, true)];
+    if (input?.unitType) conds.push(ilike(pricebookPackages.unitType, `%${String(input.unitType)}%`));
+    if (input?.tier) conds.push(ilike(pricebookPackages.tier, `%${String(input.tier)}%`));
+    if (input?.tonnage) conds.push(ilike(pricebookPackages.tonnage, `%${String(input.tonnage).replace(/[^\d.]/g, "")}%`));
+    if (input?.packageLevel) conds.push(ilike(pricebookPackages.packageLevel, `%${String(input.packageLevel)}%`));
+    const [pkgs, catalog] = await Promise.all([
+      db.select().from(pricebookPackages).where(and(...conds)),
+      db.select().from(equipmentModels),
+    ]);
+    // Same wildcard-aware model matching the pricing settings use.
+    const normModel = (m: string) => m.trim().toUpperCase().replace(/\*+$/, "");
+    const normedCatalog = catalog.map((c) => ({ c, n: normModel(c.model) }));
+    const exactByNorm = new Map<string, (typeof catalog)[number]>();
+    for (const { c, n } of normedCatalog) if (n && !exactByNorm.has(n)) exactByNorm.set(n, c);
+    const findModel = (m: string) => {
+      const n = normModel(m);
+      if (!n) return undefined;
+      const hit = exactByNorm.get(n);
+      if (hit) return hit;
+      for (const { c, n: cn } of normedCatalog) {
+        if (!cn) continue;
+        const shorter = cn.length < n.length ? cn : n;
+        const longer = cn.length < n.length ? n : cn;
+        if (shorter.length >= 8 && longer.startsWith(shorter)) return c;
+      }
+      return undefined;
+    };
+    const rows = pkgs.map((p) => {
+      const partModels = [p.outdoorModel, p.coilModel, p.indoorHeatModel, p.thermostatModel].filter(Boolean) as string[];
+      let equipCents = 0;
+      const unmatched: string[] = [];
+      for (const m of partModels) {
+        const hit = findModel(m);
+        if (hit) equipCents += hit.costCents;
+        else unmatched.push(m);
+      }
+      const price = p.totalInvestment ?? 0;
+      const hours = Number(model.laborHoursByUnitType?.[p.unitType] ?? model.laborHours) || 0;
+      const labor = Math.round(hours * Number(model.laborRatePerHour || 0) * 100);
+      const materials = Math.round((equipCents * Number(model.materialsPctOfEquipment || 0)) / 100);
+      const commission = Math.round((price * Number(model.commissionPctOfPrice || 0)) / 100);
+      const buydown = Math.round((price * Number(model.buydownPctOfPrice || 0)) / 100);
+      const overhead = Math.round((price * Number(model.overheadPctOfPrice || 0)) / 100);
+      const profit = price - equipCents - labor - materials - commission - buydown - overhead;
+      const marginPct = price > 0 ? Math.round((profit / price) * 1000) / 10 : 0;
+      const d = (c: number) => Math.round(c) / 100;
+      return {
+        package: `${p.unitType} ${p.tier} ${p.tonnage}T ${p.packageLevel}`,
+        price: d(price),
+        equipment: d(equipCents),
+        labor: d(labor),
+        materials: d(materials),
+        commission: d(commission),
+        financingBuydown: d(buydown),
+        overhead: d(overhead),
+        estimatedProfit: d(profit),
+        marginPct,
+        belowTarget: marginPct < Number(model.targetMarginPct || 0),
+        equipmentNote: unmatched.length ? `${unmatched.length} component(s) not in the catalog — equipment cost understated` : undefined,
+      };
+    });
+    const filtered = (input as any)?.onlyBelowTarget ? rows.filter((r) => r.belowTarget) : rows;
+    const limit = Math.min(Math.max(Number((input as any)?.limit) || 40, 1), 60);
+    return JSON.stringify({
+      model,
+      note: "Estimates from the Job Cost Model (Settings → Package Pricing). Money in DOLLARS. Prices never change from here — this is guidance for the humans who price.",
+      totalMatching: filtered.length,
+      packages: filtered.slice(0, limit),
     });
   }
 
