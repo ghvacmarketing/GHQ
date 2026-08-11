@@ -18,7 +18,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Layers, Loader2, Pencil, Plus,
-  Search, SlidersHorizontal, TrendingUp, Upload, X,
+  Search, SlidersHorizontal, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
@@ -674,15 +674,18 @@ type CostModel = {
   targetMarginPct: number;
 };
 
-/** Six shop-level numbers — not a per-package spreadsheet. They turn every
- *  package's price into the estimated waterfall in Package Equipment and
- *  power Gibbs' package_economics answers. Estimates only: nothing here
+/** Six shop-level numbers — not a per-package spreadsheet. Controlled by
+ *  CostsAndCatalogTab so edits preview LIVE in the Package Equipment
+ *  breakdowns above before they're saved. Estimates only: nothing here
  *  ever changes a price. */
-export function JobCostModelCard({ packages }: { packages: any[] | undefined }) {
+export function JobCostModelCard({ packages, model, dirty, onChange, onSaved }: {
+  packages: any[] | undefined;
+  model: CostModel | null;
+  dirty: boolean;
+  onChange: (m: CostModel) => void;
+  onSaved: () => void;
+}) {
   const { toast } = useToast();
-  const { data } = useQuery<CostModel>({ queryKey: ["/api/crm/cost-model"] });
-  const [form, setForm] = useState<CostModel | null>(null);
-  const model = form ?? data ?? null;
   const unitTypes = useMemo(
     () => Array.from(new Set((packages || []).map((p: any) => p.unitType).filter(Boolean))).sort() as string[],
     [packages],
@@ -692,23 +695,22 @@ export function JobCostModelCard({ packages }: { packages: any[] | undefined }) 
     mutationFn: async () => apiRequest("PUT", "/api/crm/cost-model", model),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/cost-model"] });
-      setForm(null);
-      toast({ title: "Cost model saved", description: "Package Equipment estimates now use the new numbers." });
+      onSaved();
+      toast({ title: "Cost model saved", description: "These numbers now drive every estimate — including Gibbs'." });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't save the cost model", variant: "destructive" }),
   });
 
-  const set = (patch: Partial<CostModel>) => setForm({ ...(model as CostModel), ...patch });
+  const set = (patch: Partial<CostModel>) => { if (model) onChange({ ...model, ...patch }); };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5" /> Job Cost Model</CardTitle>
         <CardDescription>
-          A handful of shop-level numbers that turn each package's price into the full estimated cost
-          waterfall in Package Equipment — equipment, labor, materials, commission, financing buydown,
-          overhead, profit. Estimates only: nothing here ever changes a price, and Gibbs uses the same
-          numbers when you ask him about package economics.
+          The shop-level numbers behind the cost breakdowns above. Change one and the cards update
+          instantly as a preview — Save makes it stick for everyone, including Gibbs. Estimates only:
+          nothing here ever changes a price.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -772,14 +774,17 @@ export function JobCostModelCard({ packages }: { packages: any[] | undefined }) 
               </div>
             )}
 
-            <Button
-              onClick={() => save.mutate()}
-              disabled={save.isPending || !form}
-              className="bg-[#711419] hover:bg-[#8a1a1f]"
-              data-testid="costmodel-save"
-            >
-              {save.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save cost model"}
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => save.mutate()}
+                disabled={save.isPending || !dirty}
+                className="bg-[#711419] hover:bg-[#8a1a1f]"
+                data-testid="costmodel-save"
+              >
+                {save.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save cost model"}
+              </Button>
+              {dirty && <span className="text-xs font-medium text-amber-600">Previewing above — save to keep.</span>}
+            </div>
           </>
         )}
       </CardContent>
@@ -787,22 +792,53 @@ export function JobCostModelCard({ packages }: { packages: any[] | undefined }) 
   );
 }
 
+/** The whole Costs & Catalog tab: package equipment (with drift + pricing
+ *  baked in), the live-preview cost model beneath it, and the raw catalog.
+ *  Owns the cost-model draft so edits preview instantly in the cards. */
+export function CostsAndCatalogTab({ packages }: { packages: any[] | undefined }) {
+  const { data: savedModel } = useQuery<CostModel>({ queryKey: ["/api/crm/cost-model"] });
+  const [draft, setDraft] = useState<CostModel | null>(null);
+  const model = draft ?? savedModel ?? null;
+  return (
+    <div className="space-y-6">
+      <PackageEquipmentCard packages={packages} costModel={model} />
+      <JobCostModelCard packages={packages} model={model} dirty={!!draft} onChange={setDraft} onSaved={() => setDraft(null)} />
+      <EquipmentCatalogCard />
+    </div>
+  );
+}
+
 // ─────────────────────────── Package equipment map ───────────────────────────
 
 /** The connective view: every proposal-builder package, the exact models
- *  inside it, and what each one costs from the catalog TODAY. Master-detail:
- *  a light package list on the left, one rich breakdown (with the package's
- *  own equipment images) on the right — not a thousand-row grid. */
-export function PackageEquipmentCard({ packages }: { packages: any[] | undefined }) {
+ *  inside it, what each costs from the catalog TODAY — with cost drift and
+ *  repricing baked in. Middle column = the package (equipment images +
+ *  financing math); right rail = the cost breakdown alone. */
+export function PackageEquipmentCard({ packages, costModel }: { packages: any[] | undefined; costModel: CostModel | null }) {
+  const { toast } = useToast();
   const [previewPkg, setPreviewPkg] = useState<any | null>(null);
   const [unitFilter, setUnitFilter] = useState("all");
   const [pkgSearch, setPkgSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [priceInput, setPriceInput] = useState("");
+  const [monthlyInput, setMonthlyInput] = useState("");
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
-  const { data: costModel } = useQuery<CostModel>({ queryKey: ["/api/crm/cost-model"] });
   const byId = useMemo(() => new Map((packages || []).map((p: any) => [p.id, p])), [packages]);
+
+  const rebaseline = useMutation({
+    mutationFn: async ({ id, totalInvestmentCents, monthlyPaymentCents }: { id: string; totalInvestmentCents?: number; monthlyPaymentCents?: number }) =>
+      apiRequest("POST", `/api/crm/pricebook-drift/${id}/rebaseline`, { totalInvestmentCents, monthlyPaymentCents }),
+    onSuccess: () => {
+      setPricingOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook-drift"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
+      toast({ title: "Package updated" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't update the package", variant: "destructive" }),
+  });
 
   const LEVEL_ORDER: Record<string, number> = { Best: 0, Better: 1, Good: 2, Budget: 3 };
   const sorted = useMemo(
@@ -837,7 +873,8 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
   }, [shown]);
   const selected = shown.find((d) => d.id === selectedId) || shown[0] || null;
   const selPkg = selected ? byId.get(selected.id) : null;
-  const anyCosts = drift.some((d) => d.matchedCount > 0);
+  const unbaselined = drift.filter((d) => d.costBasisCents == null && d.matchedCount > 0);
+  const drifted = !!selected && selected.driftCents != null && Math.abs(selected.driftCents) >= 100;
 
   const slotImage = (slot: string) =>
     slot === "Outdoor" ? selPkg?.outdoorImageUrl :
@@ -881,8 +918,9 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" /> Package Equipment</CardTitle>
         <CardDescription>
-          Every package your proposal builder can quote, and the exact equipment inside it — costed live
-          from the catalog below. Pick a package on the left to see its full breakdown.
+          Every package your proposal builder can quote — the equipment inside it, the financing story,
+          and the full cost breakdown, costed live from the catalog below. Cost drift shows here the
+          moment a supplier file moves a price, and repricing happens right on the breakdown.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -894,11 +932,18 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
           </p>
         ) : (
           <>
-            {!anyCosts && (
-              <p className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2 text-xs text-blue-800">
-                Costs show as "not in catalog" until the Equipment Catalog has models — upload a supplier
-                price file on the Price File Update tab and these link up automatically by model number.
-              </p>
+            {unbaselined.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/50 p-2.5 text-sm text-blue-800">
+                <span>{unbaselined.length} package{unbaselined.length === 1 ? " has" : "s have"} matched costs but no baseline yet.</span>
+                <Button
+                  size="sm" variant="outline" className="h-7 border-blue-300 text-blue-700"
+                  onClick={() => unbaselined.forEach((d) => rebaseline.mutate({ id: d.id }))}
+                  disabled={rebaseline.isPending}
+                  data-testid="drift-baseline-all"
+                >
+                  Baseline all at today's costs
+                </Button>
+              </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
               <Select value={unitFilter} onValueChange={setUnitFilter}>
@@ -916,8 +961,7 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
             </div>
 
             <div className="flex gap-4 max-lg:flex-col lg:min-h-[560px]">
-              {/* Package list — absolutely filled so it stretches exactly level
-                  with the money rail, scrolling inside its own column */}
+              {/* Package list — stretches level with the tallest column */}
               <div className="w-64 shrink-0 max-lg:w-full lg:relative">
                 <div className="overflow-y-auto rounded-lg border border-slate-200 max-lg:max-h-72 lg:absolute lg:inset-0">
                   {groups.map(([unit, rows]) => (
@@ -925,10 +969,11 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                       <p className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{unit}</p>
                       {rows.map((d) => {
                         const active = selected?.id === d.id;
+                        const rowDrift = d.driftCents != null && Math.abs(d.driftCents) >= 100;
                         return (
                           <button
                             key={d.id}
-                            onClick={() => setSelectedId(d.id)}
+                            onClick={() => { setSelectedId(d.id); setPricingOpen(false); }}
                             className={`block w-full border-b border-slate-100 border-l-2 px-3 py-2 text-left transition-colors ${
                               active ? "border-l-[#711419] bg-[#711419]/[0.04]" : "border-l-transparent hover:bg-slate-50"
                             }`}
@@ -942,6 +987,11 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                             </span>
                             <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
                               {d.matchedCount > 0 ? <>Equipment {usd(d.currentComponentCostCents)}</> : "No catalog match yet"}
+                              {rowDrift && (
+                                <span className={`font-medium tabular-nums ${d.driftCents! > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                  {d.driftCents! > 0 ? "+" : "−"}{usd(Math.abs(d.driftCents!))}
+                                </span>
+                              )}
                               {d.unmatchedModels.length > 0 && (
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title={`${d.unmatchedModels.length} component(s) not in catalog`} />
                               )}
@@ -959,8 +1009,8 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
 
               {selected ? (
                 <>
-                  {/* The package itself: header, equipment tiles, accessories */}
-                  <div className="min-w-0 flex-1">
+                  {/* The package itself + its financing story */}
+                  <div className="min-w-0 flex-1 space-y-4">
                     <div className="space-y-4 rounded-lg border border-slate-200 p-4" data-testid={`pkgequip-detail-${selected.id}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -1020,11 +1070,50 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                         </p>
                       )}
                     </div>
+
+                    {selected.totalInvestment > 0 && (
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Financing math</p>
+                        <div className="divide-y divide-slate-100 px-3.5 text-sm">
+                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 ? (
+                            <>
+                              <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                <span className="text-slate-600">"As low as" on the package card</span>
+                                <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.monthlyPayment)}/mo</span>
+                              </div>
+                              <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                <span className="text-slate-600">What that works out to</span>
+                                <span className="shrink-0 tabular-nums text-slate-700">
+                                  {((selected.monthlyPayment / selected.totalInvestment) * 100).toFixed(2)}%/mo of price
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="py-2.5 text-slate-500">No monthly payment stored on this package.</div>
+                          )}
+                          <div className="py-2.5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-slate-600">GreenSky estimate</span>
+                              <span className="shrink-0 tabular-nums text-slate-700">${monthlyFinancing(selected.totalInvestment / 100).toLocaleString()}/mo</span>
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-slate-400">{FINANCING_LABEL} · what quotes &amp; proposals show</p>
+                          </div>
+                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 && monthlyFinancing(selected.totalInvestment / 100) > 0 &&
+                            Math.abs(selected.monthlyPayment / 100 - monthlyFinancing(selected.totalInvestment / 100)) > monthlyFinancing(selected.totalInvestment / 100) * 0.05 && (
+                            <div className="py-2.5">
+                              <p className="text-[11px] text-amber-600">
+                                The stored monthly is more than 5% off the GreenSky estimate customers see on quotes — worth aligning next time you reprice.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Money rail — cost breakdown + financing math */}
-                  <div className="w-80 shrink-0 space-y-4 max-lg:w-full">
-                    {selected.matchedCount > 0 && econ && costModel && (
+                  {/* Right rail — the cost breakdown, drift + repricing included */}
+                  <div className="w-80 shrink-0 max-lg:w-full">
+                    {selected.matchedCount > 0 && econ && costModel ? (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
                         <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cost breakdown — estimate</p>
                         <div className="divide-y divide-slate-100 px-3.5 text-sm">
@@ -1032,6 +1121,30 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                             <span className="text-slate-600">Your price</span>
                             <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(econ.price)}</span>
                           </div>
+                          {selected.costBasisCents != null ? (
+                            drifted && (
+                              <div className="py-2.5">
+                                <div className="flex items-baseline justify-between gap-3">
+                                  <span className="text-slate-600">Equipment drift since priced</span>
+                                  <span className={`shrink-0 font-semibold tabular-nums ${selected.driftCents! > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                    {selected.driftCents! > 0 ? "+" : "−"}{usd(Math.abs(selected.driftCents!))}
+                                  </span>
+                                </div>
+                                <p className="mt-0.5 text-[11px] text-slate-400">Components cost {usd(selected.costBasisCents)} when this price was set.</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex items-center justify-between gap-3 py-2.5">
+                              <span className="text-[11px] text-slate-400">No cost baseline yet.</span>
+                              <button
+                                onClick={() => rebaseline.mutate({ id: selected.id })}
+                                className="text-[11px] font-medium text-[#711419] hover:underline"
+                                data-testid={`pkgequip-baseline-${selected.id}`}
+                              >
+                                Baseline at today's costs
+                              </button>
+                            </div>
+                          )}
                           {[
                             { label: "Equipment", sub: `live from catalog · ${equipPct}%`, cents: selected.currentComponentCostCents },
                             { label: "Labor", sub: `${econ.hours} hrs × $${costModel.laborRatePerHour}/hr`, cents: econ.labor },
@@ -1088,54 +1201,69 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                               </p>
                             </div>
                           )}
+                          <div className="py-2.5">
+                            {!pricingOpen ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                  size="sm" variant="outline" className="h-8"
+                                  onClick={() => { setPricingOpen(true); setPriceInput(((selected.totalInvestment || 0) / 100).toFixed(0)); setMonthlyInput(""); }}
+                                  data-testid={`pkgequip-setprice-${selected.id}`}
+                                >
+                                  <Pencil className="mr-1.5 h-3.5 w-3.5" /> Set price…
+                                </Button>
+                                {drifted && (
+                                  <Button
+                                    size="sm" variant="ghost" className="h-8 text-slate-500"
+                                    onClick={() => rebaseline.mutate({ id: selected.id })}
+                                    disabled={rebaseline.isPending}
+                                    title="Keep the current price; accept today's costs as the new baseline"
+                                    data-testid={`pkgequip-keep-${selected.id}`}
+                                  >
+                                    Keep price
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" min="0" placeholder="Total $" className="h-8" data-testid={`pkgequip-price-input-${selected.id}`} />
+                                  <Input value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)} type="number" min="0" placeholder="Mo $" className="h-8 w-24" data-testid={`pkgequip-monthly-input-${selected.id}`} />
+                                </div>
+                                {parseFloat(priceInput) > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setMonthlyInput(String(monthlyFinancing(parseFloat(priceInput))))}
+                                    className="text-[10px] font-medium text-slate-400 hover:text-[#711419]"
+                                    data-testid={`pkgequip-suggest-${selected.id}`}
+                                  >
+                                    suggest ${monthlyFinancing(parseFloat(priceInput)).toLocaleString()}/mo ({FINANCING_LABEL})
+                                  </button>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm" className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                                    disabled={rebaseline.isPending || !(parseFloat(priceInput) > 0)}
+                                    onClick={() => rebaseline.mutate({
+                                      id: selected.id,
+                                      totalInvestmentCents: Math.round(parseFloat(priceInput) * 100),
+                                      monthlyPaymentCents: monthlyInput ? Math.round(parseFloat(monthlyInput) * 100) : undefined,
+                                    })}
+                                    data-testid={`pkgequip-saveprice-${selected.id}`}
+                                  >
+                                    {rebaseline.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save price"}
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-8" onClick={() => setPricingOpen(false)}>Cancel</Button>
+                                </div>
+                                <p className="text-[10px] text-slate-400">Saving also re-baselines today's costs.</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    )}
-
-                    {selected.totalInvestment > 0 && (
-                      <div className="overflow-hidden rounded-lg border border-slate-200">
-                        <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Financing math</p>
-                        <div className="divide-y divide-slate-100 px-3.5 text-sm">
-                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 ? (
-                            <>
-                              <div className="flex items-baseline justify-between gap-3 py-2.5">
-                                <span className="text-slate-600">"As low as" on the package card</span>
-                                <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.monthlyPayment)}/mo</span>
-                              </div>
-                              <div className="flex items-baseline justify-between gap-3 py-2.5">
-                                <span className="text-slate-600">What that works out to</span>
-                                <span className="shrink-0 tabular-nums text-slate-700">
-                                  {((selected.monthlyPayment / selected.totalInvestment) * 100).toFixed(2)}%/mo of price
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="py-2.5 text-slate-500">No monthly payment stored on this package.</div>
-                          )}
-                          <div className="py-2.5">
-                            <div className="flex items-baseline justify-between gap-3">
-                              <span className="text-slate-600">GreenSky estimate</span>
-                              <span className="shrink-0 tabular-nums text-slate-700">${monthlyFinancing(selected.totalInvestment / 100).toLocaleString()}/mo</span>
-                            </div>
-                            <p className="mt-0.5 text-[11px] text-slate-400">{FINANCING_LABEL} · what quotes &amp; proposals show</p>
-                          </div>
-                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 && monthlyFinancing(selected.totalInvestment / 100) > 0 &&
-                            Math.abs(selected.monthlyPayment / 100 - monthlyFinancing(selected.totalInvestment / 100)) > monthlyFinancing(selected.totalInvestment / 100) * 0.05 && (
-                            <div className="py-2.5">
-                              <p className="text-[11px] text-amber-600">
-                                The stored monthly is more than 5% off the GreenSky estimate customers see on quotes — worth aligning next time you reprice.
-                              </p>
-                            </div>
-                          )}
-                          <div className="py-2.5">
-                            <p className="text-[11px] leading-relaxed text-slate-400">
-                              The package monthly is a stored number — set when the package was priced, scaled with bulk % adjustments,
-                              never changed by GHQ on its own. Everywhere else (quotes, proposals, the public quote page) the monthly is
-                              amortized from your GreenSky program — {FINANCING_LABEL} — until approval sets the final terms.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">
+                        The cost breakdown appears once this package's models match the Equipment Catalog below.
+                      </p>
                     )}
                   </div>
                 </>
@@ -1149,191 +1277,6 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
         )}
       </CardContent>
 
-      <Dialog open={!!previewPkg} onOpenChange={(o) => { if (!o) setPreviewPkg(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Proposal preview</DialogTitle>
-          </DialogHeader>
-          {previewPkg && <PackagePreviewCard pkg={previewPkg} />}
-        </DialogContent>
-      </Dialog>
-    </Card>
-  );
-}
-
-export function CostDriftCard({ packages }: { packages: any[] | undefined }) {
-  const { toast } = useToast();
-  const [previewPkg, setPreviewPkg] = useState<any | null>(null);
-  const [pricingId, setPricingId] = useState<string | null>(null);
-  const [priceInput, setPriceInput] = useState("");
-  const [monthlyInput, setMonthlyInput] = useState("");
-
-  const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
-    queryKey: ["/api/crm/pricebook-drift"],
-  });
-  const byId = useMemo(() => new Map((packages || []).map((p: any) => [p.id, p])), [packages]);
-
-  const rebaseline = useMutation({
-    mutationFn: async ({ id, totalInvestmentCents, monthlyPaymentCents }: { id: string; totalInvestmentCents?: number; monthlyPaymentCents?: number }) =>
-      apiRequest("POST", `/api/crm/pricebook-drift/${id}/rebaseline`, { totalInvestmentCents, monthlyPaymentCents }),
-    onSuccess: () => {
-      setPricingId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook-drift"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
-      toast({ title: "Package updated" });
-    },
-    onError: (e: any) => toast({ title: e?.message || "Couldn't update", variant: "destructive" }),
-  });
-
-  const flagged = drift.filter((d) => d.driftCents != null && Math.abs(d.driftCents) >= 100);
-  const unbaselined = drift.filter((d) => d.costBasisCents == null && d.matchedCount > 0);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" /> Cost Drift</CardTitle>
-        <CardDescription>
-          Live component cost (from the catalog) vs the snapshot behind each package's price.
-          Prices never change themselves — this tells you when to look. Set a baseline once and every
-          future price file lights up exactly the packages it affects.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : drift.every((d) => d.matchedCount === 0) ? (
-          <p className="rounded-lg border border-dashed border-slate-300 py-6 text-center text-sm text-slate-500">
-            No package components match the catalog yet — upload a supplier price file first, and the
-            models on your packages link up automatically by model number.
-          </p>
-        ) : (
-          <>
-            {unbaselined.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/50 p-2.5 text-sm text-blue-800">
-                <span>{unbaselined.length} package{unbaselined.length === 1 ? "" : "s"} have matched costs but no baseline yet.</span>
-                <Button
-                  size="sm" variant="outline" className="h-7 border-blue-300 text-blue-700"
-                  onClick={() => unbaselined.forEach((d) => rebaseline.mutate({ id: d.id }))}
-                  disabled={rebaseline.isPending}
-                  data-testid="drift-baseline-all"
-                >
-                  Baseline all at today's costs
-                </Button>
-              </div>
-            )}
-            <div className="max-h-[420px] overflow-auto rounded-lg border border-slate-200">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Package</TableHead>
-                    <TableHead className="text-right">Your price</TableHead>
-                    <TableHead className="text-right">Component cost</TableHead>
-                    <TableHead className="text-right">Drift</TableHead>
-                    <TableHead className="w-40" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {drift.filter((d) => d.matchedCount > 0).map((d) => {
-                    const drifted = d.driftCents != null && Math.abs(d.driftCents) >= 100;
-                    return (
-                      <TableRow key={d.id} className={drifted ? "bg-red-50/40" : undefined}>
-                        <TableCell>
-                          <span className="font-medium">{d.unitType} {d.tier}</span>{" "}
-                          <span className="text-slate-500">{d.tonnage}T · {d.packageLevel}</span>
-                          {d.unmatchedModels.length > 0 && (
-                            <span className="ml-2 text-[10px] text-amber-600" title={d.unmatchedModels.join(", ")}>
-                              {d.unmatchedModels.length} unmatched
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {pricingId === d.id ? (
-                            <span className="inline-flex flex-col items-end gap-0.5">
-                              <span className="inline-flex items-center gap-1">
-                                <Input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" min="0" placeholder="Total $" className="h-8 w-24 text-right" data-testid={`drift-price-${d.id}`} />
-                                <Input value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)} type="number" min="0" placeholder="Mo $" className="h-8 w-20 text-right" data-testid={`drift-monthly-${d.id}`} />
-                                <button
-                                  onClick={() => rebaseline.mutate({
-                                    id: d.id,
-                                    totalInvestmentCents: priceInput ? Math.round(parseFloat(priceInput) * 100) : undefined,
-                                    monthlyPaymentCents: monthlyInput ? Math.round(parseFloat(monthlyInput) * 100) : undefined,
-                                  })}
-                                  className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                              </span>
-                              {parseFloat(priceInput) > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setMonthlyInput(String(monthlyFinancing(parseFloat(priceInput))))}
-                                  className="text-[10px] font-medium text-slate-400 hover:text-[#711419]"
-                                  data-testid={`drift-suggest-monthly-${d.id}`}
-                                >
-                                  suggest ${monthlyFinancing(parseFloat(priceInput)).toLocaleString()}/mo ({FINANCING_LABEL})
-                                </button>
-                              )}
-                            </span>
-                          ) : (
-                            usd(d.totalInvestment)
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-slate-600">
-                          {usd(d.currentComponentCostCents)}
-                          {d.costBasisCents != null && <span className="block text-[10px] text-slate-400">was {usd(d.costBasisCents)}</span>}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {d.driftCents == null ? (
-                            <span className="text-[11px] text-slate-400">no baseline</span>
-                          ) : Math.abs(d.driftCents) < 100 ? (
-                            <span className="text-slate-400">—</span>
-                          ) : (
-                            <span className={d.driftCents > 0 ? "font-semibold text-red-600" : "font-semibold text-emerald-600"}>
-                              {d.driftCents > 0 ? "+" : ""}{usd(d.driftCents)}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="inline-flex items-center gap-1">
-                            <button
-                              onClick={() => setPreviewPkg(byId.get(d.id) || d)}
-                              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                              title="Preview as the proposal builder shows it"
-                              data-testid={`drift-preview-${d.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => { setPricingId(pricingId === d.id ? null : d.id); setPriceInput(((d.totalInvestment || 0) / 100).toFixed(0)); setMonthlyInput(""); }}
-                              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                              title="Set a new price (re-baselines cost)"
-                              data-testid={`drift-setprice-${d.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            {drifted && (
-                              <button
-                                onClick={() => rebaseline.mutate({ id: d.id })}
-                                className="rounded px-1.5 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100"
-                                title="Keep the current price; accept today's costs as the new baseline"
-                                data-testid={`drift-ack-${d.id}`}
-                              >
-                                Keep price
-                              </button>
-                            )}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        )}
-      </CardContent>
-
-      {/* Live preview — the package card the way the proposal builder renders it */}
       <Dialog open={!!previewPkg} onOpenChange={(o) => { if (!o) setPreviewPkg(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
