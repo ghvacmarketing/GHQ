@@ -865,23 +865,86 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                     )}
 
                     {selected.matchedCount > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100">
-                          <div className="bg-[#711419]" style={{ width: `${equipPct}%` }} />
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cost breakdown</p>
+                        <div className="divide-y divide-slate-100 px-3.5 text-sm">
+                          <div className="flex items-baseline justify-between gap-3 py-2.5">
+                            <span className="text-slate-600">Your price — what the customer pays</span>
+                            <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.totalInvestment)}</span>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-3 py-2.5">
+                            <span className="text-slate-600">Equipment — live from the catalog</span>
+                            <span className="shrink-0 tabular-nums text-slate-700">
+                              − {usd(selected.currentComponentCostCents)}<span className="ml-1.5 text-[11px] text-slate-400">{equipPct}%</span>
+                            </span>
+                          </div>
+                          <div className="py-2.5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="font-medium text-slate-800">Left after equipment</span>
+                              <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                                {usd(afterEquip)}<span className="ml-1.5 text-[11px] font-normal text-slate-400">{100 - equipPct}%</span>
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                              Labor, materials, permits, overhead, and your margin all come out of this — it is not profit.
+                            </p>
+                            <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+                              <div className="bg-[#711419]" style={{ width: `${equipPct}%` }} />
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-slate-500">
+                              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#711419]" /> Equipment {equipPct}%</span>
+                              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-slate-200" /> Everything else {100 - equipPct}%</span>
+                            </div>
+                            {selected.unmatchedModels.length > 0 && (
+                              <p className="mt-1.5 text-[11px] text-amber-600">
+                                {selected.unmatchedModels.length} component{selected.unmatchedModels.length === 1 ? " is" : "s are"} not in the catalog yet, so the real equipment number is higher than shown.
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs tabular-nums">
-                          <span className="flex items-center gap-1.5 text-slate-600">
-                            <span className="h-2 w-2 rounded-full bg-[#711419]" /> Equipment {usd(selected.currentComponentCostCents)} ({equipPct}%)
-                          </span>
-                          <span className="flex items-center gap-1.5 text-slate-600">
-                            <span className="h-2 w-2 rounded-full bg-slate-200" /> After equipment {usd(afterEquip)} ({100 - equipPct}%)
-                          </span>
+                      </div>
+                    )}
+
+                    {selected.totalInvestment > 0 && (
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Financing math</p>
+                        <div className="divide-y divide-slate-100 px-3.5 text-sm">
+                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 ? (
+                            <>
+                              <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                <span className="text-slate-600">"As low as" stored on this package</span>
+                                <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.monthlyPayment)}/mo</span>
+                              </div>
+                              <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                <span className="text-slate-600">What that works out to</span>
+                                <span className="shrink-0 tabular-nums text-slate-700">
+                                  {((selected.monthlyPayment / selected.totalInvestment) * 100).toFixed(2)}% of price · ÷ {(selected.totalInvestment / selected.monthlyPayment).toFixed(1)}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="py-2.5 text-slate-500">No monthly payment stored on this package.</div>
+                          )}
+                          <div className="flex items-baseline justify-between gap-3 py-2.5">
+                            <span className="text-slate-600">Quote &amp; proposal estimate — price ÷ 67</span>
+                            <span className="shrink-0 tabular-nums text-slate-700">${Math.round(selected.totalInvestment / 100 / 67).toLocaleString()}/mo</span>
+                          </div>
+                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 &&
+                            Math.abs(selected.monthlyPayment / 100 - selected.totalInvestment / 100 / 67) / (selected.totalInvestment / 100 / 67) > 0.05 && (
+                            <div className="py-2.5">
+                              <p className="text-[11px] text-amber-600">
+                                The stored monthly is more than 5% off the ÷ 67 estimate customers see on quotes — worth aligning next time you reprice.
+                              </p>
+                            </div>
+                          )}
+                          <div className="py-2.5">
+                            <p className="text-[11px] leading-relaxed text-slate-400">
+                              The package monthly is a stored number — set when the package was priced, scaled with bulk % adjustments,
+                              never changed by GHQ on its own. Everywhere else (quotes, proposals, the public quote page) the monthly is
+                              estimated as price ÷ 67 (≈1.5% of the total per month) until GreenSky approval sets the real terms.
+                            </p>
+                          </div>
                         </div>
-                        {selected.unmatchedModels.length > 0 && (
-                          <p className="text-[11px] text-amber-600">
-                            Equipment total is missing {selected.unmatchedModels.length} component{selected.unmatchedModels.length === 1 ? "" : "s"} not in the catalog yet.
-                          </p>
-                        )}
                       </div>
                     )}
                   </div>
@@ -995,19 +1058,31 @@ export function CostDriftCard({ packages }: { packages: any[] | undefined }) {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {pricingId === d.id ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" min="0" placeholder="Total $" className="h-8 w-24 text-right" data-testid={`drift-price-${d.id}`} />
-                              <Input value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)} type="number" min="0" placeholder="Mo $" className="h-8 w-20 text-right" data-testid={`drift-monthly-${d.id}`} />
-                              <button
-                                onClick={() => rebaseline.mutate({
-                                  id: d.id,
-                                  totalInvestmentCents: priceInput ? Math.round(parseFloat(priceInput) * 100) : undefined,
-                                  monthlyPaymentCents: monthlyInput ? Math.round(parseFloat(monthlyInput) * 100) : undefined,
-                                })}
-                                className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
+                            <span className="inline-flex flex-col items-end gap-0.5">
+                              <span className="inline-flex items-center gap-1">
+                                <Input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" min="0" placeholder="Total $" className="h-8 w-24 text-right" data-testid={`drift-price-${d.id}`} />
+                                <Input value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)} type="number" min="0" placeholder="Mo $" className="h-8 w-20 text-right" data-testid={`drift-monthly-${d.id}`} />
+                                <button
+                                  onClick={() => rebaseline.mutate({
+                                    id: d.id,
+                                    totalInvestmentCents: priceInput ? Math.round(parseFloat(priceInput) * 100) : undefined,
+                                    monthlyPaymentCents: monthlyInput ? Math.round(parseFloat(monthlyInput) * 100) : undefined,
+                                  })}
+                                  className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                              </span>
+                              {parseFloat(priceInput) > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMonthlyInput(String(Math.round(parseFloat(priceInput) / 67)))}
+                                  className="text-[10px] font-medium text-slate-400 hover:text-[#711419]"
+                                  data-testid={`drift-suggest-monthly-${d.id}`}
+                                >
+                                  suggest ${Math.round(parseFloat(priceInput) / 67).toLocaleString()}/mo (price ÷ 67)
+                                </button>
+                              )}
                             </span>
                           ) : (
                             usd(d.totalInvestment)
