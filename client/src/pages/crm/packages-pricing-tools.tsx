@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  ArrowLeftRight, Boxes, Check, Download, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
+  ArrowLeftRight, Boxes, Check, ChevronDown, Download, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
   Search, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -82,6 +83,25 @@ export function EquipmentCatalogCard() {
     onError: (e: any) => toast({ title: e?.message || "Couldn't save", variant: "destructive" }),
   });
 
+  // The whole catalog as a spreadsheet, any time — same shape a supplier
+  // file uses, so it round-trips through the wizard if ever needed.
+  const exportCatalog = () => {
+    const rows = (data?.models || []).map((m) => ({
+      Brand: m.brand,
+      Model: m.model,
+      Description: m.description || "",
+      "Cost ($)": Math.round(m.costCents) / 100,
+      Discontinued: m.isDiscontinued ? "yes" : "",
+      "Superseded by": m.supersededByModel || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Equipment Catalog");
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `equipment-catalog-${stamp}.xlsx`);
+  };
+
   const addModel = useMutation({
     mutationFn: async () =>
       apiRequest("POST", "/api/crm/equipment-catalog", {
@@ -124,6 +144,9 @@ export function EquipmentCatalogCard() {
           </Select>
           <Button size="sm" variant="outline" onClick={() => setAdding((v) => !v)} data-testid="catalog-add-toggle">
             <Plus className="mr-1 h-4 w-4" /> Add model
+          </Button>
+          <Button size="sm" variant="outline" onClick={exportCatalog} disabled={(data?.models || []).length === 0} data-testid="catalog-export">
+            <Download className="mr-1 h-4 w-4" /> Download
           </Button>
           <span className="ml-auto text-xs text-slate-400">{models.length} model{models.length === 1 ? "" : "s"}</span>
         </div>
@@ -382,7 +405,7 @@ export function PriceFileWizardCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5" /> Supplier Price File</CardTitle>
+        <CardTitle>Supplier Price File</CardTitle>
         <CardDescription>
           Drop the flat file Trane (or any brand) sends — brand, model, cost. Nothing changes until you
           review the diff: price moves, new models, discontinued models, and suggested model successions.
@@ -838,6 +861,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const [fixOpen, setFixOpen] = useState(false);
   const [fixFilter, setFixFilter] = useState("");
   const [slotEdit, setSlotEdit] = useState<(typeof SLOT_DEFS)[number] | null>(null);
+  const [equipOpen, setEquipOpen] = useState(false);
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
@@ -1097,7 +1121,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                                 className="flex h-full min-h-[76px] items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-600"
                                 data-testid={`pkgequip-addslot-${def.key}`}
                               >
-                                <Plus className="h-3.5 w-3.5" /> Add {def.label.toLowerCase()}
+                                <Plus className="h-3.5 w-3.5" /> Add {slotDisplayLabel(selected.unitType, def.label).toLowerCase()}
                               </button>
                             );
                           }
@@ -1116,7 +1140,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                                 {img ? <img src={img} alt={part.slot} className="h-12 w-12 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{slotDisplayLabel(selected.unitType, part.slot)}</p>
                                 <p className="truncate text-sm font-medium text-slate-800">{part.name || part.model}</p>
                                 {part.name && part.name !== part.model && (
                                   <p className="truncate font-mono text-[11px] text-slate-400">{part.model}</p>
@@ -1222,8 +1246,39 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                               </button>
                             </div>
                           )}
+                          <div className="py-2">
+                            <button
+                              type="button"
+                              onClick={() => setEquipOpen((v) => !v)}
+                              className="flex w-full items-baseline justify-between gap-3 text-left"
+                              title="Show the individual equipment costs"
+                              data-testid="breakdown-equip-toggle"
+                            >
+                              <span className="min-w-0">
+                                <span className="text-slate-600">Equipment</span>
+                                <span className="ml-1.5 text-[10px] text-slate-400">live from catalog · {equipPct}%</span>
+                                <ChevronDown className={`ml-1 inline h-3 w-3 text-slate-400 transition-transform ${equipOpen ? "rotate-180" : ""}`} />
+                              </span>
+                              <span className="shrink-0 tabular-nums text-slate-700">− {usd(selected.currentComponentCostCents)}</span>
+                            </button>
+                            {equipOpen && (
+                              <div className="mt-1.5 space-y-1 border-l border-slate-200 pl-3">
+                                {selected.parts.map((pt) => (
+                                  <div key={pt.slot} className="flex items-baseline justify-between gap-2 text-[11px]">
+                                    <span className="min-w-0 truncate text-slate-500">
+                                      {slotDisplayLabel(selected.unitType, pt.slot)} · <span className="font-mono">{pt.model}</span>
+                                    </span>
+                                    {pt.costCents != null ? (
+                                      <span className="shrink-0 tabular-nums text-slate-600">{usd(pt.costCents)}</span>
+                                    ) : (
+                                      <span className="shrink-0 text-amber-600">not in catalog</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           {[
-                            { label: "Equipment", sub: `live from catalog · ${equipPct}%`, cents: selected.currentComponentCostCents },
                             { label: "Labor", sub: `${econ.hours} hrs × $${costModel.laborRatePerHour}/hr`, cents: econ.labor },
                             { label: "Materials & misc", sub: `${costModel.materialsPctOfEquipment}% of equipment`, cents: econ.materials },
                             { label: "Commission", sub: `${costModel.commissionPctOfPrice}% of price`, cents: econ.commission },
@@ -1383,6 +1438,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
         <SlotEditDialog
           key={`${selected.id}-${slotEdit.key}`}
           slot={slotEdit}
+          displayLabel={slotDisplayLabel(selected.unitType, slotEdit.label)}
           pkg={selPkg || selected}
           packageId={selected.id}
           onClose={() => setSlotEdit(null)}
@@ -1404,7 +1460,15 @@ const addSlotHidden = (unitType: string, slotKey: string): boolean => {
   const isDucting = u.includes("duct");
   if ((isMini || isPackaged) && (slotKey === "coil" || slotKey === "indoorHeat")) return true;
   if (isDucting && slotKey !== "outdoor") return true;
+  // A water heater is just the unit — no coil/indoor-heat/thermostat slots.
+  if (u.includes("water") && slotKey !== "outdoor") return true;
   return false;
+};
+
+/** Water heaters aren't HVAC — their one slot reads "Unit", not "Outdoor". */
+const slotDisplayLabel = (unitType: string, label: string): string => {
+  if ((unitType || "").toLowerCase().includes("water") && label === "Outdoor") return "Unit";
+  return label;
 };
 
 const SLOT_DEFS = [
@@ -1416,8 +1480,9 @@ const SLOT_DEFS = [
 
 /** Edit one equipment card on one package: the model number, the description
  *  shown on proposals, and the image. Prices never change here. */
-function SlotEditDialog({ slot, pkg, packageId, onClose }: {
+function SlotEditDialog({ slot, displayLabel, pkg, packageId, onClose }: {
   slot: (typeof SLOT_DEFS)[number];
+  displayLabel?: string;
   pkg: any;
   packageId: string;
   onClose: () => void;
@@ -1469,7 +1534,7 @@ function SlotEditDialog({ slot, pkg, packageId, onClose }: {
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-lg overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Edit {slot.label.toLowerCase()} card</DialogTitle>
+          <DialogTitle>Edit {(displayLabel || slot.label).toLowerCase()} card</DialogTitle>
         </DialogHeader>
 
         {/* Image — full-bleed band, no floating whitespace */}
@@ -1512,7 +1577,7 @@ function SlotEditDialog({ slot, pkg, packageId, onClose }: {
           </div>
           <div>
             <p className="mb-1.5 text-[11px] font-medium text-slate-500">Description <span className="text-slate-400">(what proposals show)</span></p>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-10 text-sm" placeholder="e.g. XV18 Variable Speed Heat Pump" data-testid="slotedit-name" />
+            <Textarea value={name} onChange={(e) => setName(e.target.value)} rows={3} className="min-h-[80px] resize-y text-sm" placeholder="e.g. XV18 Variable Speed Heat Pump" data-testid="slotedit-name" />
           </div>
         </div>
 
