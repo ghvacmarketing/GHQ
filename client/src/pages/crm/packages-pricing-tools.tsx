@@ -244,9 +244,19 @@ export function PriceFileWizardCard() {
     return {
       brand: find("brand", "manufacturer", "make"),
       model: find("model", "part", "sku", "item"),
-      cost: find("cost", "price", "net", "amount"),
-      description: find("desc", "name", "product"),
+      cost: find("cost", "net", "price", "amount"),
+      // "name" alone is a trap — "Price List Name" is metadata, not a description
+      description: find("desc", "product"),
     };
+  };
+
+  const resetFile = () => {
+    setFileName("");
+    setHeaders([]);
+    setRows([]);
+    setMap({ brand: "", model: "", cost: "", description: "" });
+    setPreview(null);
+    setApplied(null);
   };
 
   const onFile = async (f: File) => {
@@ -254,9 +264,22 @@ export function PriceFileWizardCard() {
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<ParsedRow>(sheet, { defval: "" });
+      // Supplier files often carry blank/title rows above the real headers
+      // (Trane's has an empty first row) — find the first row that actually
+      // looks like headers before building objects.
+      const raw = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: "" });
+      const headerIdx = raw.findIndex(
+        (r) => Array.isArray(r) && r.filter((c) => String(c).trim() !== "").length >= 2 && r.some((c) => /[a-z]/i.test(String(c))),
+      );
+      if (headerIdx < 0 || raw.length <= headerIdx + 1) {
+        toast({ title: "That file has no usable rows", variant: "destructive" });
+        return;
+      }
+      const hdrs = raw[headerIdx].map((h: any, i: number) => String(h).trim() || `Column ${i + 1}`);
+      const json: ParsedRow[] = raw.slice(headerIdx + 1)
+        .filter((r) => Array.isArray(r) && r.some((c) => String(c).trim() !== ""))
+        .map((r) => Object.fromEntries(hdrs.map((h: string, i: number) => [h, r[i] ?? ""])));
       if (json.length === 0) { toast({ title: "That file has no rows", variant: "destructive" }); return; }
-      const hdrs = Object.keys(json[0]);
       setFileName(f.name);
       setHeaders(hdrs);
       setRows(json);
@@ -339,14 +362,46 @@ export function PriceFileWizardCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} data-testid="pricefile-input" />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => fileRef.current?.click()} data-testid="pricefile-upload">
-            <Upload className="mr-2 h-4 w-4" /> {fileName ? "Choose a different file" : "Upload price file"}
-          </Button>
-          <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Supplier / brand" className="h-9 w-36" data-testid="pricefile-supplier" />
-          {fileName && <span className="text-sm text-slate-500">{fileName} · {rows.length.toLocaleString()} rows</span>}
-        </div>
 
+        {/* Step 1 — pick the file. A proper drop-zone card when empty; a
+            compact file bar with an X once one's loaded. */}
+        {!fileName ? (
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/60 py-10 transition-colors hover:border-[#711419]/40 hover:bg-[#711419]/[0.03]"
+            data-testid="pricefile-upload"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
+              <Upload className="h-5 w-5 text-[#711419]" />
+            </span>
+            <span className="text-sm font-semibold text-slate-700">Upload the supplier price file</span>
+            <span className="text-xs text-slate-400">CSV or Excel — title rows and blank rows are handled automatically</span>
+          </button>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
+            <FileSpreadsheet className="h-5 w-5 shrink-0 text-[#711419]" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-800">{fileName}</p>
+              <p className="text-xs text-slate-400">{rows.length.toLocaleString()} rows read</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400">Supplier</span>
+              <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Trane" className="h-8 w-28" data-testid="pricefile-supplier" />
+            </div>
+            <button
+              onClick={resetFile}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Remove file"
+              title="Start over with a different file"
+              data-testid="pricefile-clear"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Step 2 — map the columns, with a live read of the first rows so
+            it's obvious the file is being understood correctly. */}
         {headers.length > 0 && !preview && (
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Which column is which?</p>
@@ -364,8 +419,37 @@ export function PriceFileWizardCard() {
                 </div>
               ))}
             </div>
-            <Button size="sm" disabled={!map.model || !map.cost || previewMutation.isPending} onClick={() => previewMutation.mutate()} data-testid="pricefile-preview">
-              {previewMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Comparing…</> : "Compare against catalog"}
+
+            {map.model && map.cost && (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <p className="border-b border-slate-100 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Reading it as — first {Math.min(5, rows.length)} of {rows.length.toLocaleString()}
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="h-8">Brand</TableHead>
+                      <TableHead className="h-8">Model</TableHead>
+                      <TableHead className="h-8 text-right">Cost</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.slice(0, 5).map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="py-1.5 text-sm">{map.brand ? String(r[map.brand] ?? "") : supplier}</TableCell>
+                        <TableCell className="py-1.5 font-mono text-xs">{String(r[map.model] ?? "")}</TableCell>
+                        <TableCell className="py-1.5 text-right tabular-nums text-sm">
+                          ${parseFloat(String(r[map.cost] ?? "").replace(/[$,]/g, "")).toLocaleString("en-US", { minimumFractionDigits: 2 }) || "?"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <Button disabled={!map.model || !map.cost || previewMutation.isPending} onClick={() => previewMutation.mutate()} className="bg-[#711419] hover:bg-[#8a1a1f]" data-testid="pricefile-preview">
+              {previewMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Comparing…</> : "Looks right — compare against catalog"}
             </Button>
           </div>
         )}

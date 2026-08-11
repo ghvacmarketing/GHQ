@@ -32873,6 +32873,21 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // Model-succession heuristic: shared leading characters weighted toward the
   // family prefix, so 4TTR6036J vs 4TTR6037K scores high and unrelated
   // models score low. Pure + deterministic — suggestions only, humans confirm.
+  // Trane price files mark models with a trailing * (revision wildcard:
+  // "5TTX6030A1000*" covers every revision letter). Strip it for keys, and
+  // match package models by prefix in EITHER direction so a concrete
+  // "5TTX6030A1000A" on a package finds the wildcard catalog row.
+  const normModel = (m: string) => m.trim().toUpperCase().replace(/\*+$/, "");
+  const modelsMatch = (a: string, b: string): boolean => {
+    const x = normModel(a);
+    const y = normModel(b);
+    if (!x || !y) return false;
+    if (x === y) return true;
+    const shorter = x.length < y.length ? x : y;
+    const longer = x.length < y.length ? y : x;
+    return shorter.length >= 8 && longer.startsWith(shorter);
+  };
+
   const modelSimilarity = (a: string, b: string): number => {
     const x = a.toUpperCase().replace(/[^A-Z0-9]/g, "");
     const y = b.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -32899,15 +32914,15 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (clean.length === 0) return res.status(400).json({ message: "No usable rows — check the column mapping." });
 
       const catalog = await db.select().from(equipmentModels);
-      const byKey = new Map(catalog.map((c) => [`${c.brand.toLowerCase()}|${c.model.toLowerCase()}`, c]));
-      const fileKeys = new Set(clean.map((r) => `${r.brand.toLowerCase()}|${r.model.toLowerCase()}`));
+      const byKey = new Map(catalog.map((c) => [`${c.brand.toLowerCase()}|${normModel(c.model).toLowerCase()}`, c]));
+      const fileKeys = new Set(clean.map((r) => `${r.brand.toLowerCase()}|${normModel(r.model).toLowerCase()}`));
       const fileBrands = new Set(clean.map((r) => r.brand.toLowerCase()));
 
       const priceChanges: any[] = [];
       const unchanged: any[] = [];
       const newModels: any[] = [];
       for (const r of clean) {
-        const hit = byKey.get(`${r.brand.toLowerCase()}|${r.model.toLowerCase()}`);
+        const hit = byKey.get(`${r.brand.toLowerCase()}|${normModel(r.model).toLowerCase()}`);
         if (!hit) newModels.push(r);
         else if (hit.costCents !== r.costCents) priceChanges.push({ id: hit.id, brand: hit.brand, model: hit.model, oldCostCents: hit.costCents, newCostCents: r.costCents });
         else unchanged.push({ id: hit.id, brand: hit.brand, model: hit.model });
@@ -32915,7 +32930,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       // Missing = catalog rows for brands PRESENT in this file that the file
       // no longer lists (other brands' rows are simply out of scope).
       const missingModels = catalog.filter(
-        (c) => fileBrands.has(c.brand.toLowerCase()) && !c.isDiscontinued && !fileKeys.has(`${c.brand.toLowerCase()}|${c.model.toLowerCase()}`),
+        (c) => fileBrands.has(c.brand.toLowerCase()) && !c.isDiscontinued && !fileKeys.has(`${c.brand.toLowerCase()}|${normModel(c.model).toLowerCase()}`),
       );
       // Succession suggestions: pair each missing model with its best-scoring
       // new model of the same brand.
@@ -32987,7 +33002,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       for (const n of Array.isArray(d.addModels) ? d.addModels : []) {
         const brand = String(n.brand || "").trim();
-        const model = String(n.model || "").trim();
+        const model = normModel(String(n.model || ""));
         const c = Math.round(Number(n.costCents));
         if (!brand || !model || !Number.isFinite(c) || c < 0) continue;
         const [existing] = await db.select().from(equipmentModels)
@@ -33066,14 +33081,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         db.select().from(pricebookPackages).where(eq(pricebookPackages.isActive, true)),
         db.select().from(equipmentModels),
       ]);
-      const byModel = new Map(catalog.map((c) => [c.model.toLowerCase(), c]));
+      const findModel = (m: string) => catalog.find((c) => modelsMatch(c.model, m));
       const out = packages.map((p) => {
         const parts = [p.outdoorModel, p.coilModel, p.indoorHeatModel, p.thermostatModel].filter(Boolean) as string[];
         let cost = 0;
         const matched: string[] = [];
         const unmatched: string[] = [];
         for (const m of parts) {
-          const hit = byModel.get(m.toLowerCase());
+          const hit = findModel(m);
           if (hit) { cost += hit.costCents; matched.push(m); }
           else unmatched.push(m);
         }
@@ -33103,11 +33118,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const [p] = await db.select().from(pricebookPackages).where(eq(pricebookPackages.id, req.params.packageId));
       if (!p) return res.status(404).json({ message: "Package not found" });
       const catalog = await db.select().from(equipmentModels);
-      const byModel = new Map(catalog.map((c) => [c.model.toLowerCase(), c]));
       let cost = 0;
       for (const m of [p.outdoorModel, p.coilModel, p.indoorHeatModel, p.thermostatModel]) {
         if (!m) continue;
-        const hit = byModel.get(m.toLowerCase());
+        const hit = catalog.find((c) => modelsMatch(c.model, m));
         if (hit) cost += hit.costCents;
       }
       const updates: Record<string, any> = { costBasisCents: cost, costBasisAt: new Date(), updatedAt: new Date() };
