@@ -21,6 +21,7 @@ import {
   Search, TrendingUp, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
+import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
 
 /** Package pricing revamp — the tools UNDER the hand-curated packages:
  *  - Equipment catalog: every supplier model + cost (brands are pure data)
@@ -761,10 +762,11 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
               <span className="ml-auto text-xs text-slate-400">{shown.length} package{shown.length === 1 ? "" : "s"}</span>
             </div>
 
-            <div className="flex gap-4 max-lg:flex-col">
-              {/* Package list */}
-              <div className="w-80 shrink-0 max-lg:w-full">
-                <div className="max-h-[600px] overflow-y-auto rounded-lg border border-slate-200 max-lg:max-h-72">
+            <div className="flex gap-4 max-lg:flex-col lg:min-h-[560px]">
+              {/* Package list — absolutely filled so it stretches exactly level
+                  with the money rail, scrolling inside its own column */}
+              <div className="w-64 shrink-0 max-lg:w-full lg:relative">
+                <div className="overflow-y-auto rounded-lg border border-slate-200 max-lg:max-h-72 lg:absolute lg:inset-0">
                   {groups.map(([unit, rows]) => (
                     <div key={unit}>
                       <p className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{unit}</p>
@@ -802,78 +804,83 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                 </div>
               </div>
 
-              {/* Breakdown */}
-              <div className="min-w-0 flex-1">
-                {selected ? (
-                  <div className="space-y-4 rounded-lg border border-slate-200 p-4" data-testid={`pkgequip-detail-${selected.id}`}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{selected.unitType}</p>
-                        <p className="text-lg font-bold text-slate-900">{selected.tier} · {selected.tonnage} Ton · {selected.packageLevel}</p>
-                        <button
-                          onClick={() => setPreviewPkg(selPkg || selected)}
-                          className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#711419] hover:underline"
-                          data-testid={`pkgequip-preview-${selected.id}`}
-                        >
-                          <Eye className="h-3.5 w-3.5" /> Preview proposal card
-                        </button>
+              {selected ? (
+                <>
+                  {/* The package itself: header, equipment tiles, accessories */}
+                  <div className="min-w-0 flex-1">
+                    <div className="space-y-4 rounded-lg border border-slate-200 p-4" data-testid={`pkgequip-detail-${selected.id}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{selected.unitType}</p>
+                          <p className="text-lg font-bold text-slate-900">{selected.tier} · {selected.tonnage} Ton · {selected.packageLevel}</p>
+                          <button
+                            onClick={() => setPreviewPkg(selPkg || selected)}
+                            className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#711419] hover:underline"
+                            data-testid={`pkgequip-preview-${selected.id}`}
+                          >
+                            <Eye className="h-3.5 w-3.5" /> Preview proposal card
+                          </button>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your price</p>
+                          <p className="text-2xl font-bold tabular-nums text-[#711419]">{usd(selected.totalInvestment)}</p>
+                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 && (
+                            <p className="text-xs tabular-nums text-slate-500">as low as {usd(selected.monthlyPayment)}/mo</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your price</p>
-                        <p className="text-2xl font-bold tabular-nums text-[#711419]">{usd(selected.totalInvestment)}</p>
-                        {selected.monthlyPayment != null && selected.monthlyPayment > 0 && (
-                          <p className="text-xs tabular-nums text-slate-500">as low as {usd(selected.monthlyPayment)}/mo</p>
+
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {selected.parts.map((part) => {
+                          const img = slotImage(part.slot);
+                          return (
+                            <div key={part.slot} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-100 bg-slate-50">
+                                {img ? <img src={img} alt={part.slot} className="h-12 w-12 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</p>
+                                <p className="truncate text-sm font-medium text-slate-800">{part.name || part.model}</p>
+                                {part.name && part.name !== part.model && (
+                                  <p className="truncate font-mono text-[11px] text-slate-400">{part.model}</p>
+                                )}
+                              </div>
+                              <div className="shrink-0 text-right">
+                                {part.costCents != null ? (
+                                  <p className="tabular-nums text-sm font-semibold text-slate-800">{usd(part.costCents)}</p>
+                                ) : (
+                                  <p className="text-[11px] font-medium text-amber-600">not in catalog</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {selected.parts.length === 0 && (
+                          <p className="text-sm text-slate-400 sm:col-span-2">No equipment models on this package.</p>
                         )}
                       </div>
-                    </div>
 
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {selected.parts.map((part) => {
-                        const img = slotImage(part.slot);
-                        return (
-                          <div key={part.slot} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-100 bg-slate-50">
-                              {img ? <img src={img} alt={part.slot} className="h-12 w-12 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</p>
-                              <p className="truncate text-sm font-medium text-slate-800">{part.name || part.model}</p>
-                              {part.name && part.name !== part.model && (
-                                <p className="truncate font-mono text-[11px] text-slate-400">{part.model}</p>
-                              )}
-                            </div>
-                            <div className="shrink-0 text-right">
-                              {part.costCents != null ? (
-                                <p className="tabular-nums text-sm font-semibold text-slate-800">{usd(part.costCents)}</p>
-                              ) : (
-                                <p className="text-[11px] font-medium text-amber-600">not in catalog</p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {selected.parts.length === 0 && (
-                        <p className="text-sm text-slate-400 sm:col-span-2">No equipment models on this package.</p>
+                      {selPkg?.accessoryModels && (
+                        <p className="text-xs text-slate-500">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Accessories</span>{" "}
+                          {selPkg.accessoryModels}
+                        </p>
                       )}
                     </div>
+                  </div>
 
-                    {selPkg?.accessoryModels && (
-                      <p className="text-xs text-slate-500">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Accessories</span>{" "}
-                        {selPkg.accessoryModels}
-                      </p>
-                    )}
-
+                  {/* Money rail — cost breakdown + financing math */}
+                  <div className="w-80 shrink-0 space-y-4 max-lg:w-full">
                     {selected.matchedCount > 0 && (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
                         <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cost breakdown</p>
                         <div className="divide-y divide-slate-100 px-3.5 text-sm">
                           <div className="flex items-baseline justify-between gap-3 py-2.5">
-                            <span className="text-slate-600">Your price — what the customer pays</span>
+                            <span className="text-slate-600">Your price</span>
                             <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.totalInvestment)}</span>
                           </div>
                           <div className="flex items-baseline justify-between gap-3 py-2.5">
-                            <span className="text-slate-600">Equipment — live from the catalog</span>
+                            <span className="text-slate-600">Equipment (live from catalog)</span>
                             <span className="shrink-0 tabular-nums text-slate-700">
                               − {usd(selected.currentComponentCostCents)}<span className="ml-1.5 text-[11px] text-slate-400">{equipPct}%</span>
                             </span>
@@ -912,28 +919,31 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                           {selected.monthlyPayment != null && selected.monthlyPayment > 0 ? (
                             <>
                               <div className="flex items-baseline justify-between gap-3 py-2.5">
-                                <span className="text-slate-600">"As low as" stored on this package</span>
+                                <span className="text-slate-600">"As low as" on the package card</span>
                                 <span className="shrink-0 font-semibold tabular-nums text-slate-900">{usd(selected.monthlyPayment)}/mo</span>
                               </div>
                               <div className="flex items-baseline justify-between gap-3 py-2.5">
                                 <span className="text-slate-600">What that works out to</span>
                                 <span className="shrink-0 tabular-nums text-slate-700">
-                                  {((selected.monthlyPayment / selected.totalInvestment) * 100).toFixed(2)}% of price · ÷ {(selected.totalInvestment / selected.monthlyPayment).toFixed(1)}
+                                  {((selected.monthlyPayment / selected.totalInvestment) * 100).toFixed(2)}%/mo of price
                                 </span>
                               </div>
                             </>
                           ) : (
                             <div className="py-2.5 text-slate-500">No monthly payment stored on this package.</div>
                           )}
-                          <div className="flex items-baseline justify-between gap-3 py-2.5">
-                            <span className="text-slate-600">Quote &amp; proposal estimate — price ÷ 67</span>
-                            <span className="shrink-0 tabular-nums text-slate-700">${Math.round(selected.totalInvestment / 100 / 67).toLocaleString()}/mo</span>
+                          <div className="py-2.5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-slate-600">GreenSky estimate</span>
+                              <span className="shrink-0 tabular-nums text-slate-700">${monthlyFinancing(selected.totalInvestment / 100).toLocaleString()}/mo</span>
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-slate-400">{FINANCING_LABEL} · what quotes &amp; proposals show</p>
                           </div>
-                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 &&
-                            Math.abs(selected.monthlyPayment / 100 - selected.totalInvestment / 100 / 67) / (selected.totalInvestment / 100 / 67) > 0.05 && (
+                          {selected.monthlyPayment != null && selected.monthlyPayment > 0 && monthlyFinancing(selected.totalInvestment / 100) > 0 &&
+                            Math.abs(selected.monthlyPayment / 100 - monthlyFinancing(selected.totalInvestment / 100)) > monthlyFinancing(selected.totalInvestment / 100) * 0.05 && (
                             <div className="py-2.5">
                               <p className="text-[11px] text-amber-600">
-                                The stored monthly is more than 5% off the ÷ 67 estimate customers see on quotes — worth aligning next time you reprice.
+                                The stored monthly is more than 5% off the GreenSky estimate customers see on quotes — worth aligning next time you reprice.
                               </p>
                             </div>
                           )}
@@ -941,19 +951,19 @@ export function PackageEquipmentCard({ packages }: { packages: any[] | undefined
                             <p className="text-[11px] leading-relaxed text-slate-400">
                               The package monthly is a stored number — set when the package was priced, scaled with bulk % adjustments,
                               never changed by GHQ on its own. Everywhere else (quotes, proposals, the public quote page) the monthly is
-                              estimated as price ÷ 67 (≈1.5% of the total per month) until GreenSky approval sets the real terms.
+                              amortized from your GreenSky program — {FINANCING_LABEL} — until approval sets the final terms.
                             </p>
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-slate-300 py-16 text-center text-sm text-slate-400">
-                    Pick a package to see its breakdown.
-                  </p>
-                )}
-              </div>
+                </>
+              ) : (
+                <p className="flex-1 rounded-lg border border-dashed border-slate-300 py-16 text-center text-sm text-slate-400">
+                  Pick a package to see its breakdown.
+                </p>
+              )}
             </div>
           </>
         )}
@@ -1076,11 +1086,11 @@ export function CostDriftCard({ packages }: { packages: any[] | undefined }) {
                               {parseFloat(priceInput) > 0 && (
                                 <button
                                   type="button"
-                                  onClick={() => setMonthlyInput(String(Math.round(parseFloat(priceInput) / 67)))}
+                                  onClick={() => setMonthlyInput(String(monthlyFinancing(parseFloat(priceInput))))}
                                   className="text-[10px] font-medium text-slate-400 hover:text-[#711419]"
                                   data-testid={`drift-suggest-monthly-${d.id}`}
                                 >
-                                  suggest ${Math.round(parseFloat(priceInput) / 67).toLocaleString()}/mo (price ÷ 67)
+                                  suggest ${monthlyFinancing(parseFloat(priceInput)).toLocaleString()}/mo ({FINANCING_LABEL})
                                 </button>
                               )}
                             </span>

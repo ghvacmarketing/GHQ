@@ -1,3 +1,4 @@
+import { monthlyFinancing } from "@/lib/financing";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Link, useLocation, useParams } from "wouter";
@@ -1256,7 +1257,7 @@ export default function CrmProposalBuilder() {
           packageLevel: item.packageLevel,
           quantity: item.quantity,
           totalPrice: finalPrice,
-          monthlyPayment: item.eliteData ? Math.round(item.eliteData.finalTotal / 67) : parseFloat(item.monthlyPayment) || 0,
+          monthlyPayment: item.eliteData ? monthlyFinancing(item.eliteData.finalTotal) : parseFloat(item.monthlyPayment) || 0,
           outdoor: {
             brand: item.outdoorBrand,
             model: item.outdoorModel,
@@ -1605,7 +1606,7 @@ export default function CrmProposalBuilder() {
         const itemPrice = finalPrice * item.quantity;
         const baseMonthly = parseFloat(item.monthlyPayment) || 0;
         const monthlyPrice = item.eliteData 
-          ? Math.round(item.eliteData.finalTotal / 67) * item.quantity
+          ? monthlyFinancing(item.eliteData.finalTotal) * item.quantity
           : baseMonthly * item.quantity;
         return {
           type: "package",
@@ -1980,26 +1981,26 @@ export default function CrmProposalBuilder() {
   const cartMonthlyTotalRange = useMemo(() => {
     const base = cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
-        // Crawlspace: derive monthly from price / 67
+        // Crawlspace: monthly from the GreenSky program
         const basePrice = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
-        const monthly = Math.round(basePrice / 67) * item.quantity;
+        const monthly = monthlyFinancing(basePrice) * item.quantity;
         return { low: acc.low + monthly, high: acc.high + monthly };
       } else if (isCrawlspaceServicesItem(item)) {
-        // Crawlspace services: derive monthly from price / 67
-        const monthly = Math.round(item.totalPrice / 67) * item.quantity;
+        // Crawlspace services: monthly from the GreenSky program
+        const monthly = monthlyFinancing(item.totalPrice) * item.quantity;
         return { low: acc.low + monthly, high: acc.high + monthly };
       } else if (isCustomBuild(item)) {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         return { 
-          low: acc.low + Math.round(estimate.low / 67) * item.quantity, 
-          high: acc.high + Math.round(estimate.high / 67) * item.quantity 
+          low: acc.low + monthlyFinancing(estimate.low) * item.quantity, 
+          high: acc.high + monthlyFinancing(estimate.high) * item.quantity 
         };
       } else {
         // HVAC packages: use proper monthly payment logic
-        // For Elite: derive from finalTotal / 67
+        // For Elite: monthly from the GreenSky program
         // For non-Elite: use the precise monthlyPayment from pricebook
         if (item.eliteData) {
-          const monthly = Math.round(item.eliteData.finalTotal / 67) * item.quantity;
+          const monthly = monthlyFinancing(item.eliteData.finalTotal) * item.quantity;
           return { low: acc.low + monthly, high: acc.high + monthly };
         } else {
           const monthly = (parseFloat(item.monthlyPayment) || 0) * item.quantity;
@@ -2007,7 +2008,7 @@ export default function CrmProposalBuilder() {
         }
       }
     }, { low: 0, high: 0 });
-    const protectionMonthlyAdj = Math.round((protectionBundlePrice - cartProtectionDiscountAmount) / 67);
+    const protectionMonthlyAdj = monthlyFinancing((protectionBundlePrice - cartProtectionDiscountAmount));
     return { low: base.low + protectionMonthlyAdj, high: base.high + protectionMonthlyAdj };
   }, [cart, protectionBundlePrice, cartProtectionDiscountAmount]);
 
@@ -3170,7 +3171,7 @@ export default function CrmProposalBuilder() {
                                       {formatPrice(item.totalPrice * item.quantity)}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                      {formatPrice(Math.round(item.totalPrice * item.quantity / 67))}/mo
+                                      {formatPrice(monthlyFinancing(item.totalPrice * item.quantity))}/mo
                                     </p>
                                   </div>
                                 </>
@@ -4734,7 +4735,7 @@ export default function CrmProposalBuilder() {
                               {formatPrice(pricing.totalPrice)}
                             </span>
                             <span className="text-sm text-muted-foreground">
-                              {formatPrice(Math.round(pricing.totalPrice / 67))}/mo
+                              {formatPrice(monthlyFinancing(pricing.totalPrice))}/mo
                             </span>
                           </div>
                         </div>
@@ -5020,7 +5021,7 @@ export default function CrmProposalBuilder() {
                           )}
                           <div className="bg-teal-100 dark:bg-teal-900/50 rounded-lg p-3 flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                              {formatPrice(Math.round(itemPrice / 67))}/mo financing
+                              {formatPrice(monthlyFinancing(itemPrice))}/mo financing
                             </div>
                             <div className="text-right">
                               {item.eliteData && (
@@ -5130,7 +5131,7 @@ export default function CrmProposalBuilder() {
                           </div>
                           <div className="bg-orange-100 dark:bg-orange-900/50 rounded-lg p-3 flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                              {formatPrice(Math.round(itemPrice / 67))}/mo financing
+                              {formatPrice(monthlyFinancing(itemPrice))}/mo financing
                             </div>
                             <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{formatPrice(itemPrice)}</p>
                           </div>
@@ -5142,7 +5143,7 @@ export default function CrmProposalBuilder() {
                     const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
                     const itemPrice = finalPrice * item.quantity;
                     const monthlyPrice = item.eliteData 
-                      ? Math.round(item.eliteData.finalTotal / 67) * item.quantity
+                      ? monthlyFinancing(item.eliteData.finalTotal) * item.quantity
                       : (parseFloat(item.monthlyPayment) || 0) * item.quantity;
                     const levelColors: Record<string, string> = {
                       Best: 'from-amber-50 to-white dark:from-amber-950 dark:to-gray-900 border-amber-200 dark:border-amber-800',
@@ -5359,7 +5360,7 @@ export default function CrmProposalBuilder() {
                         : isCustomBuild(item)
                         ? (() => { const est = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat); return est.high * item.quantity; })()
                         : 0;
-                      const optionMonthly = Math.round(optionPrice / 67);
+                      const optionMonthly = monthlyFinancing(optionPrice);
                       const levelColor = isHvacPackage(item) ? getPackageLevelColor(item.packageLevel) : 'bg-gray-500';
                       return (
                         <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 border">

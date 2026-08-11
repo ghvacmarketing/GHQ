@@ -1,3 +1,4 @@
+import { monthlyFinancing } from "@/lib/financing";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -92,14 +93,8 @@ function formatCurrency(value: string | number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
 }
 
-// Estimated monthly payment with approved financing. Divisor of 67 mirrors the
-// proposal builder / preview so the customer sees the same figure everywhere.
-const FINANCING_DIVISOR = 67;
-function monthlyFinancing(value: string | number): number {
-  const num = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
-  if (isNaN(num) || num <= 0) return 0;
-  return Math.round(num / FINANCING_DIVISOR);
-}
+// Estimated monthly payment with approved financing — computed from the
+// GreenSky program in @/lib/financing so every surface agrees.
 
 function formatDate(dateString: string | Date | null | undefined): string {
   if (!dateString) return "N/A";

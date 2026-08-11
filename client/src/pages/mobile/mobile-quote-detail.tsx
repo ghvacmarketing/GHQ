@@ -1,3 +1,4 @@
+import { monthlyFinancing } from "@/lib/financing";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
@@ -65,14 +66,8 @@ function formatCurrency(amount: number | string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num || 0);
 }
 
-// Estimated monthly payment with approved financing — same divisor as the
-// public quote page and the proposal builder, so every surface agrees.
-const FINANCING_DIVISOR = 67;
-function monthlyFinancing(value: string | number | null | undefined): number {
-  const num = typeof value === "string" ? parseFloat(value) : value ?? 0;
-  if (!num || isNaN(num) || num <= 0) return 0;
-  return Math.round(num / FINANCING_DIVISOR);
-}
+// Estimated monthly payment with approved financing — computed from the
+// GreenSky program in @/lib/financing so every surface agrees.
 
 export default function MobileQuoteDetail() {
   const { id } = useParams<{ id: string }>();

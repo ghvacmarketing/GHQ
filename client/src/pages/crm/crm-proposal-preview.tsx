@@ -1,3 +1,4 @@
+import { monthlyFinancing } from "@/lib/financing";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -564,7 +565,7 @@ export default function CrmProposalPreview() {
                         </div>
                       )}
                       <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">{formatPrice(Math.round(itemPrice / 67))}/mo financing</div>
+                        <div className="text-sm text-muted-foreground">{formatPrice(monthlyFinancing(itemPrice))}/mo financing</div>
                         <p className="text-2xl font-bold text-foreground">{formatPrice(itemPrice)}</p>
                       </div>
                     </div>
@@ -663,7 +664,7 @@ export default function CrmProposalPreview() {
                         })()}
                       </div>
                       <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">{formatPrice(Math.round(itemPrice / 67))}/mo financing</div>
+                        <div className="text-sm text-muted-foreground">{formatPrice(monthlyFinancing(itemPrice))}/mo financing</div>
                         <p className="text-2xl font-bold text-foreground">{formatPrice(itemPrice)}</p>
                       </div>
                     </div>
@@ -677,7 +678,7 @@ export default function CrmProposalPreview() {
               const finalPrice = hvac.eliteData ? hvac.eliteData.finalTotal : basePrice;
               const itemPrice = finalPrice * hvac.quantity;
               const monthlyPrice = hvac.eliteData
-                ? Math.round(hvac.eliteData.finalTotal / 67) * hvac.quantity
+                ? monthlyFinancing(hvac.eliteData.finalTotal) * hvac.quantity
                 : (parseFloat(hvac.monthlyPayment) || 0) * hvac.quantity;
               const headerColors: Record<string, string> = {
                 Best: "bg-amber-500 text-white", Better: "bg-purple-500 text-white", Good: "bg-blue-500 text-white", Budget: "bg-gray-500 text-white",
@@ -856,7 +857,7 @@ export default function CrmProposalPreview() {
                     : isCrawlspaceServicesItem(item)
                     ? item.totalPrice * item.quantity
                     : (() => { const est = calculateCustomBuildEstimate((item as CustomBuildCart).outdoorUnit, (item as CustomBuildCart).coil, (item as CustomBuildCart).indoorUnit, (item as CustomBuildCart).thermostat); return est.high * item.quantity; })();
-                  const optionMonthly = Math.round(optionPrice / 67);
+                  const optionMonthly = monthlyFinancing(optionPrice);
                   const levelColor = isHvacPackage(item) ? getPackageLevelColor((item as HvacPackageCartItem).packageLevel) : "bg-gray-500";
                   return (
                     <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 border">
