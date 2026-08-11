@@ -1085,15 +1085,16 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                         </div>
                       </div>
 
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                      <div className="grid auto-rows-fr gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                         {SLOT_DEFS.map((def) => {
                           const part = selected.parts.find((pt) => pt.slot === def.label);
                           if (!part) {
+                            if (addSlotHidden(selected.unitType, def.key)) return null;
                             return (
                               <button
                                 key={def.key}
                                 onClick={() => setSlotEdit(def)}
-                                className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-600"
+                                className="flex h-full min-h-[76px] items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-600"
                                 data-testid={`pkgequip-addslot-${def.key}`}
                               >
                                 <Plus className="h-3.5 w-3.5" /> Add {def.label.toLowerCase()}
@@ -1102,7 +1103,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                           }
                           const img = slotImage(part.slot);
                           return (
-                            <div key={def.key} className="group relative flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                            <div key={def.key} className="group relative flex h-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
                               <button
                                 onClick={() => setSlotEdit(def)}
                                 className="absolute right-1.5 top-1.5 rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100"
@@ -1393,6 +1394,19 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
 
 // ─────────────────────────── Per-slot card editor ───────────────────────────
 
+/** Which empty slots even make sense to ADD for a system type: mini-splits
+ *  and packaged units have no separate coil/indoor-heat, ducting is just the
+ *  duct job. Existing data always renders — this only hides the Add tile. */
+const addSlotHidden = (unitType: string, slotKey: string): boolean => {
+  const u = (unitType || "").toLowerCase();
+  const isMini = u.includes("mini");
+  const isPackaged = u === "php" || u === "gp" || u.includes("package");
+  const isDucting = u.includes("duct");
+  if ((isMini || isPackaged) && (slotKey === "coil" || slotKey === "indoorHeat")) return true;
+  if (isDucting && slotKey !== "outdoor") return true;
+  return false;
+};
+
 const SLOT_DEFS = [
   { key: "outdoor", label: "Outdoor", modelField: "outdoorModel", nameField: "outdoorName", imageField: "outdoorImageUrl" },
   { key: "coil", label: "Coil", modelField: "coilModel", nameField: "coilName", imageField: "coilImageUrl" },
@@ -1453,46 +1467,58 @@ function SlotEditDialog({ slot, pkg, packageId, onClose }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
+        <DialogHeader className="px-6 pb-4 pt-6">
           <DialogTitle>Edit {slot.label.toLowerCase()} card</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <p className="mb-1 text-[11px] font-medium text-slate-500">Model number</p>
-            <Input value={model} onChange={(e) => setModel(e.target.value)} className="h-9 font-mono text-sm" placeholder="e.g. 4TWX8036A1000A" data-testid="slotedit-model" />
-            <p className="mt-1 text-[10px] text-slate-400">Costing comes from matching this against the Equipment Catalog.</p>
-          </div>
-          <div>
-            <p className="mb-1 text-[11px] font-medium text-slate-500">Description <span className="text-slate-400">(what proposals show)</span></p>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 text-sm" placeholder="e.g. XV18 Variable Speed Heat Pump" data-testid="slotedit-name" />
-          </div>
-          <div>
-            <p className="mb-1 text-[11px] font-medium text-slate-500">Image</p>
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                {imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
+
+        {/* Image — full-bleed band, no floating whitespace */}
+        <div className="border-y border-slate-100 bg-slate-50/70">
+          <div className="flex h-48 items-center justify-center">
+            {imageUrl ? (
+              <img src={imageUrl} alt="" className="h-40 max-w-[75%] object-contain" />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-slate-300">
+                <Boxes className="h-10 w-10" />
+                <p className="text-xs text-slate-400">No image yet</p>
               </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }}
-                data-testid="slotedit-file"
-              />
-              <Button size="sm" variant="outline" className="h-8" disabled={uploading} onClick={() => fileRef.current?.click()} data-testid="slotedit-upload">
-                {uploading ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Uploading…</> : imageUrl ? "Replace image" : "Upload image"}
-              </Button>
-              {imageUrl && (
-                <Button size="sm" variant="ghost" className="h-8 text-slate-500" onClick={() => setImageUrl("")} data-testid="slotedit-removeimg">
-                  Remove
-                </Button>
-              )}
-            </div>
+            )}
           </div>
-          <p className="text-[11px] text-slate-400">Changes what this card shows here and on proposals — the package price never moves.</p>
-          <div className="flex justify-end gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }}
+            data-testid="slotedit-file"
+          />
+          <div className="flex items-center justify-center gap-2 border-t border-slate-100 py-2.5">
+            <Button size="sm" variant="outline" className="h-8" disabled={uploading} onClick={() => fileRef.current?.click()} data-testid="slotedit-upload">
+              {uploading ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Uploading…</> : imageUrl ? "Replace image" : "Upload image"}
+            </Button>
+            {imageUrl && (
+              <Button size="sm" variant="ghost" className="h-8 text-slate-500" onClick={() => setImageUrl("")} data-testid="slotedit-removeimg">
+                Remove
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <div>
+            <p className="mb-1.5 text-[11px] font-medium text-slate-500">Model number</p>
+            <Input value={model} onChange={(e) => setModel(e.target.value)} className="h-10 font-mono text-sm" placeholder="e.g. 4TWX8036A1000A" data-testid="slotedit-model" />
+            <p className="mt-1.5 text-[11px] text-slate-400">Costing comes from matching this against the Equipment Catalog.</p>
+          </div>
+          <div>
+            <p className="mb-1.5 text-[11px] font-medium text-slate-500">Description <span className="text-slate-400">(what proposals show)</span></p>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-10 text-sm" placeholder="e.g. XV18 Variable Speed Heat Pump" data-testid="slotedit-name" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 border-t border-slate-100 px-6 py-4">
+          <p className="text-[11px] leading-snug text-slate-400">Changes what this card shows here and on proposals — the price never moves.</p>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button
               className="bg-[#711419] hover:bg-[#8a1a1f]"
