@@ -11,6 +11,7 @@ import { openGlobalAI } from "@/components/crm/ghq-search";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 import type { CrmUser } from "@shared/schema";
 import { PriceFileWizardCard, CostsAndCatalogTab } from "@/pages/crm/packages-pricing-tools";
+import PricingGibbsPanel from "@/components/crm/pricing-gibbs-panel";
 
 /** Package pricing, condensed to two tabs:
  *  - Costs & Catalog: Package Equipment (drift + repricing baked in), the
@@ -22,6 +23,21 @@ export default function CrmSettingsPackages() {
   usePageTitle("Package Pricing Management");
   const [, navigate] = useLocation();
   const [pageTab, setPageTab] = useState<"costs" | "pricefile">("costs");
+  // The docked Pricing Gibbs panel — remembered across visits.
+  const [gibbsOpen, setGibbsOpen] = useState(() => {
+    try { return localStorage.getItem("pricing-gibbs-panel") === "1"; } catch { return false; }
+  });
+  const toggleGibbs = () => {
+    // Small screens have no room for a docked panel — the full Gibbs opens instead.
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      openGlobalAI();
+      return;
+    }
+    setGibbsOpen((v) => {
+      try { localStorage.setItem("pricing-gibbs-panel", v ? "0" : "1"); } catch { /* private mode */ }
+      return !v;
+    });
+  };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -62,7 +78,9 @@ export default function CrmSettingsPackages() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="mx-auto w-full max-w-7xl space-y-6">
+      <div className={`mx-auto w-full ${gibbsOpen ? "max-w-[1700px]" : "max-w-7xl"}`}>
+        <div className="flex items-start gap-6">
+        <div className="min-w-0 flex-1 space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -76,17 +94,17 @@ export default function CrmSettingsPackages() {
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Package Pricing Management</h1>
             <p className="text-sm text-slate-500">What your packages cost, what they earn, and the supplier files that keep it current</p>
           </div>
-          {/* Native Gibbs: opens the assistant with this page's live screen
-              context, so "this package" just works. */}
+          {/* Native Gibbs: docks the pricing-scoped panel (small screens get
+              the full assistant instead). Screen context rides every ask. */}
           <Button
             variant="outline"
             size="sm"
-            className="ml-auto h-9 gap-2"
-            onClick={openGlobalAI}
+            className={`ml-auto h-9 gap-2 ${gibbsOpen ? "border-[#711419]/40 bg-[#711419]/[0.05] text-[#711419]" : ""}`}
+            onClick={toggleGibbs}
             data-testid="pricing-ask-gibbs"
           >
             <img src={badgeGibbs} alt="" className="h-5 w-5" />
-            Ask Gibbs
+            {gibbsOpen ? "Gibbs is here" : "Ask Gibbs"}
           </Button>
         </div>
 
@@ -115,6 +133,14 @@ export default function CrmSettingsPackages() {
             <PriceFileWizardCard />
           </div>
         )}
+        </div>
+
+        {gibbsOpen && (
+          <div className="w-[380px] shrink-0 max-lg:hidden lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]">
+            <PricingGibbsPanel onClose={toggleGibbs} />
+          </div>
+        )}
+        </div>
       </div>
     </CrmLayout>
   );
