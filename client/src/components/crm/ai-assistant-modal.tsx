@@ -52,7 +52,6 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import badgeGibbs from "@/assets/badge-gibbs.png";
 import { GibbsActionPreview, hasGibbsPreview } from "@/components/crm/gibbs-action-preview";
 import {
   DropdownMenu,
@@ -919,7 +918,6 @@ export default function AiAssistantModal() {
               </div>
             ) : messages.length === 0 && !pending ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <img src={badgeGibbs} alt="" className="mb-4 h-14 w-14 select-none" draggable={false} />
                 <h2 className="text-xl font-semibold text-slate-800">Gibbs here — what can I get done?</h2>
                 <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-500">
                   I know how GHQ works and can see live data — schedules, agreements, invoices, quotes.
@@ -975,7 +973,6 @@ export default function AiAssistantModal() {
                   const revealed = freshIndex === null || i < freshIndex || typedOut;
                   return (
                     <div key={i} className="flex items-start gap-3">
-                      <img src={badgeGibbs} alt="" className="h-8 w-8 flex-shrink-0 select-none" draggable={false} />
                       <div className="min-w-0 flex-1 space-y-2">
                         {msg.content.trim() !== "" && (
                           <div className="whitespace-pre-wrap rounded-lg rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800">
@@ -1255,7 +1252,6 @@ export default function AiAssistantModal() {
                 })}
                 {pending && (
                   <div className="flex items-start gap-3">
-                    <img src={badgeGibbs} alt="" className="h-8 w-8 flex-shrink-0 select-none" draggable={false} />
                     {streamText ? (
                       /* Live stream: the answer paints word by word while the
                          model is still generating. Same bubble classes as the

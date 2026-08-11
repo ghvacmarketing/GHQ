@@ -11,6 +11,7 @@ import {
   type AiSpace,
   AiStreamStartError,
   askGibbsStream,
+  compressImageForAi,
   createAiSpace,
   dismissAiAction,
   fetchAiConversation,
@@ -19,8 +20,7 @@ import { getGibbsPageContext } from "@/lib/gibbs-page-context";
 import { openGlobalAI } from "@/components/crm/ghq-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowUpRight, Check, Loader2, Maximize2, Plus, Send, X } from "lucide-react";
-import badgeGibbs from "@/assets/badge-gibbs.png";
+import { ArrowUpRight, Check, ImagePlus, Loader2, Maximize2, Plus, Send, X } from "lucide-react";
 
 /** Docked Pricing Gibbs — the same brain, same approval rules, same stored
  *  threads as the top-dog Gibbs in the nav, but living ON the Package
@@ -54,6 +54,8 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
   const [pending, setPending] = useState(false);
   const [streamText, setStreamText] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const spaceIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -114,19 +116,46 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, pending, streamText]);
 
+  // Photos in: the picker button or pasting straight into the composer.
+  const addImageFiles = async (files: File[]) => {
+    const images = files.filter((f) => f.type.startsWith("image/")).slice(0, 4);
+    for (const f of images) {
+      try {
+        const dataUrl = await compressImageForAi(f);
+        setAttachments((prev) => (prev.length >= 4 ? prev : [...prev, dataUrl]));
+      } catch {
+        // Unreadable image — skip it.
+      }
+    }
+  };
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.items || [])
+      .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+      .map((it) => it.getAsFile())
+      .filter((f): f is File => !!f);
+    if (files.length > 0) {
+      e.preventDefault();
+      addImageFiles(files);
+    }
+  };
+
   const send = async (raw?: string) => {
     const question = (raw ?? input).trim();
-    if (!question || pending) return;
+    if ((!question && attachments.length === 0) || pending) return;
+    const photos = attachments;
+    setAttachments([]);
     setInput("");
     setPending(true);
     setStreamText(null);
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    setMessages((prev) => [...prev, { role: "user", content: question || "(photo)", attachments: photos.length > 0 ? photos : null }]);
     const spaceId = conversationId ? undefined : (await ensureSpace()) ?? undefined;
     const historyForApi = messages.slice(-10).map((m) => ({ role: m.role, content: m.content }));
     const body = {
-      question,
+      question: question || "(see the attached photo)",
       conversationHistory: historyForApi,
       conversationId,
+      images: photos.length > 0 ? photos : undefined,
       mode: "general",
       spaceId,
       // "this package" resolves — the page registers what's on screen.
@@ -225,12 +254,11 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
   // fixed positioning and pin the drawer to the page instead of the viewport.
   return createPortal(
     <div
-      className="fixed inset-y-0 right-0 z-[65] flex w-[380px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
+      className="fixed inset-y-0 right-0 z-[65] flex w-[min(46vw,820px)] min-w-[440px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
       data-testid="pricing-gibbs-panel"
     >
       {/* Header — who this Gibbs is */}
       <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
-        <img src={badgeGibbs} alt="" className="h-7 w-7" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-tight text-slate-900">Pricing Gibbs</p>
           <p className="text-[11px] leading-tight text-slate-400">Packages, catalog &amp; price files</p>
@@ -250,8 +278,7 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3.5 py-3">
         {messages.length === 0 && !pending && (
           <div className="flex h-full flex-col items-center justify-center gap-3 py-6 text-center">
-            <img src={badgeGibbs} alt="" className="h-12 w-12 opacity-90" />
-            <p className="max-w-[240px] text-xs leading-relaxed text-slate-400">
+            <p className="max-w-[280px] text-xs leading-relaxed text-slate-400">
               This Gibbs lives on the pricing page — he can see what you have selected, so
               "this package" just works. Chats file into the Pricing space in the main Gibbs.
             </p>
@@ -272,9 +299,16 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
 
         {messages.map((m, i) => (
           <div key={i}>
-            {m.content && (
+            {(m.content || (m.attachments && m.attachments.length > 0)) && (
               <div className={m.role === "user" ? "ml-8 rounded-lg bg-[#711419]/[0.06] px-3 py-2" : "mr-4"}>
-                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">{m.content}</p>
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mb-1.5 flex flex-wrap gap-1.5">
+                    {m.attachments.map((src, k) => (
+                      <img key={k} src={src} alt="" className="h-16 w-16 rounded-md border border-slate-200 object-cover" />
+                    ))}
+                  </div>
+                )}
+                {m.content && <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">{m.content}</p>}
               </div>
             )}
             {m.proposedAction && m.actionState !== "superseded" && (
@@ -338,11 +372,48 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
 
       {/* Composer */}
       <div className="border-t border-slate-200 p-2.5">
+        {attachments.length > 0 && (
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            {attachments.map((src, k) => (
+              <div key={k} className="relative">
+                <img src={src} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" />
+                <button
+                  onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== k))}
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-white"
+                  aria-label="Remove image"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            addImageFiles(Array.from(e.target.files || []));
+            e.target.value = "";
+          }}
+          data-testid="pricing-gibbs-file"
+        />
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600"
+            title="Attach a photo (or paste one into the box)"
+            data-testid="pricing-gibbs-attach"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </button>
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={onPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -356,7 +427,7 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
           <Button
             size="icon"
             className="h-9 w-9 shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
-            disabled={pending || !input.trim()}
+            disabled={pending || (!input.trim() && attachments.length === 0)}
             onClick={() => send()}
             data-testid="pricing-gibbs-send"
           >
