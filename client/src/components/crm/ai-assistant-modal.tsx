@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getGibbsPageContext } from "@/lib/gibbs-page-context";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -330,6 +331,9 @@ export default function AiAssistantModal() {
       mode,
       // A brand-new chat is filed into whichever space is selected
       spaceId: conversationId ? undefined : activeSpace ?? undefined,
+      // Whatever page the user is on may have registered screen context so
+      // "this package" / "this page" resolves ("native Gibbs").
+      pageContext: getGibbsPageContext() || undefined,
     };
     // Stream-first: the answer paints as the model generates it. If the
     // stream can't START, fall back to the plain endpoint (identical

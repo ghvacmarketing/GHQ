@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
+import { setGibbsPageContext } from "@/lib/gibbs-page-context";
 
 /** Package pricing revamp — the tools UNDER the hand-curated packages:
  *  - Equipment catalog: every supplier model + cost (brands are pure data)
@@ -360,6 +361,16 @@ export function PriceFileWizardCard() {
     },
     onError: (e: any) => toast({ title: e?.message || "Apply failed", variant: "destructive" }),
   });
+
+  // Register what's on screen so Gibbs knows where the user is in the wizard.
+  useEffect(() => {
+    setGibbsPageContext(
+      fileName
+        ? `Package Pricing Management (Settings) — Price File Update tab. Supplier file loaded: "${fileName}" (${rows.length} rows, supplier ${supplier})${preview ? `; reviewing the diff: ${preview.totals.priceChanges} price changes, ${preview.totals.newModels} new models, ${preview.totals.missing} missing, ${preview.totals.successions} successions suggested` : "; mapping columns"}.`
+        : "Package Pricing Management (Settings) — Price File Update tab. No supplier file uploaded yet.",
+    );
+  }, [fileName, rows.length, supplier, preview]);
+  useEffect(() => () => setGibbsPageContext(null), []);
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, key: string) => {
     const n = new Set(set);
@@ -920,6 +931,25 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
     ];
     return { price, hours, labor, materials, commission, buydown, overhead, profit, marginPct, suggested, segs };
   }, [selected, costModel]);
+
+  // Register what's on screen so Gibbs can resolve "this package".
+  useEffect(() => {
+    if (!selected) {
+      setGibbsPageContext("Package Pricing Management (Settings) — Costs & Catalog tab. No package selected yet.");
+      return;
+    }
+    const partsLine = selected.parts.map((pt) => `${pt.slot}: ${pt.model}${pt.costCents == null ? " (not in catalog)" : ""}`).join("; ");
+    const econLine = econ && costModel
+      ? ` Estimated: equipment ${usd(selected.currentComponentCostCents)}, labor ${usd(econ.labor)}, profit ${usd(econ.profit)} (${econ.marginPct}% margin vs ${costModel.targetMarginPct}% target).`
+      : "";
+    const driftLine = selected.driftCents != null && Math.abs(selected.driftCents) >= 100
+      ? ` Equipment cost drift since last priced: ${selected.driftCents > 0 ? "+" : "-"}${usd(Math.abs(selected.driftCents))}.`
+      : "";
+    setGibbsPageContext(
+      `Package Pricing Management (Settings) — Costs & Catalog tab, Package Equipment. Selected package: ${selected.unitType} ${selected.tier} ${selected.tonnage}T ${selected.packageLevel}, price ${usd(selected.totalInvestment)}. Components — ${partsLine}.${econLine}${driftLine} ${unmatchedDistinct} distinct unmatched model string(s) across all packages (the Fix Matches workbench handles them).`,
+    );
+  }, [selected, econ, costModel, unmatchedDistinct]);
+  useEffect(() => () => setGibbsPageContext(null), []);
 
   return (
     <Card>

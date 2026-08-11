@@ -2301,6 +2301,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? { kind: String(req.body.createContext.kind).slice(0, 40), fields: req.body.createContext.fields }
           : undefined;
 
+      // Native-page context (e.g. Package Pricing): compact plain text
+      // describing the user's screen so "this package" resolves.
+      const pageContext = typeof req.body.pageContext === "string" && req.body.pageContext.trim()
+        ? req.body.pageContext.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 800)
+        : undefined;
+
       const { askCrmHelp } = await import("./services/crmHelpAI");
       // Copilot sessions are locked to the full (general) brain — the saved
       // mode preference belongs to the standalone chat, and conversation-only
@@ -2310,7 +2316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: user.id,
         name: user.name ?? null,
         role: user.role ?? null,
-      });
+      }, pageContext);
 
       // Persist the exchange — non-fatal, answering still works if it fails.
       let messageId: string | undefined;

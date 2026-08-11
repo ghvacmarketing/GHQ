@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Package } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { openGlobalAI } from "@/components/crm/ghq-search";
+import badgeGibbs from "@/assets/badge-gibbs.png";
 import type { CrmUser } from "@shared/schema";
 import { PriceFileWizardCard, CostsAndCatalogTab } from "@/pages/crm/packages-pricing-tools";
 
@@ -74,6 +76,18 @@ export default function CrmSettingsPackages() {
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Package Pricing Management</h1>
             <p className="text-sm text-slate-500">What your packages cost, what they earn, and the supplier files that keep it current</p>
           </div>
+          {/* Native Gibbs: opens the assistant with this page's live screen
+              context, so "this package" just works. */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto h-9 gap-2"
+            onClick={openGlobalAI}
+            data-testid="pricing-ask-gibbs"
+          >
+            <img src={badgeGibbs} alt="" className="h-5 w-5" />
+            Ask Gibbs
+          </Button>
         </div>
 
         {/* Segmented control matches the Inbox/Mail filter tabs. */}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getGibbsPageContext } from "@/lib/gibbs-page-context";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -1240,6 +1241,8 @@ export default function AssistantOverlay({
       mode: copilot ? "general" : mode,
       // Copilot: ship the live form draft with every ask.
       createContext: copilot ? { kind: copilot.kind, fields: copilot.getDraft() } : undefined,
+      // Screen context registered by the current page ("native Gibbs").
+      pageContext: getGibbsPageContext() || undefined,
     };
     // Stream-first: the answer paints as the model generates it. If the
     // stream can't START, fall back to the plain endpoint (identical

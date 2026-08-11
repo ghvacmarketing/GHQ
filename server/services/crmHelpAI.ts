@@ -1063,6 +1063,9 @@ export async function askCrmHelp(
   createContext?: CreateCopilotContext,
   /** Who is asking — "me"/"my"/"I" resolve to this exact user. */
   currentUser?: { id: string; name: string | null; role: string | null },
+  /** Native-page context: compact description of what's on the user's
+   *  screen so "this package" / "this page" resolves. */
+  pageContext?: string,
 ): Promise<CrmHelpResponse> {
   // Cache is per-USER: "my jobs today" must never replay one person's
   // answer to somebody else.
@@ -1080,7 +1083,7 @@ export async function askCrmHelp(
   // never replayed from a cached action-less answer.
   // createContext also counts: copilot answers depend on the live form draft
   // and must never be replayed from cache.
-  const isFollowUp = (conversationHistory && conversationHistory.length > 0) || hasImages || !!createContext;
+  const isFollowUp = (conversationHistory && conversationHistory.length > 0) || hasImages || !!createContext || !!pageContext;
   const looksLikeActionAsk = /\b(create|make|add|schedule|send|text|email|set ?up|book|assign)\b/i.test(question);
   if (!isFollowUp && !looksLikeActionAsk) {
     const cached = helpCache.get(normalizedQuestion);
@@ -1206,6 +1209,12 @@ Return JSON with:
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
     const priorTurns: Array<{role: 'user'|'assistant', content: string}> = conversationHistory ?? [];
 
+    // Screen context rides the MODEL's copy of the question only — the
+    // stored thread keeps the user's words verbatim.
+    const modelQuestion = pageContext
+      ? `[SCREEN CONTEXT — what the user is looking at right now; "this package" / "this page" / "here" refers to it: ${pageContext}]\n\n${question}`
+      : question;
+
     // Attached photos ride the current question as vision content blocks.
     const imageBlocks = (images ?? [])
       .map((dataUrl) => {
@@ -1292,10 +1301,10 @@ Return JSON with:
             role: "user" as const,
             content: [
               ...imageBlocks.map((b) => ({ type: "image", source: { type: "base64", media_type: b.mediaType, data: b.data } })),
-              { type: "text", text: question },
+              { type: "text", text: modelQuestion },
             ],
           }
-        : { role: "user" as const, content: question };
+        : { role: "user" as const, content: modelQuestion };
       content = stripJsonFences(
         await claudeChatWithTools({
           system:
@@ -1318,10 +1327,10 @@ Return JSON with:
             role: "user",
             content: [
               ...imageBlocks.map((b) => ({ type: "image_url", image_url: { url: `data:${b.mediaType};base64,${b.data}` } })),
-              { type: "text", text: question },
+              { type: "text", text: modelQuestion },
             ],
           }
-        : { role: "user", content: question };
+        : { role: "user", content: modelQuestion };
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
