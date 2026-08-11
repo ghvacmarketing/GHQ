@@ -221,7 +221,10 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white" data-testid="pricing-gibbs-panel">
+    <div
+      className="fixed inset-y-0 right-0 z-[65] flex w-[380px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
+      data-testid="pricing-gibbs-panel"
+    >
       {/* Header — who this Gibbs is */}
       <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
         <img src={badgeGibbs} alt="" className="h-7 w-7" />

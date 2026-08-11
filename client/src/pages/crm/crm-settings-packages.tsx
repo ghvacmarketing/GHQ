@@ -78,9 +78,7 @@ export default function CrmSettingsPackages() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className={`mx-auto w-full ${gibbsOpen ? "max-w-[1700px]" : "max-w-7xl"}`}>
-        <div className="flex items-start gap-6">
-        <div className="min-w-0 flex-1 space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -133,14 +131,10 @@ export default function CrmSettingsPackages() {
             <PriceFileWizardCard />
           </div>
         )}
-        </div>
 
-        {gibbsOpen && (
-          <div className="w-[380px] shrink-0 max-lg:hidden lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]">
-            <PricingGibbsPanel onClose={toggleGibbs} />
-          </div>
-        )}
-        </div>
+        {/* True side panel — fixed to the right edge, slides over the page,
+            never reflows the content. */}
+        {gibbsOpen && <PricingGibbsPanel onClose={toggleGibbs} />}
       </div>
     </CrmLayout>
   );
