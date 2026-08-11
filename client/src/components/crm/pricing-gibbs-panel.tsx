@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   AI_ACTION_LABELS,
@@ -220,7 +221,9 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
     inputRef.current?.focus();
   };
 
-  return (
+  // Portaled to <body>: any transformed ancestor would otherwise hijack the
+  // fixed positioning and pin the drawer to the page instead of the viewport.
+  return createPortal(
     <div
       className="fixed inset-y-0 right-0 z-[65] flex w-[380px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl duration-200 animate-in slide-in-from-right max-lg:hidden"
       data-testid="pricing-gibbs-panel"
@@ -364,6 +367,7 @@ export default function PricingGibbsPanel({ onClose }: { onClose: () => void }) 
           <ArrowUpRight className="h-3 w-3" /> Same Gibbs, same approvals — chats appear in the main Gibbs under "Pricing".
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
