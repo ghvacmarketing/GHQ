@@ -143,10 +143,11 @@ app.use((req, res, next) => {
   if (
     req.path === '/api/crm/mail/send' ||
     req.path === '/api/crm/help' ||
+    req.path === '/api/crm/pricebook-import/apply' ||
     /^\/api\/mobile\/messaging\/conversations\/[^/]+\/messages$/.test(req.path)
   ) {
-    // Email attachments, Gibbs photo uploads, and MMS photos (base64) can be
-    // large — the default 1mb JSON cap would 413 them.
+    // Email attachments, Gibbs photo uploads, MMS photos, and archived price
+    // files (base64) can be large — the default 1mb JSON cap would 413 them.
     express.json({ limit: '30mb' })(req, res, next);
     return;
   }
@@ -399,6 +400,9 @@ async function runInstallPlannerMigrations() {
     `);
     await db.execute(sql`ALTER TABLE pricebook_packages ADD COLUMN IF NOT EXISTS cost_basis_cents integer`);
     await db.execute(sql`ALTER TABLE pricebook_packages ADD COLUMN IF NOT EXISTS cost_basis_at timestamp`);
+    // Keep the original uploaded price file on each import for re-download.
+    await db.execute(sql`ALTER TABLE price_file_imports ADD COLUMN IF NOT EXISTS file_data bytea`);
+    await db.execute(sql`ALTER TABLE price_file_imports ADD COLUMN IF NOT EXISTS file_mime text`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS provider_usage_snapshots (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

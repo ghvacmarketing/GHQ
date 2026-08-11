@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
+  ArrowLeftRight, Boxes, Check, Download, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
   Search, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -220,6 +220,8 @@ type Preview = {
 export function PriceFileWizardCard() {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // The original File, kept so apply can archive it byte-for-byte.
+  const rawFileRef = useRef<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [supplier, setSupplier] = useState("Trane");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -233,7 +235,7 @@ export function PriceFileWizardCard() {
   const [discontinue, setDiscontinue] = useState<Set<string>>(new Set());
   const [confirmSucc, setConfirmSucc] = useState<Set<string>>(new Set());
 
-  const { data: history = [] } = useQuery<Array<{ id: string; filename: string | null; supplier: string | null; rowCount: number; summary: any; createdAt: string }>>({
+  const { data: history = [] } = useQuery<Array<{ id: string; filename: string | null; supplier: string | null; rowCount: number; summary: any; createdAt: string; hasFile?: boolean }>>({
     queryKey: ["/api/crm/pricebook-import/history"],
   });
 
@@ -249,6 +251,7 @@ export function PriceFileWizardCard() {
   };
 
   const resetFile = () => {
+    rawFileRef.current = null;
     setFileName("");
     setHeaders([]);
     setRows([]);
@@ -278,6 +281,7 @@ export function PriceFileWizardCard() {
         .filter((r) => Array.isArray(r) && r.some((c) => String(c).trim() !== ""))
         .map((r) => Object.fromEntries(hdrs.map((h: string, i: number) => [h, r[i] ?? ""])));
       if (json.length === 0) { toast({ title: "That file has no rows", variant: "destructive" }); return; }
+      rawFileRef.current = f;
       setFileName(f.name);
       setHeaders(hdrs);
       setRows(json);
@@ -316,6 +320,20 @@ export function PriceFileWizardCard() {
   const applyMutation = useMutation({
     mutationFn: async () => {
       if (!preview) throw new Error("Nothing to apply");
+      // Archive the original upload with the import (base64; capped at 20MB).
+      let fileBase64: string | undefined;
+      let fileMime: string | undefined;
+      const raw = rawFileRef.current;
+      if (raw && raw.size <= 20 * 1024 * 1024) {
+        const bytes = new Uint8Array(await raw.arrayBuffer());
+        let bin = "";
+        const CHUNK = 0x8000;
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+          bin += String.fromCharCode(...Array.from(bytes.subarray(i, i + CHUNK)));
+        }
+        fileBase64 = btoa(bin);
+        fileMime = raw.type || "application/octet-stream";
+      }
       const body = {
         filename: fileName,
         supplier,
@@ -324,6 +342,8 @@ export function PriceFileWizardCard() {
         addModels: preview.newModels.filter((n) => addNew.has(`${n.brand}|${n.model}`)),
         discontinueIds: Array.from(discontinue),
         successions: preview.successions.filter((s) => confirmSucc.has(s.fromId)).map((s) => ({ fromId: s.fromId, toModel: s.toModel, toCostCents: s.toCostCents })),
+        fileBase64,
+        fileMime,
       };
       const res = await apiRequest("POST", "/api/crm/pricebook-import/apply", body);
       return res.json();
@@ -611,6 +631,16 @@ export function PriceFileWizardCard() {
                     <span className="tabular-nums text-slate-500">
                       {h.summary.priced ?? 0}↺ · {h.summary.added ?? 0}+ · {h.summary.successions ?? 0}⇄
                     </span>
+                  )}
+                  {h.hasFile && (
+                    <a
+                      href={`/api/crm/pricebook-import/${h.id}/file`}
+                      className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#711419]"
+                      title="Download the exact file that was uploaded"
+                      data-testid={`import-download-${h.id}`}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </a>
                   )}
                 </div>
               ))}

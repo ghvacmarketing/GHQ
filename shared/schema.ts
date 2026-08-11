@@ -3690,6 +3690,10 @@ export const priceFileImports = pgTable("price_file_imports", {
   uploadedBy: varchar("uploaded_by"),
   rowCount: integer("row_count").default(0),
   summary: json("summary").$type<Record<string, unknown>>(),
+  // The original uploaded file, byte-for-byte, so any import can be
+  // re-downloaded and inspected later.
+  fileData: bytea("file_data"),
+  fileMime: text("file_mime"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

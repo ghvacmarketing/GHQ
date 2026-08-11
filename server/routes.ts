@@ -32980,13 +32980,27 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const user = await getCurrentCrmUser(req);
       const d = req.body || {};
+      // Archive the original upload byte-for-byte so it can be re-downloaded.
+      let fileData: Buffer | null = null;
+      let fileMime: string | null = null;
+      if (typeof d.fileBase64 === "string" && d.fileBase64.length > 0 && d.fileBase64.length <= 28_000_000) {
+        try {
+          fileData = Buffer.from(d.fileBase64, "base64");
+          fileMime = String(d.fileMime || "application/octet-stream").slice(0, 120);
+        } catch {
+          fileData = null;
+          fileMime = null;
+        }
+      }
       const [imp] = await db.insert(priceFileImports).values({
         filename: String(d.filename || "").slice(0, 300) || null,
         supplier: String(d.supplier || "").slice(0, 80) || null,
         uploadedBy: user?.id || null,
         rowCount: Math.round(Number(d.rowCount)) || 0,
         summary: null,
-      }).returning();
+        fileData,
+        fileMime,
+      }).returning({ id: priceFileImports.id });
 
       let priced = 0, added = 0, discontinued = 0, succeeded = 0, packagesTouched = 0;
       const now = new Date();
@@ -33090,10 +33104,35 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   app.get("/api/crm/pricebook-import/history", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
     try {
-      const rows = await db.select().from(priceFileImports).orderBy(desc(priceFileImports.createdAt)).limit(30);
+      // Explicit columns — never ship the archived file bytes with the list.
+      const rows = await db.select({
+        id: priceFileImports.id,
+        filename: priceFileImports.filename,
+        supplier: priceFileImports.supplier,
+        uploadedBy: priceFileImports.uploadedBy,
+        rowCount: priceFileImports.rowCount,
+        summary: priceFileImports.summary,
+        createdAt: priceFileImports.createdAt,
+        hasFile: sql<boolean>`(${priceFileImports.fileData} IS NOT NULL)`,
+      }).from(priceFileImports).orderBy(desc(priceFileImports.createdAt)).limit(30);
       res.json(rows);
     } catch (error) {
       res.status(500).json({ message: "Failed to load import history" });
+    }
+  });
+
+  // Re-download the exact file that was uploaded for an import.
+  app.get("/api/crm/pricebook-import/:id/file", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const [row] = await db.select().from(priceFileImports).where(eq(priceFileImports.id, req.params.id));
+      if (!row || !row.fileData) return res.status(404).json({ message: "No file stored for this import" });
+      const name = (row.filename || `price-file-${row.id}.csv`).replace(/[^\w.() \-]/g, "_");
+      res.setHeader("Content-Type", row.fileMime || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+      res.send(row.fileData);
+    } catch (error) {
+      console.error("Error downloading import file:", error);
+      res.status(500).json({ message: "Failed to download the file" });
     }
   });
 
