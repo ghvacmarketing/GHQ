@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
-  Search, TrendingDown, TrendingUp, Upload, X,
+  ArrowLeftRight, Boxes, Check, Eye, FileSpreadsheet, Layers, Loader2, Pencil, Plus,
+  Search, TrendingUp, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -29,8 +29,14 @@ import { format } from "date-fns";
  *    price — warnings only, prices never change themselves
  *  - Live preview: the package exactly as the proposal builder shows it */
 
+// Whole dollars stay clean ($3,075); anything with cents always shows both
+// decimals ($5,223.40 — never $5,223.4).
 const usd = (cents: number | null | undefined) =>
-  cents == null ? "—" : `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  cents == null
+    ? "—"
+    : cents % 100 === 0
+      ? `$${(cents / 100).toLocaleString("en-US")}`
+      : `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 type CatalogModel = {
   id: string; brand: string; model: string; description: string | null; category: string | null;
@@ -456,50 +462,73 @@ export function PriceFileWizardCard() {
 
         {preview && (
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-3 text-sm">
-              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">{preview.totals.priceChanges} price changes</Badge>
-              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{preview.totals.newModels} new</Badge>
-              <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{preview.totals.missing} missing</Badge>
-              <Badge variant="outline" className="border-[#711419]/30 bg-[#711419]/5 text-[#711419]">{preview.totals.successions} successions suggested</Badge>
-              <Badge variant="outline" className="text-slate-500">{preview.totals.unchanged} unchanged</Badge>
+            {/* What this file would change, at a glance — plain numbers, no chips */}
+            <div className="grid grid-cols-3 divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white sm:grid-cols-5">
+              {[
+                { n: preview.totals.priceChanges, label: "Price changes" },
+                { n: preview.totals.newModels, label: "New models" },
+                { n: preview.totals.missing, label: "Missing" },
+                { n: preview.totals.successions, label: "Successions" },
+                { n: preview.totals.unchanged, label: "Unchanged" },
+              ].map((s) => (
+                <div key={s.label} className="px-3 py-2.5 text-center">
+                  <p className={`text-xl font-bold tabular-nums ${s.n > 0 ? "text-slate-900" : "text-slate-300"}`}>{s.n.toLocaleString()}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{s.label}</p>
+                </div>
+              ))}
             </div>
 
             {preview.successions.length > 0 && (
-              <div className="rounded-lg border border-[#711419]/25 p-3">
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#711419]">
-                  <ArrowLeftRight className="h-3.5 w-3.5" /> Model successions — confirm each swap
-                </p>
-                <div className="space-y-1.5">
+              <div className="overflow-hidden rounded-lg border border-[#711419]/25">
+                <div className="border-b border-[#711419]/15 bg-[#711419]/[0.04] px-3 py-2">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#711419]">
+                    <ArrowLeftRight className="h-3.5 w-3.5" /> Model successions — confirm each swap
+                  </p>
+                </div>
+                <div className="max-h-56 divide-y divide-slate-100 overflow-y-auto">
                   {preview.successions.map((s) => (
-                    <label key={s.fromId} className="flex cursor-pointer items-center gap-2.5 rounded px-1 py-1 text-sm hover:bg-slate-50">
+                    <label key={s.fromId} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm hover:bg-slate-50">
                       <Checkbox checked={confirmSucc.has(s.fromId)} onCheckedChange={() => toggle(confirmSucc, setConfirmSucc, s.fromId)} data-testid={`succ-${s.fromId}`} />
-                      <span className="font-mono text-xs">{s.fromModel}</span>
+                      <span className="font-mono text-xs text-slate-500">{s.fromModel}</span>
                       <ArrowLeftRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                       <span className="font-mono text-xs font-semibold">{s.toModel}</span>
-                      <span className="tabular-nums text-xs text-slate-500">{usd(s.oldCostCents)} → {usd(s.toCostCents)}</span>
-                      <Badge variant="outline" className="ml-auto text-[10px] text-slate-500">{Math.round(s.confidence * 100)}% match</Badge>
+                      <span className="ml-auto tabular-nums text-xs text-slate-500">{usd(s.oldCostCents)} → {usd(s.toCostCents)}</span>
+                      <span className="w-16 text-right text-[11px] tabular-nums text-slate-400">{Math.round(s.confidence * 100)}% match</span>
                     </label>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
                   Confirming swaps the model number inside every package that uses it — names, images, and your prices stay exactly as built.
                 </p>
               </div>
             )}
 
             {preview.priceChanges.length > 0 && (
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Price changes (unchecked = skip)</p>
-                <div className="max-h-56 space-y-1 overflow-y-auto">
+              <div className="overflow-hidden rounded-lg border border-slate-200">
+                <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                  <Checkbox
+                    checked={skipPrice.size === 0 ? true : skipPrice.size === preview.priceChanges.length ? false : "indeterminate"}
+                    onCheckedChange={() => setSkipPrice(skipPrice.size === 0 ? new Set(preview.priceChanges.map((c) => c.id)) : new Set())}
+                    data-testid="price-select-all"
+                  />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Price changes</p>
+                  <p className="ml-auto text-xs tabular-nums text-slate-400">
+                    {(preview.priceChanges.length - skipPrice.size).toLocaleString()} of {preview.priceChanges.length.toLocaleString()} will be repriced
+                  </p>
+                </div>
+                <div className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
                   {preview.priceChanges.map((c) => {
-                    const up = c.newCostCents > c.oldCostCents;
+                    const delta = c.newCostCents - c.oldCostCents;
+                    const pct = c.oldCostCents > 0 ? Math.round((delta / c.oldCostCents) * 1000) / 10 : 0;
                     return (
-                      <label key={c.id} className="flex cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 text-sm hover:bg-slate-50">
+                      <label key={c.id} className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-slate-50">
                         <Checkbox checked={!skipPrice.has(c.id)} onCheckedChange={() => toggle(skipPrice, setSkipPrice, c.id)} data-testid={`price-${c.id}`} />
-                        <span className="font-mono text-xs">{c.model}</span>
-                        <span className="ml-auto flex items-center gap-1 tabular-nums text-xs">
-                          {usd(c.oldCostCents)} → <span className={up ? "font-semibold text-red-600" : "font-semibold text-emerald-600"}>{usd(c.newCostCents)}</span>
-                          {up ? <TrendingUp className="h-3.5 w-3.5 text-red-500" /> : <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />}
+                        <span className="font-mono text-xs font-medium">{c.model}</span>
+                        <span className="ml-auto tabular-nums text-xs text-slate-400">{usd(c.oldCostCents)}</span>
+                        <span className="text-xs text-slate-300">→</span>
+                        <span className="w-20 text-right tabular-nums text-xs font-semibold text-slate-800">{usd(c.newCostCents)}</span>
+                        <span className={`w-28 text-right tabular-nums text-[11px] font-medium ${delta > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                          {delta > 0 ? "+" : "−"}{usd(Math.abs(delta))} ({delta > 0 ? "+" : "−"}{Math.abs(pct)}%)
                         </span>
                       </label>
                     );
@@ -509,17 +538,27 @@ export function PriceFileWizardCard() {
             )}
 
             {preview.newModels.length > 0 && (
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">New models (checked = add to catalog)</p>
-                <div className="max-h-44 space-y-1 overflow-y-auto">
+              <div className="overflow-hidden rounded-lg border border-slate-200">
+                <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                  <Checkbox
+                    checked={addNew.size === preview.newModels.length ? true : addNew.size > 0 ? "indeterminate" : false}
+                    onCheckedChange={() => setAddNew(addNew.size === preview.newModels.length ? new Set() : new Set(preview.newModels.map((n) => `${n.brand}|${n.model}`)))}
+                    data-testid="new-select-all"
+                  />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">New models</p>
+                  <p className="ml-auto text-xs tabular-nums text-slate-400">
+                    {addNew.size.toLocaleString()} of {preview.newModels.length.toLocaleString()} will be added
+                  </p>
+                </div>
+                <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
                   {preview.newModels.map((n) => {
                     const key = `${n.brand}|${n.model}`;
                     return (
-                      <label key={key} className="flex cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 text-sm hover:bg-slate-50">
+                      <label key={key} className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-slate-50">
                         <Checkbox checked={addNew.has(key)} onCheckedChange={() => toggle(addNew, setAddNew, key)} data-testid={`new-${n.model}`} />
-                        <span className="font-mono text-xs">{n.model}</span>
-                        {n.description && <span className="truncate text-xs text-slate-400">{n.description}</span>}
-                        <span className="ml-auto tabular-nums text-xs text-slate-600">{usd(n.costCents)}</span>
+                        <span className="shrink-0 font-mono text-xs font-medium">{n.model}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-slate-400">{n.description || ""}</span>
+                        <span className="shrink-0 tabular-nums text-xs text-slate-600">{usd(n.costCents)}</span>
                       </label>
                     );
                   })}
@@ -528,13 +567,23 @@ export function PriceFileWizardCard() {
             )}
 
             {preview.missingModels.length > 0 && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">In your catalog, not in this file (checked = mark discontinued)</p>
-                <div className="max-h-44 space-y-1 overflow-y-auto">
+              <div className="overflow-hidden rounded-lg border border-amber-200">
+                <div className="flex items-center gap-2.5 border-b border-amber-200 bg-amber-50/60 px-3 py-2">
+                  <Checkbox
+                    checked={discontinue.size === preview.missingModels.length ? true : discontinue.size > 0 ? "indeterminate" : false}
+                    onCheckedChange={() => setDiscontinue(discontinue.size === preview.missingModels.length ? new Set() : new Set(preview.missingModels.map((m) => m.id)))}
+                    data-testid="miss-select-all"
+                  />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">In your catalog, not in this file</p>
+                  <p className="ml-auto text-xs tabular-nums text-amber-600/80">
+                    {discontinue.size.toLocaleString()} of {preview.missingModels.length.toLocaleString()} will be marked discontinued
+                  </p>
+                </div>
+                <div className="max-h-56 divide-y divide-amber-100/70 overflow-y-auto">
                   {preview.missingModels.map((m) => (
-                    <label key={m.id} className="flex cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 text-sm hover:bg-amber-100/40">
+                    <label key={m.id} className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-amber-50/50">
                       <Checkbox checked={discontinue.has(m.id)} onCheckedChange={() => toggle(discontinue, setDiscontinue, m.id)} data-testid={`miss-${m.id}`} />
-                      <span className="font-mono text-xs">{m.model}</span>
+                      <span className="font-mono text-xs font-medium">{m.model}</span>
                       <span className="ml-auto tabular-nums text-xs text-slate-500">{usd(m.costCents)}</span>
                     </label>
                   ))}
@@ -553,7 +602,7 @@ export function PriceFileWizardCard() {
 
         {applied && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm text-emerald-800" data-testid="pricefile-result">
-            Applied: {String(applied.priced)} repriced · {String(applied.added)} added · {String(applied.discontinued)} discontinued · {String(applied.successions)} successions ({String(applied.packagesTouched)} package component swaps). Check cost drift below.
+            Applied: {String(applied.priced)} repriced · {String(applied.added)} added · {String(applied.discontinued)} discontinued · {String(applied.successions)} successions ({String(applied.packagesTouched)} package component swaps). See Package Equipment on the Equipment Catalog tab, and Cost Drift under Packages &amp; Pricing.
           </div>
         )}
 
@@ -585,9 +634,164 @@ export function PriceFileWizardCard() {
 
 type DriftRow = {
   id: string; unitType: string; tier: string; tonnage: string; packageLevel: string;
-  totalInvestment: number; currentComponentCostCents: number; costBasisCents: number | null;
+  totalInvestment: number; monthlyPayment: number | null; currentComponentCostCents: number; costBasisCents: number | null;
   costBasisAt: string | null; driftCents: number | null; matchedCount: number; unmatchedModels: string[];
+  parts: Array<{ slot: string; name: string | null; model: string; costCents: number | null }>;
 };
+
+// ─────────────────────────── Package equipment map ───────────────────────────
+
+/** The connective view: every proposal-builder package, the exact models
+ *  inside it, and what each one costs from the catalog TODAY. This is where
+ *  "a spreadsheet of Trane costs" turns into "what my packages are built
+ *  from and what they cost me." */
+export function PackageEquipmentCard({ packages }: { packages: any[] | undefined }) {
+  const [previewPkg, setPreviewPkg] = useState<any | null>(null);
+  const [unitFilter, setUnitFilter] = useState("all");
+  const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
+    queryKey: ["/api/crm/pricebook-drift"],
+  });
+  const byId = useMemo(() => new Map((packages || []).map((p: any) => [p.id, p])), [packages]);
+
+  const LEVEL_ORDER: Record<string, number> = { Best: 0, Better: 1, Good: 2, Budget: 3 };
+  const sorted = useMemo(
+    () =>
+      [...drift].sort(
+        (a, b) =>
+          a.unitType.localeCompare(b.unitType) ||
+          a.tier.localeCompare(b.tier) ||
+          (parseFloat(a.tonnage) || 0) - (parseFloat(b.tonnage) || 0) ||
+          (LEVEL_ORDER[a.packageLevel] ?? 9) - (LEVEL_ORDER[b.packageLevel] ?? 9),
+      ),
+    [drift],
+  );
+  const unitTypes = useMemo(() => Array.from(new Set(sorted.map((d) => d.unitType))), [sorted]);
+  const shown = unitFilter === "all" ? sorted : sorted.filter((d) => d.unitType === unitFilter);
+  const groups = useMemo(() => {
+    const m = new Map<string, DriftRow[]>();
+    for (const d of shown) {
+      if (!m.has(d.unitType)) m.set(d.unitType, []);
+      m.get(d.unitType)!.push(d);
+    }
+    return Array.from(m.entries());
+  }, [shown]);
+  const anyCosts = drift.some((d) => d.matchedCount > 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" /> Package Equipment</CardTitle>
+        <CardDescription>
+          Every package your proposal builder can quote, and the exact equipment inside it. The models
+          come from the package setup — the costs come live from the catalog below, so when a supplier
+          file moves a cost, you see precisely which packages it touches.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+        ) : sorted.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
+            No active packages in the proposal builder yet.
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <Select value={unitFilter} onValueChange={setUnitFilter}>
+                <SelectTrigger className="h-9 w-48" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All system types</SelectItem>
+                  {unitTypes.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span className="ml-auto text-xs text-slate-400">{shown.length} package{shown.length === 1 ? "" : "s"}</span>
+            </div>
+            {!anyCosts && (
+              <p className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2 text-xs text-blue-800">
+                Costs show as “not in catalog” until the Equipment Catalog has models — upload a supplier
+                price file on the Price File Update tab and these link up automatically by model number.
+              </p>
+            )}
+            <div className="max-h-[600px] space-y-4 overflow-y-auto pr-1">
+              {groups.map(([unit, rows]) => (
+                <div key={unit}>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{unit}</p>
+                  <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
+                    {rows.map((d) => {
+                      const afterEquip = d.totalInvestment - d.currentComponentCostCents;
+                      const pct = d.totalInvestment > 0 ? Math.round((afterEquip / d.totalInvestment) * 100) : null;
+                      return (
+                        <div key={d.id} className="px-3.5 py-3" data-testid={`pkgequip-${d.id}`}>
+                          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                            <p className="text-sm font-semibold text-slate-800">
+                              {d.tier} · {d.tonnage} ton · {d.packageLevel}
+                            </p>
+                            <button
+                              onClick={() => setPreviewPkg(byId.get(d.id) || d)}
+                              className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-600"
+                              title="Preview as the proposal builder shows it"
+                              data-testid={`pkgequip-preview-${d.id}`}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                            <div className="ml-auto flex items-baseline gap-4 tabular-nums">
+                              <span className="text-xs text-slate-400">
+                                Price <span className="text-sm font-semibold text-slate-800">{usd(d.totalInvestment)}</span>
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                Equipment{" "}
+                                <span className="text-sm font-semibold text-slate-800">
+                                  {d.matchedCount > 0 ? usd(d.currentComponentCostCents) : "—"}
+                                </span>
+                              </span>
+                              {d.matchedCount > 0 && d.unmatchedModels.length === 0 && (
+                                <span className="text-xs text-slate-400">
+                                  After equipment{" "}
+                                  <span className="text-sm font-semibold text-slate-800">{usd(afterEquip)}</span>
+                                  {pct != null && <span className="text-[11px] text-slate-400"> ({pct}%)</span>}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            {d.parts.map((part) => (
+                              <div key={part.slot} className="flex items-baseline gap-2 text-xs">
+                                <span className="w-20 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{part.slot}</span>
+                                <span className="shrink-0 font-mono text-slate-700">{part.model}</span>
+                                <span className="min-w-0 flex-1 truncate text-slate-400">{part.name || ""}</span>
+                                {part.costCents != null ? (
+                                  <span className="shrink-0 tabular-nums text-slate-600">{usd(part.costCents)}</span>
+                                ) : (
+                                  <span className="shrink-0 text-[11px] text-amber-600">not in catalog</span>
+                                )}
+                              </div>
+                            ))}
+                            {d.parts.length === 0 && (
+                              <p className="text-xs text-slate-400">No equipment models on this package.</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      <Dialog open={!!previewPkg} onOpenChange={(o) => { if (!o) setPreviewPkg(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Proposal preview</DialogTitle>
+          </DialogHeader>
+          {previewPkg && <PackagePreviewCard pkg={previewPkg} />}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
 
 export function CostDriftCard({ packages }: { packages: any[] | undefined }) {
   const { toast } = useToast();

@@ -32989,32 +32989,56 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }).returning();
 
       let priced = 0, added = 0, discontinued = 0, succeeded = 0, packagesTouched = 0;
+      const now = new Date();
+      // One catalog read serves every bucket below. The first Trane upload is
+      // ~1,400 new models — per-row lookup+insert meant ~2,800 round-trips to
+      // Neon (minutes); bulk statements make it a couple of seconds.
+      const applyCatalog = await db.select().from(equipmentModels);
+      const applyById = new Map(applyCatalog.map((c) => [c.id, c]));
+      const applyKeys = new Set(applyCatalog.map((c) => `${c.brand.toLowerCase()}|${normModel(c.model).toLowerCase()}`));
+      const chunk = <T>(arr: T[], size: number): T[][] => {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      };
 
-      for (const ch of Array.isArray(d.priceUpdates) ? d.priceUpdates : []) {
-        const [row] = await db.select().from(equipmentModels).where(eq(equipmentModels.id, String(ch.id)));
-        if (!row) continue;
-        const c = Math.round(Number(ch.newCostCents));
-        if (!Number.isFinite(c) || c < 0 || c === row.costCents) continue;
-        await db.insert(equipmentCostHistory).values({ modelId: row.id, oldCostCents: row.costCents, newCostCents: c, importId: imp.id });
-        await db.update(equipmentModels).set({ costCents: c, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(equipmentModels.id, row.id));
-        priced++;
+      const priceUpdates = (Array.isArray(d.priceUpdates) ? d.priceUpdates : [])
+        .map((ch: any) => {
+          const row = applyById.get(String(ch.id));
+          const c = Math.round(Number(ch.newCostCents));
+          return row && Number.isFinite(c) && c >= 0 && c !== row.costCents ? { row, c } : null;
+        })
+        .filter(Boolean) as Array<{ row: (typeof applyCatalog)[number]; c: number }>;
+      for (const grp of chunk(priceUpdates, 200)) {
+        await db.insert(equipmentCostHistory).values(grp.map(({ row, c }) => ({ modelId: row.id, oldCostCents: row.costCents, newCostCents: c, importId: imp.id })));
       }
+      for (const grp of chunk(priceUpdates, 25)) {
+        await Promise.all(grp.map(({ row, c }) =>
+          db.update(equipmentModels).set({ costCents: c, lastSeenAt: now, updatedAt: now }).where(eq(equipmentModels.id, row.id))));
+      }
+      priced = priceUpdates.length;
 
+      const toAdd: Array<{ brand: string; model: string; costCents: number; description: string | null; lastSeenAt: Date }> = [];
+      const batchKeys = new Set<string>();
       for (const n of Array.isArray(d.addModels) ? d.addModels : []) {
         const brand = String(n.brand || "").trim();
         const model = normModel(String(n.model || ""));
         const c = Math.round(Number(n.costCents));
         if (!brand || !model || !Number.isFinite(c) || c < 0) continue;
-        const [existing] = await db.select().from(equipmentModels)
-          .where(and(sql`lower(${equipmentModels.brand}) = ${brand.toLowerCase()}`, sql`lower(${equipmentModels.model}) = ${model.toLowerCase()}`));
-        if (existing) continue;
-        await db.insert(equipmentModels).values({ brand, model, costCents: c, description: String(n.description || "").trim() || null, lastSeenAt: new Date() });
-        added++;
+        const key = `${brand.toLowerCase()}|${model.toLowerCase()}`;
+        if (applyKeys.has(key) || batchKeys.has(key)) continue;
+        batchKeys.add(key);
+        toAdd.push({ brand, model, costCents: c, description: String(n.description || "").trim() || null, lastSeenAt: now });
+      }
+      for (const grp of chunk(toAdd, 400)) {
+        const ins = await db.insert(equipmentModels).values(grp).onConflictDoNothing().returning({ id: equipmentModels.id });
+        added += ins.length;
       }
 
-      for (const id of Array.isArray(d.discontinueIds) ? d.discontinueIds : []) {
-        const r = await db.update(equipmentModels).set({ isDiscontinued: true, updatedAt: new Date() }).where(eq(equipmentModels.id, String(id))).returning({ id: equipmentModels.id });
-        if (r.length) discontinued++;
+      const discIds = (Array.isArray(d.discontinueIds) ? d.discontinueIds : []).map(String).filter((id: string) => applyById.has(id));
+      if (discIds.length) {
+        const r = await db.update(equipmentModels).set({ isDiscontinued: true, updatedAt: now }).where(inArray(equipmentModels.id, discIds)).returning({ id: equipmentModels.id });
+        discontinued = r.length;
       }
 
       for (const s of Array.isArray(d.successions) ? d.successions : []) {
@@ -33083,25 +33107,35 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       ]);
       const findModel = (m: string) => catalog.find((c) => modelsMatch(c.model, m));
       const out = packages.map((p) => {
-        const parts = [p.outdoorModel, p.coilModel, p.indoorHeatModel, p.thermostatModel].filter(Boolean) as string[];
+        // Per-slot detail so the UI can show exactly which equipment makes up
+        // each package and what each piece costs from the catalog today.
+        const slotDefs = [
+          { slot: "Outdoor", name: p.outdoorName, model: p.outdoorModel },
+          { slot: "Coil", name: p.coilName, model: p.coilModel },
+          { slot: "Indoor heat", name: p.indoorHeatName, model: p.indoorHeatModel },
+          { slot: "Thermostat", name: p.thermostatName, model: p.thermostatModel },
+        ].filter((x): x is { slot: string; name: string | null; model: string } => !!x.model);
         let cost = 0;
         const matched: string[] = [];
         const unmatched: string[] = [];
-        for (const m of parts) {
-          const hit = findModel(m);
-          if (hit) { cost += hit.costCents; matched.push(m); }
-          else unmatched.push(m);
-        }
+        const parts = slotDefs.map((x) => {
+          const hit = findModel(x.model);
+          if (hit) { cost += hit.costCents; matched.push(x.model); }
+          else unmatched.push(x.model);
+          return { slot: x.slot, name: x.name, model: x.model, costCents: hit ? hit.costCents : null };
+        });
         return {
           id: p.id,
           unitType: p.unitType, tier: p.tier, tonnage: p.tonnage, packageLevel: p.packageLevel,
           totalInvestment: p.totalInvestment,
+          monthlyPayment: p.monthlyPayment,
           currentComponentCostCents: cost,
           costBasisCents: p.costBasisCents,
           costBasisAt: p.costBasisAt,
           driftCents: p.costBasisCents != null ? cost - p.costBasisCents : null,
           matchedCount: matched.length,
           unmatchedModels: unmatched,
+          parts,
         };
       });
       res.json(out);

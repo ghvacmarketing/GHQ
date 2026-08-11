@@ -55,7 +55,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, PackagePriceAdjustment } from "@shared/schema";
 import { format } from "date-fns";
-import { EquipmentCatalogCard, PriceFileWizardCard, CostDriftCard } from "@/pages/crm/packages-pricing-tools";
+import { EquipmentCatalogCard, PriceFileWizardCard, CostDriftCard, PackageEquipmentCard } from "@/pages/crm/packages-pricing-tools";
 
 const HVAC_UNIT_TYPES = ["PHP", "GP", "SGA", "SHP", "Mini-Split", "Ducting"] as const;
 const HVAC_TIERS = ["Packaged", "Essential", "Premium", "Ultimate", "Standard"] as const;
@@ -325,6 +325,7 @@ export default function CrmSettingsPackages() {
 
         {pageTab === "catalog" && (
           <div className="space-y-6">
+            <PackageEquipmentCard packages={packages} />
             <EquipmentCatalogCard />
           </div>
         )}
