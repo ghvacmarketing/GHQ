@@ -1467,13 +1467,13 @@ function SlotEditDialog({ slot, pkg, packageId, onClose }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
-        <DialogHeader className="px-6 pb-4 pt-6">
+      <DialogContent className="max-w-lg overflow-hidden">
+        <DialogHeader>
           <DialogTitle>Edit {slot.label.toLowerCase()} card</DialogTitle>
         </DialogHeader>
 
         {/* Image — full-bleed band, no floating whitespace */}
-        <div className="border-y border-slate-100 bg-slate-50/70">
+        <div className="-mx-6 border-y border-slate-100 bg-slate-50/70">
           <div className="flex h-48 items-center justify-center">
             {imageUrl ? (
               <img src={imageUrl} alt="" className="h-40 max-w-[75%] object-contain" />
@@ -1504,7 +1504,7 @@ function SlotEditDialog({ slot, pkg, packageId, onClose }: {
           </div>
         </div>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="space-y-4">
           <div>
             <p className="mb-1.5 text-[11px] font-medium text-slate-500">Model number</p>
             <Input value={model} onChange={(e) => setModel(e.target.value)} className="h-10 font-mono text-sm" placeholder="e.g. 4TWX8036A1000A" data-testid="slotedit-model" />
@@ -1516,7 +1516,7 @@ function SlotEditDialog({ slot, pkg, packageId, onClose }: {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 border-t border-slate-100 px-6 py-4">
+        <div className="-mx-6 -mb-6 flex items-center gap-3 border-t border-slate-100 px-6 py-4">
           <p className="text-[11px] leading-snug text-slate-400">Changes what this card shows here and on proposals — the price never moves.</p>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
