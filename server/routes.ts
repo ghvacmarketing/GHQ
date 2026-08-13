@@ -10454,6 +10454,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/users/:id - Update user (ADMIN only)
+  // Admin password reset for a team member (demo/review accounts, lockouts).
+  // Owners can reset anyone; admins can reset non-owners.
+  app.post("/api/crm/users/:id/reset-password", requireCrmAdmin, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      const password = String(req.body?.password || "");
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+      const [target] = await db.select().from(crmUsers).where(eq(crmUsers.id, req.params.id));
+      if (!target) return res.status(404).json({ message: "User not found" });
+      if (target.role === "owner" && currentUser?.role !== "owner") {
+        return res.status(403).json({ message: "Only an owner can reset an owner's password" });
+      }
+      const passwordHash = await hashCrmPassword(password);
+      await db.update(crmUsers).set({ passwordHash }).where(eq(crmUsers.id, target.id));
+      await logCrmAudit(currentUser?.id || null, "user.password_reset", "crm_user", target.id, { targetName: target.name }, req.ip);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error resetting user password:", error);
+      res.status(500).json({ message: "Failed to reset the password" });
+    }
+  });
+
   app.patch("/api/crm/users/:id", requireCrmAdmin, async (req, res) => {
     try {
       const currentUser = await getCurrentCrmUser(req);
