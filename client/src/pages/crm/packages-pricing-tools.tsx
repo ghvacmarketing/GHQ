@@ -862,6 +862,9 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const [fixFilter, setFixFilter] = useState("");
   const [slotEdit, setSlotEdit] = useState<(typeof SLOT_DEFS)[number] | null>(null);
   const [equipOpen, setEquipOpen] = useState(false);
+  const [tierFilter, setTierFilter] = useState("all");
+  const [tonnageFilter, setTonnageFilter] = useState("all");
+  const [unmatchedOnly, setUnmatchedOnly] = useState(false);
   const { data: drift = [], isLoading } = useQuery<DriftRow[]>({
     queryKey: ["/api/crm/pricebook-drift"],
   });
@@ -892,16 +895,24 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
     [drift],
   );
   const unitTypes = useMemo(() => Array.from(new Set(sorted.map((d) => d.unitType))), [sorted]);
+  const tiers = useMemo(() => Array.from(new Set(sorted.map((d) => d.tier))).sort(), [sorted]);
+  const tonnages = useMemo(
+    () => Array.from(new Set(sorted.map((d) => d.tonnage))).sort((a, b) => (parseFloat(a) || 0) - (parseFloat(b) || 0)),
+    [sorted],
+  );
   const shown = useMemo(() => {
     const q = pkgSearch.trim().toLowerCase();
     return sorted.filter(
       (d) =>
         (unitFilter === "all" || d.unitType === unitFilter) &&
+        (tierFilter === "all" || d.tier === tierFilter) &&
+        (tonnageFilter === "all" || d.tonnage === tonnageFilter) &&
+        (!unmatchedOnly || d.unmatchedModels.length > 0) &&
         (!q ||
           `${d.unitType} ${d.tier} ${d.tonnage} ${d.packageLevel}`.toLowerCase().includes(q) ||
           d.parts.some((pt) => pt.model.toLowerCase().includes(q) || (pt.name || "").toLowerCase().includes(q))),
     );
-  }, [sorted, unitFilter, pkgSearch]);
+  }, [sorted, unitFilter, tierFilter, tonnageFilter, unmatchedOnly, pkgSearch]);
   const groups = useMemo(() => {
     const m = new Map<string, DriftRow[]>();
     for (const d of shown) {
@@ -1010,12 +1021,38 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
             )}
             <div className="flex flex-wrap items-center gap-2">
               <Select value={unitFilter} onValueChange={setUnitFilter}>
-                <SelectTrigger className="h-9 w-44" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-36" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All system types</SelectItem>
+                  <SelectItem value="all">All systems</SelectItem>
                   {unitTypes.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <Select value={tierFilter} onValueChange={setTierFilter}>
+                <SelectTrigger className="h-9 w-32" data-testid="pkgequip-tier-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All tiers</SelectItem>
+                  {tiers.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={tonnageFilter} onValueChange={setTonnageFilter}>
+                <SelectTrigger className="h-9 w-[7.5rem]" data-testid="pkgequip-tonnage-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All tonnage</SelectItem>
+                  {tonnages.map((t) => <SelectItem key={t} value={t}>{t} ton</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <button
+                onClick={() => setUnmatchedOnly((v) => !v)}
+                className={`h-9 rounded-md border px-3 text-sm font-medium transition-colors ${
+                  unmatchedOnly
+                    ? "border-amber-400 bg-amber-50 text-amber-800"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                }`}
+                title="Only packages with components missing from the catalog"
+                data-testid="pkgequip-unmatched-only"
+              >
+                Unmatched only
+              </button>
               {unmatchedDistinct > 0 && (
                 <Button
                   size="sm" variant="outline"
@@ -1028,9 +1065,9 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
               )}
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-60 pl-8" data-testid="pkgequip-search" />
+                <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-52 pl-8" data-testid="pkgequip-search" />
               </div>
-              <span className="ml-auto text-xs text-slate-400">{shown.length} package{shown.length === 1 ? "" : "s"}</span>
+              <span className="ml-auto text-xs tabular-nums text-slate-400">{shown.length} of {sorted.length}</span>
             </div>
 
             <div className="flex gap-4 max-lg:flex-col lg:min-h-[560px]">
@@ -1127,15 +1164,13 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                           }
                           const img = slotImage(part.slot);
                           return (
-                            <div key={def.key} className="group relative flex h-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
-                              <button
-                                onClick={() => setSlotEdit(def)}
-                                className="absolute right-1.5 top-1.5 rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100"
-                                title={`Edit the ${def.label.toLowerCase()} card`}
-                                data-testid={`pkgequip-editslot-${def.key}`}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
+                            <div
+                              key={def.key}
+                              onClick={() => setSlotEdit(def)}
+                              className="group relative flex h-full cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 transition-colors hover:border-slate-300 hover:bg-slate-50/60"
+                              title={`Edit the ${slotDisplayLabel(selected.unitType, def.label).toLowerCase()} card`}
+                              data-testid={`pkgequip-editslot-${def.key}`}
+                            >
                               <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-100 bg-slate-50">
                                 {img ? <img src={img} alt={part.slot} className="h-12 w-12 object-contain" /> : <Boxes className="h-5 w-5 text-slate-300" />}
                               </div>
@@ -1151,7 +1186,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                                   <p className="tabular-nums text-sm font-semibold text-slate-800">{usd(part.costCents)}</p>
                                 ) : (
                                   <button
-                                    onClick={() => { setFixFilter(part.model); setFixOpen(true); }}
+                                    onClick={(e) => { e.stopPropagation(); setFixFilter(part.model); setFixOpen(true); }}
                                     className="text-[11px] font-medium text-amber-600 hover:underline"
                                     title="Fix this model's catalog match"
                                   >
