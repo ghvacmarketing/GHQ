@@ -78,6 +78,7 @@ const GIBBS_KNOWS = [
 const GIBBS_TIMELINE: Array<{ when: string; title: string; detail: string; planned?: boolean }> = [
   { when: "Planned", title: "Price-file digests", detail: "A plain-English summary after every supplier price file: what moved and which packages it hits.", planned: true },
   { when: "Planned", title: "Catalog adds by chat", detail: "Hand Gibbs a cost and he proposes adding the missing model to the catalog.", planned: true },
+  { when: "Aug 13, 2026", title: "Sharper instincts from real usage", detail: "Never denies an ability he actually has, never claims a card that wasn't registered, and photo details (phones, emails, addresses) carry all the way into the actions he prepares." },
   { when: "Aug 12, 2026", title: "Native to Package Pricing", detail: "A dedicated side-panel Gibbs that sees your screen — plus photos, pasted straight into the chat." },
   { when: "Aug 11, 2026", title: "Package economics + model cleanup", detail: "Live cost/margin answers, what-if labor scenarios, and unmatched-model fixes in one approval card." },
   { when: "Aug 11, 2026", title: "Sales funnel + job editing", detail: "Create and move leads; edit existing work orders with checklist pinning." },
