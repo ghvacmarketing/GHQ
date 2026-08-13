@@ -33381,6 +33381,44 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // Provision (or reset) a customer's portal login with an explicit email +
+  // password — for demo/review accounts (App Store review) and support
+  // resets. Normal customers still self-serve through the OTP signup.
+  app.post("/api/crm/portal-accounts/provision", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const customerId = String(req.body?.customerId || "");
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      const password = String(req.body?.password || "");
+      if (!customerId || !email || password.length < 8) {
+        return res.status(400).json({ message: "customerId, email, and a password of 8+ characters are required" });
+      }
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const passwordHash = await hashCrmPassword(password);
+      const now = new Date();
+      const [existing] = await db.select().from(customerPortalAccounts).where(eq(customerPortalAccounts.customerId, customerId));
+      let accountId: string;
+      if (existing) {
+        const [row] = await db.update(customerPortalAccounts)
+          .set({ email, passwordHash, isActive: true, emailVerifiedAt: now, failedLoginAttempts: 0, lockedUntil: null, updatedAt: now })
+          .where(eq(customerPortalAccounts.id, existing.id))
+          .returning({ id: customerPortalAccounts.id });
+        accountId = row.id;
+      } else {
+        const [row] = await db.insert(customerPortalAccounts)
+          .values({ customerId, email, passwordHash, isActive: true, emailVerifiedAt: now })
+          .returning({ id: customerPortalAccounts.id });
+        accountId = row.id;
+      }
+      await logCrmAudit(user?.id || null, "portal.account_provisioned", "customer", customerId, { email }, req.ip);
+      res.json({ ok: true, accountId, email });
+    } catch (error) {
+      console.error("Error provisioning portal account:", error);
+      res.status(500).json({ message: "Failed to provision the portal account" });
+    }
+  });
+
   // ── Model matching: which package model strings miss the catalog, and the
   // journaled remap that fixes them (individually or in bulk). Only the model
   // strings change — package names, images, and prices are never touched.
