@@ -17,8 +17,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  ArrowLeftRight, Boxes, Check, ChevronDown, Download, Eye, FileSpreadsheet, Loader2, Pencil, Plus,
+  ArrowLeftRight, Boxes, Check, ChevronDown, Download, Eye, FileSpreadsheet, Filter, Loader2, Pencil, Plus,
   Search, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -921,6 +922,8 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
     }
     return Array.from(m.entries());
   }, [shown]);
+  const activeFilterCount =
+    (unitFilter !== "all" ? 1 : 0) + (tierFilter !== "all" ? 1 : 0) + (tonnageFilter !== "all" ? 1 : 0) + (unmatchedOnly ? 1 : 0);
   const selected = shown.find((d) => d.id === selectedId) || shown[0] || null;
   const selPkg = selected ? byId.get(selected.id) : null;
   const unbaselined = drift.filter((d) => d.costBasisCents == null && d.matchedCount > 0);
@@ -1020,39 +1023,63 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={unitFilter} onValueChange={setUnitFilter}>
-                <SelectTrigger className="h-9 w-36" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All systems</SelectItem>
-                  {unitTypes.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="h-9 w-32" data-testid="pkgequip-tier-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All tiers</SelectItem>
-                  {tiers.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={tonnageFilter} onValueChange={setTonnageFilter}>
-                <SelectTrigger className="h-9 w-[7.5rem]" data-testid="pkgequip-tonnage-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All tonnage</SelectItem>
-                  {tonnages.map((t) => <SelectItem key={t} value={t}>{t} ton</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <button
-                onClick={() => setUnmatchedOnly((v) => !v)}
-                className={`h-9 rounded-md border px-3 text-sm font-medium transition-colors ${
-                  unmatchedOnly
-                    ? "border-amber-400 bg-amber-50 text-amber-800"
-                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                }`}
-                title="Only packages with components missing from the catalog"
-                data-testid="pkgequip-unmatched-only"
-              >
-                Unmatched only
-              </button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm" variant="outline"
+                    className={`h-9 ${activeFilterCount > 0 ? "border-[#711419]/40 bg-[#711419]/[0.04] text-[#711419]" : ""}`}
+                    data-testid="pkgequip-filters"
+                  >
+                    <Filter className="mr-1.5 h-4 w-4" />
+                    Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-60 space-y-3" data-testid="pkgequip-filters-pop">
+                  <div>
+                    <p className="mb-1 text-[11px] font-medium text-slate-500">System</p>
+                    <Select value={unitFilter} onValueChange={setUnitFilter}>
+                      <SelectTrigger className="h-9" data-testid="pkgequip-unit-filter"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All systems</SelectItem>
+                        {unitTypes.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-medium text-slate-500">Tier</p>
+                    <Select value={tierFilter} onValueChange={setTierFilter}>
+                      <SelectTrigger className="h-9" data-testid="pkgequip-tier-filter"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All tiers</SelectItem>
+                        {tiers.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-medium text-slate-500">Tonnage</p>
+                    <Select value={tonnageFilter} onValueChange={setTonnageFilter}>
+                      <SelectTrigger className="h-9" data-testid="pkgequip-tonnage-filter"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All tonnage</SelectItem>
+                        {tonnages.map((t) => <SelectItem key={t} value={t}>{t} ton</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2.5 pt-0.5">
+                    <Checkbox checked={unmatchedOnly} onCheckedChange={() => setUnmatchedOnly((v) => !v)} data-testid="pkgequip-unmatched-only" />
+                    <span className="text-sm text-slate-600">Unmatched only</span>
+                  </label>
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={() => { setUnitFilter("all"); setTierFilter("all"); setTonnageFilter("all"); setUnmatchedOnly(false); }}
+                      className="text-xs font-medium text-[#711419] hover:underline"
+                      data-testid="pkgequip-clear-filters"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </PopoverContent>
+              </Popover>
               {unmatchedDistinct > 0 && (
                 <Button
                   size="sm" variant="outline"

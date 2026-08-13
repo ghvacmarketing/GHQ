@@ -24,6 +24,7 @@ import { Bell,
   Palette,
   Globe,
   Camera,
+  Bot,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { PageHeader, SectionCard } from "@/components/crm/ui-kit";
@@ -48,6 +49,7 @@ const sections: SettingsSection[] = [
       { name: "Users & Roles", href: "/crm/settings/users", icon: Users },
       { name: "Time Logs", href: "/crm/settings/time-logs", icon: Clock, ownerOnly: true },
       { name: "Notifications", href: "/crm/settings/notifications", icon: Bell },
+      { name: "Gibbs", href: "/crm/settings/gibbs", icon: Bot, ownerOnly: true },
     ],
   },
   {

@@ -2471,6 +2471,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Assistant conversation history ─────────────────────────────────────
   // Every route is scoped to the signed-in user; nobody can read anyone
   // else's threads.
+  // ── Gibbs oversight (Settings → Gibbs): every action Gibbs proposed or
+  // ran, team-wide, newest first. Conversations reuse the review-mode
+  // endpoint below; this powers the actions-only view.
+  app.get("/api/crm/ai/admin/actions", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Owner or admin only" });
+      }
+      const userId = String(req.query.userId || "");
+      const conds = [isNotNull(aiMessages.proposedAction)];
+      if (userId) conds.push(eq(aiConversations.userId, userId));
+      const rows = await db
+        .select({
+          id: aiMessages.id,
+          createdAt: aiMessages.createdAt,
+          userId: aiConversations.userId,
+          userName: crmUsers.name,
+          proposedAction: aiMessages.proposedAction,
+          actionStatus: aiMessages.actionStatus,
+          actionResult: aiMessages.actionResult,
+        })
+        .from(aiMessages)
+        .innerJoin(aiConversations, eq(aiMessages.conversationId, aiConversations.id))
+        .leftJoin(crmUsers, eq(aiConversations.userId, crmUsers.id))
+        .where(and(...conds))
+        .orderBy(desc(aiMessages.createdAt))
+        .limit(300);
+      res.json(rows.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        userId: r.userId,
+        userName: r.userName || "Unknown",
+        type: (r.proposedAction as any)?.type || "unknown",
+        summary: (r.proposedAction as any)?.summary || "",
+        status: r.actionStatus || "pending",
+        resultLabel: (r.actionResult as any)?.label || null,
+        resultUrl: (r.actionResult as any)?.url || null,
+      })));
+    } catch (error) {
+      console.error("Error loading Gibbs actions log:", error);
+      res.status(500).json({ message: "Failed to load the actions log" });
+    }
+  });
+
   app.get("/api/crm/ai/conversations", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
