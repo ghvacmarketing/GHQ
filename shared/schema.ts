@@ -1040,7 +1040,8 @@ export const crmProperties = pgTable("crm_properties", {
 
 // ── Govee H5103 humidity/temperature sensors ────────────────────────────────
 export const goveeSensorLocationEnum = [
-  "crawlspace", "attic", "living_room", "basement", "garage", "kitchen", "bedroom", "mechanical_room", "other",
+  "crawlspace", "attic", "living_room", "basement", "garage", "kitchen", "bedroom", "mechanical_room",
+  "walk_in_cooler", "freezer", "other",
 ] as const;
 export type GoveeSensorLocation = (typeof goveeSensorLocationEnum)[number];
 

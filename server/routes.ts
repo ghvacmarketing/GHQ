@@ -57,7 +57,7 @@ import { crmCampaigns, crmCampaignEnrollments, crmCampaignSends, insertCrmCampai
 import { runAutomationTrigger, fireAutomationForCustomer, fireAutomationForLead } from "./services/automationEngine";
 import { previewAudience, launchCampaign, cancelCampaign, sendTestStepEmail, syncCampaignAudience, maybeCompleteCampaign } from "./services/campaignEngine";
 import { goveeService } from "./services/goveeService";
-import { riskStatus, recommendedActions } from "@shared/govee";
+import { riskStatus, recommendedActions, sanitizeSensorAlertSettings, SENSOR_ALERT_SETTINGS_KEY } from "@shared/govee";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -35339,6 +35339,63 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         res.json({ ok: true });
       } catch (e) {
         res.status(500).json({ message: "Failed to acknowledge" });
+      }
+    });
+
+    // Recent alert activity (all statuses) for Settings → Sensors, with whether
+    // each one actually sent a notification or was muted by the cooldown.
+    app.get("/api/crm/sensors/alerts/history", requireCrmAuth, async (req, res) => {
+      try {
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+        const alerts = await db
+          .select()
+          .from(goveeSensorAlerts)
+          .orderBy(desc(goveeSensorAlerts.openedAt))
+          .limit(limit);
+        const sensorIds = Array.from(new Set(alerts.map((a) => a.sensorId)));
+        const sensors = sensorIds.length
+          ? await db.select().from(goveeSensors).where(inArray(goveeSensors.id, sensorIds))
+          : [];
+        const sMap = new Map(sensors.map((s) => [s.id, s]));
+        res.json({
+          alerts: alerts.map((a) => ({
+            ...a,
+            sensorLabel: sMap.get(a.sensorId)?.label || sMap.get(a.sensorId)?.deviceName || null,
+            notified: !!a.notificationId,
+          })),
+        });
+      } catch (e) {
+        console.error("sensors/alerts/history", e);
+        res.status(500).json({ message: "Failed to load alert history" });
+      }
+    });
+
+    // ── Sensor alert policy (Settings → Sensors) ──────────────────────────────
+    app.get("/api/crm/sensor-settings", requireCrmAuth, async (_req, res) => {
+      try {
+        res.json({
+          configured: goveeService.isConfigured(),
+          settings: await goveeService.getAlertSettings(true),
+        });
+      } catch (e) {
+        console.error("sensor-settings get", e);
+        res.status(500).json({ message: "Failed to load sensor settings" });
+      }
+    });
+
+    app.put("/api/crm/sensor-settings", requireCrmAdmin, async (req, res) => {
+      try {
+        const clean = sanitizeSensorAlertSettings(req.body ?? {});
+        const value = JSON.stringify(clean);
+        await db
+          .insert(appSettings)
+          .values({ key: SENSOR_ALERT_SETTINGS_KEY, value, updatedAt: new Date() })
+          .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
+        goveeService.invalidateAlertSettings();
+        res.json({ settings: clean });
+      } catch (e) {
+        console.error("sensor-settings put", e);
+        res.status(500).json({ message: "Failed to save sensor settings" });
       }
     });
 

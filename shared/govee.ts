@@ -45,6 +45,58 @@ function coerceReading(value: unknown): number | null {
 
 export type RiskLevel = "normal" | "watch" | "high" | "critical";
 
+// ── Alert & notification policy (Settings → Sensors) ─────────────────────────
+// Stored as one JSON blob in app_settings under this key; the poller reads it
+// every cycle, so edits apply within a minute without a redeploy.
+export const SENSOR_ALERT_SETTINGS_KEY = "sensor_alert_settings";
+
+// Mirrors crmUserRoleEnum (schema.ts) — duplicated here because govee.ts must
+// stay import-free (schema.ts imports from this file).
+export const SENSOR_NOTIFY_ROLE_OPTIONS = ["owner", "admin", "supervisor", "sales", "tech"] as const;
+
+export interface SensorAlertSettings {
+  /** Roles whose active users receive alert notifications (in-app + push). */
+  notifyRoles: string[];
+  /** Continuously offline this many minutes before an offline alert opens. */
+  offlineOpenMinutes: number;
+  /** Continuously back online this many minutes before it resolves. */
+  offlineResolveMinutes: number;
+  /** Min hours between offline notifications per sensor (0 = notify every alert). */
+  offlineCooldownHours: number;
+  /** Min hours between temp/humidity notifications per sensor+type (0 = every alert). */
+  thresholdCooldownHours: number;
+}
+
+export const DEFAULT_SENSOR_ALERT_SETTINGS: SensorAlertSettings = {
+  notifyRoles: ["owner", "admin"],
+  offlineOpenMinutes: 30,
+  offlineResolveMinutes: 10,
+  offlineCooldownHours: 6,
+  thresholdCooldownHours: 1,
+};
+
+/** Coerce arbitrary stored/posted JSON into a safe settings object. */
+export function sanitizeSensorAlertSettings(raw: unknown): SensorAlertSettings {
+  const d = DEFAULT_SENSOR_ALERT_SETTINGS;
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const clamp = (v: unknown, lo: number, hi: number, fb: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : fb;
+  };
+  const roles = Array.isArray(r.notifyRoles)
+    ? r.notifyRoles.filter(
+        (x): x is string => typeof x === "string" && (SENSOR_NOTIFY_ROLE_OPTIONS as readonly string[]).includes(x),
+      )
+    : d.notifyRoles;
+  return {
+    notifyRoles: Array.from(new Set(roles)),
+    offlineOpenMinutes: clamp(r.offlineOpenMinutes, 5, 720, d.offlineOpenMinutes),
+    offlineResolveMinutes: clamp(r.offlineResolveMinutes, 2, 120, d.offlineResolveMinutes),
+    offlineCooldownHours: clamp(r.offlineCooldownHours, 0, 72, d.offlineCooldownHours),
+    thresholdCooldownHours: clamp(r.thresholdCooldownHours, 0, 72, d.thresholdCooldownHours),
+  };
+}
+
 export interface HumidityThresholds {
   watch?: number | null; // default 60
   high?: number | null; // default 65
@@ -83,7 +135,10 @@ export function recommendedActions(risk: RiskLevel, locationType?: string | null
   if (risk === "normal" || risk === "watch") return [];
   const loc = (locationType || "").toLowerCase();
   const recs: string[] = [];
-  if (loc.includes("crawl")) {
+  if (loc.includes("cooler") || loc.includes("freezer")) {
+    recs.push("Check refrigeration equipment");
+    recs.push("Check door seals / door left open");
+  } else if (loc.includes("crawl")) {
     recs.push("Schedule crawlspace inspection");
     recs.push("Recommend vapor barrier / encapsulation inspection");
     recs.push("Recommend crawlspace dehumidifier");

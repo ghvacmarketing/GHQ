@@ -94,6 +94,7 @@ const CrmSettingsQuickBooks = lazy(() => import("@/pages/crm/crm-settings-quickb
 const CrmSettingsImport = lazy(() => import("@/pages/crm/crm-settings-import"));
 const CrmSettingsFleet = lazy(() => import("@/pages/crm/crm-settings-fleet"));
 const CrmSettingsCompanycam = lazy(() => import("@/pages/crm/crm-settings-companycam"));
+const CrmSettingsSensors = lazy(() => import("@/pages/crm/crm-settings-sensors"));
 const CrmSettingsNotifications = lazy(() => import("@/pages/crm/crm-settings-notifications"));
 const CrmSettingsPackages = lazy(() => import("@/pages/crm/crm-settings-packages"));
 const CrmSettingsGibbs = lazy(() => import("@/pages/crm/crm-settings-gibbs"));
@@ -424,6 +425,7 @@ function Router() {
       <Route path="/crm/settings/import">{() => <ProtectedCrmWrapper><CrmSettingsImport /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/fleet">{() => <ProtectedCrmWrapper><CrmSettingsFleet /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/companycam">{() => <ProtectedCrmWrapper><CrmSettingsCompanycam /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/sensors">{() => <ProtectedCrmWrapper><CrmSettingsSensors /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/notifications">{() => <ProtectedCrmWrapper><CrmSettingsNotifications /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/packages">{() => <ProtectedCrmWrapper><CrmSettingsPackages /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/gibbs">{() => <ProtectedCrmWrapper><CrmSettingsGibbs /></ProtectedCrmWrapper>}</Route>

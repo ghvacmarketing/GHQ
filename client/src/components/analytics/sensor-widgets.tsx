@@ -86,6 +86,8 @@ const LOCATION_OPTIONS = [
   "kitchen",
   "bedroom",
   "mechanical_room",
+  "walk_in_cooler",
+  "freezer",
   "other",
 ] as const;
 
@@ -100,7 +102,7 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function prettyLocation(loc: string | null): string {
+export function prettyLocation(loc: string | null): string {
   if (!loc) return "";
   return loc.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
