@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { claudeConfigured, claudeChat, claudeChatWithTools, claudeErrorHint, stripJsonFences, type ClaudeTool } from "./claude";
 import { db } from "../db";
 import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmItems, crmQuotes, crmUsers, pricebookPackages, tasks, docFiles, docFolders, serviceCallChecklists, appSettings, equipmentModels } from "@shared/schema";
+import { resolveJobCost, formatJobCostValue, type JobCostModel } from "@shared/job-cost";
 import { eq, gte, lte, and, or, sql, desc, asc, isNull, isNotNull, ilike, ne, inArray } from "drizzle-orm";
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -746,10 +747,10 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
     let saved: any = {};
     try { saved = stored?.value ? JSON.parse(stored.value) : {}; } catch { saved = {}; }
     const whatIf = typeof (input as any)?.whatIf === "object" && (input as any).whatIf ? (input as any).whatIf : {};
-    const model = {
+    const model: JobCostModel = {
       laborHours: 16, laborRatePerHour: 85, laborHoursByUnitType: {} as Record<string, number>,
       materialsPctOfEquipment: 8, commissionPctOfPrice: 4, buydownPctOfPrice: 5,
-      overheadPctOfPrice: 10, targetMarginPct: 20,
+      overheadPctOfPrice: 10, targetMarginPct: 20, overrides: [],
       ...saved,
       ...whatIf,
     };
@@ -790,17 +791,28 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
         else unmatched.push(m);
       }
       const price = p.totalInvestment ?? 0;
-      const hours = Number(model.laborHoursByUnitType?.[p.unitType] ?? model.laborHours) || 0;
-      const labor = Math.round(hours * Number(model.laborRatePerHour || 0) * 100);
-      const materials = Math.round((equipCents * Number(model.materialsPctOfEquipment || 0)) / 100);
-      const commission = Math.round((price * Number(model.commissionPctOfPrice || 0)) / 100);
-      const buydown = Math.round((price * Number(model.buydownPctOfPrice || 0)) / 100);
-      const overhead = Math.round((price * Number(model.overheadPctOfPrice || 0)) / 100);
+      // Costing override groups (Settings → Package Pricing) apply per package.
+      const resolved = resolveJobCost(model, { packageId: p.id, unitType: p.unitType });
+      const eff = resolved.effective;
+      const hours = eff.laborHours;
+      const labor = Math.round(hours * eff.laborRatePerHour * 100);
+      const materials = Math.round((equipCents * eff.materialsPctOfEquipment) / 100);
+      const commission = Math.round((price * eff.commissionPctOfPrice) / 100);
+      const buydown = Math.round((price * eff.buydownPctOfPrice) / 100);
+      const overhead = Math.round((price * eff.overheadPctOfPrice) / 100);
       const profit = price - equipCents - labor - materials - commission - buydown - overhead;
       const marginPct = price > 0 ? Math.round((profit / price) * 1000) / 10 : 0;
       const d = (c: number) => Math.round(c) / 100;
       return {
         package: `${p.unitType} ${p.tier} ${p.tonnage}T ${p.packageLevel}`,
+        costingOverride: resolved.group
+          ? {
+              group: resolved.group.name,
+              changedFromDefaults: resolved.changes.map(
+                (c) => `${c.label}: ${formatJobCostValue(c.key, c.value)} (default ${formatJobCostValue(c.key, c.defaultValue)})`,
+              ),
+            }
+          : null,
         price: d(price),
         equipment: d(equipCents),
         labor: d(labor),

@@ -25,6 +25,12 @@ import {
 import { format } from "date-fns";
 import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
 import { setGibbsPageContext } from "@/lib/gibbs-page-context";
+import {
+  JOB_COST_FIELD_META,
+  formatJobCostValue,
+  resolveJobCost,
+  type JobCostOverrideGroup,
+} from "@shared/job-cost";
 
 /** Package pricing revamp — the tools UNDER the hand-curated packages:
  *  - Equipment catalog: every supplier model + cost (brands are pure data)
@@ -707,7 +713,10 @@ type CostModel = {
   buydownPctOfPrice: number;
   overheadPctOfPrice: number;
   targetMarginPct: number;
+  overrides: JobCostOverrideGroup[];
 };
+
+const pkgLabel = (p: any) => `${p.unitType} ${p.tier} ${p.tonnage}T ${p.packageLevel}`;
 
 /** Six shop-level numbers — not a per-package spreadsheet. Controlled by
  *  CostsAndCatalogTab so edits preview LIVE in the Package Equipment
@@ -809,6 +818,49 @@ export function JobCostModelCard({ packages, model, dirty, onChange, onSaved }: 
               </div>
             )}
 
+            {/* Costing override groups — a stronger layer than everything above */}
+            <div className="border-t border-slate-200 pt-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-medium text-slate-500">Costing overrides</p>
+                  <p className="text-[11px] text-slate-400">
+                    Give certain system types or specific packages their own numbers — e.g. GP installs at a
+                    different labor rate than SHP. Blank fields inherit the shop defaults above. Any package a
+                    group covers shows a "Custom costing" panel on its breakdown listing exactly what changed.
+                  </p>
+                </div>
+                <Button
+                  size="sm" variant="outline" className="h-8 shrink-0"
+                  onClick={() =>
+                    set({
+                      overrides: [
+                        ...(model.overrides ?? []),
+                        { id: crypto.randomUUID(), name: "", unitTypes: [], packageIds: [], values: {} },
+                      ],
+                    })
+                  }
+                  data-testid="costmodel-add-override"
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Add group
+                </Button>
+              </div>
+              {(model.overrides ?? []).length > 0 && (
+                <div className="mt-2.5 space-y-2.5">
+                  {(model.overrides ?? []).map((g) => (
+                    <OverrideGroupRow
+                      key={g.id}
+                      group={g}
+                      unitTypes={unitTypes}
+                      packages={packages || []}
+                      model={model}
+                      onChange={(next) => set({ overrides: (model.overrides ?? []).map((x) => (x.id === g.id ? next : x)) })}
+                      onDelete={() => set({ overrides: (model.overrides ?? []).filter((x) => x.id !== g.id) })}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => save.mutate()}
@@ -824,6 +876,158 @@ export function JobCostModelCard({ packages, model, dirty, onChange, onSaved }: 
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** One costing override group: name, targets (system types and/or specific
+ *  packages), and only the numbers it overrides — blanks inherit. Edits flow
+ *  through the same draft as the rest of the card, so the breakdown rail
+ *  previews them live before Save. */
+function OverrideGroupRow({ group, unitTypes, packages, model, onChange, onDelete }: {
+  group: JobCostOverrideGroup;
+  unitTypes: string[];
+  packages: any[];
+  model: CostModel;
+  onChange: (g: JobCostOverrideGroup) => void;
+  onDelete: () => void;
+}) {
+  const [pkgQuery, setPkgQuery] = useState("");
+  const byId = useMemo(() => new Map(packages.map((p: any) => [p.id, p])), [packages]);
+  const q = pkgQuery.trim().toLowerCase();
+  const matches = q.length >= 2
+    ? packages.filter((p: any) => !group.packageIds.includes(p.id) && pkgLabel(p).toLowerCase().includes(q)).slice(0, 8)
+    : [];
+  const incomplete =
+    !group.name.trim() ||
+    (group.unitTypes.length === 0 && group.packageIds.length === 0) ||
+    !JOB_COST_FIELD_META.some((m) => group.values[m.key] != null);
+
+  const setValue = (key: (typeof JOB_COST_FIELD_META)[number]["key"], raw: string) => {
+    const values = { ...group.values };
+    const n = parseFloat(raw);
+    if (raw.trim() === "" || !Number.isFinite(n)) delete values[key];
+    else values[key] = n;
+    onChange({ ...group, values });
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3" data-testid={`costmodel-override-${group.id}`}>
+      <div className="flex items-center gap-2">
+        <Input
+          value={group.name}
+          onChange={(e) => onChange({ ...group, name: e.target.value })}
+          placeholder='Group name — e.g. "Gas packages"'
+          className="h-8 max-w-64 bg-white"
+          data-testid={`override-name-${group.id}`}
+        />
+        {incomplete && (
+          <span className="text-[10px] font-medium uppercase tracking-wide text-amber-600">
+            incomplete — needs a name, a target, and a value
+          </span>
+        )}
+        <Button
+          size="sm" variant="ghost" className="ml-auto h-7 px-2 text-slate-400 hover:text-red-600"
+          onClick={onDelete}
+          data-testid={`override-delete-${group.id}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-medium text-slate-500">Applies to:</span>
+        {unitTypes.map((u) => {
+          const on = group.unitTypes.includes(u);
+          return (
+            <button
+              key={u}
+              type="button"
+              onClick={() =>
+                onChange({ ...group, unitTypes: on ? group.unitTypes.filter((x) => x !== u) : [...group.unitTypes, u] })
+              }
+              className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                on ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+              }`}
+              data-testid={`override-type-${group.id}-${u}`}
+            >
+              {u}
+            </button>
+          );
+        })}
+        <span className="text-[11px] text-slate-400">— a selected type covers every current &amp; future package of that type</span>
+      </div>
+
+      <div className="mt-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-medium text-slate-500">Specific packages:</span>
+          {group.packageIds.map((id) => {
+            const p = byId.get(id);
+            return (
+              <span key={id} className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                {p ? pkgLabel(p) : "Removed package"}
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...group, packageIds: group.packageIds.filter((x) => x !== id) })}
+                  className="text-slate-400 hover:text-red-600"
+                  aria-label="Remove package"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            );
+          })}
+          <div className="relative">
+            <Input
+              value={pkgQuery}
+              onChange={(e) => setPkgQuery(e.target.value)}
+              placeholder="Add package…"
+              className="h-7 w-44 bg-white text-xs"
+              data-testid={`override-pkgsearch-${group.id}`}
+            />
+            {matches.length > 0 && (
+              <div className="absolute z-20 mt-1 w-64 overflow-hidden rounded-md border border-slate-200 bg-white shadow-md">
+                {matches.map((p: any) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="block w-full px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      onChange({ ...group, packageIds: [...group.packageIds, p.id] });
+                      setPkgQuery("");
+                    }}
+                  >
+                    {pkgLabel(p)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="mt-0.5 text-[10px] text-slate-400">A package listed here wins over a system-type match from another group.</p>
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {JOB_COST_FIELD_META.map((m) => {
+          const base = m.key === "laborHours" ? model.laborHours : (model[m.key] as number);
+          const overridden = group.values[m.key] != null;
+          return (
+            <div key={m.key}>
+              <p className={`mb-0.5 text-[10px] font-medium ${overridden ? "text-amber-700" : "text-slate-500"}`}>
+                {m.label} <span className="text-slate-400">({m.unit})</span>
+              </p>
+              <Input
+                type="number" min="0" step="0.5"
+                value={group.values[m.key] ?? ""}
+                placeholder={`${base}`}
+                onChange={(e) => setValue(m.key, e.target.value)}
+                className={`h-8 bg-white ${overridden ? "border-amber-400" : ""}`}
+                data-testid={`override-${group.id}-${m.key}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -944,21 +1148,30 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
     ? Math.min(100, Math.round((selected.currentComponentCostCents / selected.totalInvestment) * 100))
     : 0;
 
+  // Which costing numbers THIS package actually uses — shop defaults unless a
+  // costing override group (Job Cost Model card below) covers it. `resolved`
+  // also carries exactly what the group changed, for the rail's amber panel.
+  const resolved = useMemo(
+    () => (selected && costModel ? resolveJobCost(costModel, { packageId: selected.id, unitType: selected.unitType }) : null),
+    [selected, costModel],
+  );
+
   // Full estimated waterfall from the Job Cost Model. Mirrors the server math
   // in Gibbs' package_economics tool — keep the two in step.
   const econ = useMemo(() => {
-    if (!selected || !costModel) return null;
+    if (!selected || !costModel || !resolved) return null;
+    const eff = resolved.effective;
     const price = selected.totalInvestment;
     const equip = selected.currentComponentCostCents;
-    const hours = Number(costModel.laborHoursByUnitType?.[selected.unitType] ?? costModel.laborHours) || 0;
-    const labor = Math.round(hours * costModel.laborRatePerHour * 100);
-    const materials = Math.round((equip * costModel.materialsPctOfEquipment) / 100);
-    const commission = Math.round((price * costModel.commissionPctOfPrice) / 100);
-    const buydown = Math.round((price * costModel.buydownPctOfPrice) / 100);
-    const overhead = Math.round((price * costModel.overheadPctOfPrice) / 100);
+    const hours = eff.laborHours;
+    const labor = Math.round(hours * eff.laborRatePerHour * 100);
+    const materials = Math.round((equip * eff.materialsPctOfEquipment) / 100);
+    const commission = Math.round((price * eff.commissionPctOfPrice) / 100);
+    const buydown = Math.round((price * eff.buydownPctOfPrice) / 100);
+    const overhead = Math.round((price * eff.overheadPctOfPrice) / 100);
     const profit = price - equip - labor - materials - commission - buydown - overhead;
     const marginPct = price > 0 ? Math.round((profit / price) * 1000) / 10 : 0;
-    const denom = 1 - (costModel.commissionPctOfPrice + costModel.buydownPctOfPrice + costModel.overheadPctOfPrice + costModel.targetMarginPct) / 100;
+    const denom = 1 - (eff.commissionPctOfPrice + eff.buydownPctOfPrice + eff.overheadPctOfPrice + eff.targetMarginPct) / 100;
     const suggested = denom > 0.05 ? Math.round((equip + labor + materials) / denom) : null;
     const segs = [
       { label: "Equipment", cents: equip, color: "#711419" },
@@ -968,8 +1181,8 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
       { label: "Buydown", cents: buydown, color: "#0369a1" },
       { label: "Overhead", cents: overhead, color: "#cbd5e1" },
     ];
-    return { price, hours, labor, materials, commission, buydown, overhead, profit, marginPct, suggested, segs };
-  }, [selected, costModel]);
+    return { price, hours, eff, labor, materials, commission, buydown, overhead, profit, marginPct, suggested, segs };
+  }, [selected, costModel, resolved]);
 
   // Register what's on screen so Gibbs can resolve "this package".
   useEffect(() => {
@@ -979,7 +1192,15 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
     }
     const partsLine = selected.parts.map((pt) => `${pt.slot}: ${pt.model}${pt.costCents == null ? " (not in catalog)" : ""}`).join("; ");
     const econLine = econ && costModel
-      ? ` Estimated: equipment ${usd(selected.currentComponentCostCents)}, labor ${usd(econ.labor)}, profit ${usd(econ.profit)} (${econ.marginPct}% margin vs ${costModel.targetMarginPct}% target).`
+      ? ` Estimated: equipment ${usd(selected.currentComponentCostCents)}, labor ${usd(econ.labor)}, profit ${usd(econ.profit)} (${econ.marginPct}% margin vs ${econ.eff.targetMarginPct}% target).${
+          resolved?.group
+            ? ` Costing override group "${resolved.group.name}" applies${
+                resolved.changes.length
+                  ? `: ${resolved.changes.map((c) => `${c.label} ${formatJobCostValue(c.key, c.value)} (default ${formatJobCostValue(c.key, c.defaultValue)})`).join(", ")}.`
+                  : " (values currently match the shop defaults)."
+              }`
+            : ""
+        }`
       : "";
     const driftLine = selected.driftCents != null && Math.abs(selected.driftCents) >= 100
       ? ` Equipment cost drift since last priced: ${selected.driftCents > 0 ? "+" : "-"}${usd(Math.abs(selected.driftCents))}.`
@@ -987,7 +1208,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
     setGibbsPageContext(
       `Package Pricing Management (Settings) — Costs & Catalog tab, Package Equipment. Selected package: ${selected.unitType} ${selected.tier} ${selected.tonnage}T ${selected.packageLevel}, price ${usd(selected.totalInvestment)}. Components — ${partsLine}.${econLine}${driftLine} ${unmatchedDistinct} distinct unmatched model string(s) across all packages (the Fix Matches workbench handles them).`,
     );
-  }, [selected, econ, costModel, unmatchedDistinct]);
+  }, [selected, econ, costModel, resolved, unmatchedDistinct]);
   useEffect(() => () => setGibbsPageContext(null), []);
 
   return (
@@ -1279,6 +1500,23 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                     {selected.matchedCount > 0 && econ && costModel ? (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
                         <p className="border-b border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cost breakdown — estimate</p>
+                        {resolved?.group && (
+                          <div className="border-b border-amber-200 bg-amber-50 px-3.5 py-2" data-testid="costing-override-panel">
+                            <p className="text-[11px] font-semibold text-amber-800">Custom costing — {resolved.group.name}</p>
+                            {resolved.changes.length > 0 ? (
+                              <ul className="mt-0.5 space-y-0.5">
+                                {resolved.changes.map((c) => (
+                                  <li key={c.key} className="text-[11px] leading-snug text-amber-700">
+                                    {c.label}: <span className="font-semibold">{formatJobCostValue(c.key, c.value)}</span>{" "}
+                                    <span className="text-amber-600/80">(shop default {formatJobCostValue(c.key, c.defaultValue)})</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-0.5 text-[11px] text-amber-700">This group's values currently match the shop defaults.</p>
+                            )}
+                          </div>
+                        )}
                         <div className="divide-y divide-slate-100 px-3.5 text-sm">
                           <div className="flex items-baseline justify-between gap-3 py-2.5">
                             <span className="text-slate-600">Your price</span>
@@ -1340,30 +1578,40 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                               </div>
                             )}
                           </div>
-                          {[
-                            { label: "Labor", sub: `${econ.hours} hrs × $${costModel.laborRatePerHour}/hr`, cents: econ.labor },
-                            { label: "Materials & misc", sub: `${costModel.materialsPctOfEquipment}% of equipment`, cents: econ.materials },
-                            { label: "Commission", sub: `${costModel.commissionPctOfPrice}% of price`, cents: econ.commission },
-                            { label: "Financing buydown", sub: `${costModel.buydownPctOfPrice}% of price`, cents: econ.buydown },
-                            { label: "Overhead", sub: `${costModel.overheadPctOfPrice}% of price`, cents: econ.overhead },
-                          ].map((r) => (
-                            <div key={r.label} className="flex items-baseline justify-between gap-3 py-2">
-                              <span className="min-w-0">
-                                <span className="text-slate-600">{r.label}</span>
-                                <span className="ml-1.5 text-[10px] text-slate-400">{r.sub}</span>
-                              </span>
-                              <span className="shrink-0 tabular-nums text-slate-700">− {usd(r.cents)}</span>
-                            </div>
-                          ))}
+                          {(() => {
+                            const changed = new Set((resolved?.changes ?? []).map((c) => c.key as string));
+                            const rows = [
+                              { label: "Labor", sub: `${econ.hours} hrs × $${econ.eff.laborRatePerHour}/hr`, cents: econ.labor, keys: ["laborHours", "laborRatePerHour"] },
+                              { label: "Materials & misc", sub: `${econ.eff.materialsPctOfEquipment}% of equipment`, cents: econ.materials, keys: ["materialsPctOfEquipment"] },
+                              { label: "Commission", sub: `${econ.eff.commissionPctOfPrice}% of price`, cents: econ.commission, keys: ["commissionPctOfPrice"] },
+                              { label: "Financing buydown", sub: `${econ.eff.buydownPctOfPrice}% of price`, cents: econ.buydown, keys: ["buydownPctOfPrice"] },
+                              { label: "Overhead", sub: `${econ.eff.overheadPctOfPrice}% of price`, cents: econ.overhead, keys: ["overheadPctOfPrice"] },
+                            ];
+                            return rows.map((r) => (
+                              <div key={r.label} className="flex items-baseline justify-between gap-3 py-2">
+                                <span className="min-w-0">
+                                  <span className="text-slate-600">{r.label}</span>
+                                  <span className="ml-1.5 text-[10px] text-slate-400">{r.sub}</span>
+                                  {r.keys.some((k) => changed.has(k)) && (
+                                    <span
+                                      className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-500 align-middle"
+                                      title={`Custom costing — ${resolved?.group?.name}`}
+                                    />
+                                  )}
+                                </span>
+                                <span className="shrink-0 tabular-nums text-slate-700">− {usd(r.cents)}</span>
+                              </div>
+                            ));
+                          })()}
                           <div className="py-2.5">
                             <div className="flex items-baseline justify-between gap-3">
                               <span className="font-medium text-slate-800">Estimated profit</span>
-                              <span className={`shrink-0 font-semibold tabular-nums ${econ.profit < 0 ? "text-red-600" : econ.marginPct >= costModel.targetMarginPct ? "text-emerald-700" : "text-amber-600"}`}>
+                              <span className={`shrink-0 font-semibold tabular-nums ${econ.profit < 0 ? "text-red-600" : econ.marginPct >= econ.eff.targetMarginPct ? "text-emerald-700" : "text-amber-600"}`}>
                                 {usd(econ.profit)}<span className="ml-1.5 text-[11px] font-normal">({econ.marginPct}%)</span>
                               </span>
                             </div>
                             <p className="mt-0.5 text-[11px] text-slate-400">
-                              Target {costModel.targetMarginPct}% · {econ.marginPct >= costModel.targetMarginPct ? "on target" : `${(costModel.targetMarginPct - econ.marginPct).toFixed(1)}% below target`}
+                              Target {econ.eff.targetMarginPct}% · {econ.marginPct >= econ.eff.targetMarginPct ? "on target" : `${(econ.eff.targetMarginPct - econ.marginPct).toFixed(1)}% below target`}
                             </p>
                             <div className="mt-2 flex h-2.5 overflow-hidden bg-emerald-300">
                               {econ.segs.map((s) => (
@@ -1385,7 +1633,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                           {econ.suggested != null && (
                             <div className="py-2.5">
                               <div className="flex items-baseline justify-between gap-3">
-                                <span className="text-slate-600">Suggested at {costModel.targetMarginPct}% margin</span>
+                                <span className="text-slate-600">Suggested at {econ.eff.targetMarginPct}% margin</span>
                                 <span className="shrink-0 font-medium tabular-nums text-slate-800">{usd(econ.suggested)}</span>
                               </div>
                               <p className={`mt-0.5 text-[11px] ${econ.price >= econ.suggested ? "text-emerald-700" : "text-amber-600"}`}>

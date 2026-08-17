@@ -58,6 +58,7 @@ import { runAutomationTrigger, fireAutomationForCustomer, fireAutomationForLead 
 import { previewAudience, launchCampaign, cancelCampaign, sendTestStepEmail, syncCampaignAudience, maybeCompleteCampaign } from "./services/campaignEngine";
 import { goveeService } from "./services/goveeService";
 import { riskStatus, recommendedActions, sanitizeSensorAlertSettings, SENSOR_ALERT_SETTINGS_KEY } from "@shared/govee";
+import { JOB_COST_FIELD_META, type JobCostOverrideGroup } from "@shared/job-cost";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -21767,41 +21768,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/quotes - List quotes with filters and pagination (OPTIMIZED)
   app.get("/api/crm/quotes", requireCrmAuth, async (req, res) => {
     try {
-      const { scope, status, customerId, projectId, workOrderId, quoteType, sourceType, page = "1", limit = "25" } = req.query;
+      const { scope, status, customerId, projectId, workOrderId, quoteType, sourceType, search, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
       const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
-      
-      const conditions: any[] = [];
+
+      // Everything EXCEPT status lives in baseConditions so the per-status tab
+      // counts can be computed over the same filtered universe. Status (and the
+      // virtual "viewed" tab) then narrows the actual page query — filtering
+      // happens server-side so tabs and search apply across ALL pages.
+      const baseConditions: any[] = [];
       if (scope) {
-        conditions.push(eq(crmQuotes.scope, scope as string));
-      }
-      if (status) {
-        conditions.push(eq(crmQuotes.status, status as string));
+        baseConditions.push(eq(crmQuotes.scope, scope as string));
       }
       if (customerId) {
-        conditions.push(eq(crmQuotes.customerId, customerId as string));
+        baseConditions.push(eq(crmQuotes.customerId, customerId as string));
       }
       if (projectId) {
-        conditions.push(eq(crmQuotes.projectId, projectId as string));
+        baseConditions.push(eq(crmQuotes.projectId, projectId as string));
       }
       if (workOrderId) {
-        conditions.push(eq(crmQuotes.workOrderId, workOrderId as string));
+        baseConditions.push(eq(crmQuotes.workOrderId, workOrderId as string));
       }
       if (quoteType) {
-        conditions.push(eq(crmQuotes.quoteType, quoteType as string));
+        baseConditions.push(eq(crmQuotes.quoteType, quoteType as string));
       }
       if (sourceType) {
-        conditions.push(eq(crmQuotes.sourceType, sourceType as string));
+        baseConditions.push(eq(crmQuotes.sourceType, sourceType as string));
+      }
+      if (search && String(search).trim()) {
+        const q = `%${String(search).trim()}%`;
+        baseConditions.push(
+          or(ilike(crmQuotes.quoteNumber, q), ilike(crmQuotes.customerName, q), ilike(crmQuotes.title, q)),
+        );
+      }
+
+      const conditions = [...baseConditions];
+      if (status === "viewed") {
+        // Virtual status: sent quotes the customer has actually opened.
+        conditions.push(eq(crmQuotes.status, "sent"), gt(crmQuotes.viewCount, 0));
+      } else if (status) {
+        conditions.push(eq(crmQuotes.status, status as string));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-      
+      const baseWhere = baseConditions.length > 0 ? and(...baseConditions) : undefined;
+
       // Get total count with filters
       const countResult = await db.select({ count: sql<number>`count(*)` })
         .from(crmQuotes)
         .where(whereClause);
       const total = Number(countResult[0]?.count) || 0;
+
+      // Per-status counts for the tab badges — across the whole (searched)
+      // dataset, not just the current page.
+      const statusRows = await db
+        .select({
+          status: crmQuotes.status,
+          n: sql<number>`count(*)::int`,
+          viewed: sql<number>`count(*) filter (where ${crmQuotes.viewCount} > 0)::int`,
+        })
+        .from(crmQuotes)
+        .where(baseWhere)
+        .groupBy(crmQuotes.status);
+      const counts: Record<string, number> = { draft: 0, sent: 0, viewed: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
+      for (const r of statusRows) {
+        const s = r.status || "draft";
+        if (s in counts) counts[s] += Number(r.n) || 0;
+        if (s === "sent") counts.viewed = Number(r.viewed) || 0;
+      }
 
       // Get paginated quotes with filters
       const quotesResult = await db.select({
@@ -21844,6 +21879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         quotes: enrichedQuotes,
+        counts,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -33355,6 +33391,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     buydownPctOfPrice: 5,
     overheadPctOfPrice: 10,
     targetMarginPct: 20,
+    overrides: [] as JobCostOverrideGroup[],
   };
 
   app.get("/api/crm/cost-model", requireCrmAuth, requireCrmAdmin, async (_req, res) => {
@@ -33384,6 +33421,28 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           if (String(k).trim() && Number.isFinite(n) && n > 0) hoursMap[String(k).trim()] = Math.min(n, 500);
         }
       }
+      // Costing override groups: only keep groups with a name, at least one
+      // target (system type or package), and at least one overridden value.
+      const overrides: JobCostOverrideGroup[] = [];
+      if (Array.isArray(b.overrides)) {
+        for (const g of b.overrides.slice(0, 50)) {
+          const name = String(g?.name || "").trim().slice(0, 60);
+          const unitTypes = Array.isArray(g?.unitTypes)
+            ? Array.from(new Set(g.unitTypes.map((u: any) => String(u).trim()).filter(Boolean))).slice(0, 20) as string[]
+            : [];
+          const packageIds = Array.isArray(g?.packageIds)
+            ? Array.from(new Set(g.packageIds.map((p: any) => String(p).trim()).filter(Boolean))).slice(0, 200) as string[]
+            : [];
+          const values: JobCostOverrideGroup["values"] = {};
+          for (const meta of JOB_COST_FIELD_META) {
+            const raw = g?.values?.[meta.key];
+            const n = Number(raw);
+            if (raw != null && raw !== "" && Number.isFinite(n)) values[meta.key] = Math.min(Math.max(n, 0), meta.max);
+          }
+          if (!name || (unitTypes.length === 0 && packageIds.length === 0) || Object.keys(values).length === 0) continue;
+          overrides.push({ id: String(g?.id || "").trim() || randomUUID(), name, unitTypes, packageIds, values });
+        }
+      }
       const model = {
         laborHours: num(b.laborHours, 500),
         laborRatePerHour: num(b.laborRatePerHour, 10000),
@@ -33393,6 +33452,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         buydownPctOfPrice: num(b.buydownPctOfPrice, 100),
         overheadPctOfPrice: num(b.overheadPctOfPrice, 100),
         targetMarginPct: num(b.targetMarginPct, 95),
+        overrides,
       };
       await db.insert(appSettings)
         .values({ key: JOB_COST_MODEL_KEY, value: JSON.stringify(model), updatedAt: new Date() })

@@ -76,6 +76,8 @@ import type { CrmUser, CrmQuote, CrmQuoteLineItem, CrmCustomer, CrmProperty } fr
 
 type QuotesResponse = {
   quotes: CrmQuote[];
+  /** Per-status counts across the WHOLE (searched) dataset, for tab badges. */
+  counts?: Record<string, number>;
   pagination: {
     page: number;
     limit: number;
@@ -215,14 +217,22 @@ export default function CrmQuotes() {
     setPage(1);
   }, [debouncedSearch, activeTab, quoteTypeFilter]);
 
+  // Status tab + search are SERVER-side filters — they must apply across every
+  // page of quotes, not just the 25 currently loaded.
   const { data: quotesData, isLoading: quotesLoadingRaw } = useQuery<QuotesResponse>({
-    queryKey: ["/api/crm/quotes", page, quoteTypeFilter],
+    queryKey: ["/api/crm/quotes", page, quoteTypeFilter, activeTab, debouncedSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("limit", String(ITEMS_PER_PAGE));
       if (quoteTypeFilter !== "all") {
         params.set("quoteType", quoteTypeFilter);
+      }
+      if (activeTab !== "all") {
+        params.set("status", activeTab);
+      }
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
       }
       const res = await fetch(`/api/crm/quotes?${params.toString()}`, {
         credentials: "include",
@@ -362,51 +372,17 @@ export default function CrmQuotes() {
     },
   });
 
-  // Count quotes by status for tab badges
+  // Tab badge counts come from the server (whole dataset, not just this page).
   const statusCounts = useMemo(() => {
-    if (!quotesData?.quotes) return { draft: 0, sent: 0, viewed: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
-    const counts = { draft: 0, sent: 0, viewed: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
-    quotesData.quotes.forEach((quote) => {
-      const status = quote.status || "draft";
-      if (status in counts) counts[status as keyof typeof counts]++;
-      // Count "viewed" tab: quotes with status="sent" AND viewCount > 0
-      if (status === "sent" && (quote.viewCount || 0) > 0) {
-        counts.viewed++;
-      }
-    });
-    return counts;
-  }, [quotesData?.quotes]);
+    const zero = { draft: 0, sent: 0, viewed: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
+    return { ...zero, ...(quotesData?.counts ?? {}) };
+  }, [quotesData?.counts]);
 
   const filteredAndSortedQuotes = useMemo(() => {
     if (!quotesData?.quotes) return [];
-    let filtered = [...quotesData.quotes];
-
-    // Search filter
-    if (debouncedSearch) {
-      const searchLower = debouncedSearch.toLowerCase();
-      filtered = filtered.filter((quote) => {
-        const customerName = quote.customerName?.toLowerCase() || "";
-        const quoteNumber = quote.quoteNumber?.toLowerCase() || "";
-        const title = quote.title?.toLowerCase() || "";
-        return (
-          customerName.includes(searchLower) ||
-          quoteNumber.includes(searchLower) ||
-          title.includes(searchLower)
-        );
-      });
-    }
-
-    // Tab filter (status-based)
-    if (activeTab !== "all") {
-      if (activeTab === "viewed") {
-        // "Viewed" tab: quotes with status="sent" AND viewCount > 0
-        filtered = filtered.filter((quote) => quote.status === "sent" && (quote.viewCount || 0) > 0);
-      } else {
-        filtered = filtered.filter((quote) => quote.status === activeTab);
-      }
-    }
-
-    // Quote type filter is handled server-side, no client-side filtering needed
+    // Status tab, quote type, and search all filter SERVER-side now (so they
+    // span every page); only the column sort happens on the loaded page.
+    const filtered = [...quotesData.quotes];
 
     // Sorting
     filtered.sort((a, b) => {
@@ -449,7 +425,7 @@ export default function CrmQuotes() {
     });
 
     return filtered;
-  }, [quotesData?.quotes, debouncedSearch, activeTab, sortField, sortDirection]);
+  }, [quotesData?.quotes, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

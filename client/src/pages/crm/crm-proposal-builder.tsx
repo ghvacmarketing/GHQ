@@ -3013,11 +3013,11 @@ export default function CrmProposalBuilder() {
               <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => {
                 const queryParams = new URLSearchParams(window.location.search);
                 const projectId = queryParams.get("projectId");
-                const customerId = routeParams.customerId;
+                // Exit returns to where the builder lives (Quotes) — never the
+                // selected customer's detail page. Only a project launch goes
+                // back to its project.
                 if (projectId) {
                   setLocation(`/crm/projects/${projectId}`);
-                } else if (customerId) {
-                  setLocation(`/crm/customers/${customerId}`);
                 } else {
                   setLocation("/crm/quotes");
                 }
