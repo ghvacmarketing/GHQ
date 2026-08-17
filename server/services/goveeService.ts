@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import pLimit from "p-limit";
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   goveeSensors,
@@ -39,6 +39,27 @@ function numOr(value: unknown, fallback: number): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
+
+// ── Alert anti-spam tuning ───────────────────────────────────────────────────
+// Sensors (especially inside metal walk-in coolers) blip offline for a poll or
+// two all the time, and readings oscillate around thresholds. These guards keep
+// that noise from turning into a notification storm on the owners' phones.
+const OFFLINE_OPEN_MINUTES = 30; // continuously offline this long before an alert opens
+const OFFLINE_RESOLVE_MINUTES = 10; // continuously back online this long before it resolves
+const RESOLVE_MARGIN = 2; // °F / %RH a reading must clear its threshold by before the alert resolves
+// An alert that still reflects reality — acknowledged rows MUST count here:
+// treating them as inactive meant acknowledging a still-offline sensor opened a
+// fresh duplicate (and re-notified) on the very next poll, every minute.
+const ACTIVE_ALERT_STATUSES = ["open", "acknowledged"];
+// At most ONE staff notification per sensor+type within this window, even when
+// alert rows legitimately re-open (rows still show in the UI — just no push).
+const NOTIFY_COOLDOWN_MS: Record<AlertType, number> = {
+  offline: 6 * 60 * 60 * 1000,
+  humidity_critical: 60 * 60 * 1000,
+  humidity_high_sustained: 60 * 60 * 1000,
+  temp_low: 60 * 60 * 1000,
+  temp_high: 60 * 60 * 1000,
+};
 
 class GoveeService {
   private getApiKey(): string {
@@ -238,14 +259,15 @@ class GoveeService {
     const tempLow = numOr(sensor.tempLowF, 40);
     const tempHigh = sensor.tempHighF != null ? Number(sensor.tempHighF) : null;
 
-    // Humidity critical — immediate
+    // Humidity critical — opens immediately; resolves only after dropping a
+    // margin below the threshold so oscillation right at the line doesn't churn.
     if (humidity != null && humidity >= critical) {
       await this.openAlert(sensor, "humidity_critical", "critical", `Humidity ${humidity}% — critical`, humidity);
-    } else {
+    } else if (humidity == null || humidity < critical - RESOLVE_MARGIN) {
       await this.resolveAlert(sensor.id, "humidity_critical");
     }
 
-    // Humidity high — sustained 2h
+    // Humidity high — sustained 2h (the sustained window already debounces re-opens)
     if (humidity != null && humidity >= high && humidity < critical) {
       if (await this.humiditySustained(sensor.id, high, 120)) {
         await this.openAlert(sensor, "humidity_high_sustained", "high", `Humidity ≥ ${high}% sustained 2h`, humidity);
@@ -254,24 +276,31 @@ class GoveeService {
       await this.resolveAlert(sensor.id, "humidity_high_sustained");
     }
 
-    // Offline (Govee reports online=false)
+    // Offline — a single offline poll must NOT alert (hubs blip constantly).
+    // Open only after a sustained offline window; resolve only after a
+    // sustained online window, so one good poll mid-outage can't close the
+    // alert just for the next blip to re-open and re-notify.
     if (!state.online) {
-      await this.openAlert(sensor, "offline", "watch", "Sensor reporting offline", null);
-    } else {
-      await this.resolveAlert(sensor.id, "offline");
+      if (await this.onlineSustained(sensor.id, false, OFFLINE_OPEN_MINUTES)) {
+        await this.openAlert(sensor, "offline", "watch", `Sensor offline for ${OFFLINE_OPEN_MINUTES}+ minutes`, null);
+      }
+    } else if (await this.findActiveAlert(sensor.id, "offline")) {
+      if (await this.onlineSustained(sensor.id, true, OFFLINE_RESOLVE_MINUTES)) {
+        await this.resolveAlert(sensor.id, "offline");
+      }
     }
 
-    // Temperature low
+    // Temperature low — resolves with margin (hysteresis)
     if (temp != null && temp <= tempLow) {
       await this.openAlert(sensor, "temp_low", "high", `Temperature ${temp}°F below ${tempLow}°F`, temp);
-    } else {
+    } else if (temp == null || temp > tempLow + RESOLVE_MARGIN) {
       await this.resolveAlert(sensor.id, "temp_low");
     }
 
-    // Temperature high (only if a threshold is configured)
+    // Temperature high (only if a threshold is configured) — resolves with margin
     if (tempHigh != null && temp != null && temp >= tempHigh) {
       await this.openAlert(sensor, "temp_high", "high", `Temperature ${temp}°F above ${tempHigh}°F`, temp);
-    } else {
+    } else if (tempHigh == null || temp == null || temp < tempHigh - RESOLVE_MARGIN) {
       await this.resolveAlert(sensor.id, "temp_high");
     }
   }
@@ -291,6 +320,54 @@ class GoveeService {
     return rows.every((r) => r.humidity != null && Number(r.humidity) >= threshold);
   }
 
+  /** True only when every reading in the last `minutes` window matches `wantOnline` AND we have enough history. */
+  private async onlineSustained(sensorId: string, wantOnline: boolean, minutes: number): Promise<boolean> {
+    const since = new Date(Date.now() - minutes * 60 * 1000);
+    const rows = await db
+      .select({ online: goveeSensorReadings.online, recordedAt: goveeSensorReadings.recordedAt })
+      .from(goveeSensorReadings)
+      .where(and(eq(goveeSensorReadings.sensorId, sensorId), gte(goveeSensorReadings.recordedAt, since)))
+      .orderBy(goveeSensorReadings.recordedAt);
+    if (rows.length === 0) return false;
+    const earliest = rows[0].recordedAt ? new Date(rows[0].recordedAt).getTime() : Date.now();
+    const coverageMin = (Date.now() - earliest) / 60000;
+    if (coverageMin < minutes * 0.8) return false; // not enough history collected yet
+    return rows.every((r) => r.online === wantOnline);
+  }
+
+  /** The alert of this type that still reflects reality: open OR acknowledged. */
+  private async findActiveAlert(sensorId: string, type: AlertType): Promise<{ id: string } | undefined> {
+    const [row] = await db
+      .select({ id: goveeSensorAlerts.id })
+      .from(goveeSensorAlerts)
+      .where(
+        and(
+          eq(goveeSensorAlerts.sensorId, sensorId),
+          eq(goveeSensorAlerts.type, type),
+          inArray(goveeSensorAlerts.status, ACTIVE_ALERT_STATUSES),
+        ),
+      );
+    return row;
+  }
+
+  /** Did a notified alert of this sensor+type open within the cooldown window? */
+  private async recentlyNotified(sensorId: string, type: AlertType): Promise<boolean> {
+    const cutoff = new Date(Date.now() - NOTIFY_COOLDOWN_MS[type]);
+    const [row] = await db
+      .select({ id: goveeSensorAlerts.id })
+      .from(goveeSensorAlerts)
+      .where(
+        and(
+          eq(goveeSensorAlerts.sensorId, sensorId),
+          eq(goveeSensorAlerts.type, type),
+          isNotNull(goveeSensorAlerts.notificationId),
+          gte(goveeSensorAlerts.openedAt, cutoff),
+        ),
+      )
+      .limit(1);
+    return !!row;
+  }
+
   private async openAlert(
     sensor: GoveeSensor,
     type: AlertType,
@@ -298,20 +375,13 @@ class GoveeService {
     message: string,
     value: number | null,
   ): Promise<void> {
-    const [existing] = await db
-      .select({ id: goveeSensorAlerts.id })
-      .from(goveeSensorAlerts)
-      .where(
-        and(
-          eq(goveeSensorAlerts.sensorId, sensor.id),
-          eq(goveeSensorAlerts.type, type),
-          eq(goveeSensorAlerts.status, "open"),
-        ),
-      );
-    if (existing) return; // already open — dedup
+    if (await this.findActiveAlert(sensor.id, type)) return; // already open or acknowledged — dedup
 
     const risk: RiskLevel = severity;
     const recommendedAction = recommendedActions(risk, sensor.locationType)[0] ?? null;
+    // Cooldown: if staff were already notified for this sensor+type recently,
+    // open the alert row silently — it still shows in the UI, no phone buzz.
+    const muted = await this.recentlyNotified(sensor.id, type);
     const [alert] = await db
       .insert(goveeSensorAlerts)
       .values({
@@ -324,15 +394,19 @@ class GoveeService {
       })
       .returning({ id: goveeSensorAlerts.id });
 
-    const notificationId = await this.notifyStaff(sensor, message, recommendedAction);
-    if (notificationId) {
-      await db.update(goveeSensorAlerts).set({ notificationId }).where(eq(goveeSensorAlerts.id, alert.id));
+    if (!muted) {
+      const notificationId = await this.notifyStaff(sensor, message, recommendedAction);
+      if (notificationId) {
+        await db.update(goveeSensorAlerts).set({ notificationId }).where(eq(goveeSensorAlerts.id, alert.id));
+      }
     }
     console.log(
-      `[Govee] ALERT ${type} (${severity}) for ${sensor.label || sensor.deviceName || sensor.device}: ${message}`,
+      `[Govee] ALERT ${type} (${severity}) for ${sensor.label || sensor.deviceName || sensor.device}: ${message}${muted ? " — notification muted (cooldown)" : ""}`,
     );
   }
 
+  // Resolves acknowledged rows too — otherwise an acknowledged alert lingered
+  // as "active" forever and blocked every future alert of that type.
   private async resolveAlert(sensorId: string, type: AlertType): Promise<void> {
     await db
       .update(goveeSensorAlerts)
@@ -341,11 +415,13 @@ class GoveeService {
         and(
           eq(goveeSensorAlerts.sensorId, sensorId),
           eq(goveeSensorAlerts.type, type),
-          eq(goveeSensorAlerts.status, "open"),
+          inArray(goveeSensorAlerts.status, ACTIVE_ALERT_STATUSES),
         ),
       );
   }
 
+  /** Sensor alerts go to OWNER + ADMIN roles only — never the whole staff
+   *  list. Techs/sales must not get environmental-monitoring pushes. */
   private async notifyStaff(
     sensor: GoveeSensor,
     message: string,
