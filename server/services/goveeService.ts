@@ -254,25 +254,28 @@ class GoveeService {
   private async evaluateAlerts(sensor: GoveeSensor, state: ParsedSensorState): Promise<void> {
     const humidity = state.humidity;
     const temp = state.temperatureF;
-    const high = numOr(sensor.humidityHigh, 65);
-    const critical = numOr(sensor.humidityCritical, 75);
-    const tempLow = numOr(sensor.tempLowF, 40);
+    // A blank threshold means "that alert is off" — a walk-in cooler runs
+    // below the old hardcoded 40°F floor around the clock, and coercing null
+    // to 0 made a cleared humidity threshold fire permanently.
+    const high = sensor.humidityHigh != null ? Number(sensor.humidityHigh) : null;
+    const critical = sensor.humidityCritical != null ? Number(sensor.humidityCritical) : null;
+    const tempLow = sensor.tempLowF != null ? Number(sensor.tempLowF) : null;
     const tempHigh = sensor.tempHighF != null ? Number(sensor.tempHighF) : null;
 
     // Humidity critical — opens immediately; resolves only after dropping a
     // margin below the threshold so oscillation right at the line doesn't churn.
-    if (humidity != null && humidity >= critical) {
+    if (critical != null && humidity != null && humidity >= critical) {
       await this.openAlert(sensor, "humidity_critical", "critical", `Humidity ${humidity}% — critical`, humidity);
-    } else if (humidity == null || humidity < critical - RESOLVE_MARGIN) {
+    } else if (critical == null || humidity == null || humidity < critical - RESOLVE_MARGIN) {
       await this.resolveAlert(sensor.id, "humidity_critical");
     }
 
     // Humidity high — sustained 2h (the sustained window already debounces re-opens)
-    if (humidity != null && humidity >= high && humidity < critical) {
+    if (high != null && humidity != null && humidity >= high && (critical == null || humidity < critical)) {
       if (await this.humiditySustained(sensor.id, high, 120)) {
         await this.openAlert(sensor, "humidity_high_sustained", "high", `Humidity ≥ ${high}% sustained 2h`, humidity);
       }
-    } else if (humidity == null || humidity < high) {
+    } else if (high == null || humidity == null || humidity < high) {
       await this.resolveAlert(sensor.id, "humidity_high_sustained");
     }
 
@@ -290,10 +293,10 @@ class GoveeService {
       }
     }
 
-    // Temperature low — resolves with margin (hysteresis)
-    if (temp != null && temp <= tempLow) {
+    // Temperature low (only if a threshold is configured) — resolves with margin
+    if (tempLow != null && temp != null && temp <= tempLow) {
       await this.openAlert(sensor, "temp_low", "high", `Temperature ${temp}°F below ${tempLow}°F`, temp);
-    } else if (temp == null || temp > tempLow + RESOLVE_MARGIN) {
+    } else if (tempLow == null || temp == null || temp > tempLow + RESOLVE_MARGIN) {
       await this.resolveAlert(sensor.id, "temp_low");
     }
 

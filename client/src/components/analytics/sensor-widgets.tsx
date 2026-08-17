@@ -415,6 +415,7 @@ export function SensorMappingDialog({
   const [search, setSearch] = useState("");
   const [humidityHigh, setHumidityHigh] = useState("");
   const [humidityCritical, setHumidityCritical] = useState("");
+  const [tempLowF, setTempLowF] = useState("");
   const [tempHighF, setTempHighF] = useState("");
   const [tempOffsetF, setTempOffsetF] = useState("");
   const [humidityOffset, setHumidityOffset] = useState("");
@@ -431,6 +432,7 @@ export function SensorMappingDialog({
     setPropertyId(sensor.propertyId || "");
     setHumidityHigh(sensor.thresholds.humidityHigh != null ? String(sensor.thresholds.humidityHigh) : "");
     setHumidityCritical(sensor.thresholds.humidityCritical != null ? String(sensor.thresholds.humidityCritical) : "");
+    setTempLowF(sensor.thresholds.tempLowF != null ? String(sensor.thresholds.tempLowF) : "");
     setTempHighF(sensor.thresholds.tempHighF != null ? String(sensor.thresholds.tempHighF) : "");
     setTempOffsetF(sensor.calibration?.tempOffsetF ? String(sensor.calibration.tempOffsetF) : "");
     setHumidityOffset(sensor.calibration?.humidityOffset ? String(sensor.calibration.humidityOffset) : "");
@@ -466,6 +468,7 @@ export function SensorMappingDialog({
         propertyId: propertyId || null,
         humidityHigh: humidityHigh === "" ? null : humidityHigh,
         humidityCritical: humidityCritical === "" ? null : humidityCritical,
+        tempLowF: tempLowF === "" ? null : tempLowF,
         tempHighF: tempHighF === "" ? null : tempHighF,
         tempOffsetF: tempOffsetF === "" ? "0" : tempOffsetF,
         humidityOffset: humidityOffset === "" ? "0" : humidityOffset,
@@ -545,19 +548,30 @@ export function SensorMappingDialog({
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <Label className="text-xs">High RH%</Label>
-              <Input value={humidityHigh} onChange={(e) => setHumidityHigh(e.target.value)} placeholder="65" />
+          <div>
+            <Label className="text-xs">Alert thresholds</Label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">High RH%</Label>
+                <Input value={humidityHigh} onChange={(e) => setHumidityHigh(e.target.value)} placeholder="65" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Critical RH%</Label>
+                <Input value={humidityCritical} onChange={(e) => setHumidityCritical(e.target.value)} placeholder="75" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Temp low °F</Label>
+                <Input value={tempLowF} onChange={(e) => setTempLowF(e.target.value)} placeholder="—" data-testid="input-temp-low" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Temp high °F</Label>
+                <Input value={tempHighF} onChange={(e) => setTempHighF(e.target.value)} placeholder="—" />
+              </div>
             </div>
-            <div>
-              <Label className="text-xs">Critical RH%</Label>
-              <Input value={humidityCritical} onChange={(e) => setHumidityCritical(e.target.value)} placeholder="75" />
-            </div>
-            <div>
-              <Label className="text-xs">Temp high °F</Label>
-              <Input value={tempHighF} onChange={(e) => setTempHighF(e.target.value)} placeholder="—" />
-            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Alerts fire at ≤ low or ≥ high; blank turns that alert off. For a walk-in cooler,
+              set low below its normal running temp (or blank) and high around 45.
+            </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <p className="text-xs font-semibold text-slate-700">Calibration</p>

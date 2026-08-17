@@ -368,7 +368,7 @@ export default function CrmAnalytics() {
               </div>
               <div className="mb-3 flex justify-end gap-2">
                 <Button size="sm" variant="outline" onClick={() => { setMapping(detail); setDetail(null); }}>
-                  Edit mapping
+                  Sensor settings
                 </Button>
                 <Button
                   size="sm"
