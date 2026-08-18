@@ -719,6 +719,44 @@ type CostModel = {
 
 const pkgLabel = (p: any) => `${p.unitType} ${p.tier} ${p.tonnage}T ${p.packageLevel}`;
 
+// Deep equality with sorted object keys — dirty checks compare a draft to the
+// saved state so "edit then revert" leaves the Save button disabled.
+const sortedJson = (v: unknown): string =>
+  JSON.stringify(v, (_k, val) =>
+    val && typeof val === "object" && !Array.isArray(val)
+      ? Object.fromEntries(Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : val,
+  );
+const jsonEq = (a: unknown, b: unknown): boolean => sortedJson(a) === sortedJson(b);
+
+/** PackageEditorDialog prefill from a RAW pricebook row (cents, real id). */
+const prefillFromRawPackage = (raw: any): PackagePrefill => ({
+  unitType: raw.unitType, tier: raw.tier, tonnage: String(raw.tonnage), packageLevel: raw.packageLevel,
+  totalInvestmentDollars: String((raw.totalInvestment || 0) / 100),
+  monthlyPaymentDollars: raw.monthlyPayment != null ? String(raw.monthlyPayment / 100) : "",
+  outdoorBrand: raw.outdoorBrand || "", outdoorModel: raw.outdoorModel || "", outdoorName: raw.outdoorName || "",
+  coilModel: raw.coilModel || "", coilName: raw.coilName || "",
+  indoorHeatModel: raw.indoorHeatModel || "", indoorHeatName: raw.indoorHeatName || "",
+  thermostatModel: raw.thermostatModel || "", thermostatName: raw.thermostatName || "",
+  accessoryModels: raw.accessoryModels || "",
+  outdoorImageUrl: raw.outdoorImageUrl || undefined, coilImageUrl: raw.coilImageUrl || undefined,
+  thermostatImageUrl: raw.thermostatImageUrl || undefined, furnaceImageUrl: raw.furnaceImageUrl || undefined,
+  copiedFromId: String(raw.id),
+});
+
+// The builder's classic section order — data-only types append after these.
+const CLASSIC_TYPE_ORDER = ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
+const mergeSectionOrder = (cfgKeys: string[], dataTypes: string[]): string[] => {
+  const order = cfgKeys.length > 0 ? cfgKeys : CLASSIC_TYPE_ORDER;
+  const extras = dataTypes
+    .filter((t) => !order.includes(t))
+    .sort((a, b) => {
+      const ia = CLASSIC_TYPE_ORDER.indexOf(a); const ib = CLASSIC_TYPE_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+  return [...order.filter((t) => dataTypes.includes(t)), ...extras];
+};
+
 /** Six shop-level numbers — not a per-package spreadsheet. Controlled by
  *  CostsAndCatalogTab so edits preview LIVE in the Package Equipment
  *  breakdowns above before they're saved. Estimates only: nothing here
@@ -1055,20 +1093,21 @@ export function BuilderSectionsCard({ packages }: { packages: any[] | undefined 
 
   // Saved config first (its order wins), then any data-only types appended in
   // the builder's classic order — same merge the builder itself performs.
-  const rows = useMemo(() => {
-    if (draft) return draft;
+  const baseline = useMemo(() => {
     const cfg = saved?.systemTypes ?? [];
     const known = new Set(cfg.map((t) => t.key));
-    const classic = ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
     const extras = [...dataTypes]
       .filter((t) => !known.has(t))
       .sort((a, b) => {
-        const ia = classic.indexOf(a); const ib = classic.indexOf(b);
+        const ia = CLASSIC_TYPE_ORDER.indexOf(a); const ib = CLASSIC_TYPE_ORDER.indexOf(b);
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
       })
       .map((key) => ({ key, name: "", description: "", hidden: false }));
     return [...cfg, ...extras];
-  }, [draft, saved, dataTypes]);
+  }, [saved, dataTypes]);
+  const rows = draft ?? baseline;
+  // Dirty only when the draft actually DIFFERS — edit-then-revert re-disables Save.
+  const dirty = draft != null && !jsonEq(draft, baseline);
 
   const update = (i: number, patch: Partial<BuilderSectionRow>) =>
     setDraft(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -1139,16 +1178,138 @@ export function BuilderSectionsCard({ packages }: { packages: any[] | undefined 
         <div className="flex items-center gap-3">
           <Button
             onClick={() => save.mutate()}
-            disabled={save.isPending || !draft}
+            disabled={save.isPending || !dirty}
             className="bg-[#711419] hover:bg-[#8a1a1f]"
             data-testid="builder-sections-save"
           >
             {save.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save sections"}
           </Button>
-          {draft && <span className="text-xs font-medium text-amber-600">Unsaved changes.</span>}
+          {dirty && <span className="text-xs font-medium text-amber-600">Unsaved changes.</span>}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Every package the builder can quote, grouped exactly like the builder's
+ *  sections — THE place to add or duplicate packages from Settings. (The same
+ *  actions live inside the proposal builder behind its Edit toggle.) */
+export function PackagesBySectionCard({ packages }: { packages: any[] | undefined }) {
+  const { data: cfg } = useQuery<{ systemTypes: BuilderSectionRow[] }>({ queryKey: ["/api/crm/builder-config"] });
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorPrefill, setEditorPrefill] = useState<PackagePrefill | null>(null);
+  const openEditor = (prefill: PackagePrefill | null) => { setEditorPrefill(prefill); setEditorOpen(true); };
+
+  const rows = packages || [];
+  const dataTypes = useMemo(() => Array.from(new Set(rows.map((p: any) => p.unitType).filter(Boolean))) as string[], [rows]);
+  const order = useMemo(() => mergeSectionOrder((cfg?.systemTypes ?? []).map((t) => t.key), dataTypes), [cfg, dataTypes]);
+  const cfgFor = (key: string) => cfg?.systemTypes?.find((t) => t.key === key);
+
+  const LEVELS: Record<string, number> = { Best: 0, Better: 1, Good: 2, Budget: 3 };
+  const groups = useMemo(
+    () =>
+      order.map((key) => ({
+        key,
+        rows: rows
+          .filter((p: any) => p.unitType === key)
+          .sort(
+            (a: any, b: any) =>
+              a.tier.localeCompare(b.tier) ||
+              (parseFloat(a.tonnage) || 0) - (parseFloat(b.tonnage) || 0) ||
+              (LEVELS[a.packageLevel] ?? 9) - (LEVELS[b.packageLevel] ?? 9),
+          ),
+      })),
+    [order, rows],
+  );
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <div>
+          <CardTitle>Packages by Section</CardTitle>
+          <CardDescription className="mt-1">
+            Everything the proposal builder can quote, grouped exactly like its steps. Add a brand-new
+            package (a new system type here becomes a new builder section), or duplicate an existing one and
+            tweak it — that's the fast path. The builder itself has the same tools behind its "Edit" toggle.
+          </CardDescription>
+        </div>
+        <Button
+          className="shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
+          onClick={() => openEditor(null)}
+          data-testid="builder-tab-add-package"
+        >
+          <Plus className="mr-1.5 h-4 w-4" /> Add package
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {groups.length === 0 && (
+          <p className="py-10 text-center text-sm text-slate-400">No packages yet — "Add package" creates the first one.</p>
+        )}
+        {groups.map(({ key, rows: pkgs }) => {
+          const c = cfgFor(key);
+          return (
+            <div key={key} className="overflow-hidden rounded-lg border border-slate-200">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="text-sm font-semibold text-slate-800">{c?.name || key}</span>
+                <span className="rounded-[3px] bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{key}</span>
+                {c?.hidden && (
+                  <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">hidden in builder</span>
+                )}
+                <span className="text-xs text-slate-400">{pkgs.length} package{pkgs.length === 1 ? "" : "s"}</span>
+                <Button
+                  size="sm" variant="outline" className="ml-auto h-7 text-xs"
+                  onClick={() => openEditor({ unitType: key })}
+                  data-testid={`builder-tab-add-${key}`}
+                >
+                  <Plus className="mr-1 h-3 w-3" /> Add to {c?.name || key}
+                </Button>
+              </div>
+              {pkgs.length === 0 ? (
+                <p className="px-3 py-4 text-center text-xs text-slate-400">No packages in this section yet.</p>
+              ) : (
+                pkgs.map((p: any) => (
+                  <div key={p.id} className="flex items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-0" data-testid={`builder-tab-pkg-${p.id}`}>
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
+                      {p.tier} · {p.tonnage}T · <span className="font-medium">{p.packageLevel}</span>
+                      {p.outdoorModel && <span className="ml-2 font-mono text-[11px] text-slate-400">{p.outdoorModel}</span>}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-sm text-slate-600">{usd(p.totalInvestment)}</span>
+                    <span className="w-20 shrink-0 text-right tabular-nums text-[11px] text-slate-400">
+                      {p.monthlyPayment != null ? `${usd(p.monthlyPayment)}/mo` : "—"}
+                    </span>
+                    <Button
+                      size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs text-slate-500 hover:text-[#711419]"
+                      onClick={() => openEditor(prefillFromRawPackage(p))}
+                      data-testid={`builder-tab-duplicate-${p.id}`}
+                    >
+                      <Copy className="mr-1 h-3 w-3" /> Duplicate
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+
+      <PackageEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        prefill={editorPrefill}
+        existing={rows.map((p: any) => ({ unitType: p.unitType, tier: p.tier, tonnage: String(p.tonnage), packageLevel: p.packageLevel }))}
+      />
+    </Card>
+  );
+}
+
+/** The "Proposal Builder" settings tab: add/duplicate packages per section +
+ *  the section manager (order, names, blurbs, visibility). */
+export function BuilderTab({ packages }: { packages: any[] | undefined }) {
+  return (
+    <div className="space-y-6">
+      <PackagesBySectionCard packages={packages} />
+      <BuilderSectionsCard packages={packages} />
+    </div>
   );
 }
 
@@ -1159,11 +1320,13 @@ export function CostsAndCatalogTab({ packages }: { packages: any[] | undefined }
   const { data: savedModel } = useQuery<CostModel>({ queryKey: ["/api/crm/cost-model"] });
   const [draft, setDraft] = useState<CostModel | null>(null);
   const model = draft ?? savedModel ?? null;
+  // Dirty only while the draft truly differs from what's saved — reverting
+  // your edits by hand re-disables the Save button.
+  const dirty = draft != null && savedModel != null && !jsonEq(draft, savedModel);
   return (
     <div className="space-y-6">
       <PackageEquipmentCard packages={packages} costModel={model} />
-      <JobCostModelCard packages={packages} model={model} dirty={!!draft} onChange={setDraft} onSaved={() => setDraft(null)} />
-      <BuilderSectionsCard packages={packages} />
+      <JobCostModelCard packages={packages} model={model} dirty={dirty} onChange={setDraft} onSaved={() => setDraft(null)} />
       <EquipmentCatalogCard />
     </div>
   );
@@ -1786,18 +1949,11 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                               <Button
                                 size="sm" variant="outline" className="h-8"
                                 onClick={() => {
-                                  const raw = selPkg;
                                   setPkgEditorPrefill({
+                                    ...(selPkg ? prefillFromRawPackage(selPkg) : {}),
                                     unitType: selected.unitType, tier: selected.tier, tonnage: String(selected.tonnage), packageLevel: selected.packageLevel,
                                     totalInvestmentDollars: String((selected.totalInvestment || 0) / 100),
                                     monthlyPaymentDollars: selected.monthlyPayment != null ? String(selected.monthlyPayment / 100) : "",
-                                    outdoorBrand: raw?.outdoorBrand || "", outdoorModel: raw?.outdoorModel || "", outdoorName: raw?.outdoorName || "",
-                                    coilModel: raw?.coilModel || "", coilName: raw?.coilName || "",
-                                    indoorHeatModel: raw?.indoorHeatModel || "", indoorHeatName: raw?.indoorHeatName || "",
-                                    thermostatModel: raw?.thermostatModel || "", thermostatName: raw?.thermostatName || "",
-                                    accessoryModels: raw?.accessoryModels || "",
-                                    outdoorImageUrl: raw?.outdoorImageUrl || undefined, coilImageUrl: raw?.coilImageUrl || undefined,
-                                    thermostatImageUrl: raw?.thermostatImageUrl || undefined, furnaceImageUrl: raw?.furnaceImageUrl || undefined,
                                     copiedFromId: String(selected.id),
                                   });
                                   setPkgEditorOpen(true);

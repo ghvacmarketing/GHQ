@@ -10,19 +10,21 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { openGlobalAI } from "@/components/crm/ghq-search";
 import badgeGibbs from "@/assets/badge-gibbs.png";
 import type { CrmUser } from "@shared/schema";
-import { PriceFileWizardCard, CostsAndCatalogTab } from "@/pages/crm/packages-pricing-tools";
+import { PriceFileWizardCard, CostsAndCatalogTab, BuilderTab } from "@/pages/crm/packages-pricing-tools";
 import PricingGibbsPanel from "@/components/crm/pricing-gibbs-panel";
 
-/** Package pricing, condensed to two tabs:
+/** Package pricing, three tabs:
  *  - Costs & Catalog: Package Equipment (drift + repricing baked in), the
  *    live-preview Job Cost Model, and the Equipment Catalog.
+ *  - Proposal Builder: add/duplicate packages per section + the section
+ *    manager (order, names, blurbs, visibility) — what the builder renders.
  *  - Price File Update: the supplier flat-file wizard.
  *  The old CSV package import, bulk % adjustments, and editable price table
  *  were removed 2026-08 — repricing happens per package in Package Equipment. */
 export default function CrmSettingsPackages() {
   usePageTitle("Package Pricing Management");
   const [, navigate] = useLocation();
-  const [pageTab, setPageTab] = useState<"costs" | "pricefile">("costs");
+  const [pageTab, setPageTab] = useState<"costs" | "builder" | "pricefile">("costs");
   // The panel sizes itself to the gutter right of this container.
   const boundaryRef = useRef<HTMLDivElement | null>(null);
   // The docked Pricing Gibbs panel — remembered across visits.
@@ -112,6 +114,7 @@ export default function CrmSettingsPackages() {
         <div className="mb-4 flex w-full max-w-md items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
           {([
             ["costs", "Costs & Catalog"],
+            ["builder", "Proposal Builder"],
             ["pricefile", "Price File Update"],
           ] as const).map(([value, label]) => (
             <button
@@ -128,6 +131,7 @@ export default function CrmSettingsPackages() {
         </div>
 
         {pageTab === "costs" && <CostsAndCatalogTab packages={packages} />}
+        {pageTab === "builder" && <BuilderTab packages={packages} />}
         {pageTab === "pricefile" && (
           <div className="space-y-6">
             <PriceFileWizardCard />

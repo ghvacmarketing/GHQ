@@ -168,6 +168,17 @@ export default function CrmSettingsSensors() {
     onError: (e: any) => toast({ title: e?.message || "Sync failed", variant: "destructive" }),
   });
 
+  // Dirty only when the form truly differs from what's saved — editing a
+  // value and putting it back re-disables Save.
+  const savedSettings = settingsData?.settings;
+  const settingsDirty = !!savedSettings && seeded && (
+    JSON.stringify([...roles].sort()) !== JSON.stringify([...savedSettings.notifyRoles].sort()) ||
+    Number(offlineOpen) !== savedSettings.offlineOpenMinutes ||
+    Number(offlineResolve) !== savedSettings.offlineResolveMinutes ||
+    Number(offlineCooldown) !== savedSettings.offlineCooldownHours ||
+    Number(thresholdCooldown) !== savedSettings.thresholdCooldownHours
+  );
+
   const sensors = sensorsData?.sensors ?? [];
   const alerts = alertsData?.alerts ?? [];
   const online = sensors.filter((s) => s.isActive && s.online === true).length;
@@ -315,7 +326,7 @@ export default function CrmSettingsSensors() {
               <Button
                 className="bg-[#711419] hover:bg-[#8a1a1f]"
                 onClick={() => saveSettings.mutate()}
-                disabled={saveSettings.isPending || !seeded}
+                disabled={saveSettings.isPending || !settingsDirty}
                 data-testid="button-save-alert-settings"
               >
                 {saveSettings.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
