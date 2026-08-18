@@ -1191,46 +1191,75 @@ export function BuilderSectionsCard({ packages }: { packages: any[] | undefined 
   );
 }
 
-/** Every package the builder can quote, grouped exactly like the builder's
- *  sections — THE place to add or duplicate packages from Settings. (The same
- *  actions live inside the proposal builder behind its Edit toggle.) */
+/** Every package the builder can quote, laid out as the builder's own
+ *  hierarchy — Section > Tier > (Size · Level) — with the first two layers
+ *  collapsible and an add action scoped to wherever you are. "Create package"
+ *  starts from a blank layer 1; the scoped buttons arrive with layers
+ *  pre-chosen. */
 export function PackagesBySectionCard({ packages }: { packages: any[] | undefined }) {
   const { data: cfg } = useQuery<{ systemTypes: BuilderSectionRow[] }>({ queryKey: ["/api/crm/builder-config"] });
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorPrefill, setEditorPrefill] = useState<PackagePrefill | null>(null);
   const openEditor = (prefill: PackagePrefill | null) => { setEditorPrefill(prefill); setEditorOpen(true); };
 
+  // Sections start folded; tier groups inside an open section start open.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [closedTiers, setClosedTiers] = useState<Set<string>>(new Set());
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const toggleTier = (key: string) =>
+    setClosedTiers((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+
   const rows = packages || [];
   const dataTypes = useMemo(() => Array.from(new Set(rows.map((p: any) => p.unitType).filter(Boolean))) as string[], [rows]);
-  const order = useMemo(() => mergeSectionOrder((cfg?.systemTypes ?? []).map((t) => t.key), dataTypes), [cfg, dataTypes]);
+  // Configured sections first (even empty ones — they're real sections), then
+  // data-only types in the builder's classic order.
+  const order = useMemo(() => {
+    const cfgKeys = (cfg?.systemTypes ?? []).map((t) => t.key);
+    const extras = dataTypes
+      .filter((t) => !cfgKeys.includes(t))
+      .sort((a, b) => {
+        const ia = CLASSIC_TYPE_ORDER.indexOf(a); const ib = CLASSIC_TYPE_ORDER.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+      });
+    return [...cfgKeys, ...extras];
+  }, [cfg, dataTypes]);
   const cfgFor = (key: string) => cfg?.systemTypes?.find((t) => t.key === key);
 
   const LEVELS: Record<string, number> = { Best: 0, Better: 1, Good: 2, Budget: 3 };
   const groups = useMemo(
     () =>
-      order.map((key) => ({
-        key,
-        rows: rows
-          .filter((p: any) => p.unitType === key)
-          .sort(
+      order.map((key) => {
+        const pkgs = rows.filter((p: any) => p.unitType === key);
+        const tiers = new Map<string, any[]>();
+        for (const p of pkgs) {
+          if (!tiers.has(p.tier)) tiers.set(p.tier, []);
+          tiers.get(p.tier)!.push(p);
+        }
+        for (const list of Array.from(tiers.values())) {
+          list.sort(
             (a: any, b: any) =>
-              a.tier.localeCompare(b.tier) ||
               (parseFloat(a.tonnage) || 0) - (parseFloat(b.tonnage) || 0) ||
-              (LEVELS[a.packageLevel] ?? 9) - (LEVELS[b.packageLevel] ?? 9),
-          ),
-      })),
+              (LEVELS[a.packageLevel] ?? 9) - (LEVELS[b.packageLevel] ?? 9) ||
+              String(a.packageLevel).localeCompare(String(b.packageLevel)),
+          );
+        }
+        return { key, pkgs, tiers: Array.from(tiers.entries()).sort(([a], [b]) => a.localeCompare(b)) };
+      }),
     [order, rows],
   );
+
+  const sizeLabel = (t: string) => (t === "All" ? "All sizes" : t + " T");
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle>Packages by Section</CardTitle>
-          <CardDescription className="mt-1">
-            Everything the proposal builder can quote, grouped exactly like its steps. Add a brand-new
-            package (a new system type here becomes a new builder section), or duplicate an existing one and
-            tweak it — that's the fast path. The builder itself has the same tools behind its "Edit" toggle.
+          <CardDescription className="mt-1 max-w-2xl">
+            The builder's four layers — section, tier, size, level — as a foldable tree. Create from scratch,
+            add into any section or tier, or duplicate a row and tweak it. The builder itself has the same
+            tools behind its "Edit" toggle.
           </CardDescription>
         </div>
         <Button
@@ -1238,54 +1267,108 @@ export function PackagesBySectionCard({ packages }: { packages: any[] | undefine
           onClick={() => openEditor(null)}
           data-testid="builder-tab-add-package"
         >
-          <Plus className="mr-1.5 h-4 w-4" /> Add package
+          Create package
         </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {groups.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No packages yet — "Add package" creates the first one.</p>
+      <CardContent className="space-y-2.5">
+        {groups.length > 0 && (
+          <div className="flex justify-end gap-3 text-[11px] font-medium">
+            <button type="button" className="text-slate-500 hover:text-[#711419]" onClick={() => setOpenSections(new Set(order))} data-testid="builder-tab-expand-all">Expand all</button>
+            <button type="button" className="text-slate-500 hover:text-[#711419]" onClick={() => { setOpenSections(new Set()); setClosedTiers(new Set()); }} data-testid="builder-tab-collapse-all">Collapse all</button>
+          </div>
         )}
-        {groups.map(({ key, rows: pkgs }) => {
+        {groups.length === 0 && (
+          <p className="py-10 text-center text-sm text-slate-400">No packages yet — "Create package" starts the first one.</p>
+        )}
+        {groups.map(({ key, pkgs, tiers }) => {
           const c = cfgFor(key);
+          const isOpen = openSections.has(key);
           return (
-            <div key={key} className="overflow-hidden rounded-lg border border-slate-200">
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
-                <span className="text-sm font-semibold text-slate-800">{c?.name || key}</span>
-                <span className="rounded-[3px] bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{key}</span>
-                {c?.hidden && (
-                  <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">hidden in builder</span>
-                )}
-                <span className="text-xs text-slate-400">{pkgs.length} package{pkgs.length === 1 ? "" : "s"}</span>
-                <Button
-                  size="sm" variant="outline" className="ml-auto h-7 text-xs"
-                  onClick={() => openEditor({ unitType: key })}
-                  data-testid={`builder-tab-add-${key}`}
+            <div key={key} className="overflow-hidden rounded-[4px] border border-slate-300/70">
+              {/* Layer 1 — section */}
+              <div className={"flex items-center gap-2 px-3 py-2 " + (isOpen ? "border-b border-slate-200 bg-slate-50" : "bg-white")}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(key)}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  aria-expanded={isOpen}
+                  data-testid={"builder-section-toggle-" + key}
                 >
-                  <Plus className="mr-1 h-3 w-3" /> Add to {c?.name || key}
+                  <ChevronDown className={"h-4 w-4 shrink-0 text-slate-400 transition-transform " + (isOpen ? "" : "-rotate-90")} />
+                  <span className="truncate text-sm font-semibold text-slate-800">{c?.name || key}</span>
+                  <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{key}</span>
+                  {c?.hidden && (
+                    <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">hidden in builder</span>
+                  )}
+                  <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-slate-400">
+                    {pkgs.length} package{pkgs.length === 1 ? "" : "s"}{tiers.length > 0 ? " · " + tiers.length + " tier" + (tiers.length === 1 ? "" : "s") : ""}
+                  </span>
+                </button>
+                <Button
+                  size="sm" variant="outline" className="h-7 shrink-0 text-xs"
+                  onClick={() => openEditor({ unitType: key })}
+                  data-testid={"builder-tab-add-" + key}
+                >
+                  Add to {c?.name || key}
                 </Button>
               </div>
-              {pkgs.length === 0 ? (
-                <p className="px-3 py-4 text-center text-xs text-slate-400">No packages in this section yet.</p>
-              ) : (
-                pkgs.map((p: any) => (
-                  <div key={p.id} className="flex items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-0" data-testid={`builder-tab-pkg-${p.id}`}>
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
-                      {p.tier} · {p.tonnage}T · <span className="font-medium">{p.packageLevel}</span>
-                      {p.outdoorModel && <span className="ml-2 font-mono text-[11px] text-slate-400">{p.outdoorModel}</span>}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-sm text-slate-600">{usd(p.totalInvestment)}</span>
-                    <span className="w-20 shrink-0 text-right tabular-nums text-[11px] text-slate-400">
-                      {p.monthlyPayment != null ? `${usd(p.monthlyPayment)}/mo` : "—"}
-                    </span>
-                    <Button
-                      size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs text-slate-500 hover:text-[#711419]"
-                      onClick={() => openEditor(prefillFromRawPackage(p))}
-                      data-testid={`builder-tab-duplicate-${p.id}`}
-                    >
-                      <Copy className="mr-1 h-3 w-3" /> Duplicate
-                    </Button>
-                  </div>
-                ))
+              {isOpen && (
+                pkgs.length === 0 ? (
+                  <p className="px-9 py-3 text-xs text-slate-400">Nothing here yet — "Add to {c?.name || key}" creates its first package.</p>
+                ) : (
+                  tiers.map(([tier, list]) => {
+                    const tierKey = key + "::" + tier;
+                    const tierOpen = !closedTiers.has(tierKey);
+                    return (
+                      <div key={tierKey} className="border-b border-slate-100 last:border-0">
+                        {/* Layer 2 — tier */}
+                        <div className="flex items-center gap-2 py-1.5 pl-6 pr-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleTier(tierKey)}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                            aria-expanded={tierOpen}
+                            data-testid={"builder-tier-toggle-" + tierKey}
+                          >
+                            <ChevronDown className={"h-3.5 w-3.5 shrink-0 text-slate-300 transition-transform " + (tierOpen ? "" : "-rotate-90")} />
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{tier}</span>
+                            <span className="text-[11px] tabular-nums text-slate-400">{list.length}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="shrink-0 text-[11px] font-medium text-slate-400 hover:text-[#711419]"
+                            onClick={() => openEditor({ unitType: key, tier })}
+                            data-testid={"builder-tab-add-" + key + "-" + tier}
+                          >
+                            Add to {tier}
+                          </button>
+                        </div>
+                        {/* Layers 3+4 — size · level rows */}
+                        {tierOpen && list.map((p: any) => (
+                          <div key={p.id} className="flex items-center gap-3 py-1.5 pl-11 pr-3 hover:bg-slate-50/70" data-testid={"builder-tab-pkg-" + p.id}>
+                            <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
+                              <span className="tabular-nums">{sizeLabel(String(p.tonnage))}</span>
+                              <span className="mx-1.5 text-slate-300">·</span>
+                              <span className="font-medium">{p.packageLevel}</span>
+                              {p.outdoorModel && <span className="ml-2 font-mono text-[11px] text-slate-400">{p.outdoorModel}</span>}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-sm text-slate-600">{usd(p.totalInvestment)}</span>
+                            <span className="w-20 shrink-0 text-right tabular-nums text-[11px] text-slate-400">
+                              {p.monthlyPayment != null ? usd(p.monthlyPayment) + "/mo" : "—"}
+                            </span>
+                            <Button
+                              size="sm" variant="ghost" className="h-6 shrink-0 px-2 text-[11px] text-slate-500 hover:text-[#711419]"
+                              onClick={() => openEditor(prefillFromRawPackage(p))}
+                              data-testid={"builder-tab-duplicate-" + p.id}
+                            >
+                              Duplicate
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })
+                )
               )}
             </div>
           );
@@ -1603,7 +1686,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                 onClick={() => { setPkgEditorPrefill(null); setPkgEditorOpen(true); }}
                 data-testid="pkgequip-add-package"
               >
-                <Plus className="mr-1 h-4 w-4" /> Add package
+                Add package
               </Button>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
