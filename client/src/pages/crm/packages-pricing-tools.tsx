@@ -19,7 +19,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  ArrowLeftRight, Boxes, Check, ChevronDown, Download, Eye, FileSpreadsheet, Filter, Loader2, Pencil, Plus,
+  ArrowLeftRight, Boxes, Check, ChevronDown, ChevronUp, Copy, Download, Eye, FileSpreadsheet, Filter, Loader2, Pencil, Plus,
   Search, Upload, X,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -31,6 +31,7 @@ import {
   resolveJobCost,
   type JobCostOverrideGroup,
 } from "@shared/job-cost";
+import { PackageEditorDialog, type PackagePrefill } from "@/components/crm/package-editor-dialog";
 
 /** Package pricing revamp — the tools UNDER the hand-curated packages:
  *  - Equipment catalog: every supplier model + cost (brands are pure data)
@@ -1031,6 +1032,126 @@ function OverrideGroupRow({ group, unitTypes, packages, model, onChange, onDelet
   );
 }
 
+type BuilderSectionRow = { key: string; name: string; description: string; hidden: boolean };
+
+/** The proposal builder's SYSTEM-TYPE sections as editable data (name, blurb,
+ *  order, hidden) — what the builder's step 1 renders. Types come from package
+ *  data automatically; this card just controls how they present. Creating a
+ *  package with a brand-new type adds its section here on the next load. */
+export function BuilderSectionsCard({ packages }: { packages: any[] | undefined }) {
+  const { toast } = useToast();
+  const { data: saved } = useQuery<{ systemTypes: BuilderSectionRow[] }>({ queryKey: ["/api/crm/builder-config"] });
+  const [draft, setDraft] = useState<BuilderSectionRow[] | null>(null);
+
+  const dataTypes = useMemo(
+    () => Array.from(new Set((packages || []).map((p: any) => p.unitType).filter(Boolean))) as string[],
+    [packages],
+  );
+  const countByType = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of packages || []) m.set(p.unitType, (m.get(p.unitType) || 0) + 1);
+    return m;
+  }, [packages]);
+
+  // Saved config first (its order wins), then any data-only types appended in
+  // the builder's classic order — same merge the builder itself performs.
+  const rows = useMemo(() => {
+    if (draft) return draft;
+    const cfg = saved?.systemTypes ?? [];
+    const known = new Set(cfg.map((t) => t.key));
+    const classic = ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
+    const extras = [...dataTypes]
+      .filter((t) => !known.has(t))
+      .sort((a, b) => {
+        const ia = classic.indexOf(a); const ib = classic.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+      })
+      .map((key) => ({ key, name: "", description: "", hidden: false }));
+    return [...cfg, ...extras];
+  }, [draft, saved, dataTypes]);
+
+  const update = (i: number, patch: Partial<BuilderSectionRow>) =>
+    setDraft(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= rows.length) return;
+    const next = [...rows];
+    [next[i], next[j]] = [next[j], next[i]];
+    setDraft(next);
+  };
+
+  const save = useMutation({
+    mutationFn: async () => apiRequest("PUT", "/api/crm/builder-config", { systemTypes: rows }),
+    onSuccess: () => {
+      setDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/builder-config"] });
+      toast({ title: "Builder sections saved", description: "The proposal builder now uses this order and wording." });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save the builder sections", variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Proposal Builder Sections</CardTitle>
+        <CardDescription>
+          The system-type step of the proposal builder, as data: reorder sections, rename them, rewrite the
+          blurb, or hide one entirely. New types appear here automatically once their first package exists.
+          Blank name/description falls back to the built-in wording.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="overflow-hidden rounded-lg border border-slate-200">
+          {rows.map((r, i) => (
+            <div key={r.key} className={`flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-0 ${r.hidden ? "opacity-50" : ""}`} data-testid={`builder-section-${r.key}`}>
+              <div className="flex flex-col">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move up" data-testid={`builder-section-up-${r.key}`}>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move down" data-testid={`builder-section-down-${r.key}`}>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <span className="w-24 shrink-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-600" title={r.key}>{r.key}</span>
+              <Input
+                value={r.name}
+                onChange={(e) => update(i, { name: e.target.value })}
+                placeholder={r.key}
+                className="h-8 w-44 text-sm"
+                data-testid={`builder-section-name-${r.key}`}
+              />
+              <Input
+                value={r.description}
+                onChange={(e) => update(i, { description: e.target.value })}
+                placeholder="Short blurb shown on the card"
+                className="h-8 min-w-56 flex-1 text-sm"
+                data-testid={`builder-section-desc-${r.key}`}
+              />
+              <span className="text-[11px] tabular-nums text-slate-400">{countByType.get(r.key) || 0} pkg</span>
+              <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                <Checkbox checked={r.hidden} onCheckedChange={(v) => update(i, { hidden: v === true })} data-testid={`builder-section-hide-${r.key}`} />
+                Hide
+              </label>
+            </div>
+          ))}
+          {rows.length === 0 && <p className="px-3 py-6 text-center text-sm text-slate-400">No system types yet — add a package first.</p>}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => save.mutate()}
+            disabled={save.isPending || !draft}
+            className="bg-[#711419] hover:bg-[#8a1a1f]"
+            data-testid="builder-sections-save"
+          >
+            {save.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save sections"}
+          </Button>
+          {draft && <span className="text-xs font-medium text-amber-600">Unsaved changes.</span>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 /** The whole Costs & Catalog tab: package equipment (with drift + pricing
  *  baked in), the live-preview cost model beneath it, and the raw catalog.
  *  Owns the cost-model draft so edits preview instantly in the cards. */
@@ -1042,6 +1163,7 @@ export function CostsAndCatalogTab({ packages }: { packages: any[] | undefined }
     <div className="space-y-6">
       <PackageEquipmentCard packages={packages} costModel={model} />
       <JobCostModelCard packages={packages} model={model} dirty={!!draft} onChange={setDraft} onSaved={() => setDraft(null)} />
+      <BuilderSectionsCard packages={packages} />
       <EquipmentCatalogCard />
     </div>
   );
@@ -1067,6 +1189,8 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const [fixFilter, setFixFilter] = useState("");
   const [slotEdit, setSlotEdit] = useState<(typeof SLOT_DEFS)[number] | null>(null);
   const [equipOpen, setEquipOpen] = useState(false);
+  const [pkgEditorOpen, setPkgEditorOpen] = useState(false);
+  const [pkgEditorPrefill, setPkgEditorPrefill] = useState<PackagePrefill | null>(null);
   const [tierFilter, setTierFilter] = useState("all");
   const [tonnageFilter, setTonnageFilter] = useState("all");
   const [unmatchedOnly, setUnmatchedOnly] = useState(false);
@@ -1311,6 +1435,13 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                   Fix matches ({unmatchedDistinct})
                 </Button>
               )}
+              <Button
+                size="sm" variant="outline" className="h-9"
+                onClick={() => { setPkgEditorPrefill(null); setPkgEditorOpen(true); }}
+                data-testid="pkgequip-add-package"
+              >
+                <Plus className="mr-1 h-4 w-4" /> Add package
+              </Button>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input value={pkgSearch} onChange={(e) => setPkgSearch(e.target.value)} placeholder="Search package or model" className="h-9 w-52 pl-8" data-testid="pkgequip-search" />
@@ -1652,6 +1783,29 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                               >
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Set price…
                               </Button>
+                              <Button
+                                size="sm" variant="outline" className="h-8"
+                                onClick={() => {
+                                  const raw = selPkg;
+                                  setPkgEditorPrefill({
+                                    unitType: selected.unitType, tier: selected.tier, tonnage: String(selected.tonnage), packageLevel: selected.packageLevel,
+                                    totalInvestmentDollars: String((selected.totalInvestment || 0) / 100),
+                                    monthlyPaymentDollars: selected.monthlyPayment != null ? String(selected.monthlyPayment / 100) : "",
+                                    outdoorBrand: raw?.outdoorBrand || "", outdoorModel: raw?.outdoorModel || "", outdoorName: raw?.outdoorName || "",
+                                    coilModel: raw?.coilModel || "", coilName: raw?.coilName || "",
+                                    indoorHeatModel: raw?.indoorHeatModel || "", indoorHeatName: raw?.indoorHeatName || "",
+                                    thermostatModel: raw?.thermostatModel || "", thermostatName: raw?.thermostatName || "",
+                                    accessoryModels: raw?.accessoryModels || "",
+                                    outdoorImageUrl: raw?.outdoorImageUrl || undefined, coilImageUrl: raw?.coilImageUrl || undefined,
+                                    thermostatImageUrl: raw?.thermostatImageUrl || undefined, furnaceImageUrl: raw?.furnaceImageUrl || undefined,
+                                    copiedFromId: String(selected.id),
+                                  });
+                                  setPkgEditorOpen(true);
+                                }}
+                                data-testid={`pkgequip-duplicate-${selected.id}`}
+                              >
+                                <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicate…
+                              </Button>
                               {drifted && (
                                 <Button
                                   size="sm" variant="ghost" className="h-8 text-slate-500"
@@ -1754,6 +1908,13 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
           onClose={() => setSlotEdit(null)}
         />
       )}
+
+      <PackageEditorDialog
+        open={pkgEditorOpen}
+        onOpenChange={setPkgEditorOpen}
+        prefill={pkgEditorPrefill}
+        existing={drift.map((d) => ({ unitType: d.unitType, tier: d.tier, tonnage: String(d.tonnage), packageLevel: d.packageLevel }))}
+      />
     </Card>
   );
 }

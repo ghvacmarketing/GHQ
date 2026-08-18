@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { PackageEditorDialog, type PackagePrefill } from "@/components/crm/package-editor-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
@@ -866,6 +867,73 @@ export default function CrmProposalBuilder() {
     queryKey: ['/api/pricebook/crawlspace-tiers'],
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Builder layout config (Settings → Package Pricing → Builder Sections):
+  // system-type display names/blurbs/order/hidden as DATA, merged over the
+  // hardcoded UNIT_TYPE_INFO defaults.
+  const { data: builderConfig } = useQuery<{ systemTypes: Array<{ key: string; name: string; description: string; hidden: boolean }> }>({
+    queryKey: ['/api/crm/builder-config'],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const typeMeta = useCallback((key: string) => {
+    const cfg = builderConfig?.systemTypes?.find(t => t.key === key);
+    const base = UNIT_TYPE_INFO[key];
+    return {
+      name: cfg?.name || base?.name || key,
+      description: cfg?.description || base?.description || `${key} system packages`,
+      icon: base?.icon || Package,
+      hidden: cfg?.hidden === true,
+    };
+  }, [builderConfig]);
+
+  // ── Builder edit mode (owner/admin/supervisor): in-place add/duplicate on
+  // every step. OFF by default so the customer-facing flow stays clean.
+  const isBuilderAdmin = ["owner", "admin", "supervisor"].includes(currentUser?.role ?? "");
+  const [builderEditMode, setBuilderEditMode] = useState(false);
+  const [pkgEditorOpen, setPkgEditorOpen] = useState(false);
+  const [pkgEditorPrefill, setPkgEditorPrefill] = useState<PackagePrefill | null>(null);
+  const openPkgEditor = (prefill: PackagePrefill) => {
+    setPkgEditorPrefill(prefill);
+    setPkgEditorOpen(true);
+  };
+  /** Tonnage as stored in the DB ("3", "2.5", "All") from a display value ("3 Ton"). */
+  const tonnageForCreate = (display: string | null): string => {
+    if (!display) return "";
+    if (display === "All") return "All";
+    const n = parseFloat(display);
+    return Number.isFinite(n) ? String(n) : display;
+  };
+  /** Full prefill for duplicating a package — prefer the RAW api row (cents,
+   *  un-rewritten image paths, real id); fall back to the transformed card. */
+  const duplicatePrefill = (pkg: PricebookPackage): PackagePrefill => {
+    const raw = (packagesData ?? []).find(r =>
+      r.unitType === pkg.unitType && r.tier === pkg.tier && r.packageLevel === pkg.packageLevel &&
+      String(r.tonnage) === String(pkg.tonnage) && (r.outdoorModel || "") === (pkg.outdoorModel || ""));
+    if (raw) {
+      return {
+        unitType: raw.unitType, tier: raw.tier, tonnage: String(raw.tonnage), packageLevel: raw.packageLevel,
+        totalInvestmentDollars: String(raw.totalInvestment / 100), monthlyPaymentDollars: String(raw.monthlyPayment / 100),
+        outdoorBrand: raw.outdoorBrand || "", outdoorModel: raw.outdoorModel || "", outdoorName: raw.outdoorName || "",
+        coilModel: raw.coilModel || "", coilName: raw.coilName || "",
+        indoorHeatModel: raw.indoorHeatModel || "", indoorHeatName: raw.indoorHeatName || "",
+        thermostatModel: raw.thermostatModel || "", thermostatName: raw.thermostatName || "",
+        accessoryModels: raw.accessoryModels || "",
+        outdoorImageUrl: raw.outdoorImageUrl || undefined, coilImageUrl: raw.coilImageUrl || undefined,
+        thermostatImageUrl: raw.thermostatImageUrl || undefined, furnaceImageUrl: raw.furnaceImageUrl || undefined,
+        copiedFromId: String(raw.id),
+      };
+    }
+    return {
+      unitType: pkg.unitType, tier: pkg.tier, tonnage: String(pkg.tonnage), packageLevel: pkg.packageLevel,
+      totalInvestmentDollars: pkg.totalInvestment, monthlyPaymentDollars: pkg.monthlyPayment,
+      outdoorBrand: pkg.outdoorBrand, outdoorModel: pkg.outdoorModel, outdoorName: pkg.outdoorName,
+      coilModel: pkg.coilModel, coilName: pkg.coilName,
+      indoorHeatModel: pkg.indoorHeatModel, indoorHeatName: pkg.indoorHeatName,
+      thermostatModel: pkg.thermostatModel, thermostatName: pkg.thermostatName,
+      accessoryModels: pkg.accessoryModels,
+    };
+  };
   
   // Transform API data to frontend format
   const packages: PricebookPackage[] = useMemo(() => {
@@ -1265,7 +1333,7 @@ export default function CrmProposalBuilder() {
         return {
           type: "package" as const,
           unitType: item.unitType,
-          unitTypeName: UNIT_TYPE_INFO[item.unitType]?.name || item.unitType,
+          unitTypeName: typeMeta(item.unitType).name,
           tier: item.tier,
           tonnage: item.extractedTonnage,
           packageLevel: item.packageLevel,
@@ -1628,7 +1696,7 @@ export default function CrmProposalBuilder() {
         return {
           type: "package",
           unitType: item.unitType,
-          unitTypeName: UNIT_TYPE_INFO[item.unitType]?.name || item.unitType,
+          unitTypeName: typeMeta(item.unitType).name,
           tier: item.tier,
           tonnage: item.extractedTonnage,
           packageLevel: item.packageLevel,
@@ -1703,10 +1771,16 @@ export default function CrmProposalBuilder() {
 
   const unitTypes = useMemo(() => {
     const allTypes = Array.from(new Set(packages.map(p => p.unitType)));
-    // Order: HVAC systems first (GP, PHP, SGA, SHP), then Ducting, then Mini-Split
-    const orderedTypes = ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
-    return orderedTypes.filter(t => allTypes.includes(t));
-  }, [packages]);
+    // Order comes from the builder config when set; otherwise the classic
+    // hardcoded order. Types present in package DATA but missing from the
+    // order list are APPENDED (never dropped) so a brand-new system type
+    // shows up the moment its first package exists. Config-hidden types stay out.
+    const configured = (builderConfig?.systemTypes ?? []).map(t => t.key);
+    const order = configured.length > 0 ? configured : ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
+    const ordered = order.filter(t => allTypes.includes(t) && !typeMeta(t).hidden);
+    const extras = allTypes.filter(t => !order.includes(t) && !typeMeta(t).hidden).sort();
+    return [...ordered, ...extras];
+  }, [packages, builderConfig, typeMeta]);
 
   const tiersForUnitType = useMemo(() => {
     if (!selectedUnitType) return [];
@@ -2499,7 +2573,7 @@ export default function CrmProposalBuilder() {
           price: item.totalPrice * item.quantity,
         };
       } else {
-        const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
+        const unitTypeName = typeMeta(item.unitType).name;
         const basePrice = parseFloat(item.totalInvestment) || 0;
         const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
         return {
@@ -3010,6 +3084,19 @@ export default function CrmProposalBuilder() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Proposal Builder</h1>
             <div className="flex items-center space-x-2">
+              {isBuilderAdmin && (
+                <Button
+                  variant={builderEditMode ? "default" : "outline"}
+                  size="sm"
+                  className={`min-h-[44px] ${builderEditMode ? "bg-[#711419] hover:bg-[#8a1a1f]" : ""}`}
+                  onClick={() => setBuilderEditMode(v => !v)}
+                  title="Add or duplicate packages right on the steps (owners/admins only)"
+                  data-testid="button-builder-edit-mode"
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  {builderEditMode ? "Editing" : "Edit"}
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => {
                 const queryParams = new URLSearchParams(window.location.search);
                 const projectId = queryParams.get("projectId");
@@ -3222,7 +3309,7 @@ export default function CrmProposalBuilder() {
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm">
-                                        {UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}
+                                        {typeMeta(item.unitType).name}
                                       </p>
                                       <p className="text-xs text-muted-foreground">
                                         {item.tier} • {item.extractedTonnage}
@@ -3457,7 +3544,7 @@ export default function CrmProposalBuilder() {
                 {selectedUnitType && (
                   <>
                     <ChevronRight className="h-3 w-3 mx-1" />
-                    <span>{UNIT_TYPE_INFO[selectedUnitType]?.name.split(' + ')[0] || selectedUnitType}</span>
+                    <span>{typeMeta(selectedUnitType).name.split(' + ')[0]}</span>
                   </>
                 )}
                 {selectedTier && (
@@ -3481,8 +3568,8 @@ export default function CrmProposalBuilder() {
                 <p className="text-muted-foreground mb-4">Choose the type of HVAC system</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {unitTypes.map(unitType => {
-                    const info = UNIT_TYPE_INFO[unitType];
-                    const IconComponent = info?.icon || Package;
+                    const info = typeMeta(unitType);
+                    const IconComponent = info.icon;
                     return (
                       <Card
                         key={unitType}
@@ -3494,14 +3581,14 @@ export default function CrmProposalBuilder() {
                           <CardTitle className="text-lg flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <IconComponent className="h-5 w-5 text-primary" />
-                              <span>{info?.name || unitType}</span>
+                              <span>{info.name}</span>
                             </div>
                             <ChevronRight className="h-5 w-5 text-muted-foreground" />
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">
-                            {info?.description || `${unitType} system packages`}
+                            {info.description}
                           </p>
                           <Badge variant="secondary" className="mt-2">
                             {unitType}
@@ -3510,6 +3597,18 @@ export default function CrmProposalBuilder() {
                       </Card>
                     );
                   })}
+                  {builderEditMode && (
+                    <button
+                      type="button"
+                      onClick={() => openPkgEditor({})}
+                      className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                      data-testid="builder-add-system-type"
+                    >
+                      <Plus className="h-6 w-6" />
+                      <span className="text-sm font-medium">New system type</span>
+                      <span className="px-4 text-center text-xs text-slate-400">Creating its first package adds the section</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -3542,6 +3641,17 @@ export default function CrmProposalBuilder() {
                       </Card>
                     );
                   })}
+                  {builderEditMode && selectedUnitType && (
+                    <button
+                      type="button"
+                      onClick={() => openPkgEditor({ unitType: selectedUnitType })}
+                      className="flex min-h-[100px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                      data-testid="builder-add-tier"
+                    >
+                      <Plus className="h-5 w-5" />
+                      <span className="text-sm font-medium">Package in a new tier</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -3579,6 +3689,17 @@ export default function CrmProposalBuilder() {
                       </Card>
                     );
                   })}
+                  {builderEditMode && selectedUnitType && selectedTier && (
+                    <button
+                      type="button"
+                      onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier })}
+                      className="flex min-h-[90px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                      data-testid="builder-add-tonnage"
+                    >
+                      <Plus className="h-5 w-5" />
+                      <span className="text-sm font-medium">New size…</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -3707,6 +3828,16 @@ export default function CrmProposalBuilder() {
                         </Card>
                       );
                     })}
+                    {builderEditMode && selectedUnitType && selectedTier && (
+                      <button
+                        type="button"
+                        onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier, tonnage: tonnageForCreate(selectedTonnage) })}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-4 text-sm font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                        data-testid="builder-add-package-compact"
+                      >
+                        <Plus className="h-4 w-4" /> Add package here
+                      </button>
+                    )}
                   </div>
                 ) : (
                   /* Standard package grid for other equipment types */
@@ -3725,6 +3856,17 @@ export default function CrmProposalBuilder() {
                           className={`relative bg-slate-50 ${isInCart ? 'border-primary ring-1 ring-primary' : ''}`}
                           data-testid={`package-${pkg.packageLevel.toLowerCase()}`}
                         >
+                          {builderEditMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openPkgEditor(duplicatePrefill(pkg)); }}
+                              className="absolute top-2 left-2 z-10 rounded-md border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:border-[#711419] hover:text-[#711419]"
+                              title="Duplicate this package"
+                              data-testid={`builder-duplicate-${pkg.packageLevel.toLowerCase()}`}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           {isInCart && (
                             <div className="absolute top-2 right-2">
                               <Badge className="bg-primary">
@@ -3935,14 +4077,36 @@ export default function CrmProposalBuilder() {
                         </Card>
                       );
                     })}
+                    {builderEditMode && selectedUnitType && selectedTier && (
+                      <button
+                        type="button"
+                        onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier, tonnage: tonnageForCreate(selectedTonnage) })}
+                        className="flex min-h-[140px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                        data-testid="builder-add-package"
+                      >
+                        <Plus className="h-6 w-6" />
+                        <span className="text-sm font-medium">Add package here</span>
+                        <span className="text-xs text-slate-400">{selectedUnitType} · {selectedTier} · {selectedTonnage}</span>
+                      </button>
+                    )}
                   </div>
                 )}
-                
+
                 {packageOptions.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>No packages found for this combination</p>
                     <p className="text-sm">Try a different tonnage or tier</p>
+                    {builderEditMode && selectedUnitType && selectedTier && (
+                      <Button
+                        variant="outline"
+                        className="mt-3"
+                        onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier, tonnage: tonnageForCreate(selectedTonnage) })}
+                        data-testid="builder-add-package-empty"
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" /> Add the first package for this combination
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -3986,8 +4150,8 @@ export default function CrmProposalBuilder() {
                 <p className="text-muted-foreground mb-4">Choose the type of system you want to build</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {["SGA", "SHP", "PHP", "GP", "Mini-Split", "Ducting", "Crawlspace Services"].map(type => {
-                    const typeInfo = UNIT_TYPE_INFO[type];
-                    const TypeIcon = typeInfo?.icon || Package;
+                    const typeInfo = typeMeta(type);
+                    const TypeIcon = typeInfo.icon;
                     return (
                       <Card
                         key={type}
@@ -5195,7 +5359,7 @@ export default function CrmProposalBuilder() {
                         </div>
                         <div className="p-4">
                           <div className="flex items-center gap-2 mb-3">
-                            <span className="font-semibold text-lg">{UNIT_TYPE_INFO[item.unitType]?.name || item.unitType}</span>
+                            <span className="font-semibold text-lg">{typeMeta(item.unitType).name}</span>
                             <Badge variant="secondary" className="text-xs">{item.extractedTonnage}</Badge>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -5543,7 +5707,15 @@ export default function CrmProposalBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
+      {/* Builder edit mode: create/duplicate packages without leaving the flow */}
+      <PackageEditorDialog
+        open={pkgEditorOpen}
+        onOpenChange={setPkgEditorOpen}
+        prefill={pkgEditorPrefill}
+        existing={(packagesData ?? []).map(p => ({ unitType: p.unitType, tier: p.tier, tonnage: String(p.tonnage), packageLevel: p.packageLevel }))}
+      />
+
       </div>
     </CrmLayout>
   );

@@ -33465,6 +33465,55 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // ── Proposal Builder layout config: the builder's SYSTEM-TYPE sections as
+  // data (display name, blurb, order, hidden) instead of hardcoded maps. The
+  // builder merges this over its built-in defaults; types that exist in
+  // package data but not here are appended automatically, so a brand-new
+  // unitType shows up with zero code.
+  const BUILDER_CONFIG_KEY = "proposal_builder_config";
+
+  app.get("/api/crm/builder-config", requireCrmAuth, async (_req, res) => {
+    try {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, BUILDER_CONFIG_KEY)).limit(1);
+      let saved: any = {};
+      try { saved = row?.value ? JSON.parse(row.value) : {}; } catch { saved = {}; }
+      res.json({ systemTypes: Array.isArray(saved.systemTypes) ? saved.systemTypes : [] });
+    } catch (error) {
+      console.error("Error loading builder config:", error);
+      res.status(500).json({ message: "Failed to load the builder config" });
+    }
+  });
+
+  app.put("/api/crm/builder-config", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const seen = new Set<string>();
+      const systemTypes: Array<{ key: string; name: string; description: string; hidden: boolean }> = [];
+      if (Array.isArray(req.body?.systemTypes)) {
+        for (const t of req.body.systemTypes.slice(0, 40)) {
+          const key = String(t?.key ?? "").trim().slice(0, 50);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          systemTypes.push({
+            key,
+            name: String(t?.name ?? "").trim().slice(0, 80),
+            description: String(t?.description ?? "").trim().slice(0, 200),
+            hidden: t?.hidden === true,
+          });
+        }
+      }
+      const value = JSON.stringify({ systemTypes });
+      await db.insert(appSettings)
+        .values({ key: BUILDER_CONFIG_KEY, value, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
+      await logCrmAudit(user?.id || null, "pricebook.builder_config_updated", "app_setting", BUILDER_CONFIG_KEY, { systemTypes }, req.ip);
+      res.json({ systemTypes });
+    } catch (error) {
+      console.error("Error saving builder config:", error);
+      res.status(500).json({ message: "Failed to save the builder config" });
+    }
+  });
+
   // Provision (or reset) a customer's portal login with an explicit email +
   // password — for demo/review accounts (App Store review) and support
   // resets. Normal customers still self-serve through the OTP signup.
@@ -33558,6 +33607,71 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error updating package slot:", error);
       res.status(500).json({ message: "Failed to update the package" });
+    }
+  });
+
+  // POST /api/pricebook/packages — create ONE package (the proposal builder's
+  // "+ Add package" tiles and Settings → Package Pricing's Add/Duplicate all
+  // land here). Prices arrive in CENTS. The row is a first-class package:
+  // drift, catalog matching, costing overrides, and the slot editor all apply.
+  app.post("/api/pricebook/packages", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const b = req.body || {};
+      const str = (v: any, max = 100) => {
+        const s = String(v ?? "").trim();
+        return s ? s.slice(0, max) : null;
+      };
+      const unitType = str(b.unitType, 50);
+      const tier = str(b.tier, 50);
+      const tonnage = str(b.tonnage, 20);
+      const packageLevel = str(b.packageLevel, 50);
+      const totalInvestment = Math.round(Number(b.totalInvestment));
+      const monthlyPayment = Math.round(Number(b.monthlyPayment));
+      if (!unitType || !tier || !tonnage || !packageLevel) {
+        return res.status(400).json({ message: "unitType, tier, tonnage, and packageLevel are required" });
+      }
+      if (!Number.isFinite(totalInvestment) || totalInvestment <= 0 || !Number.isFinite(monthlyPayment) || monthlyPayment <= 0) {
+        return res.status(400).json({ message: "totalInvestment and monthlyPayment must be positive cent amounts" });
+      }
+      const [created] = await db
+        .insert(pricebookPackages)
+        .values({
+          unitType,
+          tier,
+          tonnage,
+          packageLevel,
+          totalInvestment,
+          monthlyPayment,
+          outdoorBrand: str(b.outdoorBrand),
+          outdoorModel: str(b.outdoorModel),
+          outdoorName: str(b.outdoorName, 500),
+          coilModel: str(b.coilModel),
+          coilName: str(b.coilName, 500),
+          indoorHeatModel: str(b.indoorHeatModel),
+          indoorHeatName: str(b.indoorHeatName, 500),
+          thermostatModel: str(b.thermostatModel),
+          thermostatName: str(b.thermostatName, 500),
+          accessoryModels: str(b.accessoryModels, 1000),
+          outdoorImageUrl: str(b.outdoorImageUrl, 500),
+          coilImageUrl: str(b.coilImageUrl, 500),
+          thermostatImageUrl: str(b.thermostatImageUrl, 500),
+          furnaceImageUrl: str(b.furnaceImageUrl, 500),
+          isActive: b.isActive === false ? false : true,
+        })
+        .returning();
+      await logCrmAudit(
+        user?.id || null,
+        "pricebook.package_created",
+        "pricebook_package",
+        created.id,
+        { unitType, tier, tonnage, packageLevel, totalInvestment, monthlyPayment, copiedFromId: str(b.copiedFromId) },
+        req.ip,
+      );
+      return res.json(created);
+    } catch (error: any) {
+      console.error("Error creating pricebook package:", error);
+      return res.status(500).json({ message: "Failed to create the package" });
     }
   });
 
