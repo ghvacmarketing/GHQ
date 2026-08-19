@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { PackageEditorDialog, type PackagePrefill } from "@/components/crm/package-editor-dialog";
+import { packageWizardUrl } from "@/pages/crm/packages-pricing-tools";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
@@ -891,11 +891,11 @@ export default function CrmProposalBuilder() {
   // every step. OFF by default so the customer-facing flow stays clean.
   const isBuilderAdmin = ["owner", "admin", "supervisor"].includes(currentUser?.role ?? "");
   const [builderEditMode, setBuilderEditMode] = useState(false);
-  const [pkgEditorOpen, setPkgEditorOpen] = useState(false);
-  const [pkgEditorPrefill, setPkgEditorPrefill] = useState<PackagePrefill | null>(null);
-  const openPkgEditor = (prefill: PackagePrefill) => {
-    setPkgEditorPrefill(prefill);
-    setPkgEditorOpen(true);
+  // The Create/Duplicate Package wizard is a full PAGE — pass a back param so
+  // it returns to this builder (cart survives in localStorage; the steps reset).
+  const openPkgWizard = (q: Record<string, string | undefined>) => {
+    const back = window.location.pathname + window.location.search;
+    setLocation(packageWizardUrl({ ...q, back }));
   };
   /** Tonnage as stored in the DB ("3", "2.5", "All") from a display value ("3 Ton"). */
   const tonnageForCreate = (display: string | null): string => {
@@ -904,35 +904,14 @@ export default function CrmProposalBuilder() {
     const n = parseFloat(display);
     return Number.isFinite(n) ? String(n) : display;
   };
-  /** Full prefill for duplicating a package — prefer the RAW api row (cents,
-   *  un-rewritten image paths, real id); fall back to the transformed card. */
-  const duplicatePrefill = (pkg: PricebookPackage): PackagePrefill => {
+  /** Wizard params for duplicating a package — the RAW api row's id when we
+   *  can find it (full copy incl. images), else just the identity layers. */
+  const duplicateParams = (pkg: PricebookPackage): Record<string, string | undefined> => {
     const raw = (packagesData ?? []).find(r =>
       r.unitType === pkg.unitType && r.tier === pkg.tier && r.packageLevel === pkg.packageLevel &&
       String(r.tonnage) === String(pkg.tonnage) && (r.outdoorModel || "") === (pkg.outdoorModel || ""));
-    if (raw) {
-      return {
-        unitType: raw.unitType, tier: raw.tier, tonnage: String(raw.tonnage), packageLevel: raw.packageLevel,
-        totalInvestmentDollars: String(raw.totalInvestment / 100), monthlyPaymentDollars: String(raw.monthlyPayment / 100),
-        outdoorBrand: raw.outdoorBrand || "", outdoorModel: raw.outdoorModel || "", outdoorName: raw.outdoorName || "",
-        coilModel: raw.coilModel || "", coilName: raw.coilName || "",
-        indoorHeatModel: raw.indoorHeatModel || "", indoorHeatName: raw.indoorHeatName || "",
-        thermostatModel: raw.thermostatModel || "", thermostatName: raw.thermostatName || "",
-        accessoryModels: raw.accessoryModels || "",
-        outdoorImageUrl: raw.outdoorImageUrl || undefined, coilImageUrl: raw.coilImageUrl || undefined,
-        thermostatImageUrl: raw.thermostatImageUrl || undefined, furnaceImageUrl: raw.furnaceImageUrl || undefined,
-        copiedFromId: String(raw.id),
-      };
-    }
-    return {
-      unitType: pkg.unitType, tier: pkg.tier, tonnage: String(pkg.tonnage), packageLevel: pkg.packageLevel,
-      totalInvestmentDollars: pkg.totalInvestment, monthlyPaymentDollars: pkg.monthlyPayment,
-      outdoorBrand: pkg.outdoorBrand, outdoorModel: pkg.outdoorModel, outdoorName: pkg.outdoorName,
-      coilModel: pkg.coilModel, coilName: pkg.coilName,
-      indoorHeatModel: pkg.indoorHeatModel, indoorHeatName: pkg.indoorHeatName,
-      thermostatModel: pkg.thermostatModel, thermostatName: pkg.thermostatName,
-      accessoryModels: pkg.accessoryModels,
-    };
+    if (raw) return { copy: String(raw.id) };
+    return { system: pkg.unitType, tier: pkg.tier, size: String(pkg.tonnage), level: pkg.packageLevel };
   };
   
   // Transform API data to frontend format
@@ -3600,7 +3579,7 @@ export default function CrmProposalBuilder() {
                   {builderEditMode && (
                     <button
                       type="button"
-                      onClick={() => openPkgEditor({})}
+                      onClick={() => openPkgWizard({})}
                       className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
                       data-testid="builder-add-system-type"
                     >
@@ -3644,7 +3623,7 @@ export default function CrmProposalBuilder() {
                   {builderEditMode && selectedUnitType && (
                     <button
                       type="button"
-                      onClick={() => openPkgEditor({ unitType: selectedUnitType })}
+                      onClick={() => openPkgWizard({ system: selectedUnitType })}
                       className="flex min-h-[100px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
                       data-testid="builder-add-tier"
                     >
@@ -3692,7 +3671,7 @@ export default function CrmProposalBuilder() {
                   {builderEditMode && selectedUnitType && selectedTier && (
                     <button
                       type="button"
-                      onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier })}
+                      onClick={() => openPkgWizard({ system: selectedUnitType, tier: selectedTier })}
                       className="flex min-h-[90px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
                       data-testid="builder-add-tonnage"
                     >
@@ -3831,7 +3810,7 @@ export default function CrmProposalBuilder() {
                     {builderEditMode && selectedUnitType && selectedTier && (
                       <button
                         type="button"
-                        onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier, tonnage: tonnageForCreate(selectedTonnage) })}
+                        onClick={() => openPkgWizard({ system: selectedUnitType, tier: selectedTier, size: tonnageForCreate(selectedTonnage) })}
                         className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-4 text-sm font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
                         data-testid="builder-add-package-compact"
                       >
@@ -3859,7 +3838,7 @@ export default function CrmProposalBuilder() {
                           {builderEditMode && (
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); openPkgEditor(duplicatePrefill(pkg)); }}
+                              onClick={(e) => { e.stopPropagation(); openPkgWizard(duplicateParams(pkg)); }}
                               className="absolute top-2 left-2 z-10 rounded-md border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:border-[#711419] hover:text-[#711419]"
                               title="Duplicate this package"
                               data-testid={`builder-duplicate-${pkg.packageLevel.toLowerCase()}`}
@@ -4080,7 +4059,7 @@ export default function CrmProposalBuilder() {
                     {builderEditMode && selectedUnitType && selectedTier && (
                       <button
                         type="button"
-                        onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier, tonnage: tonnageForCreate(selectedTonnage) })}
+                        onClick={() => openPkgWizard({ system: selectedUnitType, tier: selectedTier, size: tonnageForCreate(selectedTonnage) })}
                         className="flex min-h-[140px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
                         data-testid="builder-add-package"
                       >
@@ -4101,7 +4080,7 @@ export default function CrmProposalBuilder() {
                       <Button
                         variant="outline"
                         className="mt-3"
-                        onClick={() => openPkgEditor({ unitType: selectedUnitType, tier: selectedTier, tonnage: tonnageForCreate(selectedTonnage) })}
+                        onClick={() => openPkgWizard({ system: selectedUnitType, tier: selectedTier, size: tonnageForCreate(selectedTonnage) })}
                         data-testid="builder-add-package-empty"
                       >
                         <Plus className="h-4 w-4 mr-1.5" /> Add the first package for this combination
@@ -5707,14 +5686,6 @@ export default function CrmProposalBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Builder edit mode: create/duplicate packages without leaving the flow */}
-      <PackageEditorDialog
-        open={pkgEditorOpen}
-        onOpenChange={setPkgEditorOpen}
-        prefill={pkgEditorPrefill}
-        existing={(packagesData ?? []).map(p => ({ unitType: p.unitType, tier: p.tier, tonnage: String(p.tonnage), packageLevel: p.packageLevel }))}
-      />
 
       </div>
     </CrmLayout>

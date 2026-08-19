@@ -25,13 +25,13 @@ import {
 import { format } from "date-fns";
 import { FINANCING_LABEL, monthlyFinancing } from "@/lib/financing";
 import { setGibbsPageContext } from "@/lib/gibbs-page-context";
+import { useLocation } from "wouter";
 import {
   JOB_COST_FIELD_META,
   formatJobCostValue,
   resolveJobCost,
   type JobCostOverrideGroup,
 } from "@shared/job-cost";
-import { PackageEditorDialog, type PackagePrefill } from "@/components/crm/package-editor-dialog";
 
 /** Package pricing revamp — the tools UNDER the hand-curated packages:
  *  - Equipment catalog: every supplier model + cost (brands are pure data)
@@ -729,20 +729,13 @@ const sortedJson = (v: unknown): string =>
   );
 const jsonEq = (a: unknown, b: unknown): boolean => sortedJson(a) === sortedJson(b);
 
-/** PackageEditorDialog prefill from a RAW pricebook row (cents, real id). */
-const prefillFromRawPackage = (raw: any): PackagePrefill => ({
-  unitType: raw.unitType, tier: raw.tier, tonnage: String(raw.tonnage), packageLevel: raw.packageLevel,
-  totalInvestmentDollars: String((raw.totalInvestment || 0) / 100),
-  monthlyPaymentDollars: raw.monthlyPayment != null ? String(raw.monthlyPayment / 100) : "",
-  outdoorBrand: raw.outdoorBrand || "", outdoorModel: raw.outdoorModel || "", outdoorName: raw.outdoorName || "",
-  coilModel: raw.coilModel || "", coilName: raw.coilName || "",
-  indoorHeatModel: raw.indoorHeatModel || "", indoorHeatName: raw.indoorHeatName || "",
-  thermostatModel: raw.thermostatModel || "", thermostatName: raw.thermostatName || "",
-  accessoryModels: raw.accessoryModels || "",
-  outdoorImageUrl: raw.outdoorImageUrl || undefined, coilImageUrl: raw.coilImageUrl || undefined,
-  thermostatImageUrl: raw.thermostatImageUrl || undefined, furnaceImageUrl: raw.furnaceImageUrl || undefined,
-  copiedFromId: String(raw.id),
-});
+/** URL for the full-page Create/Duplicate Package wizard (blank values dropped). */
+export const packageWizardUrl = (q: Record<string, string | undefined> = {}): string => {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) if (v) usp.set(k, v);
+  const qs = usp.toString();
+  return `/crm/settings/packages/new${qs ? `?${qs}` : ""}`;
+};
 
 // The builder's classic section order — data-only types append after these.
 const CLASSIC_TYPE_ORDER = ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
@@ -1198,9 +1191,8 @@ export function BuilderSectionsCard({ packages }: { packages: any[] | undefined 
  *  pre-chosen. */
 export function PackagesBySectionCard({ packages }: { packages: any[] | undefined }) {
   const { data: cfg } = useQuery<{ systemTypes: BuilderSectionRow[] }>({ queryKey: ["/api/crm/builder-config"] });
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorPrefill, setEditorPrefill] = useState<PackagePrefill | null>(null);
-  const openEditor = (prefill: PackagePrefill | null) => { setEditorPrefill(prefill); setEditorOpen(true); };
+  const [, navigate] = useLocation();
+  const openWizard = (q: Record<string, string | undefined> = {}) => navigate(packageWizardUrl(q));
 
   // Sections start folded; tier groups inside an open section start open.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
@@ -1264,7 +1256,7 @@ export function PackagesBySectionCard({ packages }: { packages: any[] | undefine
         </div>
         <Button
           className="shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
-          onClick={() => openEditor(null)}
+          onClick={() => openWizard()}
           data-testid="builder-tab-add-package"
         >
           Create package
@@ -1306,7 +1298,7 @@ export function PackagesBySectionCard({ packages }: { packages: any[] | undefine
                 </button>
                 <Button
                   size="sm" variant="outline" className="h-7 shrink-0 text-xs"
-                  onClick={() => openEditor({ unitType: key })}
+                  onClick={() => openWizard({ system: key })}
                   data-testid={"builder-tab-add-" + key}
                 >
                   Add to {c?.name || key}
@@ -1337,7 +1329,7 @@ export function PackagesBySectionCard({ packages }: { packages: any[] | undefine
                           <button
                             type="button"
                             className="shrink-0 text-[11px] font-medium text-slate-400 hover:text-[#711419]"
-                            onClick={() => openEditor({ unitType: key, tier })}
+                            onClick={() => openWizard({ system: key, tier })}
                             data-testid={"builder-tab-add-" + key + "-" + tier}
                           >
                             Add to {tier}
@@ -1358,7 +1350,7 @@ export function PackagesBySectionCard({ packages }: { packages: any[] | undefine
                             </span>
                             <Button
                               size="sm" variant="ghost" className="h-6 shrink-0 px-2 text-[11px] text-slate-500 hover:text-[#711419]"
-                              onClick={() => openEditor(prefillFromRawPackage(p))}
+                              onClick={() => openWizard({ copy: String(p.id) })}
                               data-testid={"builder-tab-duplicate-" + p.id}
                             >
                               Duplicate
@@ -1375,12 +1367,6 @@ export function PackagesBySectionCard({ packages }: { packages: any[] | undefine
         })}
       </CardContent>
 
-      <PackageEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        prefill={editorPrefill}
-        existing={rows.map((p: any) => ({ unitType: p.unitType, tier: p.tier, tonnage: String(p.tonnage), packageLevel: p.packageLevel }))}
-      />
     </Card>
   );
 }
@@ -1435,8 +1421,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
   const [fixFilter, setFixFilter] = useState("");
   const [slotEdit, setSlotEdit] = useState<(typeof SLOT_DEFS)[number] | null>(null);
   const [equipOpen, setEquipOpen] = useState(false);
-  const [pkgEditorOpen, setPkgEditorOpen] = useState(false);
-  const [pkgEditorPrefill, setPkgEditorPrefill] = useState<PackagePrefill | null>(null);
+  const [, navigateTo] = useLocation();
   const [tierFilter, setTierFilter] = useState("all");
   const [tonnageFilter, setTonnageFilter] = useState("all");
   const [unmatchedOnly, setUnmatchedOnly] = useState(false);
@@ -1683,7 +1668,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
               )}
               <Button
                 size="sm" variant="outline" className="h-9"
-                onClick={() => { setPkgEditorPrefill(null); setPkgEditorOpen(true); }}
+                onClick={() => navigateTo(packageWizardUrl({ back: "/crm/settings/packages" }))}
                 data-testid="pkgequip-add-package"
               >
                 Add package
@@ -2031,16 +2016,7 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
                               </Button>
                               <Button
                                 size="sm" variant="outline" className="h-8"
-                                onClick={() => {
-                                  setPkgEditorPrefill({
-                                    ...(selPkg ? prefillFromRawPackage(selPkg) : {}),
-                                    unitType: selected.unitType, tier: selected.tier, tonnage: String(selected.tonnage), packageLevel: selected.packageLevel,
-                                    totalInvestmentDollars: String((selected.totalInvestment || 0) / 100),
-                                    monthlyPaymentDollars: selected.monthlyPayment != null ? String(selected.monthlyPayment / 100) : "",
-                                    copiedFromId: String(selected.id),
-                                  });
-                                  setPkgEditorOpen(true);
-                                }}
+                                onClick={() => navigateTo(packageWizardUrl({ copy: String(selected.id), back: "/crm/settings/packages" }))}
                                 data-testid={`pkgequip-duplicate-${selected.id}`}
                               >
                                 <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicate…
@@ -2148,12 +2124,6 @@ export function PackageEquipmentCard({ packages, costModel }: { packages: any[] 
         />
       )}
 
-      <PackageEditorDialog
-        open={pkgEditorOpen}
-        onOpenChange={setPkgEditorOpen}
-        prefill={pkgEditorPrefill}
-        existing={drift.map((d) => ({ unitType: d.unitType, tier: d.tier, tonnage: String(d.tonnage), packageLevel: d.packageLevel }))}
-      />
     </Card>
   );
 }

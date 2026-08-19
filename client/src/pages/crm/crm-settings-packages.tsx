@@ -24,7 +24,11 @@ import PricingGibbsPanel from "@/components/crm/pricing-gibbs-panel";
 export default function CrmSettingsPackages() {
   usePageTitle("Package Pricing Management");
   const [, navigate] = useLocation();
-  const [pageTab, setPageTab] = useState<"costs" | "builder" | "pricefile">("costs");
+  // ?tab=builder deep-links a tab (the package wizard returns here with it).
+  const [pageTab, setPageTab] = useState<"costs" | "builder" | "pricefile">(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t === "builder" || t === "pricefile" ? t : "costs";
+  });
   // The panel sizes itself to the gutter right of this container.
   const boundaryRef = useRef<HTMLDivElement | null>(null);
   // The docked Pricing Gibbs panel — remembered across visits.
