@@ -97,53 +97,69 @@ export async function unregisterNativePush(): Promise<void> {
     await apiRequest("POST", "/api/crm/push/unregister-device", { token });
     localStorage.removeItem("ghq-push-token");
     pushInitStarted = false; // next login re-registers cleanly
+    shellPermSequence = null; // …and the login sequence may run again
   } catch {
     /* best-effort */
   }
 }
 
-/** One-time permission priming on the first launch after login — the way
- *  established apps ask for everything upfront: notifications first (via
- *  push registration), then camera, microphone, and location. Each prompt
- *  only ever appears once per install; iOS remembers the answers. */
+const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** One-time permission priming on the first launch after login: camera, then
+ *  microphone — strictly ONE dialog at a time, each awaited until the user
+ *  actually answers. iOS auto-dismisses a permission prompt when another one
+ *  is presented over it, so any overlap makes dialogs "flash" past unanswered
+ *  (the v1 bug: prompts fired on a blind timer while the push dialog was
+ *  still up). Location is deliberately NOT primed — agenda/prospects/lead
+ *  capture ask contextually the first time a "near me" feature is used. */
 let primeStarted = false;
 export async function primeNativePermissions(): Promise<void> {
   if (!isNativeApp() || primeStarted) return;
   primeStarted = true;
   try {
-    // Older installed binaries lack the mic/location usage strings — iOS
-    // HARD-CRASHES an app that touches those APIs without them. The Keyboard
-    // plugin only exists in binaries new enough to carry the strings, so its
-    // presence is the safety gate.
+    // Older installed binaries lack the mic usage strings — iOS HARD-CRASHES
+    // an app that touches those APIs without them. The Keyboard plugin only
+    // exists in binaries new enough to carry the strings, so its presence is
+    // the safety gate.
     if (!Capacitor.isPluginAvailable("Keyboard")) return;
-    if (localStorage.getItem("ghq-perms-primed") === "1") return;
-    localStorage.setItem("ghq-perms-primed", "1");
-    // Give the push-permission dialog (fired by initNativePush) a moment
-    // before stacking the next prompts.
-    await new Promise((r) => setTimeout(r, 1500));
+    // v2 key: phones that ran the broken v1 pass get ONE more properly
+    // sequenced pass — permissions the user already answered resolve
+    // silently (iOS never re-shows a determined dialog), only the ones that
+    // flashed past unanswered actually prompt again.
+    if (localStorage.getItem("ghq-perms-primed-v2") === "1") return;
+    localStorage.setItem("ghq-perms-primed-v2", "1");
+    await settle(500); // let the push dialog's dismiss animation finish
     try {
-      const { Camera } = await import("@capacitor/camera");
-      await Camera.requestPermissions();
+      // Camera only — photo picking uses PHPicker, which needs no permission,
+      // so the no-arg call's second "photo library" dialog was pure noise.
+      const cam = await Camera.checkPermissions();
+      if (cam.camera === "prompt") {
+        await Camera.requestPermissions({ permissions: ["camera"] });
+        await settle(500);
+      }
     } catch { /* plugin missing or denied — fine */ }
     try {
+      // Microphone (voice dictation). getUserMedia resolves/rejects only
+      // after the user answers, keeping the one-dialog-at-a-time chain.
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
-    } catch { /* mic denied — Gibbs voice will re-ask contextually */ }
-    try {
-      await new Promise<void>((resolve) => {
-        navigator.geolocation.getCurrentPosition(() => resolve(), () => resolve(), { timeout: 8000 });
-        setTimeout(resolve, 9000);
-      });
-    } catch { /* location denied — nothing depends on it yet */ }
+    } catch { /* mic denied — voice features re-ask contextually */ }
   } catch { /* priming is best-effort */ }
 }
 
-/** Hook flavor for layouts: registers push once a CRM user is logged in. */
+/** Hook flavor for layouts: push registration + permission priming once a
+ *  CRM user is logged in. Single-flight across every mount (CrmLayout and
+ *  MobileShell both call this): ONE sequence, notifications awaited to an
+ *  answer BEFORE the camera/mic prompts — never two dialogs stacked. */
+let shellPermSequence: Promise<void> | null = null;
 export function useNativePush(loggedIn: boolean) {
   useEffect(() => {
-    if (loggedIn) {
-      void initNativePush();
-      void primeNativePermissions();
+    if (!loggedIn || !isNativeApp()) return;
+    if (!shellPermSequence) {
+      shellPermSequence = (async () => {
+        await initNativePush();
+        await primeNativePermissions();
+      })().catch(() => { shellPermSequence = null; });
     }
   }, [loggedIn]);
 }
