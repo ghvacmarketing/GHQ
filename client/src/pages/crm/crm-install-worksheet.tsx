@@ -52,7 +52,6 @@ type AssignableUser = {
   role: string;
 };
 import PartsSelection from "@/components/parts-selection";
-import SelectedParts from "@/components/selected-parts";
 import WarrantySection from "@/components/warranty-section";
 import CustomPartModal from "@/components/custom-part-modal";
 
@@ -116,6 +115,20 @@ export default function CrmInstallWorksheet() {
 
   const [serviceParts, setServiceParts] = useState<QuotePart[]>([]);
   const [serviceLaborHours, setServiceLaborHours] = useState<string>("");
+  // Editable per-quote service knobs, seeded from Settings once loaded — the
+  // same pattern as the install inputs card. Changing them here never writes
+  // back to Settings.
+  const [serviceInputs, setServiceInputs] = useState<{
+    laborRate: number;
+    laborBenefitsPct: number;
+    salesTaxPct: number;
+    shrinkagePct: number;
+    warrantyReserve: number;
+    overheadPct: number;
+    profitPct: number;
+    financingPct: number;
+    commissionPct: number;
+  } | null>(null);
   const [serviceGhvacInstalled, setServiceGhvacInstalled] = useState<boolean | undefined>(undefined);
   const [serviceYearsSinceInstallation, setServiceYearsSinceInstallation] = useState<string>("");
   const [serviceJobNotes, setServiceJobNotes] = useState<string>("");
@@ -161,6 +174,22 @@ export default function CrmInstallWorksheet() {
   });
   const serviceSettings = (initialData as any)?.settings;
   const availableParts = (initialData as any)?.parts || [];
+  useEffect(() => {
+    if (!serviceInputs && serviceSettings && serviceSettings.laborRate !== undefined) {
+      setServiceInputs({
+        laborRate: serviceSettings.laborRate ?? 0,
+        laborBenefitsPct: serviceSettings.laborBenefitsPercent ?? 0,
+        salesTaxPct: serviceSettings.salesTaxPercent ?? 0,
+        shrinkagePct: serviceSettings.materialShrinkagePercent ?? 0,
+        warrantyReserve: serviceSettings.warrantyReserve ?? 0,
+        overheadPct: serviceSettings.overheadPercent ?? 0,
+        profitPct: serviceSettings.profitPercent ?? 0,
+        financingPct: serviceSettings.financingPromotionPercent ?? 0,
+        commissionPct: serviceSettings.commissionPercent ?? 0,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceSettings]);
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<CrmCustomer[]>({
     queryKey: ["/api/crm/customers", "search", customerSearch],
@@ -262,17 +291,7 @@ export default function CrmInstallWorksheet() {
 
   const calculateServiceTotals = useMemo(() => {
     if (isLoadingInitialData) return null;
-    if (!serviceSettings || 
-        serviceSettings.laborRate === undefined ||
-        serviceSettings.laborBenefitsPercent === undefined ||
-        serviceSettings.salesTaxPercent === undefined ||
-        serviceSettings.warrantyReserve === undefined ||
-        serviceSettings.materialShrinkagePercent === undefined ||
-        serviceSettings.overheadPercent === undefined ||
-        serviceSettings.profitPercent === undefined ||
-        serviceSettings.financingPromotionPercent === undefined ||
-        serviceSettings.commissionPercent === undefined ||
-        !serviceSettings.warrantyDiscounts) {
+    if (!serviceInputs || !serviceSettings?.warrantyDiscounts) {
       return null;
     }
     
@@ -304,7 +323,7 @@ export default function CrmInstallWorksheet() {
       }
     });
 
-    const materialShrinkagePercent = serviceSettings.materialShrinkagePercent;
+    const materialShrinkagePercent = serviceInputs.shrinkagePct;
     const shrinkageMaterials = ['refrigerant filter dryer', 'copper', 'armaflex insulation', 'acid away'];
     
     const shrinkagePartsTotal = serviceParts.reduce((sum, part) => {
@@ -330,16 +349,16 @@ export default function CrmInstallWorksheet() {
     const materialShrinkageCost = shrinkagePartsTotal * materialShrinkagePercent;
     
     const hours = parseFloat(serviceLaborHours || "1");
-    const laborRate = serviceSettings.laborRate;
+    const laborRate = serviceInputs.laborRate;
     const baseLaborCost = laborRate * hours;
     
-    const laborBenefitsPercent = serviceSettings.laborBenefitsPercent;
-    const salesTaxPercent = serviceSettings.salesTaxPercent;
-    const warrantyReserve = serviceSettings.warrantyReserve;
-    const overheadPercent = serviceSettings.overheadPercent;
-    const profitPercent = serviceSettings.profitPercent;
-    const financingPercent = serviceSettings.financingPromotionPercent;
-    const commissionPercent = serviceSettings.commissionPercent;
+    const laborBenefitsPercent = serviceInputs.laborBenefitsPct;
+    const salesTaxPercent = serviceInputs.salesTaxPct;
+    const warrantyReserve = serviceInputs.warrantyReserve;
+    const overheadPercent = serviceInputs.overheadPct;
+    const profitPercent = serviceInputs.profitPct;
+    const financingPercent = serviceInputs.financingPct;
+    const commissionPercent = serviceInputs.commissionPct;
     
     const laborBenefits = baseLaborCost * laborBenefitsPercent;
     const totalLaborCost = baseLaborCost + laborBenefits;
@@ -394,7 +413,7 @@ export default function CrmInstallWorksheet() {
       labor: baseLaborCost.toFixed(2),
       tax: fullSalesTax.toFixed(2),
     };
-  }, [serviceParts, serviceLaborHours, serviceGhvacInstalled, serviceYearsSinceInstallation, serviceSettings, isLoadingInitialData]);
+  }, [serviceParts, serviceLaborHours, serviceGhvacInstalled, serviceYearsSinceInstallation, serviceInputs, serviceSettings, isLoadingInitialData]);
 
   const handleUpdateServiceParts = (updates: { parts: QuotePart[] }) => {
     setServiceParts(updates.parts);
@@ -454,7 +473,7 @@ export default function CrmInstallWorksheet() {
     }));
 
     const laborHours = parseFloat(serviceLaborHours);
-    const laborRate = serviceSettings?.laborRate || 0;
+    const laborRate = serviceInputs?.laborRate || 0;
     lineItems.push({
       description: `Labor (${laborHours} hours @ $${laborRate}/hr)`,
       quantity: 1,
@@ -604,6 +623,7 @@ export default function CrmInstallWorksheet() {
 
   const formatCurrency = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatPercent = (n: number) => `${(n * 100).toFixed(2)}%`;
+  const money = (v: string | undefined) => formatCurrency(parseFloat(v || "0"));
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -933,6 +953,26 @@ export default function CrmInstallWorksheet() {
               </div>
 
               <div className="space-y-2 pb-3 border-b">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Overhead</span>
+                  <span data-testid="calc-overhead-dollars">{formatCurrency(calcs.sellPrice * inputs.overheadPct)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Financing</span>
+                  <span data-testid="calc-financing-dollars">{formatCurrency(calcs.sellPrice * inputs.financingPct)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Commission</span>
+                  <span data-testid="calc-commission-dollars">{formatCurrency(calcs.sellPrice * inputs.commissionPct)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-medium">
+                  <span className="text-slate-700">Profit</span>
+                  <span data-testid="calc-profit-dollars">{formatCurrency(calcs.sellPrice * inputs.profitPct)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pb-3 border-b">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Gross Profit</span>
                   <span data-testid="calc-gross-profit">{formatCurrency(calcs.grossProfit)}</span>
@@ -1000,25 +1040,80 @@ export default function CrmInstallWorksheet() {
         )}
 
         {pricingMode === "service" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* ── Inputs — seeded from Service Settings, editable per quote ── */}
+          <Card className="lg:col-span-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Inputs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!serviceInputs ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <>
+                  <div className={`space-y-2 ${serviceValidationErrors.includes('laborHours') ? 'rounded-lg p-2 ring-2 ring-red-500' : ''}`}>
+                    <Label htmlFor="svcLaborHours">Labor Hours</Label>
+                    <Input
+                      id="svcLaborHours"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={serviceLaborHours}
+                      onChange={(e) => setServiceLaborHours(e.target.value)}
+                      placeholder="0"
+                      data-testid="input-service-labor-hours"
+                    />
+                  </div>
+                  {([
+                    ["laborRate", "Labor Rate ($/hr)", 1, false],
+                    ["warrantyReserve", "Warranty Reserve ($)", 1, false],
+                    ["laborBenefitsPct", "Labor Benefits (%)", 1, true],
+                    ["salesTaxPct", "Sales Tax (%)", 0.5, true],
+                    ["shrinkagePct", "Material Shrinkage (%)", 0.5, true],
+                    ["overheadPct", "Overhead (%)", 1, true],
+                    ["profitPct", "Profit (%)", 1, true],
+                    ["financingPct", "Financing (%)", 0.5, true],
+                    ["commissionPct", "Commission (%)", 0.5, true],
+                  ] as Array<[keyof NonNullable<typeof serviceInputs>, string, number, boolean]>).map(([key, label, step, isPct]) => (
+                    <div key={key} className="space-y-2">
+                      <Label htmlFor={`svc-${key}`}>{label}</Label>
+                      <Input
+                        id={`svc-${key}`}
+                        type="number"
+                        step={step}
+                        min="0"
+                        value={isPct ? (serviceInputs[key] * 100).toFixed(step < 1 ? 1 : 0) : serviceInputs[key]}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value) || 0;
+                          setServiceInputs((prev) => (prev ? { ...prev, [key]: isPct ? n / 100 : n } : prev));
+                        }}
+                        data-testid={`input-svc-${key}`}
+                      />
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-slate-400">
+                    Seeded from Service Settings — changes here apply to this quote only.
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Parts, warranty, notes ── */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Parts &amp; Job Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
               {isLoadingInitialData ? (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                      <span className="ml-3 text-slate-500">Loading parts...</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                  <span className="ml-3 text-slate-500">Loading parts...</span>
+                </div>
               ) : isErrorInitialData ? (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center py-8 text-red-600">
-                      <p>Failed to load parts data. Please check your connection to Google Sheets.</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="text-center py-8 text-red-600">
+                  <p>Failed to load parts data. Please check your connection to Google Sheets.</p>
+                </div>
               ) : (
                 <div className={`${serviceValidationErrors.includes('parts') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
                   <PartsSelection
@@ -1033,6 +1128,55 @@ export default function CrmInstallWorksheet() {
                 </div>
               )}
 
+              {serviceParts.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2 uppercase tracking-wide border-b pb-1">
+                    Selected Parts
+                  </h4>
+                  <div className="space-y-2">
+                    {serviceParts.map((part) => (
+                      <div
+                        key={part.id}
+                        className="flex items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white p-2"
+                        data-testid={`service-part-${part.id}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-slate-800">{part.description}</p>
+                          {part.partNumber && <p className="font-mono text-[11px] text-slate-400">{part.partNumber}</p>}
+                        </div>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={part.quantity || 1}
+                          onChange={(e) => {
+                            const q = Math.max(1, parseInt(e.target.value, 10) || 1);
+                            setServiceParts((prev) => prev.map((x) => (x.id === part.id ? { ...x, quantity: q } : x)));
+                          }}
+                          className="w-16 shrink-0 text-center"
+                          data-testid={`service-part-qty-${part.id}`}
+                        />
+                        <span className="w-20 shrink-0 text-right text-sm tabular-nums text-slate-600">
+                          {formatCurrency(parseFloat(part.price) * (part.quantity || 1))}
+                        </span>
+                        <button
+                          onClick={() => setServiceParts((prev) => prev.filter((x) => x.id !== part.id))}
+                          className="shrink-0 rounded p-1.5 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                          title="Remove part"
+                          data-testid={`service-part-remove-${part.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <EyeOff className="h-3.5 w-3.5" />
+                    Part costs are your internal build-up — the customer sees the final price.
+                  </p>
+                </div>
+              )}
+
               <div className={`${serviceValidationErrors.includes('warranty') ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
                 <WarrantySection
                   ghvacInstalled={serviceGhvacInstalled}
@@ -1044,78 +1188,161 @@ export default function CrmInstallWorksheet() {
                 />
               </div>
 
-              <Card>
-                <CardContent className="p-6">
-                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Wrench className="h-5 w-5" />
-                    Labor & Notes
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className={`${serviceValidationErrors.includes('laborHours') ? 'ring-2 ring-red-500 rounded-lg p-2' : ''}`}>
-                      <Label htmlFor="laborHours" className="text-sm font-medium mb-2 block">Labor Hours</Label>
-                      <Input
-                        id="laborHours"
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={serviceLaborHours}
-                        onChange={(e) => setServiceLaborHours(e.target.value)}
-                        placeholder="Enter labor hours"
-                        className="min-h-[44px]"
-                        data-testid="input-service-labor-hours"
-                      />
-                      {serviceSettings?.laborRate && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          Rate: ${serviceSettings.laborRate}/hr
-                        </p>
-                      )}
+              <div className="space-y-2">
+                <Label htmlFor="jobNotes">Job Notes</Label>
+                <Textarea
+                  id="jobNotes"
+                  value={serviceJobNotes}
+                  onChange={(e) => setServiceJobNotes(e.target.value)}
+                  placeholder="Enter any job notes..."
+                  className="min-h-[80px]"
+                  data-testid="input-service-job-notes"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Calculated Totals — the full internal waterfall ── */}
+          <Card className="lg:col-span-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Calculated Totals</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!calculateServiceTotals ? (
+                <div className="py-8 text-center text-sm text-slate-400">
+                  <Package className="mx-auto mb-3 h-10 w-10 opacity-30" />
+                  Add parts and labor hours to see the breakdown.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 pb-3 border-b">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Parts Subtotal</span>
+                      <span data-testid="svc-calc-parts">{money(calculateServiceTotals.partsSubtotal)}</span>
                     </div>
-                    <div>
-                      <Label htmlFor="jobNotes" className="text-sm font-medium mb-2 block">Job Notes</Label>
-                      <Textarea
-                        id="jobNotes"
-                        value={serviceJobNotes}
-                        onChange={(e) => setServiceJobNotes(e.target.value)}
-                        placeholder="Enter any job notes..."
-                        className="min-h-[80px]"
-                        data-testid="input-service-job-notes"
-                      />
+                    {parseFloat(calculateServiceTotals.ghvacCoveredParts) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-emerald-700">GHVAC-Covered Parts</span>
+                        <span className="text-emerald-700" data-testid="svc-calc-covered">{money(calculateServiceTotals.ghvacCoveredParts)}</span>
+                      </div>
+                    )}
+                    {parseFloat(calculateServiceTotals.materialShrinkage) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Material Shrinkage</span>
+                        <span data-testid="svc-calc-shrinkage">{money(calculateServiceTotals.materialShrinkage)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Labor Payroll</span>
+                      <span data-testid="svc-calc-labor">{money(calculateServiceTotals.baseLaborCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Labor Benefits</span>
+                      <span data-testid="svc-calc-benefits">{money(calculateServiceTotals.laborBenefits)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Sales Tax</span>
+                      <span data-testid="svc-calc-tax">{money(calculateServiceTotals.salesTax)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Warranty Reserve</span>
+                      <span data-testid="svc-calc-reserve">{money(calculateServiceTotals.warrantyReserve)}</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
 
-            <div className="space-y-6">
-              {serviceParts.length > 0 && calculateServiceTotals && (
-                <SelectedParts
-                  parts={serviceParts}
-                  totals={calculateServiceTotals}
-                  onUpdate={handleUpdateServiceParts}
-                />
+                  <div className="space-y-2 pb-3 border-b">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Direct Cost</span>
+                      <span data-testid="svc-calc-direct">{money(calculateServiceTotals.directCost)}</span>
+                    </div>
+                  </div>
+
+                  <div className="py-3 border-b">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-lg">Sell Price</span>
+                      <span className="text-2xl font-bold text-[#d3b07d]" data-testid="svc-calc-sell">
+                        {money(calculateServiceTotals.fullSellingPrice)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pb-3 border-b">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Overhead</span>
+                      <span data-testid="svc-calc-overhead">{money(calculateServiceTotals.overhead)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Financing</span>
+                      <span data-testid="svc-calc-financing">{money(calculateServiceTotals.financingCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Commission</span>
+                      <span data-testid="svc-calc-commission">{money(calculateServiceTotals.commission)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-medium">
+                      <span className="text-slate-700">Profit</span>
+                      <span data-testid="svc-calc-profit">{money(calculateServiceTotals.profit)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pb-3 border-b">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Gross Profit</span>
+                      <span data-testid="svc-calc-gp">
+                        {formatCurrency(parseFloat(calculateServiceTotals.fullSellingPrice) - parseFloat(calculateServiceTotals.directCost))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Gross Margin %</span>
+                      <span data-testid="svc-calc-margin">
+                        {(() => {
+                          const sell = parseFloat(calculateServiceTotals.fullSellingPrice);
+                          const direct = parseFloat(calculateServiceTotals.directCost);
+                          return sell > 0 ? formatPercent(1 - direct / sell) : "—";
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {calculateServiceTotals.isGHVACWarranty && (
+                    <div className="space-y-2 pt-2 bg-amber-50 -mx-4 px-4 py-3 rounded-b-lg">
+                      <h4 className="text-sm font-semibold text-amber-800">GHVAC Warranty Applied</h4>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-amber-700">Coverage</span>
+                        <span data-testid="svc-calc-coverage">{formatPercent(calculateServiceTotals.warrantyCoverage)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-amber-700">Price Before Warranty</span>
+                        <span data-testid="svc-calc-before">{money(calculateServiceTotals.priceBeforeWarranty)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold">
+                        <span className="text-amber-800">Customer Pays</span>
+                        <span data-testid="svc-calc-total">{money(calculateServiceTotals.total)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {!calculateServiceTotals.isGHVACWarranty && (
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-sm font-medium text-slate-700">Customer Pays</span>
+                      <span className="font-semibold" data-testid="svc-calc-total">{money(calculateServiceTotals.total)}</span>
+                    </div>
+                  )}
+                </>
               )}
+            </CardContent>
+          </Card>
 
-              {serviceParts.length === 0 && (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                    <p className="text-slate-500">No parts selected yet</p>
-                    <p className="text-sm text-slate-400">Search and add parts from the left panel</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            <CustomPartModal
-              isOpen={isCustomPartModalOpen}
-              onClose={() => {
-                setIsCustomPartModalOpen(false);
-                setCustomPartPrefillData(null);
-              }}
-              onAddPart={handleAddCustomPart}
-              prefillData={customPartPrefillData}
-            />
-          </div>
+          <CustomPartModal
+            isOpen={isCustomPartModalOpen}
+            onClose={() => {
+              setIsCustomPartModalOpen(false);
+              setCustomPartPrefillData(null);
+            }}
+            onAddPart={handleAddCustomPart}
+            prefillData={customPartPrefillData}
+          />
+        </div>
         )}
       </div>
 
