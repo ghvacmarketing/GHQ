@@ -2913,20 +2913,12 @@ export default function CrmQuoteDetail() {
               )}
               
               {/* Show deposit status if paid */}
-              {quote.depositPaidAt && (() => {
-                const dep = parseFloat(quote.depositAmount || "0");
-                const total = parseFloat(quote.total || "0");
-                const charged = parseFloat((quote as any).depositInvoice?.amountPaid || (quote as any).depositInvoice?.total || "0");
-                const fee = charged > dep ? charged - dep : 0;
-                const pct = total > 0 ? Math.round((dep / total) * 100) : null;
-                return (
-                  <StatusDot pill="bg-green-100 text-green-800 border-green-200">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Deposit Paid: ${dep.toFixed(2)}{pct != null ? ` (${pct}%)` : ""}
-                    {fee > 0.009 ? ` + $${fee.toFixed(2)} card fee = $${charged.toFixed(2)} charged` : ""}
-                  </StatusDot>
-                );
-              })()}
+              {quote.depositPaidAt && (
+                <StatusDot pill="bg-green-100 text-green-800 border-green-200">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Deposit Paid: ${parseFloat(quote.depositAmount || "0").toFixed(2)}
+                </StatusDot>
+              )}
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -3534,18 +3526,120 @@ export default function CrmQuoteDetail() {
                   <span className="text-slate-600">Total internal costs</span>
                   <span className="font-medium">{formatCurrency(internalCostsTotal)}</span>
                 </div>
-                {parseFloat(quote.total || "0") > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Gross margin (sell − costs)</span>
-                    <span className={`font-semibold ${parseFloat(quote.total || "0") - internalCostsTotal >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                      {formatCurrency(parseFloat(quote.total || "0") - internalCostsTotal)}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  // Full waterfall from the Custom Pricing snapshot when this
+                  // quote was finalized; older quotes fall back to sell − costs.
+                  const snap = (quote as any).costingSnapshot as {
+                    directCost?: number; sellPrice?: number; overhead?: number;
+                    financing?: number; commission?: number; profit?: number;
+                    grossProfit?: number; grossMarginPct?: number;
+                  } | null;
+                  const sell = parseFloat(quote.total || "0");
+                  if (snap && snap.sellPrice) {
+                    return (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">Sell price (at finalize)</span>
+                          <span className="font-medium">{formatCurrency(snap.sellPrice)}</span>
+                        </div>
+                        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">Overhead</span>
+                          <span>{formatCurrency(snap.overhead || 0)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">Financing</span>
+                          <span>{formatCurrency(snap.financing || 0)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">Commission</span>
+                          <span>{formatCurrency(snap.commission || 0)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-medium">
+                          <span className="text-slate-700">Profit</span>
+                          <span>{formatCurrency(snap.profit || 0)}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1.5 text-sm">
+                          <span className="text-slate-600">Gross profit · margin</span>
+                          <span className={`font-semibold ${(snap.grossProfit || 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                            {formatCurrency(snap.grossProfit || 0)} · {((snap.grossMarginPct || 0) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        {sell > 0 && snap.sellPrice && Math.abs(sell - snap.sellPrice) > 0.01 && (
+                          <p className="text-[11px] text-amber-600">
+                            Quote total is now {formatCurrency(sell)} — the breakdown above reflects pricing at finalize time.
+                          </p>
+                        )}
+                      </>
+                    );
+                  }
+                  return sell > 0 ? (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Gross margin (sell − costs)</span>
+                        <span className={`font-semibold ${sell - internalCostsTotal >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                          {formatCurrency(sell - internalCostsTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Margin %</span>
+                        <span className="font-medium">{((1 - internalCostsTotal / sell) * 100).toFixed(1)}%</span>
+                      </div>
+                    </>
+                  ) : null;
+                })()}
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Payment & deposit — the fee split lives HERE, not in the header pill */}
+        {quote.depositPaidAt && (() => {
+          const dep = parseFloat(quote.depositAmount || "0");
+          const total = parseFloat(quote.total || "0");
+          const charged = parseFloat((quote as any).depositInvoice?.amountPaid || (quote as any).depositInvoice?.total || "0");
+          const fee = charged > dep ? charged - dep : 0;
+          const pct = total > 0 ? Math.round((dep / total) * 100) : null;
+          return (
+            <Card data-testid="deposit-breakdown-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  Payment &amp; deposit
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Deposit paid{pct != null ? ` (${pct}% of total)` : ""}</span>
+                  <span className="font-medium" data-testid="text-deposit-contract">{formatCurrency(dep)}</span>
+                </div>
+                {fee > 0.009 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Card processing fee (paid by customer)</span>
+                      <span data-testid="text-deposit-fee">{formatCurrency(fee)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Total charged{(quote as any).depositInvoice?.invoiceNumber ? ` — ${(quote as any).depositInvoice.invoiceNumber}` : ""}</span>
+                      <span className="font-medium" data-testid="text-deposit-charged">{formatCurrency(charged)}</span>
+                    </div>
+                  </>
+                )}
+                {total > 0 && (
+                  <div className="flex justify-between border-t pt-1.5 text-sm">
+                    <span className="text-slate-600">Remaining balance (total − deposit)</span>
+                    <span className="font-semibold" data-testid="text-deposit-balance">{formatCurrency(Math.max(0, total - dep))}</span>
+                  </div>
+                )}
+                {fee > 0.009 && (
+                  <p className="text-[11px] text-slate-400">
+                    The processing fee is a cost of the card transaction — it is never credited toward the job total.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Items Catalog Dialog */}
         <Dialog open={showItemsCatalogDialog} onOpenChange={(open) => {

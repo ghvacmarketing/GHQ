@@ -1546,6 +1546,9 @@ export const crmQuotes = pgTable("crm_quotes", {
   customerPhone: text("customer_phone"),
   serviceAddress: text("service_address"),
   billingAddress: text("billing_address"), // bill-to account's address snapshot
+  // Internal costing snapshot taken when a Custom Pricing quote is finalized
+  // (direct cost, sell price, overhead/financing/commission/profit dollars).
+  costingSnapshot: json("costing_snapshot"),
   title: text("title"),
   description: text("description"),
   lineItems: json("line_items").default([]),

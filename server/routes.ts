@@ -21966,6 +21966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_name as "customerName", customer_email as "customerEmail",
           customer_phone as "customerPhone", service_address as "serviceAddress",
           billing_address as "billingAddress",
+          costing_snapshot as "costingSnapshot",
           title, description, line_items as "lineItems", subtotal, 
           labor_total as "laborTotal", total, status,
           valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
@@ -22286,6 +22287,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scope: "project",
         status: "draft",
         title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
+        costingSnapshot: {
+          mode: "install",
+          directCost: calcs.directCost,
+          sellPrice: calcs.sellPrice,
+          overhead: Math.round(calcs.sellPrice * (inputs.overheadPct || 0) * 100) / 100,
+          financing: Math.round(calcs.sellPrice * (inputs.financingPct || 0) * 100) / 100,
+          commission: Math.round(calcs.sellPrice * (inputs.commissionPct || 0) * 100) / 100,
+          profit: Math.round(calcs.sellPrice * (inputs.profitPct || 0) * 100) / 100,
+          grossProfit: calcs.grossProfit,
+          grossMarginPct: calcs.grossMarginPct,
+        } as any,
         description: "",
         subtotal: calcs.linesTotal.toString(),
         total: calcs.discountedSellPrice.toString(),
@@ -22504,6 +22516,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Assigned user not found" });
         }
         const isServiceQuote = quoteType === "quick" || quoteType === "custom_service";
+
+      // Custom Pricing (service) sends its calculated totals — snapshot the
+      // internal waterfall on the quote so the detail page can show it later.
+      const svcTotals = (req.body?.serviceQuoteData as any)?.totals;
+      const svcSell = svcTotals ? parseFloat(svcTotals.fullSellingPrice || "0") : 0;
+      const svcDirect = svcTotals ? parseFloat(svcTotals.directCost || "0") : 0;
+      const svcSnapshot = svcTotals && svcSell > 0 ? {
+        mode: "service",
+        directCost: svcDirect,
+        sellPrice: svcSell,
+        overhead: parseFloat(svcTotals.overhead || "0"),
+        financing: parseFloat(svcTotals.financingCost || "0"),
+        commission: parseFloat(svcTotals.commission || "0"),
+        profit: parseFloat(svcTotals.profit || "0"),
+        grossProfit: Math.round((svcSell - svcDirect) * 100) / 100,
+        grossMarginPct: (svcSell - svcDirect) / svcSell,
+      } : null;
         const validRoles = isServiceQuote
           ? ["admin", "sales", "supervisor", "owner"]
           : ["sales", "supervisor", "owner"];
@@ -22569,6 +22598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         aiGeneratedQuote: aiGeneratedQuote || null,
         quoteMode: quoteMode || null,
         quoteType: quoteType || null,
+        ...(svcSnapshot ? { costingSnapshot: svcSnapshot as any } : {}),
         quoteCategory: quoteCategory,
         assignedToId: assignedToId || null,
       }).returning();

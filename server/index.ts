@@ -357,6 +357,7 @@ async function runInstallPlannerMigrations() {
     await db.execute(sql`ALTER TABLE crm_quotes ADD COLUMN IF NOT EXISTS billing_address text`);
     await db.execute(sql`ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS service_address text`);
     await db.execute(sql`ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS billing_address text`);
+    await db.execute(sql`ALTER TABLE crm_quotes ADD COLUMN IF NOT EXISTS costing_snapshot jsonb`);
     // ── Cost tracker (Settings → Usage & Costs) ──
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS ai_usage_events (
