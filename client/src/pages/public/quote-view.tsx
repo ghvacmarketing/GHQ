@@ -368,6 +368,16 @@ function QuoteAlreadyAccepted({ quote, lineItems }: { quote: CrmQuote; lineItems
                 <h3 className="font-semibold text-green-800 mb-2">Payment Received</h3>
                 <div className="space-y-1 text-sm text-green-700">
                   <p>Deposit Paid: <strong>{formatCurrency(depositAmount)}</strong></p>
+                  {(() => {
+                    const charged = parseFloat(((quote as any).depositChargedAmount ?? "0") as string);
+                    const fee = charged > depositAmount ? charged - depositAmount : 0;
+                    return fee > 0.009 ? (
+                      <p data-testid="text-deposit-fee">
+                        Card processing fee: <strong>{formatCurrency(fee)}</strong>
+                        <span className="text-xs block text-green-600">Total charged: {formatCurrency(charged)} — the fee is not credited toward the job total.</span>
+                      </p>
+                    ) : null;
+                  })()}
                   <p>Payment Date: {formatDate(quote.depositPaidAt)}</p>
                   {remainingBalance > 0 && (
                     <p className="pt-2 border-t border-green-200 mt-2">

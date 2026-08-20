@@ -2913,12 +2913,20 @@ export default function CrmQuoteDetail() {
               )}
               
               {/* Show deposit status if paid */}
-              {quote.depositPaidAt && (
-                <StatusDot pill="bg-green-100 text-green-800 border-green-200">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Deposit Paid: ${parseFloat(quote.depositAmount || "0").toFixed(2)}
-                </StatusDot>
-              )}
+              {quote.depositPaidAt && (() => {
+                const dep = parseFloat(quote.depositAmount || "0");
+                const total = parseFloat(quote.total || "0");
+                const charged = parseFloat((quote as any).depositInvoice?.amountPaid || (quote as any).depositInvoice?.total || "0");
+                const fee = charged > dep ? charged - dep : 0;
+                const pct = total > 0 ? Math.round((dep / total) * 100) : null;
+                return (
+                  <StatusDot pill="bg-green-100 text-green-800 border-green-200">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Deposit Paid: ${dep.toFixed(2)}{pct != null ? ` (${pct}%)` : ""}
+                    {fee > 0.009 ? ` + $${fee.toFixed(2)} card fee = $${charged.toFixed(2)} charged` : ""}
+                  </StatusDot>
+                );
+              })()}
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

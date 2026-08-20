@@ -3,6 +3,7 @@ import { db } from './db';
 import { crmInvoices, crmInvoiceLineItems, crmQuotes, crmAgreements, maintenanceVisits, crmWorkOrders, crmCustomers } from '@shared/schema';
 import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { autoSyncInvoice, autoSyncPayment } from './services/quickbooksService';
+import { contractDepositFrom } from './stripe-payments';
 
 async function generateDepositInvoiceNumber(): Promise<string> {
   const now = new Date();
@@ -190,12 +191,17 @@ export class WebhookHandlers {
 
           if (quote) {
             const chargedTotal = session.amount_total ? session.amount_total / 100 : 0;
-            // The convenience fee (card 3% / ACH free) is part of the charge
-            // but NOT part of the deposit against the quote — split it out so
-            // the quote's deposit math stays honest and the fee is itemized
-            // on the deposit invoice.
-            const depositSurcharge = Math.max(0, parseFloat(metadata.surchargeAmount || "0") || 0);
-            const depositAmount = Math.max(0, chargedTotal - depositSurcharge);
+            // Record the CONTRACT deposit (metadata.baseDepositAmount — the
+            // percent of the un-surcharged total), never a derived number.
+            // The old math here subtracted metadata.surchargeAmount, which is
+            // the fee on the FULL total, from a charge that only carried the
+            // deposit's share of that fee — understating every card deposit
+            // (e.g. 48.5% of total instead of 50%).
+            const depositAmount = contractDepositFrom(
+              metadata as Record<string, string>,
+              chargedTotal,
+              parseFloat(quote.total || "0"),
+            );
             const now = new Date();
 
             // Auto-accept the quote when deposit is paid (signature was captured before payment)

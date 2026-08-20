@@ -22050,6 +22050,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
         assignedTo = assignedQuery.rows[0] || null;
       }
+
+      // The deposit invoice shows what was actually CHARGED (contract deposit
+      // + card/ACH convenience fee) — the quote's depositAmount stays the
+      // contract number that offsets the balance.
+      const depQuery = await db.execute(sql`
+        SELECT invoice_number as "invoiceNumber", total, amount_paid as "amountPaid", payment_method as "paymentMethod"
+        FROM crm_invoices WHERE quote_id = ${req.params.id} AND is_deposit_invoice = true
+        ORDER BY created_at DESC LIMIT 1
+      `);
+      const depositInvoice = depQuery.rows[0] || null;
       
       return res.json({
         ...quote,
@@ -22058,6 +22068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrder,
         project,
         assignedTo,
+        depositInvoice,
       });
     } catch (error) {
       console.error("Error fetching CRM quote:", error);
@@ -27326,6 +27337,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
       }
 
+      let pubDepCharged: string | null = null;
+      if (quote.depositPaidAt) {
+        const [depInv] = (await db.execute(sql`
+          SELECT amount_paid as "amountPaid" FROM crm_invoices
+          WHERE quote_id = ${quote.id} AND is_deposit_invoice = true
+          ORDER BY created_at DESC LIMIT 1
+        `)).rows as any[];
+        pubDepCharged = depInv?.amountPaid ?? null;
+      }
+
       let pubQuoteBilling = "";
       if (!quote.billingAddress && quote.customerId) {
         const [pubCust] = await db.select({ fullAddress: crmCustomers.fullAddress }).from(crmCustomers).where(eq(crmCustomers.id, quote.customerId)).limit(1);
@@ -27358,6 +27379,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         quoteType: quote.quoteType,
         depositPaidAt: quote.depositPaidAt,
         depositAmount: quote.depositAmount,
+        depositChargedAmount: pubDepCharged,
         stripePaymentLinkId: quote.stripePaymentLinkId,
         depositPercentage,
       };

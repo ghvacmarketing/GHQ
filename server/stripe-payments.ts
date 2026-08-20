@@ -477,7 +477,7 @@ router.post("/api/stripe/settings/deposit-percentage", async (req, res) => {
 /** The deposit that offsets the CONTRACT: the base amount before any card/
  *  ACH convenience fee. New links carry it in metadata; legacy links fall
  *  back to re-deriving from the deposit percentage, then to the raw charge. */
-function contractDepositFrom(
+export function contractDepositFrom(
   md: Record<string, string> | null | undefined,
   chargedAmount: number,
   quoteTotal: number,

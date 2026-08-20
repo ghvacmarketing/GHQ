@@ -298,6 +298,21 @@ async function runTaggedCommentMigrations() {
          AND deposit_amount::numeric > ROUND(total::numeric * 0.5, 2) + 0.01
          AND deposit_amount::numeric <= ROUND(total::numeric * 0.5, 2) * 1.05 + 1
     `);
+    // Repair deposits recorded by the webhook's surcharge-subtraction bug
+    // (fixed 2026-08-20): it subtracted the FULL total's card fee from a
+    // charge that only carried the deposit's share, storing total × 48.5%
+    // instead of the 50% contract deposit. The 48.5% fingerprint (±2¢) is
+    // surgical — custom exact-$ deposits land there only by fluke, and
+    // repaired rows sit at exactly 50% so this never re-fires.
+    await db.execute(sql`
+      UPDATE crm_quotes
+         SET deposit_amount = ROUND(total::numeric * 0.5, 2)
+       WHERE deposit_paid_at IS NOT NULL
+         AND stripe_payment_link_id IS NOT NULL
+         AND total IS NOT NULL AND total::numeric > 0
+         AND deposit_amount IS NOT NULL
+         AND ABS(deposit_amount::numeric - ROUND(total::numeric * 0.485, 2)) <= 0.02
+    `);
   } catch (err) {
     console.error("Tagged comment migration error (non-fatal):", err);
   }
