@@ -769,7 +769,7 @@ Every page in the CRM sidebar:
 | Other | Goals | /crm/reports |
 | Other | Settings | /crm/settings |
 
-Not in the sidebar but real CRM pages: Notifications (/crm/notifications, bell icon), Install Planner (/crm/install-planner), Checklist Canvas (/crm/checklists, reached from Settings → Service Checklists), Marketing Automations (/crm/marketing).
+Not in the sidebar but real CRM pages: Notifications (/crm/notifications, bell icon; the bell's side drawer has Mark all read AND Clear all buttons — Clear all deletes every notification for that user; completing a task someone assigned you notifies THEM, type "Task completed"; task rows in Tasks show "from {name}" so it's clear who assigned what), Install Planner (/crm/install-planner), Checklist Canvas (/crm/checklists, reached from Settings → Service Checklists), Marketing Automations (/crm/marketing).
 
 ### The GHQ app suite (beyond the CRM)
 The signed-in home screen at / greets the user and shows role-filtered app tiles:

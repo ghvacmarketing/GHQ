@@ -26,7 +26,7 @@ import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
   id: string;
-  type: "mention" | "task_assigned" | "task_due" | "comment" | "status_change" | "system" | "tagged_comment";
+  type: "mention" | "task_assigned" | "task_due" | "task_completed" | "comment" | "status_change" | "system" | "tagged_comment";
   title: string;
   preview: string | null;
   entityType: string | null;
@@ -105,6 +105,13 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     onSuccess: invalidateAll,
   });
 
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/crm/notifications");
+    },
+    onSuccess: invalidateAll,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (notificationId: string) => {
       await apiRequest("DELETE", `/api/crm/notifications/${notificationId}`);
@@ -118,6 +125,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
         return <AtSign className="h-4 w-4 text-blue-500" />;
       case "task_assigned":
       case "task_due":
+      case "task_completed":
         return <ClipboardList className="h-4 w-4 text-green-500" />;
       case "comment":
         return <Bell className="h-4 w-4 text-purple-500" />;
@@ -174,6 +182,24 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-lg font-semibold">Notifications</h2>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => markAllReadMutation.mutate()}
+            disabled={markAllReadMutation.isPending || !notifications?.some((n) => !n.isRead)}
+            className="rounded-[4px] border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
+            data-testid="notif-mark-all-read"
+          >
+            Mark all read
+          </button>
+          <button
+            onClick={() => clearAllMutation.mutate()}
+            disabled={clearAllMutation.isPending || !notifications?.length}
+            className="rounded-[4px] border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+            data-testid="notif-clear-all"
+          >
+            Clear all
+          </button>
+        </div>
       </div>
 
       <div className="p-4 border-b space-y-3">
@@ -192,6 +218,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="mention">Mentions</SelectItem>
             <SelectItem value="task_assigned">Tasks Assigned</SelectItem>
+            <SelectItem value="task_completed">Tasks Completed</SelectItem>
             <SelectItem value="tagged_comment">Tagged Notes</SelectItem>
             <SelectItem value="comment">Comments</SelectItem>
             <SelectItem value="system">System</SelectItem>

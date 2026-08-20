@@ -73,6 +73,7 @@ type TaskRowProps = {
   t: Task & { assignedToUser?: CrmUser | null };
   scope: string;
   assigneeName: string | null;
+  creatorName: string | null;
   counts: { total: number; done: number } | undefined;
   isExpanded: boolean;
   checking: boolean;
@@ -86,7 +87,7 @@ type TaskRowProps = {
 };
 
 const TaskRow = memo(function TaskRow({
-  t, scope, assigneeName, counts, isExpanded, checking, leaving, entrance,
+  t, scope, assigneeName, creatorName, counts, isExpanded, checking, leaving, entrance,
   onToggle, onOpen, onDelete, onToggleExpanded, onToggleSubtask,
 }: TaskRowProps) {
   const completed = t.status === "completed";
@@ -148,6 +149,9 @@ const TaskRow = memo(function TaskRow({
               )}
               {assigneeName && scope === "everyone" && (
                 <span className="text-[11px] text-slate-400">{assigneeName}</span>
+              )}
+              {creatorName && creatorName !== assigneeName && (
+                <span className="text-[11px] text-slate-400">from {creatorName}</span>
               )}
             </div>
           </button>
@@ -705,6 +709,7 @@ export default function CrmTasksSimple() {
                 t={t}
                 scope={scope}
                 assigneeName={userName(t.assignedToUserId)}
+                creatorName={userName(t.createdByUserId)}
                 counts={subCounts.get(t.id)}
                 isExpanded={expandedTasks.has(t.id)}
                 checking={checkingIds.has(t.id)}
@@ -738,6 +743,7 @@ export default function CrmTasksSimple() {
                     t={t}
                     scope={scope}
                     assigneeName={userName(t.assignedToUserId)}
+                    creatorName={userName(t.createdByUserId)}
                     counts={subCounts.get(t.id)}
                     isExpanded={expandedTasks.has(t.id)}
                     checking={false}

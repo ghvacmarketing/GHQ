@@ -47,6 +47,7 @@ type PushDevice = {
 const TYPE_DESCRIPTIONS: Record<string, string> = {
   task_assigned: "A task gets assigned to someone",
   task_due: "A task reaches its due date",
+  task_completed: "A task they assigned gets completed",
   mention: "Someone is @-mentioned in a comment",
   tagged_comment: "Someone is tagged in a pin comment",
   comment: "A new comment lands on their work",
@@ -62,6 +63,7 @@ const TYPE_SUBTYPES: Record<string, string[]> = {
     "A teammate assigned you a task",
   ],
   task_due: ["A task reaches its due date"],
+  task_completed: ["A task you assigned was completed"],
   mention: ["@-mention in a comment"],
   tagged_comment: [
     "Someone left you a pin note",
@@ -82,6 +84,7 @@ const TYPE_LABELS: Record<string, string> = {
   mention: "Mention",
   task_assigned: "Task assigned",
   task_due: "Task due",
+  task_completed: "Task completed",
   comment: "Comment",
   status_change: "Status change",
   system: "System",

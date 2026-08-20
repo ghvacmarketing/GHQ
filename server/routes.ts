@@ -10904,6 +10904,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/notifications/mark-all-read - Mark all unread notifications as read
+  // DELETE /api/crm/notifications - clear EVERY notification for the current user
+  app.delete("/api/crm/notifications", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const result = await db.delete(crmNotifications)
+        .where(eq(crmNotifications.userId, currentUser.id));
+      // Icon badge follows the unread count (debounced, silent push)
+      import("./services/push").then(({ queueBadgeSync }) => queueBadgeSync(currentUser.id)).catch(() => {});
+      return res.json({ deleted: result.rowCount || 0 });
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+      return res.status(500).json({ message: "Failed to clear notifications" });
+    }
+  });
+
   app.post("/api/crm/notifications/mark-all-read", requireCrmAuth, async (req, res) => {
     try {
       const currentUser = await getCurrentCrmUser(req);
@@ -34555,6 +34573,21 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         beforeJson: JSON.stringify(existingTask),
         afterJson: JSON.stringify(updatedTask),
       });
+
+      // Completing someone's task tells THEM — the person who assigned it
+      // (task creator) gets a notification, unless they completed it themselves.
+      if (action === "completed" && existingTask.createdByUserId && existingTask.createdByUserId !== user.id) {
+        await db.insert(crmNotifications).values({
+          userId: existingTask.createdByUserId,
+          type: "task_completed" as any,
+          title: `${user.name} completed your task`,
+          preview: updatedTask.title || existingTask.title || null,
+          entityType: "task",
+          entityId: id,
+          actorId: user.id,
+          isRead: false,
+        });
+      }
 
       // Notify the new assignee when the task is reassigned
       const newAssigneeId = req.body.assignedToUserId;
