@@ -1545,6 +1545,7 @@ export const crmQuotes = pgTable("crm_quotes", {
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
   serviceAddress: text("service_address"),
+  billingAddress: text("billing_address"), // bill-to account's address snapshot
   title: text("title"),
   description: text("description"),
   lineItems: json("line_items").default([]),
@@ -1692,6 +1693,10 @@ export const crmInvoices = pgTable("crm_invoices", {
   invoiceNumber: text("invoice_number").notNull(),
   customerId: varchar("customer_id"),
   propertyId: varchar("property_id"),
+  // Address snapshots taken at creation (like quote.serviceAddress) — the
+  // property being serviced vs the bill-to account's address.
+  serviceAddress: text("service_address"),
+  billingAddress: text("billing_address"),
   workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "cascade" }),
   projectId: varchar("project_id").references(() => crmProjects.id, { onDelete: "set null" }),
   status: text("status").$type<CrmInvoiceStatus>().notNull().default("draft"),

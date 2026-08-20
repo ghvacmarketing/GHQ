@@ -15,7 +15,7 @@ import ghvacLogo from "@assets/ghvac-logo.png";
 const BRAND_COLOR = "#711419";
 
 interface PublicInvoiceData {
-  invoice: CrmInvoice & { customerName?: string; serviceAddress?: string };
+  invoice: CrmInvoice & { customerName?: string; serviceAddress?: string; billingAddress?: string };
   lineItems: CrmInvoiceLineItem[];
 }
 
@@ -297,6 +297,20 @@ export default function PublicInvoiceView() {
                     <p className="text-sm text-slate-500">Service Address</p>
                     <p className="font-medium text-slate-900">
                       {invoice.serviceAddress}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {invoice.billingAddress && invoice.billingAddress !== invoice.serviceAddress && (
+                <div className="flex items-start gap-3">
+                  <div className="text-slate-400 mt-0.5">
+                    <MapPin className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Bill To</p>
+                    <p className="font-medium text-slate-900" data-testid="text-billing-address">
+                      {invoice.billingAddress}
                     </p>
                   </div>
                 </div>

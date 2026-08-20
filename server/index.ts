@@ -338,6 +338,10 @@ async function runInstallPlannerMigrations() {
     // Govee per-sensor calibration offsets (match the Govee app's calibrated values).
     await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS temp_offset_f numeric(5,2) NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS humidity_offset numeric(5,2) NOT NULL DEFAULT 0`);
+    // Address snapshots: service (property) + bill-to (account) on quotes & invoices
+    await db.execute(sql`ALTER TABLE crm_quotes ADD COLUMN IF NOT EXISTS billing_address text`);
+    await db.execute(sql`ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS service_address text`);
+    await db.execute(sql`ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS billing_address text`);
     // ── Cost tracker (Settings → Usage & Costs) ──
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS ai_usage_events (

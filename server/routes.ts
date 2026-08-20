@@ -675,6 +675,34 @@ function shapeGoveeSensor(
   };
 }
 
+// ── Address snapshots for quotes/invoices ───────────────────────────────────
+// Service address = the property being worked on; billing address = the
+// bill-to account's (customer's) address. Snapshotted at creation so the
+// documents stay stable even if the customer record changes later.
+function formatCrmPropertyAddress(p: { address1?: string | null; address2?: string | null; city?: string | null; state?: string | null; zip?: string | null }): string {
+  const cityStZip = [p.city, [p.state, p.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return [p.address1, p.address2, cityStZip].filter(Boolean).join(", ");
+}
+
+async function resolveOrderAddresses(customerId?: string | null, propertyId?: string | null): Promise<{ serviceAddress: string | null; billingAddress: string | null }> {
+  let serviceAddress: string | null = null;
+  let billingAddress: string | null = null;
+  try {
+    if (propertyId) {
+      const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
+      if (prop) serviceAddress = formatCrmPropertyAddress(prop) || null;
+    }
+    if (customerId) {
+      const [cust] = await db.select({ fullAddress: crmCustomers.fullAddress }).from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      billingAddress = cust?.fullAddress || null;
+      if (!serviceAddress) serviceAddress = cust?.fullAddress || null;
+    }
+  } catch (e) {
+    console.error("resolveOrderAddresses failed:", (e as Error).message);
+  }
+  return { serviceAddress, billingAddress };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit's infrastructure
   app.set('trust proxy', 1);
@@ -19951,8 +19979,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         project = proj || null;
       }
       
+      // Older invoices predate the address snapshots — derive them on read.
+      let svcAddr = invoice.serviceAddress || null;
+      let billAddr = invoice.billingAddress || (customer as any)?.fullAddress || null;
+      if (!svcAddr && invoice.propertyId) {
+        const [prop] = await db.select().from(crmProperties).where(eq(crmProperties.id, invoice.propertyId));
+        if (prop) svcAddr = formatCrmPropertyAddress(prop) || null;
+      }
+      if (!svcAddr) svcAddr = (customer as any)?.fullAddress || null;
+
       return res.json({
         ...invoice,
+        serviceAddress: svcAddr,
+        billingAddress: billAddr,
         lineItems,
         customer,
         workOrder,
@@ -19985,11 +20024,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const invoiceNumber = await generateInvoiceNumber();
       
+      const invCustomerId = invoiceData.customerId || workOrder.customerId;
+      const invPropertyId = invoiceData.propertyId || workOrder.propertyId;
+      const invAddr = await resolveOrderAddresses(invCustomerId, invPropertyId);
+
       const invoiceToCreate = {
         ...invoiceData,
         invoiceNumber,
-        customerId: invoiceData.customerId || workOrder.customerId,
-        propertyId: invoiceData.propertyId || workOrder.propertyId,
+        serviceAddress: invoiceData.serviceAddress || invAddr.serviceAddress,
+        billingAddress: invoiceData.billingAddress || invAddr.billingAddress,
+        customerId: invCustomerId,
+        propertyId: invPropertyId,
         projectId: invoiceData.projectId || workOrder.projectId,
         createdBy: user.id,
         subtotal: invoiceData.subtotal ?? "0",
@@ -21902,6 +21947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id, quote_number as "quoteNumber", customer_id as "customerId", 
           customer_name as "customerName", customer_email as "customerEmail",
           customer_phone as "customerPhone", service_address as "serviceAddress",
+          billing_address as "billingAddress",
           title, description, line_items as "lineItems", subtotal, 
           labor_total as "laborTotal", total, status,
           valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
@@ -22061,6 +22107,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate quote number
       const quoteNumber = await generateQuoteNumber();
+
+      // Snapshot service + billing addresses (property being serviced / the
+      // bill-to account) unless the caller supplied them explicitly.
+      {
+        const addr = await resolveOrderAddresses(quoteData.customerId, quoteData.propertyId);
+        if (!quoteData.serviceAddress) quoteData.serviceAddress = addr.serviceAddress;
+        if (!quoteData.billingAddress) quoteData.billingAddress = addr.billingAddress;
+      }
 
       // Validate with schema
       const parseResult = insertCrmQuoteSchema.safeParse({
@@ -22568,6 +22622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Customer not found" });
       }
 
+      const quickAddr = await resolveOrderAddresses(customerId, propertyId);
+
       // Calculate totals from line items
       let subtotal = 0;
       for (const item of lineItems) {
@@ -22586,7 +22642,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: existingCustomer.displayName || existingCustomer.name || "Customer",
         customerEmail: existingCustomer.email || null,
         customerPhone: existingCustomer.phone || null,
-        serviceAddress: existingCustomer.address || null,
+        serviceAddress: quickAddr.serviceAddress,
+        billingAddress: quickAddr.billingAddress,
         scope: projectId ? "project" : (workOrderId ? "work_order" : "standalone"),
         workOrderId: workOrderId || null,
         propertyId: propertyId || null,
@@ -27098,23 +27155,27 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .where(eq(crmInvoiceLineItems.invoiceId, invoice.id))
         .orderBy(crmInvoiceLineItems.sortOrder);
 
-      // Get customer name
+      // Get customer name + billing address
       let customerName = "Customer";
+      let billingAddress = invoice.billingAddress || "";
       if (invoice.customerId) {
         const [customer] = await db.select().from(crmCustomers)
           .where(eq(crmCustomers.id, invoice.customerId)).limit(1);
         if (customer) {
           customerName = customer.name || "Customer";
+          if (!billingAddress) billingAddress = customer.fullAddress || "";
         }
       }
 
-      // Get property address
-      let serviceAddress = "";
-      if (invoice.propertyId) {
+      // Service address: snapshot first, else the property's real address
+      // (the old code read property.address — a field that doesn't exist —
+      // so this was always blank).
+      let serviceAddress = invoice.serviceAddress || "";
+      if (!serviceAddress && invoice.propertyId) {
         const [property] = await db.select().from(crmProperties)
           .where(eq(crmProperties.id, invoice.propertyId)).limit(1);
         if (property) {
-          serviceAddress = property.address || "";
+          serviceAddress = formatCrmPropertyAddress(property);
         }
       }
 
@@ -27124,6 +27185,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         invoiceNumber: invoice.invoiceNumber,
         customerName,
         serviceAddress,
+        billingAddress,
         status: invoice.status,
         subtotal: invoice.subtotal,
         laborTotal: invoice.laborTotal,
@@ -27246,12 +27308,19 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
       }
 
+      let pubQuoteBilling = "";
+      if (!quote.billingAddress && quote.customerId) {
+        const [pubCust] = await db.select({ fullAddress: crmCustomers.fullAddress }).from(crmCustomers).where(eq(crmCustomers.id, quote.customerId)).limit(1);
+        pubQuoteBilling = pubCust?.fullAddress || "";
+      }
+
       // Return only public-safe fields, exclude internal data
       const publicQuote = {
         id: quote.id,
         quoteNumber: quote.quoteNumber,
         customerName: quote.customerName,
         serviceAddress: quote.serviceAddress,
+        billingAddress: quote.billingAddress || pubQuoteBilling,
         title: quote.title,
         description: quote.description,
         subtotal: quote.subtotal,

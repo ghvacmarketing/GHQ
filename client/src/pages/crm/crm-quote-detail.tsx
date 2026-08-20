@@ -5012,8 +5012,15 @@ export default function CrmQuoteDetail() {
                     <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
                     <p className="font-medium text-slate-900">{quote.customerName || quote.customer?.name}</p>
                     {quote.serviceAddress && (
-                      <p className="text-slate-600 text-sm">{quote.serviceAddress}</p>
+                      <p className="text-slate-600 text-sm">
+                        {(quote.billingAddress || quote.customer?.fullAddress) ? "Service address: " : ""}{quote.serviceAddress}
+                      </p>
                     )}
+                    {(() => {
+                      const billTo = quote.billingAddress || quote.customer?.fullAddress;
+                      if (!billTo || billTo === quote.serviceAddress) return null;
+                      return <p className="text-slate-600 text-sm">Bill to: {billTo}</p>;
+                    })()}
                   </div>
 
                   {/* Description / Contract Template */}

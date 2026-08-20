@@ -519,11 +519,22 @@ export default function CrmInvoiceDetail() {
       doc.setFontSize(8.5);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...SLATE);
-      if (invoice.customer?.fullAddress) {
-        const addr = doc.splitTextToSize(String(invoice.customer.fullAddress), CW * 0.55);
+      const pdfBillTo = (invoice as any).billingAddress || invoice.customer?.fullAddress;
+      if (pdfBillTo) {
+        const addr = doc.splitTextToSize(String(pdfBillTo), CW * 0.55);
         addr.forEach((line: string) => { doc.text(line, M, by); by += 4.2; });
       }
       if (invoice.customer?.phone) { doc.text(String(invoice.customer.phone), M, by); by += 4.2; }
+      const pdfSvcAddr = (invoice as any).serviceAddress;
+      if (pdfSvcAddr && pdfSvcAddr !== pdfBillTo) {
+        by += 1.5;
+        doc.setFont("helvetica", "bold");
+        doc.text("SERVICE AT", M, by, { charSpace: 0.6 });
+        by += 4.2;
+        doc.setFont("helvetica", "normal");
+        const svcLines = doc.splitTextToSize(String(pdfSvcAddr), CW * 0.55);
+        svcLines.forEach((line: string) => { doc.text(line, M, by); by += 4.2; });
+      }
 
       doc.setFontSize(9);
       doc.setTextColor(...SLATE);
@@ -863,18 +874,27 @@ export default function CrmInvoiceDetail() {
             </CardContent>
           </Card>
 
-          {invoice.customer?.fullAddress && (
+          {((invoice as any).serviceAddress || (invoice as any).billingAddress) && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-slate-500" />
-                  Service Address
+                  Addresses
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-slate-700" data-testid="text-service-address">
-                  {invoice.customer.fullAddress}
-                </p>
+              <CardContent className="space-y-2">
+                {(invoice as any).serviceAddress && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Service address</p>
+                    <p className="text-slate-700" data-testid="text-service-address">{(invoice as any).serviceAddress}</p>
+                  </div>
+                )}
+                {(invoice as any).billingAddress && (invoice as any).billingAddress !== (invoice as any).serviceAddress && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Bill to</p>
+                    <p className="text-slate-700" data-testid="text-billing-address">{(invoice as any).billingAddress}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

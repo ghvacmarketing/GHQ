@@ -722,7 +722,13 @@ export default function PublicQuoteView() {
               <h3 className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Prepared for</h3>
               <p className="font-semibold text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
               {quoteData.serviceAddress && (
-                <p className="text-slate-600 text-sm" data-testid="text-service-address">{quoteData.serviceAddress}</p>
+                <p className="text-slate-600 text-sm" data-testid="text-service-address">
+                  {(quoteData as any).billingAddress && (quoteData as any).billingAddress !== quoteData.serviceAddress ? "Service address: " : ""}
+                  {quoteData.serviceAddress}
+                </p>
+              )}
+              {(quoteData as any).billingAddress && (quoteData as any).billingAddress !== quoteData.serviceAddress && (
+                <p className="text-slate-600 text-sm" data-testid="text-billing-address">Bill to: {(quoteData as any).billingAddress}</p>
               )}
             </div>
 
