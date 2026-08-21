@@ -22199,6 +22199,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Full internal waterfall for a Custom Pricing (install) quote — everything
+  // the worksheet's Calculated Totals panel shows, PLUS the raw inputs and
+  // lines so the worksheet can re-open this quote later for edits.
+  function buildInstallCostingSnapshot(
+    inputs: any,
+    installSubtype: string,
+    lines: Array<{ category?: string; description?: string; cost?: number; customerVisible?: boolean }>,
+    calcs: any,
+  ) {
+    return {
+      mode: "install",
+      installSubtype,
+      inputs: {
+        hoursToInstall: inputs.hoursToInstall || 0,
+        topManHourlyRate: inputs.topManHourlyRate || 0,
+        laborBenefitsPct: inputs.laborBenefitsPct || 0,
+        overheadPct: inputs.overheadPct || 0,
+        profitPct: inputs.profitPct || 0,
+        financingPct: inputs.financingPct || 0,
+        commissionPct: inputs.commissionPct || 0,
+        warrantyReserveDollar: inputs.warrantyReserveDollar || 0,
+        crewDayHours: inputs.crewDayHours || 0,
+        discountDollar: inputs.discountDollar || 0,
+      },
+      lines: lines.map((l) => ({
+        category: l.category || "other",
+        description: l.description || "",
+        cost: l.cost || 0,
+        customerVisible: l.customerVisible === true,
+      })),
+      laborPayroll: calcs.laborPayroll,
+      laborBenefits: calcs.laborBenefits,
+      linesTotal: calcs.linesTotal,
+      warrantyReserve: inputs.warrantyReserveDollar || 0,
+      directCost: calcs.directCost,
+      sellPrice: calcs.sellPrice,
+      overhead: Math.round(calcs.sellPrice * (inputs.overheadPct || 0) * 100) / 100,
+      financing: Math.round(calcs.sellPrice * (inputs.financingPct || 0) * 100) / 100,
+      commission: Math.round(calcs.sellPrice * (inputs.commissionPct || 0) * 100) / 100,
+      profit: Math.round(calcs.sellPrice * (inputs.profitPct || 0) * 100) / 100,
+      grossProfit: calcs.grossProfit,
+      grossMarginPct: calcs.grossMarginPct,
+      crewDays: calcs.crewDays,
+      grossProfitPerCrewDay: calcs.grossProfitPerCrewDay,
+      discountDollar: inputs.discountDollar || 0,
+      discountedSellPrice: calcs.discountedSellPrice,
+      discountedGrossProfit: calcs.discountedGrossProfit,
+      discountedGrossMarginPct: calcs.discountedGrossMarginPct,
+      discountedGpPerCrewDay: calcs.discountedGpPerCrewDay,
+    };
+  }
+
+  // Service twin: summary waterfall from the calculated totals + the full raw
+  // worksheet state (parts, labor hours, warranty answers, per-quote inputs)
+  // so Custom Pricing can re-open the quote for edits.
+  function buildServiceCostingSnapshot(serviceQuoteData: any) {
+    const svcTotals = serviceQuoteData?.totals;
+    const svcSell = svcTotals ? parseFloat(svcTotals.fullSellingPrice || "0") : 0;
+    const svcDirect = svcTotals ? parseFloat(svcTotals.directCost || "0") : 0;
+    if (!svcTotals || !(svcSell > 0)) return null;
+    const { totals: _totals, ...rawState } = serviceQuoteData;
+    return {
+      mode: "service",
+      directCost: svcDirect,
+      sellPrice: svcSell,
+      overhead: parseFloat(svcTotals.overhead || "0"),
+      financing: parseFloat(svcTotals.financingCost || "0"),
+      commission: parseFloat(svcTotals.commission || "0"),
+      profit: parseFloat(svcTotals.profit || "0"),
+      grossProfit: Math.round((svcSell - svcDirect) * 100) / 100,
+      grossMarginPct: (svcSell - svcDirect) / svcSell,
+      totals: svcTotals,
+      serviceQuoteData: rawState,
+    };
+  }
+
   // POST /api/crm/quotes/from-worksheet - Create quote from install pricing worksheet
   app.post("/api/crm/quotes/from-worksheet", requireCrmSalesOrAbove, async (req, res) => {
     try {
@@ -22287,17 +22363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scope: "project",
         status: "draft",
         title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
-        costingSnapshot: {
-          mode: "install",
-          directCost: calcs.directCost,
-          sellPrice: calcs.sellPrice,
-          overhead: Math.round(calcs.sellPrice * (inputs.overheadPct || 0) * 100) / 100,
-          financing: Math.round(calcs.sellPrice * (inputs.financingPct || 0) * 100) / 100,
-          commission: Math.round(calcs.sellPrice * (inputs.commissionPct || 0) * 100) / 100,
-          profit: Math.round(calcs.sellPrice * (inputs.profitPct || 0) * 100) / 100,
-          grossProfit: calcs.grossProfit,
-          grossMarginPct: calcs.grossMarginPct,
-        } as any,
+        costingSnapshot: buildInstallCostingSnapshot(inputs, installSubtype, lines, calcs) as any,
         description: "",
         subtotal: calcs.linesTotal.toString(),
         total: calcs.discountedSellPrice.toString(),
@@ -22386,6 +22452,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating quote from worksheet:", error);
       return res.status(500).json({ message: "Failed to create quote from worksheet" });
+    }
+  });
+
+  // PUT /api/crm/quotes/:id/from-worksheet - Re-finalize a Custom Pricing
+  // quote after re-opening it in the worksheet: line items, totals, and the
+  // costing snapshot are regenerated wholesale from the edited worksheet.
+  // Allowed at any point before the customer accepts — draft, sent, even
+  // declined/expired (repricing revives the numbers, never the status).
+  app.put("/api/crm/quotes/:id/from-worksheet", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id));
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      if (quote.quoteType !== "custom_install" && quote.quoteType !== "custom_service") {
+        return res.status(400).json({ message: "Only Custom Pricing quotes can be re-opened in the worksheet" });
+      }
+      if (quote.status === "accepted" || quote.status === "converted") {
+        return res.status(409).json({ message: "This quote was accepted — its pricing is locked" });
+      }
+
+      const prevTotal = quote.total;
+      let newTotal = prevTotal;
+
+      if (req.body?.mode === "service") {
+        const { serviceQuoteData, lineItems } = req.body;
+        if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+          return res.status(400).json({ message: "At least one line item is required" });
+        }
+        const svcSnapshot = buildServiceCostingSnapshot(serviceQuoteData);
+        if (!svcSnapshot) {
+          return res.status(400).json({ message: "Missing calculated totals" });
+        }
+
+        await db.delete(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quote.id));
+
+        let sortOrder = 0;
+        let subtotal = 0;
+        for (const item of lineItems) {
+          if (!item.description?.trim()) continue;
+          const quantity = item.quantity || 1;
+          const unitPrice = item.unitPrice || 0;
+          const lineTotal = quantity * unitPrice;
+          subtotal += lineTotal;
+          await db.insert(crmQuoteLineItems).values({
+            quoteId: quote.id,
+            lineType: item.lineType || "part",
+            description: item.description.trim(),
+            quantity: quantity.toString(),
+            unitPrice: unitPrice.toString(),
+            lineTotal: lineTotal.toString(),
+            sortOrder: sortOrder++,
+          });
+        }
+
+        newTotal = subtotal.toFixed(2);
+        await db.update(crmQuotes)
+          .set({
+            subtotal: subtotal.toFixed(2),
+            total: newTotal,
+            costingSnapshot: svcSnapshot as any,
+            updatedAt: new Date(),
+          })
+          .where(eq(crmQuotes.id, quote.id));
+      } else {
+        const { installSubtype, inputs, lines } = req.body;
+        if (!lines || !Array.isArray(lines) || lines.length === 0) {
+          return res.status(400).json({ message: "At least one line item is required" });
+        }
+
+        const { calcWorksheet } = await import("@shared/calcWorksheet");
+        const calcs = calcWorksheet(inputs, lines.map((l: { cost: number }) => ({ cost: l.cost })));
+
+        await db.delete(crmQuoteLineItems).where(eq(crmQuoteLineItems.quoteId, quote.id));
+
+        let sortOrder = 0;
+        let equipmentSubtotal = 0;
+        for (const line of lines) {
+          const cost = line.cost || 0;
+          if (cost === 0) continue;
+          equipmentSubtotal += cost;
+          await db.insert(crmQuoteLineItems).values({
+            quoteId: quote.id,
+            lineType: "part",
+            description: line.description || line.category,
+            unitPrice: cost.toString(),
+            quantity: "1",
+            lineTotal: cost.toString(),
+            sortOrder: sortOrder++,
+            // Promotions made on the quote page ride along on re-finalize —
+            // the worksheet carries each line's current visibility flag.
+            customerVisible: line.customerVisible === true,
+          });
+        }
+
+        const laborTotal = calcs.laborPayroll + calcs.laborBenefits;
+        if (laborTotal > 0) {
+          await db.insert(crmQuoteLineItems).values({
+            quoteId: quote.id,
+            lineType: "labor",
+            description: `Installation Labor (${inputs.hoursToInstall} hrs)`,
+            unitPrice: laborTotal.toString(),
+            quantity: "1",
+            lineTotal: laborTotal.toString(),
+            sortOrder: sortOrder++,
+            customerVisible: false,
+          });
+        }
+
+        if (inputs.warrantyReserveDollar > 0) {
+          await db.insert(crmQuoteLineItems).values({
+            quoteId: quote.id,
+            lineType: "other",
+            description: "Warranty Reserve",
+            unitPrice: inputs.warrantyReserveDollar.toString(),
+            quantity: "1",
+            lineTotal: inputs.warrantyReserveDollar.toString(),
+            sortOrder: sortOrder++,
+            customerVisible: false,
+          });
+        }
+
+        const internalSubtotal = equipmentSubtotal + laborTotal + (inputs.warrantyReserveDollar || 0);
+        const subtype = typeof installSubtype === "string" && installSubtype ? installSubtype : "residential";
+        const autoTitle = `Install - ${subtype.charAt(0).toUpperCase() + subtype.slice(1)}`;
+
+        newTotal = calcs.discountedSellPrice.toString();
+        await db.update(crmQuotes)
+          .set({
+            // Regenerate the auto title only when it was never customized
+            ...(quote.title && !quote.title.startsWith("Install - ") ? {} : { title: autoTitle }),
+            subtotal: internalSubtotal.toString(),
+            laborTotal: laborTotal.toString(),
+            total: newTotal,
+            costingSnapshot: buildInstallCostingSnapshot(inputs, subtype, lines, calcs) as any,
+            updatedAt: new Date(),
+          })
+          .where(eq(crmQuotes.id, quote.id));
+      }
+
+      await logCrmAudit(
+        user.id,
+        "quote.repriced",
+        "crm_quote",
+        quote.id,
+        { quoteNumber: quote.quoteNumber, mode: req.body?.mode === "service" ? "service" : "install", prevTotal, newTotal },
+        req.ip
+      );
+
+      return res.json({ quoteId: quote.id });
+    } catch (error) {
+      console.error("Error re-finalizing quote from worksheet:", error);
+      return res.status(500).json({ message: "Failed to update quote from worksheet" });
     }
   });
 
@@ -22516,23 +22740,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Assigned user not found" });
         }
         const isServiceQuote = quoteType === "quick" || quoteType === "custom_service";
-
-      // Custom Pricing (service) sends its calculated totals — snapshot the
-      // internal waterfall on the quote so the detail page can show it later.
-      const svcTotals = (req.body?.serviceQuoteData as any)?.totals;
-      const svcSell = svcTotals ? parseFloat(svcTotals.fullSellingPrice || "0") : 0;
-      const svcDirect = svcTotals ? parseFloat(svcTotals.directCost || "0") : 0;
-      const svcSnapshot = svcTotals && svcSell > 0 ? {
-        mode: "service",
-        directCost: svcDirect,
-        sellPrice: svcSell,
-        overhead: parseFloat(svcTotals.overhead || "0"),
-        financing: parseFloat(svcTotals.financingCost || "0"),
-        commission: parseFloat(svcTotals.commission || "0"),
-        profit: parseFloat(svcTotals.profit || "0"),
-        grossProfit: Math.round((svcSell - svcDirect) * 100) / 100,
-        grossMarginPct: (svcSell - svcDirect) / svcSell,
-      } : null;
         const validRoles = isServiceQuote
           ? ["admin", "sales", "supervisor", "owner"]
           : ["sales", "supervisor", "owner"];
@@ -22543,6 +22750,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: roleMsg });
         }
       }
+
+      // Custom Pricing (service) sends its calculated totals — snapshot the
+      // internal waterfall (plus the raw worksheet state for later re-edits).
+      const svcSnapshot = buildServiceCostingSnapshot(req.body?.serviceQuoteData);
 
       // Calculate totals from line items
       let subtotal = 0;

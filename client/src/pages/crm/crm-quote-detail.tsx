@@ -71,6 +71,7 @@ import {
   FolderKanban,
   Eye,
   EyeOff,
+  Calculator,
   Package,
   Search,
   Tag,
@@ -1180,6 +1181,14 @@ export default function CrmQuoteDetail() {
   };
 
   const canEditLineItems = quote && !["accepted", "converted"].includes(quote.status);
+  // Custom Pricing quotes re-open in the worksheet until the customer accepts.
+  // Service quotes additionally need the raw worksheet state in their snapshot
+  // (older ones predate it); install quotes can always reconstruct.
+  const quoteCostingSnapshot = (quote as any)?.costingSnapshot as any | null;
+  const isCustomQuote =
+    !!quote && ((quote as any).quoteType === "custom_install" || (quote as any).quoteType === "custom_service");
+  const canReopenWorksheet =
+    isCustomQuote && ((quote as any).quoteType === "custom_install" || !!quoteCostingSnapshot?.serviceQuoteData);
 
   const acceptInPersonMutation = useMutation({
     mutationFn: async (data: { signatureImage: string; signerName: string; selectedOption?: string | null }) => {
@@ -3459,9 +3468,23 @@ export default function CrmQuoteDetail() {
                     Cost build-up for this job — internal only, never on customer-facing copies.
                   </p>
                 </div>
-                <span className="rounded-[3px] bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-800">
-                  Internal only
-                </span>
+                <div className="flex items-center gap-2">
+                  {isCustomQuote && canEditLineItems && canReopenWorksheet && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-amber-300 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                      onClick={() => navigate(`/crm/quotes/install-worksheet/${quote.id}`)}
+                      data-testid="button-edit-custom-pricing"
+                    >
+                      <Calculator className="h-4 w-4 mr-1.5" />
+                      Edit in Custom Pricing
+                    </Button>
+                  )}
+                  <span className="rounded-[3px] bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-800">
+                    Internal only
+                  </span>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -3527,45 +3550,118 @@ export default function CrmQuoteDetail() {
                   <span className="font-medium">{formatCurrency(internalCostsTotal)}</span>
                 </div>
                 {(() => {
-                  // Full waterfall from the Custom Pricing snapshot when this
-                  // quote was finalized; older quotes fall back to sell − costs.
-                  const snap = (quote as any).costingSnapshot as {
-                    directCost?: number; sellPrice?: number; overhead?: number;
-                    financing?: number; commission?: number; profit?: number;
-                    grossProfit?: number; grossMarginPct?: number;
-                  } | null;
+                  // Full waterfall from the Custom Pricing snapshot — the same
+                  // numbers the worksheet's Calculated Totals panel showed at
+                  // finalize time. Older snapshots carry fewer fields, so each
+                  // row renders only when its number exists; ancient quotes
+                  // with no snapshot at all fall back to sell − costs.
+                  const snap = quoteCostingSnapshot;
                   const sell = parseFloat(quote.total || "0");
                   if (snap && snap.sellPrice) {
+                    const isService = snap.mode === "service";
+                    const st = isService ? snap.totals || {} : null;
+                    const num = (v: any): number | null => {
+                      if (v === null || v === undefined || v === "") return null;
+                      const n = parseFloat(String(v));
+                      return Number.isNaN(n) ? null : n;
+                    };
+                    const row = (label: string, value: number | null, strong = false) =>
+                      value === null ? null : (
+                        <div key={label} className="flex justify-between text-sm">
+                          <span className={strong ? "font-medium text-slate-700" : "text-slate-600"}>{label}</span>
+                          <span className={strong ? "font-medium" : undefined}>{formatCurrency(value)}</span>
+                        </div>
+                      );
+                    const subtypeLabel =
+                      !isService && typeof snap.installSubtype === "string" && snap.installSubtype
+                        ? snap.installSubtype.charAt(0).toUpperCase() + snap.installSubtype.slice(1)
+                        : null;
+                    // What finalize actually stored as the quote total — the
+                    // drift note fires only when the stored total moved since.
+                    const finalizeTotal = isService
+                      ? num(st.partsSubtotal) !== null && num(st.totalLaborCost) !== null
+                        ? (num(st.partsSubtotal) || 0) + (num(st.totalLaborCost) || 0)
+                        : null
+                      : num(snap.discountedSellPrice ?? snap.sellPrice);
                     return (
                       <>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Sell price (at finalize)</span>
-                          <span className="font-medium">{formatCurrency(snap.sellPrice)}</span>
+                        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cost build-up</p>
+                        {isService ? (
+                          <>
+                            {row("Parts subtotal", num(st.partsSubtotal))}
+                            {(num(st.ghvacCoveredParts) || 0) > 0 ? row("of which GHVAC-warranty covered", num(st.ghvacCoveredParts)) : null}
+                            {(num(st.materialShrinkage) || 0) > 0 ? row("Material shrinkage", num(st.materialShrinkage)) : null}
+                            {row("Labor payroll", num(st.baseLaborCost))}
+                            {row("Labor benefits", num(st.laborBenefits))}
+                            {(num(st.salesTax) || 0) > 0 ? row("Sales tax", num(st.salesTax)) : null}
+                            {(num(st.warrantyReserve) || 0) > 0 ? row("Warranty reserve", num(st.warrantyReserve)) : null}
+                          </>
+                        ) : (
+                          <>
+                            {row("Labor payroll", num(snap.laborPayroll))}
+                            {row("Labor benefits", num(snap.laborBenefits))}
+                            {row("Lines total (materials & equipment)", num(snap.linesTotal))}
+                            {(num(snap.warrantyReserve) || 0) > 0 ? row("Warranty reserve", num(snap.warrantyReserve)) : null}
+                          </>
+                        )}
+                        <div className="flex justify-between border-t pt-1.5 text-sm font-medium" data-testid="snap-direct-cost">
+                          <span className="text-slate-700">Direct cost</span>
+                          <span>{formatCurrency(num(snap.directCost) || 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t pt-1.5" data-testid="snap-sell-price">
+                          <span className="text-sm font-semibold text-slate-800">Sell price (at finalize)</span>
+                          <span className="text-base font-bold text-[#d3b07d]">{formatCurrency(num(snap.sellPrice) || 0)}</span>
                         </div>
                         <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Overhead</span>
-                          <span>{formatCurrency(snap.overhead || 0)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Financing</span>
-                          <span>{formatCurrency(snap.financing || 0)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Commission</span>
-                          <span>{formatCurrency(snap.commission || 0)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-medium">
-                          <span className="text-slate-700">Profit</span>
-                          <span>{formatCurrency(snap.profit || 0)}</span>
-                        </div>
+                        {row("Overhead", num(snap.overhead) ?? 0)}
+                        {row("Financing", num(snap.financing) ?? 0)}
+                        {row("Commission", num(snap.commission) ?? 0)}
+                        {row("Profit", num(snap.profit) ?? 0, true)}
                         <div className="flex justify-between border-t pt-1.5 text-sm">
                           <span className="text-slate-600">Gross profit · margin</span>
-                          <span className={`font-semibold ${(snap.grossProfit || 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                            {formatCurrency(snap.grossProfit || 0)} · {((snap.grossMarginPct || 0) * 100).toFixed(1)}%
+                          <span className={`font-semibold ${(num(snap.grossProfit) || 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                            {formatCurrency(num(snap.grossProfit) || 0)} · {((num(snap.grossMarginPct) || 0) * 100).toFixed(1)}%
                           </span>
                         </div>
-                        {sell > 0 && snap.sellPrice && Math.abs(sell - snap.sellPrice) > 0.01 && (
+                        {!isService && num(snap.crewDays) !== null && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-600">Crew days · GP per crew day</span>
+                            <span className="font-medium">
+                              {(num(snap.crewDays) || 0).toFixed(2)} · {formatCurrency(num(snap.grossProfitPerCrewDay) || 0)}
+                            </span>
+                          </div>
+                        )}
+                        {subtypeLabel && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-600">Install type</span>
+                            <span className="font-medium">{subtypeLabel}</span>
+                          </div>
+                        )}
+                        {!isService && (num(snap.discountDollar) || 0) > 0 && (
+                          <div className="-mx-1 space-y-1 rounded-[4px] bg-amber-50 px-2 py-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-amber-700">Discount</span>
+                              <span className="text-amber-800">−{formatCurrency(num(snap.discountDollar) || 0)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-medium">
+                              <span className="text-amber-700">Discounted price</span>
+                              <span className="text-amber-900">{formatCurrency(num(snap.discountedSellPrice) || 0)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-amber-700">Discounted GP · margin</span>
+                              <span className="text-amber-800">
+                                {formatCurrency(num(snap.discountedGrossProfit) || 0)} · {((num(snap.discountedGrossMarginPct) || 0) * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {isService && st.isGHVACWarranty && num(st.priceBeforeWarranty) !== null && (
+                          <p className="text-[11px] text-slate-500">
+                            GHVAC warranty applied — full price {formatCurrency(num(st.priceBeforeWarranty) || 0)}, customer pays{" "}
+                            {Math.round((num(st.warrantyCoverage) || 0) * 100)}%.
+                          </p>
+                        )}
+                        {finalizeTotal !== null && sell > 0 && Math.abs(sell - finalizeTotal) > 0.01 && (
                           <p className="text-[11px] text-amber-600">
                             Quote total is now {formatCurrency(sell)} — the breakdown above reflects pricing at finalize time.
                           </p>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useRoute, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,6 +137,23 @@ export default function CrmInstallWorksheet() {
   const [customPartPrefillData, setCustomPartPrefillData] = useState<any>(null);
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
 
+  // ── Edit mode: /crm/quotes/install-worksheet/<quoteId> re-opens a finalized
+  // Custom Pricing quote — the worksheet seeds from its costing snapshot and
+  // Save regenerates the quote's lines + totals in place. ──
+  const [, routeParams] = useRoute("/crm/quotes/install-worksheet/:id");
+  const editQuoteId = routeParams?.id && routeParams.id !== "new" ? routeParams.id : null;
+  const [editSeeded, setEditSeeded] = useState(false);
+  const [editReconstructed, setEditReconstructed] = useState(false);
+  const { data: editQuote, isError: editLoadError } = useQuery<any>({
+    queryKey: ["/api/crm/quotes", editQuoteId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes/${editQuoteId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load quote");
+      return res.json();
+    },
+    enabled: !!editQuoteId,
+  });
+
   // ── Prefill from the New Quote setup flow: customer + salesperson are
   // chosen BEFORE this page opens, so finalizing must never re-ask. ──
   const urlParams = useMemo(() => new URLSearchParams(searchString), [searchString]);
@@ -159,6 +176,101 @@ export default function CrmInstallWorksheet() {
     if (presetCustomer && !selectedCustomer) setSelectedCustomer(presetCustomer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetCustomer]);
+
+  // Seed the whole worksheet from the quote being edited (once, on load)
+  useEffect(() => {
+    if (!editQuoteId || !editQuote || editSeeded) return;
+    if (editQuote.status === "accepted" || editQuote.status === "converted") {
+      toast({ title: "Quote is locked", description: "Accepted quotes can't be repriced.", variant: "destructive" });
+      navigate(`/crm/quotes/${editQuoteId}`);
+      return;
+    }
+    const snap = (editQuote.costingSnapshot || null) as any;
+    const mode: PricingMode = snap?.mode === "service" || editQuote.quoteType === "custom_service" ? "service" : "install";
+    setPricingMode(mode);
+    if (editQuote.customer) setSelectedCustomer(editQuote.customer as CrmCustomer);
+    else if (editQuote.customerId) setSelectedCustomer({ id: editQuote.customerId, name: editQuote.customerName } as CrmCustomer);
+    if (editQuote.assignedToId) setAssignedToId(editQuote.assignedToId);
+
+    if (mode === "install") {
+      const lineItems: any[] = editQuote.lineItems || [];
+      if (snap?.inputs) {
+        setInputs({ ...defaultInputs, ...snap.inputs });
+      } else {
+        // Older quote — its snapshot predates raw-input storage. Rebuild what
+        // we can from the summary numbers + generated line items; the rest
+        // stays at defaults, flagged in the banner so nobody trusts it blindly.
+        const round4 = (n: number) => Math.round(n * 10000) / 10000;
+        const rebuilt = { ...defaultInputs };
+        const sell = Number(snap?.sellPrice) || 0;
+        if (sell > 0) {
+          rebuilt.overheadPct = round4((Number(snap?.overhead) || 0) / sell);
+          rebuilt.financingPct = round4((Number(snap?.financing) || 0) / sell);
+          rebuilt.commissionPct = round4((Number(snap?.commission) || 0) / sell);
+          rebuilt.profitPct = round4((Number(snap?.profit) || 0) / sell);
+        }
+        const laborItem = lineItems.find((i) => i.lineType === "labor");
+        const hrsMatch = laborItem?.description?.match(/\(([\d.]+)\s*hrs?\)/i);
+        if (hrsMatch) rebuilt.hoursToInstall = parseFloat(hrsMatch[1]) || rebuilt.hoursToInstall;
+        const laborLineTotal = parseFloat(String(laborItem?.lineTotal || 0)) || 0;
+        if (laborLineTotal > 0 && rebuilt.hoursToInstall > 0) {
+          // The labor line bundles payroll + benefits — split with the default benefits pct
+          rebuilt.topManHourlyRate = Math.round((laborLineTotal / (1 + rebuilt.laborBenefitsPct) / rebuilt.hoursToInstall) * 100) / 100;
+        }
+        const warrantyItem = lineItems.find((i) => i.description === "Warranty Reserve");
+        rebuilt.warrantyReserveDollar = warrantyItem ? parseFloat(String(warrantyItem.lineTotal || 0)) || 0 : 0;
+        const total = parseFloat(String(editQuote.total || 0)) || 0;
+        if (sell > 0 && total > 0 && sell - total > 0.009) rebuilt.discountDollar = Math.round((sell - total) * 100) / 100;
+        setInputs(rebuilt);
+        setEditReconstructed(true);
+      }
+      if (snap?.installSubtype && INSTALL_SUBTYPES.some((s) => s.value === snap.installSubtype)) {
+        setInstallSubtype(snap.installSubtype);
+      } else if (typeof editQuote.title === "string") {
+        const m = editQuote.title.match(/^Install - (\w+)/i);
+        const s = m?.[1]?.toLowerCase();
+        if (s && INSTALL_SUBTYPES.some((st) => st.value === s)) setInstallSubtype(s as InstallSubtype);
+      }
+      // Cost lines: the quote's CURRENT part lines are the source of truth
+      // (they carry any additions/promotions made on the quote page); the
+      // snapshot only contributes each line's original category.
+      const snapLines: any[] = Array.isArray(snap?.lines) ? snap.lines : [];
+      const categoryFor = (desc: string): LineCategory => {
+        const c = snapLines.find((sl) => sl.description === desc)?.category;
+        return LINE_CATEGORIES.some((lc) => lc.value === c) ? (c as LineCategory) : "other";
+      };
+      setLines(
+        lineItems
+          .filter((i) => i.lineType === "part")
+          .map((i, idx) => ({
+            id: `line-${i.id || idx}`,
+            category: categoryFor(i.description || ""),
+            description: i.description || "",
+            cost: parseFloat(String(i.lineTotal ?? i.unitPrice ?? 0)) || 0,
+            customerVisible: i.customerVisible === true,
+          }))
+      );
+    } else {
+      const sq = snap?.serviceQuoteData;
+      if (!sq) {
+        toast({
+          title: "Can't re-open this quote",
+          description: "It was created before editable Custom Pricing — the original parts list wasn't saved.",
+          variant: "destructive",
+        });
+        navigate(`/crm/quotes/${editQuoteId}`);
+        return;
+      }
+      setServiceParts(Array.isArray(sq.parts) ? sq.parts : []);
+      setServiceLaborHours(String(sq.laborHours ?? ""));
+      setServiceGhvacInstalled(typeof sq.ghvacInstalled === "boolean" ? sq.ghvacInstalled : undefined);
+      setServiceYearsSinceInstallation(String(sq.yearsSinceInstallation ?? ""));
+      setServiceJobNotes(sq.jobNotes || "");
+      if (sq.serviceInputs) setServiceInputs(sq.serviceInputs);
+    }
+    setEditSeeded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editQuote, editSeeded, editQuoteId]);
 
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
@@ -241,6 +353,25 @@ export default function CrmInstallWorksheet() {
     },
     onError: (error: Error) => {
       toast({ title: "Error creating quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Edit mode's Save — regenerates the existing quote's lines, totals, and
+  // costing snapshot from the current worksheet state.
+  const updateMutation = useMutation({
+    mutationFn: async (payload: object) => {
+      const res = await apiRequest("PUT", `/api/crm/quotes/${editQuoteId}/from-worksheet`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Quote updated", description: "Line items and totals were regenerated from the worksheet." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", editQuoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      navigate(`/crm/quotes/${editQuoteId}`);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error updating quote", description: error.message, variant: "destructive" });
     },
   });
 
@@ -481,6 +612,23 @@ export default function CrmInstallWorksheet() {
       taxable: false,
     });
 
+    // The full worksheet state rides the snapshot so this quote can be
+    // re-opened in Custom Pricing later for edits.
+    const serviceQuoteData = {
+      parts: serviceParts,
+      laborHours: serviceLaborHours,
+      ghvacInstalled: serviceGhvacInstalled,
+      yearsSinceInstallation: serviceYearsSinceInstallation,
+      jobNotes: serviceJobNotes,
+      serviceInputs,
+      totals: calculateServiceTotals,
+    };
+
+    if (editQuoteId) {
+      updateMutation.mutate({ mode: "service", serviceQuoteData, lineItems });
+      return;
+    }
+
     saveServiceQuoteMutation.mutate({
       customerId: selectedCustomer.id,
       title: "Service Quote",
@@ -489,14 +637,7 @@ export default function CrmInstallWorksheet() {
       lineItems,
       status: "draft",
       quoteType: "custom_service",
-      serviceQuoteData: {
-        parts: serviceParts,
-        laborHours: serviceLaborHours,
-        ghvacInstalled: serviceGhvacInstalled,
-        yearsSinceInstallation: serviceYearsSinceInstallation,
-        jobNotes: serviceJobNotes,
-        totals: calculateServiceTotals,
-      },
+      serviceQuoteData,
       assignedToId: assignedToId || undefined,
     });
   };
@@ -514,12 +655,31 @@ export default function CrmInstallWorksheet() {
       toast({ title: "Missing warranty info", description: "Select GHVAC warranty status", variant: "destructive" });
       return;
     }
+    if (editQuoteId) {
+      handleSaveServiceQuote();
+      return;
+    }
     setShowCustomerModal(true);
   };
 
   const handleFinalizeClick = () => {
     if (lines.length === 0) {
       toast({ title: "No line items", description: "Add at least one line item before creating a quote", variant: "destructive" });
+      return;
+    }
+    // Editing an existing quote — save in place, never re-ask for a customer.
+    if (editQuoteId) {
+      updateMutation.mutate({
+        mode: "install",
+        installSubtype,
+        inputs,
+        lines: lines.map((l) => ({
+          category: l.category,
+          description: l.description,
+          cost: l.cost,
+          customerVisible: l.customerVisible,
+        })),
+      });
       return;
     }
     // Customer + salesperson were picked in the New Quote setup — create
@@ -602,7 +762,7 @@ export default function CrmInstallWorksheet() {
     items: lines.filter((l) => l.category === cat.value),
   })).filter((group) => group.items.length > 0);
 
-  const isFinalizing = finalizeMutation.isPending;
+  const isFinalizing = finalizeMutation.isPending || updateMutation.isPending;
 
   if (authLoading) {
     return (
@@ -621,6 +781,32 @@ export default function CrmInstallWorksheet() {
 
   if (!currentUser) return null;
 
+  if (editQuoteId && !editSeeded) {
+    return (
+      <CrmLayout currentUser={currentUser}>
+        <div className="max-w-7xl mx-auto space-y-6">
+          {editLoadError ? (
+            <div className="rounded-[4px] border border-slate-300/70 bg-white p-8 text-center">
+              <p className="text-sm text-slate-500">Couldn't load this quote for editing.</p>
+              <Button variant="outline" className="mt-4" onClick={() => navigate(`/crm/quotes/${editQuoteId}`)} data-testid="button-back-to-quote">
+                Back to quote
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Skeleton className="h-12 w-64" />
+              <div className="grid grid-cols-3 gap-6">
+                <Skeleton className="h-96" />
+                <Skeleton className="h-96" />
+                <Skeleton className="h-96" />
+              </div>
+            </>
+          )}
+        </div>
+      </CrmLayout>
+    );
+  }
+
   const formatCurrency = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatPercent = (n: number) => `${(n * 100).toFixed(2)}%`;
   const money = (v: string | undefined) => formatCurrency(parseFloat(v || "0"));
@@ -632,7 +818,7 @@ export default function CrmInstallWorksheet() {
         <div className="grid items-center gap-3 xl:grid-cols-[1fr_auto_1fr]">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              onClick={() => navigate("/crm/quotes")}
+              onClick={() => navigate(editQuoteId ? `/crm/quotes/${editQuoteId}` : "/crm/quotes")}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] border border-slate-300/70 text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
               data-testid="button-back"
               aria-label="Back to quotes"
@@ -643,7 +829,13 @@ export default function CrmInstallWorksheet() {
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="text-page-title">
                 Custom Pricing
               </h1>
-              {selectedCustomer ? (
+              {editQuoteId ? (
+                <p className="mt-0.5 truncate text-sm text-muted-foreground" data-testid="text-editing-quote">
+                  Editing <span className="font-semibold text-[#711419]">{editQuote?.quoteNumber || "quote"}</span>
+                  {selectedCustomer ? <> for <span className="font-semibold text-[#711419]">{selectedCustomer.name}</span></> : null}
+                  {" — saving replaces its line items and totals"}
+                </p>
+              ) : selectedCustomer ? (
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">
                   For <span className="font-semibold text-[#711419]">{selectedCustomer.name}</span>
                   {assignedToId ? " · salesperson set" : ""}
@@ -658,15 +850,21 @@ export default function CrmInstallWorksheet() {
             </div>
           </div>
           <div className="justify-self-center">
-            <IndustrialTabs
-              testidPrefix="pricing-mode"
-              activeKey={pricingMode}
-              onSelect={(k) => setPricingMode(k as PricingMode)}
-              tabs={[
-                { key: "install", label: "Install" },
-                { key: "service", label: "Service" },
-              ]}
-            />
+            {editQuoteId ? (
+              <div className="rounded-[4px] border border-slate-300/70 bg-white px-4 py-1.5 text-sm font-medium text-slate-600" data-testid="edit-mode-badge">
+                {pricingMode === "install" ? "Install" : "Service"} · editing
+              </div>
+            ) : (
+              <IndustrialTabs
+                testidPrefix="pricing-mode"
+                activeKey={pricingMode}
+                onSelect={(k) => setPricingMode(k as PricingMode)}
+                tabs={[
+                  { key: "install", label: "Install" },
+                  { key: "service", label: "Service" },
+                ]}
+              />
+            )}
           </div>
           <div className="justify-self-end">
             {pricingMode === "install" ? (
@@ -677,21 +875,27 @@ export default function CrmInstallWorksheet() {
                 data-testid="button-finalize"
               >
                 {isFinalizing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                Finalize → Create Quote
+                {editQuoteId ? "Save Changes" : "Finalize → Create Quote"}
               </Button>
             ) : (
               <Button
                 className="bg-[#711419] hover:bg-[#8a1a1f] text-white"
                 onClick={handleServiceFinalizeClick}
-                disabled={saveServiceQuoteMutation.isPending || serviceParts.length === 0}
+                disabled={saveServiceQuoteMutation.isPending || updateMutation.isPending || serviceParts.length === 0}
                 data-testid="button-finalize-service"
               >
-                {saveServiceQuoteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                Finalize → Create Quote
+                {saveServiceQuoteMutation.isPending || updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                {editQuoteId ? "Save Changes" : "Finalize → Create Quote"}
               </Button>
             )}
           </div>
         </div>
+
+        {editQuoteId && editReconstructed && (
+          <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800" data-testid="reconstructed-warning">
+            This quote predates editable worksheets, so its inputs were reconstructed from the finalize-time snapshot — double-check hours, rates, and percentages before saving.
+          </div>
+        )}
 
         {pricingMode === "install" && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
