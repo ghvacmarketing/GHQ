@@ -3455,7 +3455,7 @@ export default function CrmQuoteDetail() {
         {/* Internal costs — staff-only cost build-up (worksheet lines, labor,
             warranty reserve). Never shown to the customer: excluded from the
             public view, emails, the PDF, and presentation mode. */}
-        {internalLineItems.length > 0 && (
+        {(internalLineItems.length > 0 || (isCustomQuote && !!quoteCostingSnapshot?.sellPrice)) && (
           <Card className="border-amber-200/70" data-testid="internal-costs-card">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -3488,203 +3488,350 @@ export default function CrmQuoteDetail() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right w-24">Qty</TableHead>
-                    <TableHead className="text-right w-32">Unit Cost</TableHead>
-                    <TableHead className="text-right w-32">Total</TableHead>
-                    {canEditLineItems && <TableHead className="w-20">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {internalLineItems.map((item) => (
-                    <TableRow key={item.id} data-testid={`internal-line-${item.id}`}>
-                      <TableCell>
-                        <span className="text-slate-700">{item.description}</span>
-                        {item.lineType === "labor" && (
-                          <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">Labor</span>
-                        )}
-                        {item.description === "Warranty Reserve" && (
-                          <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">Warranty</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
-                      {canEditLineItems && (
-                        <TableCell>
-                          <div className="flex items-center gap-1">
+              {quoteCostingSnapshot?.sellPrice ? (
+                (() => {
+                  // ONE integrated breakdown — the quote's live cost lines ARE
+                  // the build-up section (the old items-table-plus-waterfall
+                  // listed the same money twice), flowing into direct cost →
+                  // sell price → where the price goes → profitability. Every
+                  // figure carries its share of the sell price.
+                  const snap = quoteCostingSnapshot as any;
+                  const isService = snap.mode === "service";
+                  const st = (isService ? snap.totals || {} : {}) as any;
+                  const num = (v: any): number | null => {
+                    if (v === null || v === undefined || v === "") return null;
+                    const n = parseFloat(String(v));
+                    return Number.isNaN(n) ? null : n;
+                  };
+                  const sellAtFinalize = num(snap.sellPrice) || 0;
+                  const pct = (v: number | null) =>
+                    v === null || sellAtFinalize <= 0 ? null : `${((v / sellAtFinalize) * 100).toFixed(1)}%`;
+
+                  const sum = (arr: any[]) => arr.reduce((s, i) => s + (parseFloat(String(i.lineTotal || 0)) || 0), 0);
+                  const laborItems = internalLineItems.filter((i) => i.lineType === "labor");
+                  const warrantyItems = internalLineItems.filter((i) => i.lineType !== "labor" && i.description === "Warranty Reserve");
+                  const materialItems = internalLineItems.filter((i) => i.lineType !== "labor" && i.description !== "Warranty Reserve");
+                  const materialsSum = sum(materialItems);
+                  const laborSum = sum(laborItems);
+                  const laborPayroll = num(snap.laborPayroll);
+                  const laborBenefits = num(snap.laborBenefits);
+                  // Split the bundled labor line into payroll + benefits only
+                  // while the snapshot's split still matches the live line.
+                  const showLaborSplit =
+                    !isService && laborPayroll !== null && laborBenefits !== null &&
+                    Math.abs(laborPayroll + laborBenefits - laborSum) < 0.015;
+                  const directCostShown = isService ? num(snap.directCost) ?? 0 : internalCostsTotal;
+
+                  const groupHeader = (label: string, amount: number) => (
+                    <div className="flex items-center gap-3 border-t border-slate-200 bg-slate-50 px-3 py-1.5 first:border-t-0">
+                      <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-slate-400">{pct(amount)}</span>
+                      <span className="w-24 shrink-0 text-right text-xs font-medium tabular-nums text-slate-500">{formatCurrency(amount)}</span>
+                      {canEditLineItems && <span className="w-14 shrink-0" />}
+                    </div>
+                  );
+                  const itemRow = (item: any) => {
+                    const lineTotal = parseFloat(String(item.lineTotal || 0)) || 0;
+                    const qty = parseFloat(String(item.quantity || "1")) || 1;
+                    return (
+                      <div key={item.id} className="flex items-center gap-3 border-t border-slate-100 px-3 py-1.5 first:border-t-0" data-testid={`internal-line-${item.id}`}>
+                        <span className="min-w-0 flex-1 text-sm text-slate-700">
+                          {item.description}
+                          {qty > 1 && <span className="ml-1.5 text-xs text-slate-400">× {qty}</span>}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-slate-400">{pct(lineTotal)}</span>
+                        <span className="w-24 shrink-0 text-right text-sm tabular-nums text-slate-700">{formatCurrency(lineTotal)}</span>
+                        {canEditLineItems && (
+                          <span className="flex w-14 shrink-0 items-center">
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => setLineVisibilityMutation.mutate({ lineItemId: item.id, customerVisible: true })}
                               disabled={setLineVisibilityMutation.isPending}
                               title="Show to customer — moves this line into the customer-facing list"
                               data-testid={`button-promote-${item.id}`}
                             >
-                              <Eye className="h-4 w-4 text-slate-500 hover:text-emerald-600" />
+                              <Eye className="h-3.5 w-3.5 text-slate-400 hover:text-emerald-600" />
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => deleteLineItemMutation.mutate(item.id)}
                               disabled={deleteLineItemMutation.isPending}
                               data-testid={`button-delete-internal-${item.id}`}
                             >
-                              <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                              <Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-600" />
                             </Button>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  };
+                  const subRow = (label: string, value: number | null) =>
+                    value === null ? null : (
+                      <div key={label} className="flex items-center gap-3 border-t border-slate-100 px-3 py-1 pl-7">
+                        <span className="min-w-0 flex-1 text-xs text-slate-500">{label}</span>
+                        <span className="shrink-0 text-[11px] tabular-nums text-slate-400">{pct(value)}</span>
+                        <span className="w-24 shrink-0 text-right text-xs tabular-nums text-slate-500">{formatCurrency(value)}</span>
+                        {canEditLineItems && <span className="w-14 shrink-0" />}
+                      </div>
+                    );
+                  const svcRow = (label: string, value: number | null, sub = false) =>
+                    value === null ? null : (
+                      <div key={label} className={`flex items-center gap-3 border-t border-slate-100 px-3 first:border-t-0 ${sub ? "py-1 pl-7" : "py-1.5"}`}>
+                        <span className={`min-w-0 flex-1 ${sub ? "text-xs text-slate-500" : "text-sm text-slate-700"}`}>{label}</span>
+                        <span className={`shrink-0 tabular-nums text-slate-400 ${sub ? "text-[11px]" : "text-xs"}`}>{pct(value)}</span>
+                        <span className={`w-24 shrink-0 text-right tabular-nums ${sub ? "text-xs text-slate-500" : "text-sm text-slate-700"}`}>{formatCurrency(value)}</span>
+                      </div>
+                    );
+
+                  const levies = [
+                    { key: "overhead", label: "Overhead", value: num(snap.overhead) ?? 0, dot: "bg-slate-500" },
+                    { key: "financing", label: "Financing", value: num(snap.financing) ?? 0, dot: "bg-[#8f784f]" },
+                    { key: "commission", label: "Commission", value: num(snap.commission) ?? 0, dot: "bg-[#d3b07d]" },
+                    { key: "profit", label: "Profit", value: num(snap.profit) ?? 0, dot: "bg-emerald-500" },
+                  ];
+                  const directForBar = num(snap.directCost) ?? directCostShown;
+                  const subtypeLabel =
+                    !isService && typeof snap.installSubtype === "string" && snap.installSubtype
+                      ? snap.installSubtype.charAt(0).toUpperCase() + snap.installSubtype.slice(1)
+                      : null;
+                  const storedTotal = parseFloat(quote.total || "0");
+                  const finalizeTotal = isService
+                    ? num(st.partsSubtotal) !== null && num(st.totalLaborCost) !== null
+                      ? (num(st.partsSubtotal) || 0) + (num(st.totalLaborCost) || 0)
+                      : null
+                    : num(snap.discountedSellPrice ?? snap.sellPrice);
+
+                  return (
+                    <div className="space-y-4">
+                      {/* ── Cost build-up: the live internal lines, grouped ── */}
+                      <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cost build-up</p>
+                        <div className="overflow-hidden rounded-[4px] border border-slate-200">
+                          {isService ? (
+                            <>
+                              {svcRow("Parts", num(st.partsSubtotal))}
+                              {(num(st.ghvacCoveredParts) || 0) > 0 ? svcRow("of which GHVAC-warranty covered", num(st.ghvacCoveredParts), true) : null}
+                              {(num(st.materialShrinkage) || 0) > 0 ? svcRow("Material shrinkage", num(st.materialShrinkage)) : null}
+                              {svcRow("Labor payroll", num(st.baseLaborCost))}
+                              {svcRow("Labor benefits", num(st.laborBenefits))}
+                              {(num(st.salesTax) || 0) > 0 ? svcRow("Sales tax", num(st.salesTax)) : null}
+                              {(num(st.warrantyReserve) || 0) > 0 ? svcRow("Warranty reserve", num(st.warrantyReserve)) : null}
+                            </>
+                          ) : (
+                            <>
+                              {materialItems.length > 0 && (
+                                <>
+                                  {groupHeader("Materials & equipment", materialsSum)}
+                                  {materialItems.map(itemRow)}
+                                </>
+                              )}
+                              {(laborItems.length > 0 || warrantyItems.length > 0) && (
+                                <>
+                                  {groupHeader("Labor & warranty", laborSum + sum(warrantyItems))}
+                                  {laborItems.map(itemRow)}
+                                  {showLaborSplit && subRow("Payroll", laborPayroll)}
+                                  {showLaborSplit && subRow("Benefits", laborBenefits)}
+                                  {warrantyItems.map(itemRow)}
+                                </>
+                              )}
+                            </>
+                          )}
+                          <div className="flex items-center gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2" data-testid="snap-direct-cost">
+                            <span className="min-w-0 flex-1 text-sm font-semibold text-slate-800">Direct cost</span>
+                            <span className="shrink-0 text-xs tabular-nums text-slate-400">{pct(directCostShown)}</span>
+                            <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-slate-800">{formatCurrency(directCostShown)}</span>
+                            {canEditLineItems && !isService && <span className="w-14 shrink-0" />}
                           </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <div className="mt-4 border-t pt-3 space-y-1.5">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Total internal costs</span>
-                  <span className="font-medium">{formatCurrency(internalCostsTotal)}</span>
-                </div>
-                {(() => {
-                  // Full waterfall from the Custom Pricing snapshot — the same
-                  // numbers the worksheet's Calculated Totals panel showed at
-                  // finalize time. Older snapshots carry fewer fields, so each
-                  // row renders only when its number exists; ancient quotes
-                  // with no snapshot at all fall back to sell − costs.
-                  const snap = quoteCostingSnapshot;
-                  const sell = parseFloat(quote.total || "0");
-                  if (snap && snap.sellPrice) {
-                    const isService = snap.mode === "service";
-                    const st = isService ? snap.totals || {} : null;
-                    const num = (v: any): number | null => {
-                      if (v === null || v === undefined || v === "") return null;
-                      const n = parseFloat(String(v));
-                      return Number.isNaN(n) ? null : n;
-                    };
-                    const row = (label: string, value: number | null, strong = false) =>
-                      value === null ? null : (
-                        <div key={label} className="flex justify-between text-sm">
-                          <span className={strong ? "font-medium text-slate-700" : "text-slate-600"}>{label}</span>
-                          <span className={strong ? "font-medium" : undefined}>{formatCurrency(value)}</span>
                         </div>
-                      );
-                    const subtypeLabel =
-                      !isService && typeof snap.installSubtype === "string" && snap.installSubtype
-                        ? snap.installSubtype.charAt(0).toUpperCase() + snap.installSubtype.slice(1)
-                        : null;
-                    // What finalize actually stored as the quote total — the
-                    // drift note fires only when the stored total moved since.
-                    const finalizeTotal = isService
-                      ? num(st.partsSubtotal) !== null && num(st.totalLaborCost) !== null
-                        ? (num(st.partsSubtotal) || 0) + (num(st.totalLaborCost) || 0)
-                        : null
-                      : num(snap.discountedSellPrice ?? snap.sellPrice);
-                    return (
-                      <>
-                        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cost build-up</p>
-                        {isService ? (
+                        {!isService && num(snap.directCost) !== null && Math.abs((num(snap.directCost) || 0) - directCostShown) > 0.01 && (
+                          <p className="mt-1.5 text-[11px] text-amber-600">
+                            Direct cost at finalize was {formatCurrency(num(snap.directCost) || 0)} — cost lines changed since; re-open Custom Pricing to resync the price.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* ── Sell price ── */}
+                      <div className="flex items-baseline justify-between border-y border-slate-200 py-2.5" data-testid="snap-sell-price">
+                        <span className="text-sm font-semibold text-slate-800">Sell price (at finalize)</span>
+                        <span className="text-2xl font-bold tabular-nums text-[#d3b07d]">{formatCurrency(sellAtFinalize)}</span>
+                      </div>
+
+                      {/* ── Where the price goes ── */}
+                      <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
+                        {sellAtFinalize > 0 && (
                           <>
-                            {row("Parts subtotal", num(st.partsSubtotal))}
-                            {(num(st.ghvacCoveredParts) || 0) > 0 ? row("of which GHVAC-warranty covered", num(st.ghvacCoveredParts)) : null}
-                            {(num(st.materialShrinkage) || 0) > 0 ? row("Material shrinkage", num(st.materialShrinkage)) : null}
-                            {row("Labor payroll", num(st.baseLaborCost))}
-                            {row("Labor benefits", num(st.laborBenefits))}
-                            {(num(st.salesTax) || 0) > 0 ? row("Sales tax", num(st.salesTax)) : null}
-                            {(num(st.warrantyReserve) || 0) > 0 ? row("Warranty reserve", num(st.warrantyReserve)) : null}
-                          </>
-                        ) : (
-                          <>
-                            {row("Labor payroll", num(snap.laborPayroll))}
-                            {row("Labor benefits", num(snap.laborBenefits))}
-                            {row("Lines total (materials & equipment)", num(snap.linesTotal))}
-                            {(num(snap.warrantyReserve) || 0) > 0 ? row("Warranty reserve", num(snap.warrantyReserve)) : null}
+                            <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
+                              <div className="bg-slate-200" style={{ width: `${Math.max(0, (directForBar / sellAtFinalize) * 100)}%` }} title={`Direct cost ${pct(directForBar) || ""}`} />
+                              {levies.map((s) => (
+                                <div key={s.key} className={s.dot} style={{ width: `${Math.max(0, (s.value / sellAtFinalize) * 100)}%` }} title={`${s.label} ${pct(s.value) || ""}`} />
+                              ))}
+                            </div>
+                            <div className="mt-1 flex justify-between text-[11px]">
+                              <span className="text-slate-400">Direct cost · {pct(directForBar)}</span>
+                              <span className="font-medium text-emerald-700">Gross margin · {((num(snap.grossMarginPct) || 0) * 100).toFixed(1)}%</span>
+                            </div>
                           </>
                         )}
-                        <div className="flex justify-between border-t pt-1.5 text-sm font-medium" data-testid="snap-direct-cost">
-                          <span className="text-slate-700">Direct cost</span>
-                          <span>{formatCurrency(num(snap.directCost) || 0)}</span>
+                        <div className="mt-2 space-y-1">
+                          {levies.map((s) => (
+                            <div key={s.key} className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-2 text-slate-600">
+                                <span className={`h-2 w-2 shrink-0 rounded-full ${s.dot}`} />
+                                {s.label}
+                              </span>
+                              <span className={`tabular-nums text-slate-700 ${s.key === "profit" ? "font-medium" : ""}`}>
+                                <span className="mr-2 text-xs font-normal text-slate-400">{pct(s.value)}</span>
+                                {formatCurrency(s.value)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center justify-between border-t pt-1.5" data-testid="snap-sell-price">
-                          <span className="text-sm font-semibold text-slate-800">Sell price (at finalize)</span>
-                          <span className="text-base font-bold text-[#d3b07d]">{formatCurrency(num(snap.sellPrice) || 0)}</span>
-                        </div>
-                        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
-                        {row("Overhead", num(snap.overhead) ?? 0)}
-                        {row("Financing", num(snap.financing) ?? 0)}
-                        {row("Commission", num(snap.commission) ?? 0)}
-                        {row("Profit", num(snap.profit) ?? 0, true)}
-                        <div className="flex justify-between border-t pt-1.5 text-sm">
+                      </div>
+
+                      {/* ── Profitability ── */}
+                      <div className="space-y-1 border-t border-slate-200 pt-2.5">
+                        <div className="flex items-center justify-between text-sm">
                           <span className="text-slate-600">Gross profit · margin</span>
-                          <span className={`font-semibold ${(num(snap.grossProfit) || 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                          <span className={`font-semibold tabular-nums ${(num(snap.grossProfit) || 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                             {formatCurrency(num(snap.grossProfit) || 0)} · {((num(snap.grossMarginPct) || 0) * 100).toFixed(1)}%
                           </span>
                         </div>
                         {!isService && num(snap.crewDays) !== null && (
-                          <div className="flex justify-between text-sm">
+                          <div className="flex items-center justify-between text-sm">
                             <span className="text-slate-600">Crew days · GP per crew day</span>
-                            <span className="font-medium">
+                            <span className="font-medium tabular-nums">
                               {(num(snap.crewDays) || 0).toFixed(2)} · {formatCurrency(num(snap.grossProfitPerCrewDay) || 0)}
                             </span>
                           </div>
                         )}
                         {subtypeLabel && (
-                          <div className="flex justify-between text-sm">
+                          <div className="flex items-center justify-between text-sm">
                             <span className="text-slate-600">Install type</span>
                             <span className="font-medium">{subtypeLabel}</span>
                           </div>
                         )}
-                        {!isService && (num(snap.discountDollar) || 0) > 0 && (
-                          <div className="-mx-1 space-y-1 rounded-[4px] bg-amber-50 px-2 py-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-amber-700">Discount</span>
-                              <span className="text-amber-800">−{formatCurrency(num(snap.discountDollar) || 0)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm font-medium">
-                              <span className="text-amber-700">Discounted price</span>
-                              <span className="text-amber-900">{formatCurrency(num(snap.discountedSellPrice) || 0)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-amber-700">Discounted GP · margin</span>
-                              <span className="text-amber-800">
-                                {formatCurrency(num(snap.discountedGrossProfit) || 0)} · {((num(snap.discountedGrossMarginPct) || 0) * 100).toFixed(1)}%
-                              </span>
-                            </div>
+                      </div>
+
+                      {!isService && (num(snap.discountDollar) || 0) > 0 && (
+                        <div className="space-y-1 rounded-[4px] bg-amber-50 px-3 py-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-amber-700">Discount</span>
+                            <span className="tabular-nums text-amber-800">−{formatCurrency(num(snap.discountDollar) || 0)}</span>
                           </div>
-                        )}
-                        {isService && st.isGHVACWarranty && num(st.priceBeforeWarranty) !== null && (
-                          <p className="text-[11px] text-slate-500">
-                            GHVAC warranty applied — full price {formatCurrency(num(st.priceBeforeWarranty) || 0)}, customer pays{" "}
-                            {Math.round((num(st.warrantyCoverage) || 0) * 100)}%.
-                          </p>
-                        )}
-                        {finalizeTotal !== null && sell > 0 && Math.abs(sell - finalizeTotal) > 0.01 && (
-                          <p className="text-[11px] text-amber-600">
-                            Quote total is now {formatCurrency(sell)} — the breakdown above reflects pricing at finalize time.
-                          </p>
-                        )}
-                      </>
-                    );
-                  }
-                  return sell > 0 ? (
-                    <>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Gross margin (sell − costs)</span>
-                        <span className={`font-semibold ${sell - internalCostsTotal >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                          {formatCurrency(sell - internalCostsTotal)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Margin %</span>
-                        <span className="font-medium">{((1 - internalCostsTotal / sell) * 100).toFixed(1)}%</span>
-                      </div>
-                    </>
-                  ) : null;
-                })()}
-              </div>
+                          <div className="flex justify-between text-sm font-medium">
+                            <span className="text-amber-700">Discounted price</span>
+                            <span className="tabular-nums text-amber-900">{formatCurrency(num(snap.discountedSellPrice) || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-amber-700">Discounted GP · margin</span>
+                            <span className="tabular-nums text-amber-800">
+                              {formatCurrency(num(snap.discountedGrossProfit) || 0)} · {((num(snap.discountedGrossMarginPct) || 0) * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {isService && st.isGHVACWarranty && num(st.priceBeforeWarranty) !== null && (
+                        <p className="text-[11px] text-slate-500">
+                          GHVAC warranty applied — full price {formatCurrency(num(st.priceBeforeWarranty) || 0)}, customer pays{" "}
+                          {Math.round((num(st.warrantyCoverage) || 0) * 100)}%.
+                        </p>
+                      )}
+                      {finalizeTotal !== null && storedTotal > 0 && Math.abs(storedTotal - finalizeTotal) > 0.01 && (
+                        <p className="text-[11px] text-amber-600">
+                          Quote total is now {formatCurrency(storedTotal)} — the breakdown above reflects pricing at finalize time.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right w-24">Qty</TableHead>
+                        <TableHead className="text-right w-32">Unit Cost</TableHead>
+                        <TableHead className="text-right w-32">Total</TableHead>
+                        {canEditLineItems && <TableHead className="w-20">Actions</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {internalLineItems.map((item) => (
+                        <TableRow key={item.id} data-testid={`internal-line-${item.id}`}>
+                          <TableCell>
+                            <span className="text-slate-700">{item.description}</span>
+                            {item.lineType === "labor" && (
+                              <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">Labor</span>
+                            )}
+                            {item.description === "Warranty Reserve" && (
+                              <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">Warranty</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                          {canEditLineItems && (
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => setLineVisibilityMutation.mutate({ lineItemId: item.id, customerVisible: true })}
+                                  disabled={setLineVisibilityMutation.isPending}
+                                  title="Show to customer — moves this line into the customer-facing list"
+                                  data-testid={`button-promote-${item.id}`}
+                                >
+                                  <Eye className="h-4 w-4 text-slate-500 hover:text-emerald-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => deleteLineItemMutation.mutate(item.id)}
+                                  disabled={deleteLineItemMutation.isPending}
+                                  data-testid={`button-delete-internal-${item.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="mt-4 border-t pt-3 space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Total internal costs</span>
+                      <span className="font-medium">{formatCurrency(internalCostsTotal)}</span>
+                    </div>
+                    {(() => {
+                      const sell = parseFloat(quote.total || "0");
+                      return sell > 0 ? (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-600">Gross margin (sell − costs)</span>
+                            <span className={`font-semibold ${sell - internalCostsTotal >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                              {formatCurrency(sell - internalCostsTotal)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-600">Margin %</span>
+                            <span className="font-medium">{((1 - internalCostsTotal / sell) * 100).toFixed(1)}%</span>
+                          </div>
+                        </>
+                      ) : null;
+                    })()}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
