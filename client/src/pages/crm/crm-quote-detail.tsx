@@ -3665,7 +3665,7 @@ export default function CrmQuoteDetail() {
                         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Where the price goes</p>
                         {sellAtFinalize > 0 && (
                           <>
-                            <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="flex h-3 overflow-hidden rounded-[2px] bg-slate-100">
                               <div className="bg-slate-200" style={{ width: `${Math.max(0, (directForBar / sellAtFinalize) * 100)}%` }} title={`Direct cost ${pct(directForBar) || ""}`} />
                               {levies.map((s) => (
                                 <div key={s.key} className={s.dot} style={{ width: `${Math.max(0, (s.value / sellAtFinalize) * 100)}%` }} title={`${s.label} ${pct(s.value) || ""}`} />
@@ -3681,7 +3681,7 @@ export default function CrmQuoteDetail() {
                           {levies.map((s) => (
                             <div key={s.key} className="flex items-center justify-between text-sm">
                               <span className="flex items-center gap-2 text-slate-600">
-                                <span className={`h-2 w-2 shrink-0 rounded-full ${s.dot}`} />
+                                <span className={`h-2 w-2 shrink-0 rounded-[1px] ${s.dot}`} />
                                 {s.label}
                               </span>
                               <span className={`tabular-nums text-slate-700 ${s.key === "profit" ? "font-medium" : ""}`}>
