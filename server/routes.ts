@@ -1271,6 +1271,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/call-logs/history - One flat page of the full call log (all days,
+  // newest first) so the client can scroll back through everything.
+  // Must stay registered before /api/call-logs/:id.
+  app.get("/api/call-logs/history", async (req, res) => {
+    try {
+      const offset = Math.max(0, parseInt(String(req.query.offset), 10) || 0);
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit), 10) || 30));
+      const { logs, total } = await storage.getCallLogHistory(offset, limit);
+      // Preload comment counts in one query so each row doesn't fetch its own
+      let withCounts: any[] = logs;
+      if (logs.length > 0) {
+        try {
+          const counts = await db
+            .select({ entityId: crmComments.entityId, cnt: sql<number>`COUNT(*)::int` })
+            .from(crmComments)
+            .where(and(eq(crmComments.entityType, "call_log"), inArray(crmComments.entityId, logs.map((l) => l.id))))
+            .groupBy(crmComments.entityId);
+          const byId = new Map(counts.map((c) => [c.entityId, Number(c.cnt) || 0]));
+          withCounts = logs.map((l) => ({ ...l, commentCount: byId.get(l.id) ?? 0 }));
+        } catch (e) {
+          console.error("call-log history comment counts (non-fatal):", e);
+        }
+      }
+      res.json({ logs: withCounts, total, hasMore: offset + logs.length < total });
+    } catch (error) {
+      console.error("Error fetching call log history:", error);
+      res.status(500).json({ message: "Error fetching call log history" });
+    }
+  });
+
   // GET /api/call-logs/search - Search call logs
   app.get("/api/call-logs/search", async (req, res) => {
     try {

@@ -159,6 +159,7 @@ export interface IStorage {
   getCallLogDays(): Promise<{ id: string; date: string; count: number }[]>;
   getOrCreateCallLogDay(date: string): Promise<CallLogDay>;
   getCallLogsByDay(date: string): Promise<(CallLog & { tasks: CallLogTask[] })[]>;
+  getCallLogHistory(offset: number, limit: number): Promise<{ logs: (CallLog & { date: string; tasks: CallLogTask[] })[]; total: number }>;
   createCallLog(data: InsertCallLog): Promise<CallLog>;
   updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined>;
   deleteCallLog(id: string): Promise<boolean>;
@@ -1381,6 +1382,46 @@ export class DatabaseStorage implements IStorage {
       byLog.set(t.callLogId, list);
     }
     return logs.map((l) => ({ ...l, tasks: byLog.get(l.id) ?? [] }));
+  }
+
+  // One flat page of the full call history (every day), newest first — powers
+  // the scrollable log so nobody has to guess the right day filter.
+  async getCallLogHistory(offset: number, limit: number): Promise<{ logs: (CallLog & { date: string; tasks: CallLogTask[] })[]; total: number }> {
+    const [{ total }] = await db.select({ total: sql<number>`COUNT(*)::int` }).from(callLogs);
+    const logs = await db
+      .select({
+        id: callLogs.id,
+        dayId: callLogs.dayId,
+        clientName: callLogs.clientName,
+        description: callLogs.description,
+        phone: callLogs.phone,
+        tag: callLogs.tag,
+        billable: callLogs.billable,
+        createdByUserId: callLogs.createdByUserId,
+        createdByName: callLogs.createdByName,
+        createdAt: callLogs.createdAt,
+        updatedAt: callLogs.updatedAt,
+        date: callLogDays.date,
+      })
+      .from(callLogs)
+      .innerJoin(callLogDays, eq(callLogs.dayId, callLogDays.id))
+      .orderBy(desc(callLogDays.date), desc(callLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+    if (logs.length === 0) return { logs: [], total: Number(total) || 0 };
+    // Preload every log's tasks in one query so the client doesn't fan out N+1 requests
+    const taskRows = await db
+      .select()
+      .from(callLogTasks)
+      .where(inArray(callLogTasks.callLogId, logs.map((l) => l.id)))
+      .orderBy(asc(callLogTasks.createdAt));
+    const byLog = new Map<string, CallLogTask[]>();
+    for (const t of taskRows) {
+      const list = byLog.get(t.callLogId) ?? [];
+      list.push(t);
+      byLog.set(t.callLogId, list);
+    }
+    return { logs: logs.map((l) => ({ ...l, tasks: byLog.get(l.id) ?? [] })), total: Number(total) || 0 };
   }
 
   async createCallLog(data: InsertCallLog): Promise<CallLog> {

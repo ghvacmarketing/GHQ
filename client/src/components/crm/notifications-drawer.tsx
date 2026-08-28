@@ -46,6 +46,8 @@ function getEntityUrl(entityType: string | null, entityId: string | null): strin
   if (!entityType || !entityId) return null;
   
   switch (entityType) {
+    case "task":
+      return `/crm/tasks/mine?highlight=${entityId}`;
     case "customer":
       return `/crm/customers/${entityId}`;
     case "lead":

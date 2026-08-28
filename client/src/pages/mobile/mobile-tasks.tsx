@@ -1,14 +1,14 @@
 import { memo, useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { format, isBefore, isSameDay, startOfDay } from "date-fns";
+import { format, formatDistanceToNow, isBefore, isSameDay, startOfDay } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardInset } from "@/lib/native";
 import {
   ArrowUp, CalendarDays, Check, ClipboardList, ListChecks, ListPlus,
-  Loader2, SlidersHorizontal, Trash2, ChevronDown, ChevronRight,
+  Loader2, MessageSquare, SlidersHorizontal, Trash2, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { SheetSelect } from "@/components/mobile/sheet-select";
 import { Switch } from "@/components/ui/switch";
@@ -612,6 +612,36 @@ export default function MobileTasks() {
   );
 }
 
+type TaskComment = {
+  id: string;
+  body: string;
+  createdAt: string;
+  author: { id: string; name: string } | null;
+  mentions: { userId: string; userName: string }[];
+};
+
+// Desktop comments carry @[userId] mention tokens — show them as name chips.
+// (No link like the CRM version: tapping out to a desktop page mid-sheet is worse
+// than a plain chip.)
+function renderMentionText(body: string, mentions: { userId: string; userName: string }[]) {
+  const names = new Map(mentions.map((m) => [m.userId, m.userName]));
+  const parts: Array<string | JSX.Element> = [];
+  const re = /@\[([^\]]+)\]/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    if (m.index > last) parts.push(body.slice(last, m.index));
+    parts.push(
+      <span key={m.index} className="rounded-[3px] bg-[#711419]/10 px-1 py-0.5 text-[13px] font-medium text-[#711419]">
+        @{names.get(m[1]) || "someone"}
+      </span>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < body.length) parts.push(body.slice(last));
+  return parts.length ? parts : body;
+}
+
 function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; users: CrmUser[]; meId?: string; onClose: () => void }) {
   const { toast } = useToast();
   const [newSubtask, setNewSubtask] = useState("");
@@ -636,6 +666,20 @@ function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; use
       if (!res.ok) return [];
       return res.json();
     },
+  });
+
+  // Same thread the CRM's task panel shows (entityType "task")
+  const [newComment, setNewComment] = useState("");
+  const { data: comments = [] } = useQuery<TaskComment[]>({
+    queryKey: ["/api/crm/comments", "task", taskId],
+  });
+  const addComment = useMutation({
+    mutationFn: async (body: string) => apiRequest("POST", "/api/crm/comments", { entityType: "task", entityId: taskId, body }),
+    onSuccess: () => {
+      setNewComment("");
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "task", taskId] });
+    },
+    onError: (e: any) => toast({ title: "Couldn't post the comment", description: e?.message, variant: "destructive" }),
   });
 
   const patchTask = useMutation({
@@ -841,6 +885,51 @@ function TaskDetailSheet({ taskId, users, meId, onClose }: { taskId: string; use
                     className="rounded-full bg-[#711419] p-1.5 text-white transition-transform active:scale-90"
                     aria-label="Add subtask"
                     data-testid="subtask-add"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Comments — the same thread the CRM's task panel shows */}
+          <div>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Comments{comments.length > 0 ? ` · ${comments.length}` : ""}
+            </p>
+            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              {comments.map((c, i) => (
+                <div key={c.id} className={`px-3 py-2.5 ${i > 0 ? "border-t border-slate-200/80" : ""}`} data-testid={`task-comment-${c.id}`}>
+                  <p className="text-xs text-slate-400">
+                    <span className="font-semibold text-slate-600">{c.author?.name || "Someone"}</span>
+                    {" · "}
+                    {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                    {renderMentionText(c.body, c.mentions || [])}
+                  </p>
+                </div>
+              ))}
+              <div className={`flex items-center gap-2.5 px-3 py-2.5 ${comments.length > 0 ? "border-t border-slate-200/80" : ""}`}>
+                <MessageSquare className="h-5 w-5 shrink-0 text-slate-400" />
+                <input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newComment.trim()) addComment.mutate(newComment.trim());
+                  }}
+                  placeholder="Add a comment…"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  data-testid="task-comment-input"
+                />
+                {newComment.trim() && (
+                  <button
+                    onClick={() => addComment.mutate(newComment.trim())}
+                    disabled={addComment.isPending}
+                    className="rounded-full bg-[#711419] p-1.5 text-white transition-transform active:scale-90"
+                    aria-label="Post comment"
+                    data-testid="task-comment-post"
                   >
                     <ArrowUp className="h-3.5 w-3.5" />
                   </button>

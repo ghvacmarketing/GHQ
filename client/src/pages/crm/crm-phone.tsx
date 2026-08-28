@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } fro
 import { createPortal } from "react-dom";
 import { useSearch, useLocation } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -742,6 +742,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days", date] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/history"] });
       form.reset();
       toast({ title: "Success", description: "Call log created" });
       onSuccess?.();
@@ -759,6 +760,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days", date] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/history"] });
       toast({ title: "Success", description: "Call log updated" });
       onSuccess?.();
     },
@@ -907,6 +909,7 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
       queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days", date] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/history"] });
       toast({ title: "Success", description: "Call log deleted" });
     },
     onError: () => {
@@ -1007,6 +1010,160 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
 
 interface SearchResult extends CallLog {
   date: string;
+}
+
+const HISTORY_PAGE_SIZE = 30;
+
+interface HistoryLog extends CallLog {
+  date: string;
+  tasks?: CallLogTask[];
+  commentCount?: number;
+}
+
+interface HistoryPage {
+  logs: HistoryLog[];
+  total: number;
+  hasMore: boolean;
+}
+
+interface CallHistoryListProps {
+  excludeDate: string;
+  logFilter: { tag: string; billableOnly: boolean };
+  highlightedLogId: string | null;
+  entryRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
+}
+
+/** The whole call log as one scrollable list — every day, newest first, loading
+ *  older pages as you approach the bottom. No day filter needed to browse. */
+function CallHistoryList({ excludeDate, logFilter, highlightedLogId, entryRefs }: CallHistoryListProps) {
+  const { toast } = useToast();
+  const [editingLog, setEditingLog] = useState<HistoryLog | null>(null);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
+    queryKey: ["/api/call-logs/history"],
+    queryFn: async ({ pageParam }): Promise<HistoryPage> => {
+      const res = await fetch(`/api/call-logs/history?offset=${pageParam}&limit=${HISTORY_PAGE_SIZE}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load call history");
+      return res.json();
+    },
+    initialPageParam: 0,
+    // Offset = rows already loaded, so a mid-scroll insert can't skip anyone
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.reduce((n, p) => n + p.logs.length, 0) : undefined,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/call-logs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/days"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/call-logs/history"] });
+      toast({ title: "Success", description: "Call log deleted" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete call log", variant: "destructive" });
+    },
+  });
+
+  // Flatten pages, dedupe (an insert while paging can re-serve a row), hide
+  // today's calls (they live in the Today card above), apply shared filters.
+  const seen = new Set<string>();
+  const logs = (data?.pages ?? []).flatMap((p) => p.logs).filter((l) => {
+    if (seen.has(l.id)) return false;
+    seen.add(l.id);
+    if (l.date === excludeDate) return false;
+    if (logFilter.billableOnly && !l.billable) return false;
+    if (logFilter.tag && !(l.tag || "").toLowerCase().includes(logFilter.tag.toLowerCase())) return false;
+    return true;
+  });
+
+  // Consecutive same-date rows share one day header
+  const groups: { date: string; logs: HistoryLog[] }[] = [];
+  for (const log of logs) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === log.date) last.logs.push(log);
+    else groups.push({ date: log.date, logs: [log] });
+  }
+
+  // Auto-load the next page as the sentinel nears the viewport
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) fetchNextPage();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  if (isLoading) {
+    return <div className="text-center text-xs text-muted-foreground py-4">Loading call history...</div>;
+  }
+
+  if (groups.length === 0) {
+    return hasNextPage ? (
+      <div ref={sentinelRef} className="text-center text-xs text-muted-foreground py-4">Loading older calls...</div>
+    ) : (
+      <div className="text-center text-xs text-muted-foreground py-4">No earlier calls match.</div>
+    );
+  }
+
+  return (
+    <div className="space-y-4" data-testid="crm-phone-history-list">
+      {groups.map((group) => (
+        <div key={group.date} data-testid={`crm-phone-history-day-${group.date}`}>
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <span className="text-sm font-medium">{format(parseISO(group.date), "EEE, MMM d, yyyy")}</span>
+            <Badge variant="outline" className="text-xs h-5 px-1.5">{group.logs.length}</Badge>
+          </div>
+          <div className="space-y-1.5">
+            {group.logs.map((log) =>
+              editingLog?.id === log.id ? (
+                <CallLogForm
+                  key={log.id}
+                  date={log.date}
+                  editingLog={editingLog}
+                  onCancel={() => setEditingLog(null)}
+                  onSuccess={() => setEditingLog(null)}
+                />
+              ) : (
+                <CallLogEntry
+                  key={log.id}
+                  log={log}
+                  isHighlighted={highlightedLogId === log.id}
+                  entryRef={(el) => { entryRefs.current[log.id] = el; }}
+                  onEdit={() => setEditingLog(log)}
+                  onDelete={(id) => deleteMutation.mutate(id)}
+                />
+              ),
+            )}
+          </div>
+        </div>
+      ))}
+
+      {hasNextPage ? (
+        <div ref={sentinelRef}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full h-8 text-xs text-muted-foreground"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            data-testid="crm-phone-history-load-more"
+          >
+            {isFetchingNextPage ? "Loading older calls..." : "Load older calls"}
+          </Button>
+        </div>
+      ) : (
+        <p className="text-center text-[11px] text-muted-foreground/70 pb-1">That's the whole log — every call is above.</p>
+      )}
+    </div>
+  );
 }
 
 interface YearlyCallCalendarProps {
@@ -1464,7 +1621,7 @@ function DailyCallLog() {
                 onChange={(v) => setSelectedPastDate(!v || v === todayDate ? null : v)}
                 testid="call-log-filter-day"
               />
-              <p className="mt-1 text-[11px] text-slate-400">Pick any day — today shows by default.</p>
+              <p className="mt-1 text-[11px] text-slate-400">Jump straight to one day — clear it to browse the whole log.</p>
             </div>
             <div>
               <p className="mb-1 text-xs font-medium text-slate-500">Tag contains</p>
@@ -1566,13 +1723,13 @@ function DailyCallLog() {
           {(() => {
             const pastDays = days.filter(d => d.date !== todayDate);
             if (pastDays.length === 0) return null;
-            
+
             const pendingPastDate = pendingScrollTarget?.date && pendingScrollTarget.date !== todayDate ? pendingScrollTarget.date : null;
             const activePastDate = pendingPastDate || selectedPastDate;
-            
-            return (
-              <div className="space-y-2">
-                {activePastDate && (
+
+            if (activePastDate) {
+              return (
+                <div className="space-y-2">
                   <Card className="rounded-[4px] border-slate-300/70 shadow-none" data-testid={`crm-phone-past-day-card-${activePastDate}`}>
                     <CardHeader className="pb-2 pt-3 px-4">
                       <div className="flex items-center justify-between">
@@ -1585,7 +1742,7 @@ function DailyCallLog() {
                           className="h-7 w-7"
                           onClick={() => { setSelectedPastDate(null); setPendingScrollTarget(null); }}
                           data-testid="crm-phone-button-clear-selection"
-                          aria-label="Back to today"
+                          aria-label="Back to the full log"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -1605,8 +1762,28 @@ function DailyCallLog() {
                       />
                     </CardContent>
                   </Card>
-                )}
-              </div>
+                </div>
+              );
+            }
+
+            // No day picked: the whole log, scrollable — older pages load as you go
+            return (
+              <Card className="rounded-[4px] border-slate-300/70 shadow-none" data-testid="crm-phone-history-card">
+                <CardHeader className="pb-2 pt-3 px-4">
+                  <div>
+                    <CardTitle className="text-base font-semibold">History</CardTitle>
+                    <p className="text-xs text-muted-foreground">Every call, newest first — keep scrolling to go further back.</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-4 pb-3">
+                  <CallHistoryList
+                    excludeDate={todayDate}
+                    logFilter={{ tag: filterTag, billableOnly: filterBillable }}
+                    highlightedLogId={highlightedLogId}
+                    entryRefs={entryRefs}
+                  />
+                </CardContent>
+              </Card>
             );
           })()}
         </div>

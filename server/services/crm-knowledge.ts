@@ -560,7 +560,8 @@ Classes route revenue to proper income accounts for P&L reporting:
 The Phone page (sidebar: "Phone", URL: /crm/phone) provides integrated calling features for the CRM.
 
 ### Call Log
-The Phone page keeps a shared day-by-day call log: each entry records who called (any name — the caller doesn't have to be a CRM customer), what the call was about, an optional phone number, a category tag (service, install, sales, maintenance, billing, other), and whether it's billable. Entries can carry follow-up tasks.
+The Phone page keeps a shared call log: each entry records who called (any name — the caller doesn't have to be a CRM customer), what the call was about, an optional phone number, a category tag (service, install, sales, maintenance, billing, other), and whether it's billable. Entries can carry follow-up tasks and comment threads.
+Layout: a "Today" card on top, then **History** — every past call in ONE scrolling list, newest first under day headers; older pages load automatically as you scroll, so nobody needs to know the date to browse back. The funnel-icon filter popover can still jump straight to one specific day, or narrow by tag / billable-only; the search box finds calls by caller name, phone number, or keyword.
 
 ### Logging a call through Gibbs
 Gibbs can add an entry to TODAY's call log as an approval-gated action (log_call) — useful when someone on the road answers the phone and dictates what the call was about right after hanging up ("log a call from Mrs. Jenkins, her heat pump is icing up again"). Gibbs prepares the entry (caller, summary, optional phone/tag/billable) and nothing is saved until the user approves the card. The entry lands on the Phone page's log for today under the approving user's name.
@@ -577,6 +578,16 @@ Gibbs can put customers into the Lead Funnel and keep their leads current — bo
 Gibbs can also BUILD company setup, approval-gated like everything else, but marked on the approval card with an amber "Company setup" chip because these shape how the whole team works (day-to-day actions carry a slate "Day-to-day" chip; texts/emails a maroon "Sends to customer" chip). Builder actions require supervisor, admin, or owner to approve — techs and sales can ask, but the server refuses their approval:
 - create_checklist — Gibbs composes a full checklist template from a description ("build me a no-heat service checklist"): sections, ordered questions with the right answer types (yes/no, text, selects with options, multi-select), required flags, help-text scripts, and required photo steps. It lands in Settings → Checklists ready to fine-tune on the canvas, and auto-assigns to matching jobs like any checklist.
 - create_item — Gibbs adds a price book item (name, sell price, optional cost/type/category/unit/part number). Gibbs never invents prices — it confirms the sell price first. The item is immediately available to quotes and invoices.
+
+---
+
+## ACTIVITY (TASKS)
+
+### What is the Activity Page?
+The Activity page (sidebar: "Activity", URL: /crm/tasks/board or /crm/tasks/mine) is the team's task list, Google-Tasks style. Tabs: My Tasks, Everyone (with a per-person filter), Notifications, and Comments (open pin comments across the CRM). A quick-add bar (title + due date + assignee), round check-off circles with a collapsible Completed section, and clicking a task opens a slide-over detail panel where everything edits in place: title, assignee, due date, priority, notes, and a subtask checklist.
+
+### Task comments
+Every task carries its own comment thread inside the detail panel (open the task; Comments sit under Subtasks). Type @ to mention a teammate — they get a notification that opens that exact task. Authors can edit/delete their own comments (admins/owners can delete any). The SAME thread shows on mobile: Field app → Tasks → open a task → Comments at the bottom of the sheet, so techs can read and reply from the field.
 
 ---
 

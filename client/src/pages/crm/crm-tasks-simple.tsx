@@ -2,11 +2,13 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isBefore, startOfDay } from "date-fns";
-import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink, ListChecks, X, Flag } from "lucide-react";
+import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink, ListChecks, X, Flag, MessageSquare } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 import { NotificationsPanel } from "@/pages/crm/crm-notifications";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { DatePickerField } from "@/components/crm/date-picker";
@@ -464,6 +466,26 @@ export default function CrmTasksSimple() {
     setPanelVisible(false);
     window.setTimeout(() => setDetailId(null), 300);
   };
+  // Mention notifications land here as ?highlight=<taskId> — open that task's
+  // panel once the list is in. If it isn't in My Tasks (someone else's task),
+  // widen to Everyone and look again; if it's nowhere, it was deleted. Keyed by
+  // id (not a done-flag): the drawer navigates in-SPA, so a second notification
+  // can arrive while the page stays mounted.
+  const [handledHighlight, setHandledHighlight] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tasksData) return;
+    const target = new URLSearchParams(searchString).get("highlight");
+    if (!target || target === handledHighlight) return;
+    if (tasksData.tasks.some((t) => t.id === target)) {
+      setDetailId(target);
+      setHandledHighlight(target);
+    } else if (scope === "mine") {
+      setScope("everyone");
+    } else {
+      setHandledHighlight(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasksData, handledHighlight, searchString, scope]);
   const detailTask = tasks.find((t) => t.id === detailId) || null;
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
@@ -515,6 +537,13 @@ export default function CrmTasksSimple() {
     },
     enabled: !!detailId,
   });
+  // Same cache key CommentThread uses internally, so this costs no extra
+  // request — it just lets the panel skip the bulky empty-thread state.
+  const { data: taskComments = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/crm/comments", "task", detailId],
+    enabled: !!detailId,
+  });
+
   const [newSubtask, setNewSubtask] = useState("");
   const addSubtask = useMutation({
     mutationFn: async () =>
@@ -951,6 +980,27 @@ export default function CrmTasksSimple() {
                     placeholder="Add a subtask — press Enter"
                     className="h-7 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
                     data-testid="subtask-add-input"
+                  />
+                </div>
+              </div>
+
+              {/* Comments — the shared CRM thread (@mention to notify someone) */}
+              <div data-testid="task-detail-comments">
+                <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Comments
+                  {taskComments.length > 0 && <span className="text-slate-500">{taskComments.length}</span>}
+                </p>
+                {taskComments.length > 0 && (
+                  <div className="overflow-hidden rounded-[4px] border border-slate-200">
+                    <CommentThread entityType="task" entityId={detailTask.id} />
+                  </div>
+                )}
+                <div className="mt-2">
+                  <CommentComposer
+                    entityType="task"
+                    entityId={detailTask.id}
+                    placeholder="Add a comment — @ to mention a teammate…"
                   />
                 </div>
               </div>
