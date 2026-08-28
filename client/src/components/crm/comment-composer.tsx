@@ -1,10 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, Send } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -20,28 +16,6 @@ interface SearchUser {
   name: string;
   role: string;
   email: string;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" {
-  switch (role.toLowerCase()) {
-    case "owner":
-    case "admin":
-      return "default";
-    case "sales":
-    case "technician":
-      return "secondary";
-    default:
-      return "outline";
-  }
 }
 
 export function renderCommentBody(
@@ -64,14 +38,14 @@ export function renderCommentBody(
     const userId = match[1];
     const userName = mentionMap.get(userId) || "Unknown User";
 
+    // A quiet chip, not a link — there's no profile page to land on.
     parts.push(
-      <Link
+      <span
         key={`mention-${match.index}`}
-        href={`/crm/team/${userId}`}
-        className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-sm font-medium hover:underline"
+        className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-sm font-medium"
       >
         @{userName}
-      </Link>
+      </span>
     );
 
     lastIndex = match.index + match[0].length;
@@ -108,12 +82,27 @@ export function CommentComposer({
     staleTime: 30000,
   });
 
+  // The textarea holds readable "@Ryo Martin" text; the raw @[userId] tokens
+  // the server parses are swapped in only at post time. Longest names first so
+  // "@Ryo Martin" can't be half-eaten by a teammate named "@Ryo".
+  const encodeMentions = useCallback(
+    (text: string) => {
+      let out = text;
+      const entries = Array.from(insertedMentions.entries()).sort((a, b) => b[1].length - a[1].length);
+      for (const [id, name] of entries) {
+        out = out.split(`@${name}`).join(`@[${id}]`);
+      }
+      return out;
+    },
+    [insertedMentions]
+  );
+
   const postCommentMutation = useMutation({
-    mutationFn: async (body: string) => {
+    mutationFn: async (rawBody: string) => {
       const response = await apiRequest("POST", "/api/crm/comments", {
         entityType,
         entityId,
-        body,
+        body: encodeMentions(rawBody),
       });
       return response.json();
     },
@@ -163,7 +152,7 @@ export function CommentComposer({
 
     const before = value.slice(0, mentionStartIndex);
     const after = value.slice(mentionStartIndex + 1 + mentionQuery.length);
-    const mentionToken = `@[${user.id}]`;
+    const mentionToken = `@${user.name}`;
     const newValue = before + mentionToken + " " + after;
 
     setValue(newValue);
@@ -252,7 +241,7 @@ export function CommentComposer({
     <div className="relative">
       {/* Single-row pill: input + send button in one bordered container */}
       <div className="flex items-center rounded-lg border border-input bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
-        <div className="relative flex-1">
+        <div className="flex-1">
           <textarea
             ref={textareaRef}
             value={value}
@@ -263,47 +252,6 @@ export function CommentComposer({
             className="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none overflow-hidden"
             style={{ minHeight: "38px", maxHeight: "120px" }}
           />
-
-          {showMentionPicker && (
-            <Card
-              ref={pickerRef}
-              className="absolute left-0 right-0 bottom-full mb-1 z-50 max-h-[200px] overflow-y-auto shadow-lg"
-            >
-              {isSearching ? (
-                <div className="flex items-center justify-center p-4">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : users.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No matching teammates
-                </div>
-              ) : (
-                <div className="py-1">
-                  {users.map((user, index) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted/50 transition-colors ${
-                        index === selectedIndex ? "bg-muted" : ""
-                      }`}
-                      onClick={() => insertMention(user)}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                    >
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium text-sm truncate">{user.name}</span>
-                      <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs capitalize ml-auto">
-                        {user.role}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
         </div>
 
         {/* Send button — sits flush at the right edge of the pill, vertically centred */}
@@ -321,10 +269,39 @@ export function CommentComposer({
         </button>
       </div>
 
-      {insertedMentions.size > 0 && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          Mentioning: {Array.from(insertedMentions.values()).join(", ")}
-        </p>
+      {/* Mention picker — a sibling of the pill, NOT inside it: the pill's
+          overflow-hidden was silently clipping this list into invisibility. */}
+      {showMentionPicker && (
+        <Card
+          ref={pickerRef}
+          className="absolute left-0 right-0 bottom-full mb-1 z-50 max-h-[200px] overflow-y-auto shadow-lg"
+        >
+          {isSearching ? (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : users.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No matching teammates
+            </div>
+          ) : (
+            <div className="py-1">
+              {users.map((user, index) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted/50 ${
+                    index === selectedIndex ? "bg-muted" : ""
+                  }`}
+                  onClick={() => insertMention(user)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                >
+                  <span className="truncate font-medium">{user.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
       )}
     </div>
   );
