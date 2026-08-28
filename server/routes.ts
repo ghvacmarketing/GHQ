@@ -10760,9 +10760,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/crm/users/search", requireCrmAuth, async (req, res) => {
     try {
       const { q } = req.query as { q?: string };
-      
+
+      // Bare "@" — hand back the whole active team so nobody has to guess a
+      // name before the picker shows anyone.
       if (!q || q.trim().length === 0) {
-        return res.json([]);
+        const everyone = await db.select({
+          id: crmUsers.id,
+          name: crmUsers.name,
+          role: crmUsers.role,
+          email: crmUsers.email,
+        })
+        .from(crmUsers)
+        .where(eq(crmUsers.isActive, true))
+        .orderBy(crmUsers.name)
+        .limit(20);
+        return res.json(everyone);
       }
 
       const searchTerm = `%${q.trim()}%`;

@@ -100,9 +100,11 @@ export function CommentComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  // Enabled on a bare "@" too — the server returns the whole active team for
+  // an empty query, so the picker lists everyone before a letter is typed.
   const { data: users = [], isFetching: isSearching } = useQuery<SearchUser[]>({
     queryKey: [`/api/crm/users/search?q=${encodeURIComponent(mentionQuery)}`],
-    enabled: showMentionPicker && mentionQuery.length > 0,
+    enabled: showMentionPicker,
     staleTime: 30000,
   });
 
@@ -273,7 +275,7 @@ export function CommentComposer({
                 </div>
               ) : users.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
-                  {mentionQuery ? "No users found" : "Type to search users..."}
+                  No matching teammates
                 </div>
               ) : (
                 <div className="py-1">

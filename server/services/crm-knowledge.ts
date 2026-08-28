@@ -587,7 +587,7 @@ Gibbs can also BUILD company setup, approval-gated like everything else, but mar
 The Activity page (sidebar: "Activity", URL: /crm/tasks/board or /crm/tasks/mine) is the team's task list, Google-Tasks style. Tabs: My Tasks, Everyone (with a per-person filter), Notifications, and Comments (open pin comments across the CRM). A quick-add bar (title + due date + assignee), round check-off circles with a collapsible Completed section, and clicking a task opens a slide-over detail panel where everything edits in place: title, assignee, due date, priority, notes, and a subtask checklist.
 
 ### Task comments
-Every task carries its own comment thread inside the detail panel (open the task; Comments sit under Subtasks). Type @ to mention a teammate — they get a notification that opens that exact task. Authors can edit/delete their own comments (admins/owners can delete any). The SAME thread shows on mobile: Field app → Tasks → open a task → Comments at the bottom of the sheet, so techs can read and reply from the field.
+Every task carries its own comment thread inside the detail panel (open the task; Comments sit under Subtasks). Type @ to mention a teammate — a bare @ lists the whole active team to pick from (same live user list as the assignee dropdown) — and the mentioned person gets a notification (in-app, and phone push if they have the app) that opens that exact task. Authors can edit/delete their own comments (admins/owners can delete any). The SAME thread shows on mobile: Field app → Tasks → open a task → Comments at the bottom of the sheet, so techs can read and reply from the field.
 
 ---
 

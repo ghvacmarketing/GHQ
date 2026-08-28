@@ -1,14 +1,13 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, isBefore, startOfDay } from "date-fns";
-import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink, ListChecks, X, Flag, MessageSquare } from "lucide-react";
+import { format, formatDistanceToNow, isBefore, startOfDay } from "date-fns";
+import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink, ListChecks, X, Flag, MessageSquare, Pencil } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { CommentComposer } from "@/components/crm/comment-composer";
-import { CommentThread } from "@/components/crm/comment-thread";
+import { CommentComposer, renderCommentBody } from "@/components/crm/comment-composer";
 import { NotificationsPanel } from "@/pages/crm/crm-notifications";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { DatePickerField } from "@/components/crm/date-picker";
@@ -206,6 +205,124 @@ const TaskRow = memo(function TaskRow({
     </div>
   );
 });
+
+type TaskComment = {
+  id: string;
+  authorId: string;
+  body: string;
+  editedAt: string | null;
+  createdAt: string;
+  author: { id: string; name: string; role: string } | null;
+  mentions: { userId: string; userName: string }[];
+};
+
+/** Quiet comment thread for the task panel — name · time and the text, with
+ *  hover-reveal icon actions and inline edit that saves on blur, matching the
+ *  panel's Notes/Subtasks idiom. The shared CommentThread (big avatars, role
+ *  badges, labeled buttons) was too loud in a 28rem slide-over. */
+function TaskComments({ taskId, currentUser }: { taskId: string; currentUser: CrmUser }) {
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+
+  const { data: comments = [] } = useQuery<TaskComment[]>({
+    queryKey: ["/api/crm/comments", "task", taskId],
+  });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "task", taskId] });
+
+  const updateComment = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) =>
+      apiRequest("PATCH", `/api/crm/comments/${id}`, { body }),
+    onSuccess: () => {
+      invalidate();
+      setEditingId(null);
+      toast({ title: "Comment saved" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save the comment", variant: "destructive" }),
+  });
+  const deleteComment = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/comments/${id}`),
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Comment deleted" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't delete the comment", variant: "destructive" }),
+  });
+
+  // Same rule the rest of the CRM uses: authors own their comments,
+  // admins/owners can clean up anything.
+  const canModify = (c: TaskComment) =>
+    c.authorId === currentUser.id || currentUser.role === "admin" || currentUser.role === "owner";
+
+  return (
+    <div>
+      {comments.length > 0 && (
+        <div className="mb-3 space-y-3">
+          {comments.map((c) => (
+            <div key={c.id} className="group/comment" data-testid={`task-comment-${c.id}`}>
+              <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <span className="font-semibold text-slate-600">{c.author?.name || "Someone"}</span>
+                <span>·</span>
+                <span>{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}</span>
+                {c.editedAt && <span className="italic">(edited)</span>}
+                {canModify(c) && editingId !== c.id && (
+                  <span className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/comment:opacity-100">
+                    <button
+                      onClick={() => { setEditingId(c.id); setEditDraft(c.body); }}
+                      className="rounded p-0.5 text-slate-300 hover:bg-slate-100 hover:text-slate-600"
+                      title="Edit"
+                      data-testid={`task-comment-edit-${c.id}`}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => deleteComment.mutate(c.id)}
+                      className="rounded p-0.5 text-slate-300 hover:bg-red-50 hover:text-red-600"
+                      title="Delete"
+                      data-testid={`task-comment-delete-${c.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </p>
+              {editingId === c.id ? (
+                <textarea
+                  autoFocus
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onBlur={() => {
+                    const v = editDraft.trim();
+                    if (v && v !== c.body) updateComment.mutate({ id: c.id, body: v });
+                    else setEditingId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      (e.target as HTMLTextAreaElement).blur();
+                    }
+                    if (e.key === "Escape") {
+                      setEditDraft(c.body);
+                      setEditingId(null);
+                    }
+                  }}
+                  rows={2}
+                  className="mt-1 w-full resize-none rounded-[4px] border border-slate-300/70 bg-white px-2 py-1.5 text-sm leading-relaxed text-slate-800 focus:border-[#711419] focus:outline-none"
+                  data-testid={`task-comment-edit-input-${c.id}`}
+                />
+              ) : (
+                <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                  {renderCommentBody(c.body, c.mentions || [])}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <CommentComposer entityType="task" entityId={taskId} placeholder="Add a comment — @ to mention…" />
+    </div>
+  );
+}
 
 /**
  * Tasks, Google-Tasks style: one list, a quick-add bar, round check-off
@@ -984,25 +1101,14 @@ export default function CrmTasksSimple() {
                 </div>
               </div>
 
-              {/* Comments — the shared CRM thread (@mention to notify someone) */}
+              {/* Comments — quiet thread; @ in the composer notifies a teammate */}
               <div data-testid="task-detail-comments">
                 <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   <MessageSquare className="h-3.5 w-3.5" />
                   Comments
                   {taskComments.length > 0 && <span className="text-slate-500">{taskComments.length}</span>}
                 </p>
-                {taskComments.length > 0 && (
-                  <div className="overflow-hidden rounded-[4px] border border-slate-200">
-                    <CommentThread entityType="task" entityId={detailTask.id} />
-                  </div>
-                )}
-                <div className="mt-2">
-                  <CommentComposer
-                    entityType="task"
-                    entityId={detailTask.id}
-                    placeholder="Add a comment — @ to mention a teammate…"
-                  />
-                </div>
+                <TaskComments taskId={detailTask.id} currentUser={currentUser} />
               </div>
 
               {/* Meta */}
