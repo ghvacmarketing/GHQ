@@ -118,6 +118,8 @@ import {
   PACKAGE_LEVEL_ORDER,
   getOptionSortOrder,
   groupLineItemsByOption,
+  isDiscountLineItem,
+  summarizeOptionItems,
   formatPresentationCurrency,
   formatPresentationDate,
   parseEquipmentImages,
@@ -267,6 +269,9 @@ export default function CrmQuoteDetail() {
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
   const [discountMode, setDiscountMode] = useState<"amount" | "percentage">("amount");
   const [discountValue, setDiscountValue] = useState("");
+  // Multi-option quotes: which options this discount targets (default: every
+  // option that doesn't already carry a discount of the chosen kind).
+  const [discountOptionTags, setDiscountOptionTags] = useState<string[]>([]);
 
   // Protection bundle parts-discount prompt
   const [protectionPrompt, setProtectionPrompt] = useState<{ pct: number; bundleName: string } | null>(null);
@@ -888,44 +893,64 @@ export default function CrmQuoteDetail() {
 
   const hasProtectionDiscountLine = () => !!findProtectionDiscountLine();
 
-  const calculateProtectionEligibleSubtotal = () =>
+  // Eligible base for the parts discount. Pass an option tag on a multi-option
+  // quote to size the discount from that option alone (its lines + untagged
+  // shared lines); no tag means the whole quote (single-mode and legacy lines).
+  const calculateProtectionEligibleSubtotal = (optionTag?: string | null) =>
     quote?.lineItems
       ?.filter((item) => {
         const price = parseFloat(String(item.unitPrice)) || 0;
         if (item.isDiscountLine || item.lineType === "discount") return false;
         if (item.lineType === "protection") return false;
-        return price > 0;
+        if (price <= 0) return false;
+        return optionTag ? item.optionTag === optionTag || !item.optionTag : true;
       })
       .reduce((sum, item) => sum + parseFloat(String(item.lineTotal || 0)), 0) || 0;
 
   const addProtectionDiscountMutation = useMutation({
-    mutationFn: async ({ pct, amount }: { pct: number; amount: number }) => {
-      const value = -Math.abs(amount);
-      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
-        description: protectionDiscountLabel(pct),
-        quantity: "1",
-        unitPrice: value.toString(),
-        lineTotal: value.toString(),
-        lineType: "discount",
-        isDiscountLine: true,
-        discountKind: "protection",
-      });
-      return res.json();
+    mutationFn: async (lines: Array<{ pct: number; amount: number; optionTag?: string }>) => {
+      for (const line of lines) {
+        const value = -Math.abs(line.amount);
+        await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
+          description: protectionDiscountLabel(line.pct),
+          quantity: "1",
+          unitPrice: value.toFixed(2),
+          lineTotal: value.toFixed(2),
+          lineType: "discount",
+          isDiscountLine: true,
+          discountKind: "protection",
+          ...(line.optionTag ? { optionTag: line.optionTag } : {}),
+        });
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+    onSuccess: (_data, lines) => {
       setProtectionPrompt(null);
-      toast({ title: "Parts discount applied" });
+      toast({
+        title: "Parts discount applied",
+        description: lines.length > 1 ? `Applied to each of the ${lines.length} options separately.` : undefined,
+      });
     },
     onError: (error: any) => {
       setProtectionPrompt(null);
       toast({ title: "Error", description: error.message || "Failed to apply discount", variant: "destructive" });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+    },
   });
 
   const handleApplyProtectionDiscount = (pct: number) => {
-    const eligible = calculateProtectionEligibleSubtotal();
-    if (eligible <= 0) {
+    // Multi-option quote: one discount line per option, each sized from that
+    // option's own eligible subtotal. Single mode: one line for the quote.
+    const lines = isOptionsQuote()
+      ? quoteOptionTags()
+          .map((tag) => ({ pct, amount: calculateProtectionEligibleSubtotal(tag) * (pct / 100), optionTag: tag }))
+          .filter((line) => line.amount > 0)
+      : (() => {
+          const eligible = calculateProtectionEligibleSubtotal();
+          return eligible > 0 ? [{ pct, amount: eligible * (pct / 100) }] : [];
+        })();
+    if (lines.length === 0) {
       toast({
         title: "No eligible items",
         description: "Add priced line items before applying the parts discount.",
@@ -934,35 +959,42 @@ export default function CrmQuoteDetail() {
       setProtectionPrompt(null);
       return;
     }
-    addProtectionDiscountMutation.mutate({ pct, amount: eligible * (pct / 100) });
+    addProtectionDiscountMutation.mutate(lines);
   };
 
   // Keep the protection discount in sync: recalc when eligible items change and
-  // remove it automatically once the bundle is gone.
+  // remove it automatically once the bundle is gone. Option-tagged lines track
+  // their own option's eligible subtotal; untagged lines keep tracking the
+  // whole quote. One write per pass — the refetch re-runs the effect.
   useEffect(() => {
     if (!quote?.lineItems) return;
-    const discountLine = findProtectionDiscountLine();
-    if (!discountLine) return;
+    const discountLines = quote.lineItems.filter(
+      (item) => item.discountKind === "protection" && parseFloat(String(item.unitPrice)) < 0,
+    );
+    if (discountLines.length === 0) return;
     if (deleteLineItemMutation.isPending || updateLineItemMutation.isPending) return;
 
     if (!hasProtectionBundleLine()) {
-      deleteLineItemMutation.mutate(discountLine.id);
+      deleteLineItemMutation.mutate(discountLines[0].id);
       return;
     }
 
-    const pct = parseProtectionDiscountLabelPct(discountLine.description);
-    if (!pct) return;
-    const eligible = calculateProtectionEligibleSubtotal();
-    const target = -Math.abs(eligible * (pct / 100));
-    const current = parseFloat(String(discountLine.unitPrice)) || 0;
-    if (Math.abs(current - target) > 0.005) {
-      updateLineItemMutation.mutate({
-        lineItemId: discountLine.id,
-        description: discountLine.description || protectionDiscountLabel(pct),
-        quantity: 1,
-        unitPrice: target,
-        lineTotal: target,
-      });
+    for (const discountLine of discountLines) {
+      const pct = parseProtectionDiscountLabelPct(discountLine.description);
+      if (!pct) continue;
+      const eligible = calculateProtectionEligibleSubtotal(discountLine.optionTag || null);
+      const target = -Math.abs(eligible * (pct / 100));
+      const current = parseFloat(String(discountLine.unitPrice)) || 0;
+      if (Math.abs(current - target) > 0.005) {
+        updateLineItemMutation.mutate({
+          lineItemId: discountLine.id,
+          description: discountLine.description || protectionDiscountLabel(pct),
+          quantity: 1,
+          unitPrice: target,
+          lineTotal: target,
+        });
+        return;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quote?.lineItems]);
@@ -974,8 +1006,8 @@ export default function CrmQuoteDetail() {
   };
 
   const hasExistingDiscount = (kind: "promotion" | "maintenance") => {
-    return quote?.lineItems?.some(item => 
-      item.description?.includes(kind === "promotion" ? "Promotional" : "Maintenance") && 
+    return quote?.lineItems?.some(item =>
+      item.description?.includes(kind === "promotion" ? "Promotional" : "Maintenance") &&
       parseFloat(String(item.unitPrice)) < 0
     ) || false;
   };
@@ -992,61 +1024,181 @@ export default function CrmQuoteDetail() {
       .reduce((sum, item) => sum + parseFloat(String(item.lineTotal || 0)), 0) || 0;
   };
 
+  // --- Multi-option quotes discount PER OPTION ---
+  // The customer buys exactly one option, so a discount must be sized from each
+  // option's own price (its tagged lines + untagged shared lines) and saved as
+  // one tagged line per option — never computed from the sum of all options.
+  // Discounts can target specific options, so one option can carry 20% off
+  // while another gets $500 flat (one discount of each kind per option).
+  const quoteOptionTags = () =>
+    Array.from(new Set((quote?.lineItems || []).map(li => li.optionTag).filter((t): t is string => !!t)))
+      .sort((a, b) => getOptionSortOrder(a) - getOptionSortOrder(b));
+
+  const isOptionsQuote = () => quote?.quoteMode === "options" && quoteOptionTags().length > 0;
+
+  // Does this line carry the given discount kind? Matches by discountKind and,
+  // for legacy lines saved without one, by the description convention.
+  const discountKindMatches = (item: CrmQuoteLineItem, kind: "promotion" | "maintenance") =>
+    item.discountKind === kind ||
+    (!item.discountKind &&
+      !!item.description?.includes(kind === "promotion" ? "Promotional" : "Maintenance") &&
+      parseFloat(String(item.unitPrice)) < 0);
+
+  // An option already has this discount kind when a matching line targets it —
+  // its own tagged line, or a legacy untagged line (which hits every option).
+  const optionHasDiscountKind = (tag: string, kind: "promotion" | "maintenance") =>
+    quote?.lineItems?.some(item =>
+      isDiscountLineItem(item) &&
+      discountKindMatches(item, kind) &&
+      (item.optionTag === tag || !item.optionTag)
+    ) || false;
+
+  const eligibleDiscountTags = (kind: "promotion" | "maintenance") =>
+    quoteOptionTags().filter(tag => !optionHasDiscountKind(tag, kind));
+
+  // A discount kind is exhausted when nothing can still take it: every option
+  // has one (options mode), or the quote has one (single mode).
+  const kindFullyApplied = (kind: "promotion" | "maintenance") =>
+    isOptionsQuote() ? eligibleDiscountTags(kind).length === 0 : hasExistingDiscount(kind);
+
+  // Compact name for a discount line in summaries ("Discount: Promotional
+  // (20%)" → "Promotional (20%)").
+  const discountShortLabel = (description?: string | null) =>
+    (description || "Discount").replace(/^Discount:\s*/i, "").trim() || "Discount";
+
+  // What one option costs before discounts: its own positive non-discount
+  // lines plus the untagged shared lines (charged with every option).
+  const calculateOptionSubtotal = (tag: string) =>
+    quote?.lineItems
+      ?.filter(item => {
+        const price = parseFloat(String(item.unitPrice)) || 0;
+        if (item.isDiscountLine || item.lineType === "discount" || item.description?.startsWith("Discount:")) return false;
+        if (price <= 0) return false;
+        return item.optionTag === tag || !item.optionTag;
+      })
+      .reduce((sum, item) => sum + parseFloat(String(item.lineTotal || 0)), 0) || 0;
+
+  type DiscountLinePayload = { description: string; amount: number; optionTag?: string; discountKind: "promotion" | "maintenance" };
+
+  // The discount lines the current dialog inputs would create — one per option
+  // on a multi-option quote, a single line otherwise. Shared with the dialog
+  // preview so what's shown is exactly what gets applied.
+  const buildDiscountLines = (): DiscountLinePayload[] => {
+    const value = parseFloat(discountValue) || 0;
+    const perBasis = (basis: number): { amount: number; description: string } => {
+      if (discountKind === "maintenance") {
+        return { amount: basis * 0.15, description: "Discount: Maintenance Agreement (15%)" };
+      }
+      if (discountMode === "amount") {
+        return { amount: value, description: "Discount: Promotional" };
+      }
+      return { amount: basis * value / 100, description: `Discount: Promotional (${discountValue}%)` };
+    };
+
+    if (isOptionsQuote()) {
+      // Only the options the user targeted (and that don't already carry
+      // this kind) get a line — so "Best" can take 20% while "Good" later
+      // gets $500 flat.
+      const eligible = new Set(eligibleDiscountTags(discountKind));
+      return quoteOptionTags()
+        .filter(tag => discountOptionTags.includes(tag) && eligible.has(tag))
+        .map(tag => {
+          const { amount, description } = perBasis(calculateOptionSubtotal(tag));
+          return { description, amount, optionTag: tag, discountKind };
+        })
+        .filter(line => line.amount > 0);
+    }
+    const basis = discountKind === "maintenance" ? calculateQuoteSubtotal() : calculateEligibleSubtotal("promotion");
+    const { amount, description } = perBasis(basis);
+    return amount > 0 ? [{ description, amount, discountKind }] : [];
+  };
+
   const addDiscountMutation = useMutation({
-    mutationFn: async (data: { description: string; amount: number }) => {
-      const discountValue = -Math.abs(data.amount);
-      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
-        description: data.description,
-        quantity: "1",
-        unitPrice: discountValue.toString(),
-        lineTotal: discountValue.toString(),
-        lineType: "discount",
-        isDiscountLine: true,
-      });
-      return res.json();
+    mutationFn: async (lines: DiscountLinePayload[]) => {
+      for (const line of lines) {
+        const discountValue = -Math.abs(line.amount);
+        await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
+          description: line.description,
+          quantity: "1",
+          unitPrice: discountValue.toFixed(2),
+          lineTotal: discountValue.toFixed(2),
+          lineType: "discount",
+          isDiscountLine: true,
+          discountKind: line.discountKind,
+          ...(line.optionTag ? { optionTag: line.optionTag } : {}),
+        });
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+    onSuccess: (_data, lines) => {
       setShowDiscountDialog(false);
       setDiscountKind("promotion");
       setDiscountMode("amount");
       setDiscountValue("");
-      toast({ title: "Discount added" });
+      setDiscountOptionTags([]);
+      toast({
+        title: "Discount added",
+        description: lines.length > 1
+          ? `Applied to each of the ${lines.length} options separately.`
+          : lines[0]?.optionTag
+            ? `Applied to ${lines[0].optionTag} only.`
+            : undefined,
+      });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to add discount", variant: "destructive" });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+    },
   });
 
   const handleApplyDiscount = () => {
-    if (hasExistingDiscount(discountKind)) {
+    if (isOptionsQuote()) {
+      if (discountOptionTags.length === 0) {
+        toast({ title: "No option selected", description: "Pick at least one option to apply the discount to.", variant: "destructive" });
+        return;
+      }
+    } else if (hasExistingDiscount(discountKind)) {
       toast({ title: "Discount already exists", description: "Remove the existing discount first.", variant: "destructive" });
       return;
     }
 
-    let discountAmount: number;
-    let description: string;
-
-    if (discountKind === "maintenance") {
-      discountAmount = calculateQuoteSubtotal() * 0.15;
-      description = "Discount: Maintenance Agreement (15%)";
-    } else {
-      if (discountMode === "amount") {
-        discountAmount = parseFloat(discountValue) || 0;
-      } else {
-        discountAmount = calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100;
-      }
-      description = discountMode === "percentage" 
-        ? `Discount: Promotional (${discountValue}%)`
-        : `Discount: Promotional`;
-    }
-
-    if (discountAmount <= 0) {
+    const lines = buildDiscountLines();
+    if (lines.length === 0) {
       toast({ title: "Invalid discount", description: "Please enter a valid discount amount.", variant: "destructive" });
       return;
     }
 
-    addDiscountMutation.mutate({ description, amount: discountAmount });
+    addDiscountMutation.mutate(lines);
+  };
+
+  // Dialog preview for multi-option quotes: the exact per-option lines the
+  // current inputs would create (same math as buildDiscountLines).
+  const renderOptionDiscountPreview = () => {
+    if (isOptionsQuote() && discountOptionTags.length === 0) {
+      return <p className="mt-2 text-sm text-slate-500">Select at least one option above.</p>;
+    }
+    const lines = buildDiscountLines();
+    if (lines.length === 0) return null;
+    return (
+      <div className="mt-2 space-y-1.5" data-testid="discount-per-option-preview">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          {lines.length === quoteOptionTags().length ? "Applied to every option separately" : "Applied to the selected options separately"}
+        </p>
+        {lines.map((line) => (
+          <div key={line.optionTag} className="flex items-center justify-between gap-2 text-sm">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+              {line.optionTag}
+            </span>
+            <span className="text-slate-600 tabular-nums">
+              {formatCurrency(calculateOptionSubtotal(line.optionTag!))}
+              <span className="mx-1 text-slate-400">→</span>
+              <span className="font-medium text-emerald-700">−{formatCurrency(line.amount)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const handleStartEditLineItem = (item: CrmQuoteLineItem) => {
@@ -3112,9 +3264,13 @@ export default function CrmQuoteDetail() {
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    setDiscountKind("promotion");
+                    // Open on the first kind that can still be applied, with
+                    // every eligible option targeted ("everything gets it").
+                    const kind = kindFullyApplied("promotion") ? "maintenance" : "promotion";
+                    setDiscountKind(kind);
                     setDiscountMode("amount");
                     setDiscountValue("");
+                    setDiscountOptionTags(eligibleDiscountTags(kind));
                     setShowDiscountDialog(true);
                   }}
                   className="border-[#d3b07d] text-[#b8944d] hover:bg-[#faf6ef] hover:text-[#9a7d3f]"
@@ -3232,7 +3388,14 @@ export default function CrmQuoteDetail() {
                       ) : (
                         <>
                           <TableCell>
-                            <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
+                            {isDiscountLineItem(item) ? (
+                              <div className="flex items-center gap-1.5" data-testid={`discount-line-${item.id}`}>
+                                <Tag className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                                <div className="prose prose-sm max-w-none [&_*]:text-emerald-700 [&_*]:font-medium" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
+                              </div>
+                            ) : (
+                              <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
+                            )}
                             {addOnState(item) === "pending" && (
                               <span className="mt-1 inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-[#711419]/10 text-[#711419]" data-testid={`badge-addon-pending-${item.id}`}>
                                 Optional add-on — customer picks
@@ -3255,6 +3418,10 @@ export default function CrmQuoteDetail() {
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
                                   {item.optionTag}
                                 </span>
+                              ) : isDiscountLineItem(item) ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                                  All options
+                                </span>
                               ) : (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
                                   Untagged
@@ -3262,9 +3429,13 @@ export default function CrmQuoteDetail() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                          <TableCell className="text-right">{isDiscountLineItem(item) ? "" : item.quantity}</TableCell>
+                          <TableCell className={`text-right ${isDiscountLineItem(item) ? "text-emerald-700 font-medium" : ""}`}>
+                            {isDiscountLineItem(item) ? "" : formatCurrency(item.unitPrice)}
+                          </TableCell>
+                          <TableCell className={`text-right ${isDiscountLineItem(item) ? "text-emerald-700 font-medium" : ""}`}>
+                            {formatCurrency(item.lineTotal)}
+                          </TableCell>
                           {canEditLineItems && (
                             <TableCell>
                               <div className="flex items-center gap-1">
@@ -3440,8 +3611,79 @@ export default function CrmQuoteDetail() {
               </TableBody>
             </Table>
 
-            {/* Hide subtotal/total for options mode since each package is a separate choice */}
-            {quote.quoteMode !== "options" && (
+            {/* Options mode: each package is a separate choice, so totals are
+                shown PER OPTION — subtotal, that option's own discount, and
+                what the customer would pay for it. Shared (untagged) lines
+                count toward every option, matching the customer view. */}
+            {quote.quoteMode === "options" ? (
+              (() => {
+                const tags = Array.from(new Set(
+                  visibleLineItems.map((li) => li.optionTag).filter((t): t is string => !!t)
+                )).sort((a, b) => getOptionSortOrder(a) - getOptionSortOrder(b));
+                if (tags.length === 0) return null;
+                const shared = visibleLineItems.filter((li) => !li.optionTag);
+                return (
+                  <div className="mt-6 border-t pt-4" data-testid="option-totals-summary">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Per-option pricing — the customer picks one
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {tags.map((tag) => {
+                        const optionItems = [
+                          ...visibleLineItems.filter((li) => li.optionTag === tag),
+                          ...shared,
+                        ];
+                        const summary = summarizeOptionItems(optionItems);
+                        // Every discount hitting this option, listed by name —
+                        // its own tagged lines plus untagged lines that apply
+                        // to every option.
+                        const discountLines = optionItems.filter(isDiscountLineItem);
+                        return (
+                          <div key={tag} className="rounded-[4px] border border-slate-300/70 bg-slate-50 p-3" data-testid={`option-total-${tag.toLowerCase().replace(/\s+/g, "-")}`}>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                              {tag}
+                            </span>
+                            <div className="mt-2 space-y-1 text-sm">
+                              {discountLines.length > 0 && (
+                                <>
+                                  <div className="flex justify-between text-slate-500">
+                                    <span>Subtotal</span>
+                                    <span className="tabular-nums">{formatCurrency(summary.subtotal)}</span>
+                                  </div>
+                                  {discountLines.map((d) => (
+                                    <div key={d.id} className="flex items-center justify-between gap-2 text-emerald-700">
+                                      <span className="flex min-w-0 items-center gap-1">
+                                        <Tag className="h-3 w-3 shrink-0" />
+                                        <span className="truncate" title={d.description || "Discount"}>
+                                          {discountShortLabel(d.description)}
+                                        </span>
+                                      </span>
+                                      <span className="shrink-0 tabular-nums font-medium">
+                                        −{formatCurrency(Math.abs(parseFloat(String(d.lineTotal || 0)) || 0))}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {discountLines.length > 1 && (
+                                    <div className="flex justify-between text-emerald-800">
+                                      <span>Total savings</span>
+                                      <span className="tabular-nums font-semibold">−{formatCurrency(summary.discountTotal)}</span>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold text-slate-900">
+                                <span>Option total</span>
+                                <span className="tabular-nums text-[#711419]">{formatCurrency(summary.total)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
               <div className="mt-6 border-t pt-4 space-y-2">
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Sell Price</span>
@@ -4055,49 +4297,143 @@ export default function CrmQuoteDetail() {
                 <Label>Discount Type</Label>
                 <RadioGroup
                   value={discountKind}
-                  onValueChange={(value) => setDiscountKind(value as "promotion" | "maintenance")}
+                  onValueChange={(value) => {
+                    const kind = value as "promotion" | "maintenance";
+                    setDiscountKind(kind);
+                    // Eligibility differs per kind — retarget to every option
+                    // that can still take the newly chosen kind.
+                    if (isOptionsQuote()) setDiscountOptionTags(eligibleDiscountTags(kind));
+                  }}
                   className="flex flex-col gap-2"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem 
-                      value="promotion" 
-                      id="detail-discount-promotion" 
-                      disabled={hasExistingDiscount("promotion")}
+                    <RadioGroupItem
+                      value="promotion"
+                      id="detail-discount-promotion"
+                      disabled={kindFullyApplied("promotion")}
                     />
-                    <Label 
-                      htmlFor="detail-discount-promotion" 
-                      className={cn(hasExistingDiscount("promotion") && "text-slate-400")}
+                    <Label
+                      htmlFor="detail-discount-promotion"
+                      className={cn(kindFullyApplied("promotion") && "text-slate-400")}
                     >
                       Promotion Discount
-                      {hasExistingDiscount("promotion") && <span className="text-xs ml-2">(Already applied)</span>}
+                      {kindFullyApplied("promotion") && (
+                        <span className="text-xs ml-2">{isOptionsQuote() ? "(Every option has one)" : "(Already applied)"}</span>
+                      )}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem 
-                      value="maintenance" 
+                    <RadioGroupItem
+                      value="maintenance"
                       id="detail-discount-maintenance"
-                      disabled={hasExistingDiscount("maintenance")}
+                      disabled={kindFullyApplied("maintenance")}
                     />
-                    <Label 
+                    <Label
                       htmlFor="detail-discount-maintenance"
-                      className={cn(hasExistingDiscount("maintenance") && "text-slate-400")}
+                      className={cn(kindFullyApplied("maintenance") && "text-slate-400")}
                     >
                       Maintenance Discount
-                      {hasExistingDiscount("maintenance") && <span className="text-xs ml-2">(Already applied)</span>}
+                      {kindFullyApplied("maintenance") && (
+                        <span className="text-xs ml-2">{isOptionsQuote() ? "(Every option has one)" : "(Already applied)"}</span>
+                      )}
                     </Label>
                   </div>
                 </RadioGroup>
               </div>
 
+              {/* Multi-option quotes: pick which options this discount targets.
+                  Everything eligible starts checked; uncheck to single out
+                  options — so one option can get 20% while another later gets
+                  $500 flat. Options already carrying this kind are locked. */}
+              {isOptionsQuote() && (
+                <div className="space-y-2" data-testid="discount-option-targets">
+                  <div className="flex items-center justify-between">
+                    <Label>Apply To</Label>
+                    <div className="flex gap-3 text-xs">
+                      <button
+                        type="button"
+                        className="text-[#711419] hover:underline disabled:text-slate-300 disabled:no-underline"
+                        disabled={discountOptionTags.length === eligibleDiscountTags(discountKind).length}
+                        onClick={() => setDiscountOptionTags(eligibleDiscountTags(discountKind))}
+                        data-testid="discount-targets-all"
+                      >
+                        All options
+                      </button>
+                      <button
+                        type="button"
+                        className="text-slate-500 hover:underline disabled:text-slate-300 disabled:no-underline"
+                        disabled={discountOptionTags.length === 0}
+                        onClick={() => setDiscountOptionTags([])}
+                        data-testid="discount-targets-none"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {quoteOptionTags().map((tag) => {
+                      const taken = optionHasDiscountKind(tag, discountKind);
+                      const checked = discountOptionTags.includes(tag);
+                      return (
+                        <label
+                          key={tag}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-[4px] border p-2.5 text-sm transition-colors",
+                            taken
+                              ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                              : checked
+                                ? "border-[#711419]/40 bg-[#711419]/5 cursor-pointer"
+                                : "border-slate-200 hover:border-slate-300 cursor-pointer",
+                          )}
+                          data-testid={`discount-target-${tag.toLowerCase().replace(/\s+/g, "-")}`}
+                        >
+                          <Checkbox
+                            checked={checked}
+                            disabled={taken}
+                            onCheckedChange={(c) =>
+                              setDiscountOptionTags(prev =>
+                                c === true ? [...prev, tag] : prev.filter(t => t !== tag),
+                              )
+                            }
+                          />
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                            {tag}
+                          </span>
+                          {taken && (
+                            <span className="text-xs text-slate-500">
+                              already has a {discountKind} discount
+                            </span>
+                          )}
+                          <span className="ml-auto tabular-nums text-slate-500">
+                            {formatCurrency(calculateOptionSubtotal(tag))}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {discountKind === "maintenance" ? (
                 <div className="p-4 bg-slate-50 rounded-lg border">
                   <p className="text-sm font-medium text-slate-700">Fixed 15% Discount</p>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Maintenance discount is always 15% of the total quote amount.
-                  </p>
-                  <p className="text-sm font-medium text-slate-800 mt-2">
-                    ≈ ${(calculateQuoteSubtotal() * 0.15).toFixed(2)} off ${calculateQuoteSubtotal().toFixed(2)} total
-                  </p>
+                  {isOptionsQuote() ? (
+                    <>
+                      <p className="text-sm text-slate-500 mt-1">
+                        15% off each selected option — sized from that option's own price, never the combined total of all options.
+                      </p>
+                      {renderOptionDiscountPreview()}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Maintenance discount is always 15% of the total quote amount.
+                      </p>
+                      <p className="text-sm font-medium text-slate-800 mt-2">
+                        ≈ ${(calculateQuoteSubtotal() * 0.15).toFixed(2)} off ${calculateQuoteSubtotal().toFixed(2)} total
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <>
@@ -4138,10 +4474,23 @@ export default function CrmQuoteDetail() {
                         className="pl-8"
                       />
                     </div>
-                    {discountMode === "percentage" && discountValue && (
-                      <p className="text-sm text-slate-500">
-                        ≈ ${(calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal("promotion").toFixed(2)} eligible subtotal
-                      </p>
+                    {isOptionsQuote() ? (
+                      discountValue ? (
+                        <div className="rounded-lg border bg-slate-50 p-3">
+                          {discountMode === "amount" && discountOptionTags.length > 0 && (
+                            <p className="text-sm text-slate-500 mb-1">
+                              The same amount comes off each selected option.
+                            </p>
+                          )}
+                          {renderOptionDiscountPreview()}
+                        </div>
+                      ) : null
+                    ) : (
+                      discountMode === "percentage" && discountValue && (
+                        <p className="text-sm text-slate-500">
+                          ≈ ${(calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal("promotion").toFixed(2)} eligible subtotal
+                        </p>
+                      )
                     )}
                   </div>
                 </>
@@ -4154,9 +4503,9 @@ export default function CrmQuoteDetail() {
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleApplyDiscount}
-                disabled={addDiscountMutation.isPending}
+                disabled={addDiscountMutation.isPending || (isOptionsQuote() && discountOptionTags.length === 0)}
                 className="bg-[#d3b07d] hover:bg-[#b8944d] text-white"
               >
                 {addDiscountMutation.isPending ? (
@@ -4185,8 +4534,32 @@ export default function CrmQuoteDetail() {
               </p>
               {protectionPrompt && (
                 <div className="p-3 bg-slate-50 rounded-lg border text-sm">
-                  ≈ ${(calculateProtectionEligibleSubtotal() * (protectionPrompt.pct / 100)).toFixed(2)} off{" "}
-                  ${calculateProtectionEligibleSubtotal().toFixed(2)} eligible subtotal
+                  {isOptionsQuote() ? (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Applied to each option separately
+                      </p>
+                      {quoteOptionTags().map((tag) => (
+                        <div key={tag} className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                            {tag}
+                          </span>
+                          <span className="text-slate-600 tabular-nums">
+                            {formatCurrency(calculateProtectionEligibleSubtotal(tag))}
+                            <span className="mx-1 text-slate-400">→</span>
+                            <span className="font-medium text-emerald-700">
+                              −{formatCurrency(calculateProtectionEligibleSubtotal(tag) * (protectionPrompt.pct / 100))}
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      ≈ ${(calculateProtectionEligibleSubtotal() * (protectionPrompt.pct / 100)).toFixed(2)} off{" "}
+                      ${calculateProtectionEligibleSubtotal().toFixed(2)} eligible subtotal
+                    </>
+                  )}
                   <p className="text-xs text-slate-400 mt-1">
                     Applies to all priced items except the protection bundle. Removing the bundle reverses it.
                   </p>
@@ -5463,7 +5836,17 @@ export default function CrmQuoteDetail() {
                                   </div>
                                   <span className="font-semibold text-slate-900 text-base sm:text-lg">{option.tag}</span>
                                 </div>
-                                <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
+                                <div className="text-right">
+                                  {option.discountTotal > 0 && (
+                                    <div className="text-sm text-slate-400 line-through">{formatPresentationCurrency(option.subtotal)}</div>
+                                  )}
+                                  <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
+                                  {option.discountTotal > 0 && (
+                                    <div className="text-xs font-semibold text-emerald-700">
+                                      You save {formatPresentationCurrency(option.discountTotal)}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div className="p-3 sm:p-4 bg-gray-50">
                                 {/* Show AI-generated category title if available */}
@@ -5474,6 +5857,24 @@ export default function CrmQuoteDetail() {
                                 )}
                                 
                                 {option.items.map((item) => {
+                                  // Discount lines get their own quiet row — always
+                                  // labeled (even when an AI category title hides
+                                  // normal descriptions), no quantity, green amount.
+                                  if (isDiscountLineItem(item)) {
+                                    return (
+                                      <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
+                                        <div className="flex justify-between items-center gap-2 text-sm">
+                                          <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+                                            <Tag className="h-3.5 w-3.5 shrink-0" />
+                                            {item.description}
+                                          </span>
+                                          <span className="font-semibold text-emerald-700 tabular-nums">
+                                            {formatPresentationCurrency(item.lineTotal)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                   const equipmentImages = parseEquipmentImages(item.imageUrl);
                                   return (
                                     <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
@@ -5484,8 +5885,8 @@ export default function CrmQuoteDetail() {
                                           </div>
                                         ) : item.imageUrl && !item.imageUrl.startsWith('{') && (
                                           <div className="flex-shrink-0">
-                                            <img 
-                                              src={item.imageUrl} 
+                                            <img
+                                              src={item.imageUrl}
                                               alt={item.description}
                                               className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-slate-200"
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}

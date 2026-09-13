@@ -15,7 +15,36 @@ export const COMPANY_INFO = {
 export interface OptionGroup {
   tag: string;
   items: CrmQuoteLineItem[];
+  /** Net price of the option (discount lines included). */
   total: number;
+  /** Price before discounts — sum of the non-discount lines. */
+  subtotal: number;
+  /** Total discount on this option, as a positive number. */
+  discountTotal: number;
+}
+
+export const isDiscountLineItem = (item: {
+  isDiscountLine?: boolean | null;
+  lineType?: string | null;
+  description?: string | null;
+}): boolean =>
+  item.isDiscountLine === true ||
+  item.lineType === "discount" ||
+  (item.description ?? "").startsWith("Discount:");
+
+export function summarizeOptionItems(items: CrmQuoteLineItem[]): {
+  total: number;
+  subtotal: number;
+  discountTotal: number;
+} {
+  let subtotal = 0;
+  let discountTotal = 0;
+  for (const item of items) {
+    const lineTotal = parseFloat(item.lineTotal || "0") || 0;
+    if (isDiscountLineItem(item)) discountTotal += -lineTotal;
+    else subtotal += lineTotal;
+  }
+  return { total: subtotal - discountTotal, subtotal, discountTotal };
 }
 
 export const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
@@ -44,11 +73,7 @@ export function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGro
   });
   
   return Array.from(groups.entries())
-    .map(([tag, items]) => ({
-      tag,
-      items,
-      total: items.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
-    }))
+    .map(([tag, items]) => ({ tag, items, ...summarizeOptionItems(items) }))
     .sort((a, b) => getOptionSortOrder(a.tag) - getOptionSortOrder(b.tag));
 }
 

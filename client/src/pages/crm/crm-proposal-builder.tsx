@@ -1533,16 +1533,46 @@ export default function CrmProposalBuilder() {
         taxable: true,
         lineType: "protection",
       });
-      if (protectionDiscountApplied && cartProtectionDiscountAmount > 0) {
-        lineItems.push({
-          description: protectionDiscountLabel(protectionBundle.pct),
-          quantity: 1,
-          unitPrice: -Math.abs(cartProtectionDiscountAmount),
-          taxable: false,
-          lineType: "discount",
-          isDiscountLine: true,
-          discountKind: "protection",
-        });
+      if (protectionDiscountApplied && protectionBundle.pct > 0) {
+        // Multi-option proposals: one discount line PER OPTION, sized from that
+        // option's own price. The customer buys exactly one option, so the
+        // discount must never be computed from the sum of all options.
+        const optionTags = Array.from(new Set(lineItems.map(li => li.optionTag).filter((t): t is string => !!t)));
+        if (quoteMode === "options" && optionTags.length > 0) {
+          for (const tag of optionTags) {
+            const eligible = lineItems
+              .filter(li =>
+                (li.optionTag === tag || !li.optionTag) &&
+                li.lineType !== "protection" &&
+                !li.isDiscountLine &&
+                li.unitPrice > 0,
+              )
+              .reduce((sum, li) => sum + li.unitPrice * li.quantity, 0);
+            const amount = Math.round(eligible * (protectionBundle.pct / 100) * 100) / 100;
+            if (amount > 0) {
+              lineItems.push({
+                description: protectionDiscountLabel(protectionBundle.pct),
+                quantity: 1,
+                unitPrice: -amount,
+                taxable: false,
+                optionTag: tag,
+                lineType: "discount",
+                isDiscountLine: true,
+                discountKind: "protection",
+              });
+            }
+          }
+        } else if (cartProtectionDiscountAmount > 0) {
+          lineItems.push({
+            description: protectionDiscountLabel(protectionBundle.pct),
+            quantity: 1,
+            unitPrice: -Math.abs(cartProtectionDiscountAmount),
+            taxable: false,
+            lineType: "discount",
+            isDiscountLine: true,
+            discountKind: "protection",
+          });
+        }
       }
     }
 

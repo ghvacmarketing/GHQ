@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeHtml } from "@/lib/sanitize-html";
-import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink, Landmark } from "lucide-react";
+import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink, Landmark, Tag } from "lucide-react";
+import { isDiscountLineItem, summarizeOptionItems } from "@/components/quote-presentation";
 import { surchargeFor, surchargeLabel, type PaymentMethod } from "@shared/payment-fees";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
@@ -40,7 +41,12 @@ type ExtendedLineItem = CrmQuoteLineItem;
 interface OptionGroup {
   tag: string;
   items: ExtendedLineItem[];
+  /** Net price of the option (discount lines included). */
   total: number;
+  /** Price before discounts. */
+  subtotal: number;
+  /** Total discount on this option, as a positive number. */
+  discountTotal: number;
 }
 
 const PACKAGE_LEVEL_ORDER = ["Best", "Better", "Good", "Budget"];
@@ -79,11 +85,7 @@ function groupLineItemsByOption(lineItems: CrmQuoteLineItem[]): OptionGroup[] {
   return Array.from(groups.entries())
     .map(([tag, items]) => {
       const all = [...items, ...shared];
-      return {
-        tag,
-        items: all,
-        total: all.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0),
-      };
+      return { tag, items: all, ...summarizeOptionItems(all) };
     })
     .sort((a, b) => getOptionSortOrder(a.tag) - getOptionSortOrder(b.tag));
 }
@@ -789,7 +791,17 @@ export default function PublicQuoteView() {
                             <span className="font-semibold text-slate-900 text-base sm:text-lg">{option.tag}</span>
                           </div>
                           <div className="text-right">
+                            {option.discountTotal > 0 && (
+                              <div className="text-sm text-slate-400 line-through" data-testid={`option-was-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}>
+                                {formatCurrency(option.subtotal)}
+                              </div>
+                            )}
                             <div className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</div>
+                            {option.discountTotal > 0 && (
+                              <div className="text-xs font-semibold text-emerald-700" data-testid={`option-savings-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}>
+                                You save {formatCurrency(option.discountTotal)}
+                              </div>
+                            )}
                             {monthlyFinancing(option.total) > 0 && (
                               <div className="text-xs font-medium text-slate-500" data-testid={`option-monthly-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}>
                                 or ~${monthlyFinancing(option.total).toLocaleString()}/mo with financing
@@ -806,6 +818,24 @@ export default function PublicQuoteView() {
                           )}
                           
                           {option.items.map((item) => {
+                            // Discount lines: their own labeled row — visible even
+                            // when the AI category title hides item descriptions,
+                            // shown as savings rather than a quantity × price line.
+                            if (isDiscountLineItem(item)) {
+                              return (
+                                <div key={item.id} className="py-2 border-b border-slate-100 last:border-0" data-testid={`option-discount-line-${item.id}`}>
+                                  <div className="flex justify-between items-center gap-2 text-sm">
+                                    <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+                                      <Tag className="h-3.5 w-3.5 shrink-0" />
+                                      {item.description}
+                                    </span>
+                                    <span className="font-semibold text-emerald-700 tabular-nums">
+                                      {formatCurrency(item.lineTotal || "0")}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            }
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
                             return (
                               <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">

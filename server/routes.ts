@@ -294,14 +294,21 @@ type DiscountLineItem = {
   quantity?: string | number;
   unitPrice?: string | number;
   lineTotal?: string | number;
+  optionTag?: string | null;
 };
 
 type ExistingLineItem = {
   isDiscountLine?: boolean | null;
   lineType?: string | null;
   discountKind?: string | null;
+  optionTag?: string | null;
   id?: string;
 };
+
+// Multi-option quotes carry one discount line PER option (each tagged with its
+// option), so the one-per-kind rule is scoped to the option the line belongs to.
+const discountScopeKey = (kind: string | null | undefined, optionTag: string | null | undefined) =>
+  `${kind || ""}::${optionTag || ""}`;
 
 function validateDiscountLineItem(
   lineItem: DiscountLineItem,
@@ -333,7 +340,8 @@ function validateDiscountLineItem(
     return { valid: false, error: "Discount amount must be negative or zero" };
   }
 
-  // Check for duplicate discount kinds (promotion, maintenance)
+  // Check for duplicate discount kinds (promotion, maintenance) — scoped per
+  // option, so a multi-option quote may carry one line of a kind per option.
   if (lineItem.discountKind === 'promotion' || lineItem.discountKind === 'maintenance') {
     const existingOfSameKind = existingLineItems.filter(item => {
       // Exclude current item when updating
@@ -341,15 +349,18 @@ function validateDiscountLineItem(
         return false;
       }
       const itemIsDiscount = item.isDiscountLine === true || item.lineType === 'discount';
-      return itemIsDiscount && item.discountKind === lineItem.discountKind;
+      return itemIsDiscount
+        && item.discountKind === lineItem.discountKind
+        && discountScopeKey(item.discountKind, item.optionTag) === discountScopeKey(lineItem.discountKind, lineItem.optionTag);
     });
 
     if (existingOfSameKind.length > 0) {
+      const scope = lineItem.optionTag ? `${entityType} option` : entityType;
       if (lineItem.discountKind === 'promotion') {
-        return { valid: false, error: `Only one promotion discount allowed per ${entityType}` };
+        return { valid: false, error: `Only one promotion discount allowed per ${scope}` };
       }
       if (lineItem.discountKind === 'maintenance') {
-        return { valid: false, error: `Only one maintenance discount allowed per ${entityType}` };
+        return { valid: false, error: `Only one maintenance discount allowed per ${scope}` };
       }
     }
   }
@@ -363,30 +374,26 @@ function validateDiscountLineItems(
   existingLineItems: ExistingLineItem[] = [],
   entityType: 'quote' | 'invoice' = 'quote'
 ): { valid: boolean; error?: string } {
-  // Track discount kinds in this batch
-  const batchPromotionCount = lineItems.filter(item => 
-    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'promotion'
-  ).length;
-  
-  const batchMaintenanceCount = lineItems.filter(item => 
-    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'maintenance'
-  ).length;
+  // Count promotion/maintenance discounts per (kind, option) scope — one of a
+  // kind per option (untagged lines share the "" scope).
+  const scopeCounts = new Map<string, number>();
+  const countScoped = (items: Array<DiscountLineItem | ExistingLineItem>) => {
+    for (const item of items) {
+      const isDiscount = item.isDiscountLine === true || item.lineType === 'discount';
+      if (!isDiscount || (item.discountKind !== 'promotion' && item.discountKind !== 'maintenance')) continue;
+      const key = discountScopeKey(item.discountKind, item.optionTag);
+      scopeCounts.set(key, (scopeCounts.get(key) || 0) + 1);
+    }
+  };
+  countScoped(lineItems);
+  countScoped(existingLineItems);
 
-  // Check existing counts
-  const existingPromotionCount = existingLineItems.filter(item => 
-    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'promotion'
-  ).length;
-  
-  const existingMaintenanceCount = existingLineItems.filter(item => 
-    (item.isDiscountLine === true || item.lineType === 'discount') && item.discountKind === 'maintenance'
-  ).length;
-
-  if (batchPromotionCount + existingPromotionCount > 1) {
-    return { valid: false, error: `Only one promotion discount allowed per ${entityType}` };
-  }
-
-  if (batchMaintenanceCount + existingMaintenanceCount > 1) {
-    return { valid: false, error: `Only one maintenance discount allowed per ${entityType}` };
+  for (const [key, count] of Array.from(scopeCounts.entries())) {
+    if (count > 1) {
+      const kind = key.startsWith('promotion') ? 'promotion' : 'maintenance';
+      const scope = key.endsWith('::') ? entityType : `${entityType} option`;
+      return { valid: false, error: `Only one ${kind} discount allowed per ${scope}` };
+    }
   }
 
   // Validate each individual line item

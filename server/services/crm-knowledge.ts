@@ -201,6 +201,8 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 
 ### Multi-option quote totals (goals/analytics)
 - An options-mode quote counts toward quoted pipeline at its HIGHEST-priced option (plus shared items); once accepted/sold it counts at the option the customer actually chose plus shared items — never the sum of all options
+- Discounts on an options-mode quote apply PER OPTION: adding a discount (promotional $/%, the 15% maintenance discount, or a protection bundle's parts discount) creates one discount line per targeted option, each tagged to its option and sized from that option's own price (its lines + shared lines) — never computed from the combined total of all options. A percentage discount uses the same rate on every targeted option, so each option shows a different dollar amount off
+- The Add Discount dialog on an options quote has an "Apply To" picker: target every option (the default) or check specific ones. Different options can carry different discounts (e.g. 20% off Best, $500 flat off Good) — the rule is one discount of each kind (promotion / maintenance / protection) per option. Each option card shows its struck-through original price, its own discount lines, and "You save $X"; the quote detail's line-items section lists every discount by name per option (subtotal → each discount → option total), and an untagged discount line is badged "All options"
 
 ### Quote PDF
 - Custom and quick quotes print with the same professional template as invoices: brand header, thick maroon rule, PREPARED FOR block, bordered items table, totals with Total in brand color. Internal costs never print

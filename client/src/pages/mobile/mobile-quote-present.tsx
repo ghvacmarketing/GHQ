@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { QuoteLineDescription } from "@/components/crm/quote-line-description";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { X, FileText, Check, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff, Plus } from "lucide-react";
+import { X, FileText, Check, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff, Plus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import {
   BRAND_COLOR,
   COMPANY_INFO,
   groupLineItemsByOption,
+  isDiscountLineItem,
   formatPresentationCurrency,
   formatPresentationDate,
   parseEquipmentImages,
@@ -518,9 +519,19 @@ export default function MobileQuotePresent() {
                               </div>
                               <span className="font-semibold text-slate-900 text-base">{option.tag}</span>
                             </div>
-                            <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>
-                              {formatPresentationCurrency(option.total)}
-                            </span>
+                            <div className="text-right">
+                              {option.discountTotal > 0 && (
+                                <div className="text-sm text-slate-400 line-through">{formatPresentationCurrency(option.subtotal)}</div>
+                              )}
+                              <span className="text-lg font-bold" style={{ color: BRAND_COLOR }}>
+                                {formatPresentationCurrency(option.total)}
+                              </span>
+                              {option.discountTotal > 0 && (
+                                <div className="text-xs font-semibold text-emerald-700">
+                                  You save {formatPresentationCurrency(option.discountTotal)}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="p-4 bg-white">
                             {whatsIncluded.categoryTitle && (
@@ -530,6 +541,23 @@ export default function MobileQuotePresent() {
                             )}
                             
                             {option.items.map((item) => {
+                              // Discount lines: labeled savings row, no qty —
+                              // always visible even under an AI category title.
+                              if (isDiscountLineItem(item)) {
+                                return (
+                                  <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
+                                    <div className="flex justify-between items-center gap-2 text-sm">
+                                      <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+                                        <Tag className="h-3.5 w-3.5 shrink-0" />
+                                        {item.description}
+                                      </span>
+                                      <span className="font-semibold text-emerald-700 tabular-nums">
+                                        {formatPresentationCurrency(item.lineTotal)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              }
                               const equipmentImages = parseEquipmentImages(item.imageUrl);
                               return (
                                 <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
