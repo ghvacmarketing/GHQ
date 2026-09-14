@@ -76,6 +76,7 @@ import {
   Search,
   Tag,
   Star,
+  CornerDownRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1273,6 +1274,28 @@ export default function CrmQuoteDetail() {
     ((item as any).customerVisible !== true && (item.lineType === "labor" || item.lineType === "other"));
   const visibleLineItems = (quote?.lineItems || []).filter((i) => !isInternalLine(i));
   const internalLineItems = (quote?.lineItems || []).filter((i) => isInternalLine(i));
+
+  // Options mode: the Line Items table reads option by option — an option's
+  // lines first, then its discount lines nested directly beneath as
+  // sub-line-items, with shared (untagged) lines last. Display ordering only:
+  // the stored rows, totals math, and every row action are untouched.
+  const displayLineItems: Array<{ item: CrmQuoteLineItem; subItem: boolean }> =
+    quote?.quoteMode === "options"
+      ? (() => {
+          const tags = Array.from(
+            new Set(visibleLineItems.map((li) => li.optionTag).filter((t): t is string => !!t)),
+          ).sort((a, b) => getOptionSortOrder(a) - getOptionSortOrder(b));
+          if (tags.length === 0) return visibleLineItems.map((item) => ({ item, subItem: false }));
+          const rows: Array<{ item: CrmQuoteLineItem; subItem: boolean }> = [];
+          const pushGroup = (items: CrmQuoteLineItem[]) => {
+            items.filter((li) => !isDiscountLineItem(li)).forEach((item) => rows.push({ item, subItem: false }));
+            items.filter(isDiscountLineItem).forEach((item) => rows.push({ item, subItem: true }));
+          };
+          tags.forEach((tag) => pushGroup(visibleLineItems.filter((li) => li.optionTag === tag)));
+          pushGroup(visibleLineItems.filter((li) => !li.optionTag));
+          return rows;
+        })()
+      : visibleLineItems.map((item) => ({ item, subItem: false }));
 
   // Menu quotes: lines flagged "optional add-on" get picked in person on the
   // presentation; after acceptance, acceptedLineItemIds says what was taken.
@@ -3305,9 +3328,9 @@ export default function CrmQuoteDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleLineItems.length > 0 ? (
-                  visibleLineItems.map((item) => (
-                    <TableRow key={item.id} className={addOnState(item) === "declined" ? "opacity-55" : undefined}>
+                {displayLineItems.length > 0 ? (
+                  displayLineItems.map(({ item, subItem }) => (
+                    <TableRow key={item.id} className={cn(addOnState(item) === "declined" && "opacity-55", subItem && "bg-emerald-50/40")}>
                       {editingLineItemId === item.id ? (
                         <>
                           <TableCell>
@@ -3389,7 +3412,8 @@ export default function CrmQuoteDetail() {
                         <>
                           <TableCell>
                             {isDiscountLineItem(item) ? (
-                              <div className="flex items-center gap-1.5" data-testid={`discount-line-${item.id}`}>
+                              <div className={cn("flex items-center gap-1.5", subItem && "pl-6")} data-testid={`discount-line-${item.id}`}>
+                                {subItem && <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
                                 <Tag className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
                                 <div className="prose prose-sm max-w-none [&_*]:text-emerald-700 [&_*]:font-medium" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
                               </div>
@@ -3415,7 +3439,10 @@ export default function CrmQuoteDetail() {
                           {quote.quoteMode === "options" && (
                             <TableCell>
                               {item.optionTag ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                                <span className={cn(
+                                  "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]",
+                                  subItem && "opacity-50",
+                                )}>
                                   {item.optionTag}
                                 </span>
                               ) : isDiscountLineItem(item) ? (
