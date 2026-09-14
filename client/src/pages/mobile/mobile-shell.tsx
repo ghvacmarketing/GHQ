@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { crmFetch } from "@/lib/crmAuth";
 import {
   ClipboardList, Wrench, Clock, ShieldX, Plus,
   FileText, Receipt, Camera, LayoutGrid, Briefcase, Sparkles, CheckSquare, UserRoundPlus,
@@ -324,7 +325,11 @@ export default function MobileShell({ children, customNav, pullToRefresh = false
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      // crmFetch, not a bare cookie fetch — the iOS shell may hold its
+      // session in the Bearer token while the WKWebView cookie is gone, and
+      // every auth gate must agree with the login page or the app bounces
+      // between /mobile and /crm/login forever.
+      const res = await crmFetch("/api/crm/auth/me");
       if (!res.ok) return null;
       return res.json();
     },

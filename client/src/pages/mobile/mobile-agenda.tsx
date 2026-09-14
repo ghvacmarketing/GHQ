@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { crmFetch } from "@/lib/crmAuth";
 import { Link, useLocation } from "wouter";
 import { format, isToday, formatDistanceToNow } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
@@ -771,7 +772,11 @@ export default function MobileAgenda() {
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      // crmFetch, not a bare cookie fetch — the iOS shell may hold its
+      // session in the Bearer token while the WKWebView cookie is gone, and
+      // every auth gate must agree with the login page or the app bounces
+      // between /mobile and /crm/login forever.
+      const res = await crmFetch("/api/crm/auth/me");
       if (!res.ok) return null;
       return res.json();
     },

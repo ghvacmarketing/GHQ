@@ -115,6 +115,25 @@ export default function CrmLogin() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
+      // Loop breaker: if this page keeps bouncing into the app and straight
+      // back (auth gates disagreeing about the session — the iOS shell's
+      // token-vs-cookie split did exactly this), STOP auto-redirecting after
+      // three hops in 30s. A visible sign-in form beats an infinite bounce,
+      // and signing in manually re-mints both the cookie and the token.
+      let hops: number[] = [];
+      try {
+        hops = JSON.parse(sessionStorage.getItem("ghq-login-hops") || "[]");
+      } catch {}
+      const now = Date.now();
+      hops = hops.filter((t) => typeof t === "number" && now - t < 30_000);
+      if (hops.length >= 3) {
+        (window as any).__ghqBeacon?.({ stage: "login-redirect-loop-capped" });
+        return;
+      }
+      hops.push(now);
+      try {
+        sessionStorage.setItem("ghq-login-hops", JSON.stringify(hops));
+      } catch {}
       // Technicians go to the mobile app, others to the CRM — except on
       // phones and inside the App Store shell, where EVERYONE lands on
       // /mobile (the desktop CRM is a desktop thing).

@@ -1,4 +1,29 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getCrmToken, clearCrmToken } from "@/lib/crmAuth";
+
+// The native iOS shell can't always keep the CRM session COOKIE alive
+// (WKWebView cookie loss is why the Bearer-token fallback exists), but only
+// crmFetch ever sent the token — every default-fetcher request here was
+// cookie-only. On a phone holding a live token and a dead cookie, the login
+// page (token: "you're signed in → /mobile") and every other page (cookie:
+// "you're not → /crm/login") disagreed forever — a full-page redirect
+// ping-pong about once a second. Attach the token at these choke points so
+// EVERY CRM request authenticates exactly like crmFetch, stale-token
+// clear-and-retry included.
+const isCrmApiUrl = (url: string) => url.startsWith("/api/crm/") || url.startsWith("/api/mobile/");
+function safeCrmToken(url: string): string | null {
+  if (!isCrmApiUrl(url)) return null;
+  try {
+    return getCrmToken();
+  } catch {
+    return null;
+  }
+}
+function safeClearCrmToken(): void {
+  try {
+    clearCrmToken();
+  } catch {}
+}
 
 // A newer login displaced this device's CRM session (single-active-session
 // policy). Send the user to the login page with an explanation — every authed
@@ -42,12 +67,30 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const token = safeCrmToken(url);
+  const buildHeaders = (useToken: boolean): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (data) headers["Content-Type"] = "application/json";
+    if (useToken && token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
+  };
+  let res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: buildHeaders(true),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // Stale Bearer token — drop it and retry on the cookie alone.
+  if (res.status === 401 && token) {
+    safeClearCrmToken();
+    res = await fetch(url, {
+      method,
+      headers: buildHeaders(false),
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -112,9 +155,18 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const token = safeCrmToken(url);
+    let res = await fetch(url, {
       credentials: "include",
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     });
+
+    // Stale Bearer token — drop it and retry on the cookie alone.
+    if (res.status === 401 && token) {
+      safeClearCrmToken();
+      res = await fetch(url, { credentials: "include" });
+    }
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       // Even a swallowed 401 must surface a displaced-session notice.
