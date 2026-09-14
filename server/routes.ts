@@ -409,7 +409,13 @@ function validateDiscountLineItems(
 
 // Option-aware totals moved to services/quoteTotals.ts — options-mode quotes
 // store best-option totals while unsold and selected-option totals once sold.
-import { recomputeQuoteStoredTotals } from "./services/quoteTotals";
+import {
+  recomputeQuoteStoredTotals,
+  parseDiscountPct,
+  inferDiscountKind,
+  optionDiscountBasis,
+  expandSharedPercentDiscountLines,
+} from "./services/quoteTotals";
 
 // Helper function to check for scheduling conflicts
 async function checkSchedulingConflict(
@@ -22804,9 +22810,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // internal waterfall (plus the raw worksheet state for later re-edits).
       const svcSnapshot = buildServiceCostingSnapshot(req.body?.serviceQuoteData);
 
+      // Stale proposal-builder clients can still send ONE untagged percentage
+      // parts-discount computed from all options combined — expand it into
+      // per-option lines sized from each option's own price.
+      const normalizedLineItems = expandSharedPercentDiscountLines(lineItems, quoteMode || null);
+
       // Calculate totals from line items
       let subtotal = 0;
-      for (const item of lineItems) {
+      for (const item of normalizedLineItems) {
         const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
         subtotal += lineTotal;
       }
@@ -22866,10 +22877,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create line items
       // Determine lineType based on quoteType - install quotes should use "install" lineType
       const defaultLineType = isInstallQuote ? "install" : "part";
-      
+
       const createdLineItems = [];
       let sortOrder = 0;
-      for (const item of lineItems) {
+      for (const item of normalizedLineItems) {
         if (!item.description?.trim()) continue;
         
         const quantity = item.quantity || 1;
@@ -23129,7 +23140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/crm/quotes/:id/line-items - Add line item to quote
   app.post("/api/crm/quotes/:id/line-items", requireCrmTechOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -23154,16 +23165,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!discountValidation.valid) {
         return res.status(400).json({ message: discountValidation.error });
       }
-      
+
+      // Stale clients can still send ONE untagged percentage discount for a
+      // multi-option quote, computed from the sum of ALL options. Normalize
+      // it here: one tagged line per option, each at that percentage of the
+      // option's own price (skipping options that already carry the kind).
+      const bodyIsDiscount = req.body?.isDiscountLine === true || req.body?.lineType === "discount";
+      const sharedPct = bodyIsDiscount && !req.body?.optionTag ? parseDiscountPct(req.body?.description) : null;
+      if (quote.quoteMode === "options" && sharedPct) {
+        const tags = Array.from(new Set(existingLineItems.map((i) => i.optionTag).filter((t): t is string => !!t)));
+        if (tags.length > 0) {
+          const kind = inferDiscountKind(req.body?.description, req.body?.discountKind);
+          const created: CrmQuoteLineItem[] = [];
+          for (const tag of tags) {
+            const tagTaken = existingLineItems.some(
+              (i) =>
+                i.optionTag === tag &&
+                (i.isDiscountLine === true || i.lineType === "discount") &&
+                inferDiscountKind(i.description, i.discountKind) === kind,
+            );
+            if (tagTaken) continue;
+            const basis = optionDiscountBasis(existingLineItems, tag, kind === "protection");
+            const amount = Math.round(basis * (sharedPct / 100) * 100) / 100;
+            if (amount <= 0) continue;
+            const parsed = insertCrmQuoteLineItemSchema.safeParse({
+              ...req.body,
+              quoteId: req.params.id,
+              optionTag: tag,
+              quantity: "1",
+              unitPrice: (-amount).toFixed(2),
+              lineTotal: (-amount).toFixed(2),
+              ...(kind ? { discountKind: kind } : {}),
+            });
+            if (parsed.success) {
+              const [row] = await db.insert(crmQuoteLineItems).values(parsed.data as typeof crmQuoteLineItems.$inferInsert).returning();
+              created.push(row);
+            }
+          }
+          if (created.length > 0) {
+            await recomputeQuoteStoredTotals(req.params.id);
+            await logCrmAudit(
+              user.id,
+              "quote_line_item.created",
+              "quote_line_item",
+              created[0].id,
+              { quoteId: req.params.id, description: created[0].description, perOptionLines: created.length },
+              req.ip
+            );
+            return res.status(201).json(created[0]);
+          }
+        }
+      }
+
       const lineItemData = { ...req.body, quoteId: req.params.id };
       const parseResult = insertCrmQuoteLineItemSchema.safeParse(lineItemData);
       if (!parseResult.success) {
-        return res.status(400).json({ 
-          message: "Validation failed", 
-          errors: parseResult.error.errors 
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: parseResult.error.errors
         });
       }
-      
+
       const [lineItem] = await db.insert(crmQuoteLineItems).values(parseResult.data).returning();
 
       // Keep the quote's stored subtotal/total in sync with its line items
@@ -23177,7 +23239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { quoteId: req.params.id, description: lineItem.description },
         req.ip
       );
-      
+
       return res.status(201).json(lineItem);
     } catch (error) {
       console.error("Error creating quote line item:", error);

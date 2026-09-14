@@ -1290,10 +1290,16 @@ async function runWaterHeaterSeeds() {
       .then(({ startPushNotificationBridge }) => startPushNotificationBridge())
       .catch((err) => console.error("Push bridge import failed:", err));
 
-    // Multi-option quotes: self-heal stored totals (best option while unsold,
-    // selected option once sold) — legacy rows stored the sum of all options.
+    // Multi-option quotes: self-heal discounts and stored totals. First
+    // convert legacy untagged percentage discount lines (computed from the
+    // sum of ALL options) into per-option lines sized from each option's own
+    // price, then recompute stored totals (best option while unsold, selected
+    // option once sold) — legacy rows stored the sum of all options.
     import("./services/quoteTotals")
-      .then(({ recomputeAllOptionsQuoteTotals }) => recomputeAllOptionsQuoteTotals())
+      .then(async ({ migrateSharedPercentDiscountsToPerOption, recomputeAllOptionsQuoteTotals }) => {
+        await migrateSharedPercentDiscountsToPerOption();
+        await recomputeAllOptionsQuoteTotals();
+      })
       .catch((err) => console.error("Quote totals backfill import failed:", err));
 
     // Daily provider cost snapshots (Settings → Usage & Costs)
