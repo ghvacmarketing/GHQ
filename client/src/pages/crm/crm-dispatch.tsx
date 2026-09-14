@@ -3,6 +3,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreIcon } from "@/components/crm/more-icon";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { guardedReload, clearReloadGuard } from "@/lib/reload-guard";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -255,16 +256,42 @@ const END_HOUR = 22;
 // the server and reloads once if this cached value is stale.
 const STEP_MINUTES: 15 | 30 = (() => {
   if (typeof window === "undefined") return 30;
-  return Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
+  try {
+    return Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
+  } catch {
+    return 30;
+  }
 })();
 
 function syncStepMinutes() {
   fetch("/api/crm/dispatch-settings", { credentials: "include" })
     .then((r) => (r.ok ? r.json() : null))
     .then((s) => {
-      if (s && (s.stepMinutes === 15 || s.stepMinutes === 30) && s.stepMinutes !== STEP_MINUTES) {
-        localStorage.setItem("crm_dispatch_step_minutes", String(s.stepMinutes));
-        window.location.reload();
+      if (!s) return;
+      if ((s.stepMinutes === 15 || s.stepMinutes === 30) && s.stepMinutes !== STEP_MINUTES) {
+        // Reload to apply the server's increment — but NEVER into a loop. A
+        // webview with wedged storage (iOS WKWebView wedges: writes silently
+        // don't persist) would come back with the same stale cached value and
+        // reload again forever. Two locks: reload only when the write reads
+        // back, and cap attempts with the storage-proof URL guard.
+        try {
+          localStorage.setItem("crm_dispatch_step_minutes", String(s.stepMinutes));
+        } catch {}
+        let persisted = false;
+        try {
+          persisted = Number(localStorage.getItem("crm_dispatch_step_minutes")) === s.stepMinutes;
+        } catch {}
+        if (!persisted) {
+          (window as any).__ghqBeacon?.({ stage: "dispatch-grid-storage-wedged" });
+          return; // keep the old grid density rather than reload-loop
+        }
+        if (!guardedReload("ghqgrid")) {
+          (window as any).__ghqBeacon?.({ stage: "dispatch-grid-reload-capped" });
+        }
+      } else {
+        // Device and server agree — a healthy boot earns fresh attempts for
+        // the next real settings change.
+        clearReloadGuard("ghqgrid");
       }
     })
     .catch(() => {});
@@ -2910,11 +2937,17 @@ export default function CrmDispatch() {
 
   // The schedule grid derives from STEP_MINUTES (read once at module load). If the
   // configured increment (Settings → Dispatch Board) changed — locally or by an
-  // admin on another machine — reload once to apply it.
+  // admin on another machine — reload once to apply it. The reload rides the
+  // storage-proof URL guard so a flaky-storage device can never reload-loop.
   useEffect(() => {
-    const desired = Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
+    let desired: number = STEP_MINUTES;
+    try {
+      desired = Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
+    } catch {}
     if (desired !== STEP_MINUTES) {
-      window.location.reload();
+      if (!guardedReload("ghqgrid")) {
+        (window as any).__ghqBeacon?.({ stage: "dispatch-grid-reload-capped" });
+      }
       return;
     }
     syncStepMinutes();

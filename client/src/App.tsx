@@ -4,6 +4,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "react";
+import { guardedReload, clearReloadGuard, reloadGuardAttempts } from "@/lib/reload-guard";
 import type { Announcement } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import redLogoUrl from "@assets/redlogo.webp";
@@ -176,12 +177,14 @@ class ErrorBoundary extends Component<
   componentDidMount() {
     (window as any).__ghqBeacon?.({ stage: "react-mounted" });
     // A healthy stretch of runtime means the shell is good — reset the
-    // recovery counter so a LATER mid-session deploy gets its own attempts.
+    // recovery counters (sessionStorage AND the URL guard) so a LATER
+    // mid-session deploy gets its own attempts.
     setTimeout(() => {
       if (!this.state.hasError) {
         try {
           sessionStorage.removeItem("chunk-reload-attempted");
         } catch {}
+        clearReloadGuard("ghqcr");
         (window as any).__ghqBeacon?.({ stage: "healthy-15s" });
       }
     }, 15000);
@@ -194,16 +197,19 @@ class ErrorBoundary extends Component<
     // shell by the service worker) can fail to lazy-load a route chunk. A
     // plain reload is NOT enough: the stale shell can come back out of the
     // service worker / Cache Storage and loop the app dead — clear every
-    // cache layer first, then reload (twice at most).
+    // cache layer first, then reload (twice at most). The attempt cap lives
+    // in BOTH sessionStorage and the URL (?ghqcr=N): a webview with wedged
+    // storage can't advance a storage counter, and an unbreakable cap is the
+    // difference between "shows the error screen" and "reloads forever".
     const text = `${error?.name || ""} ${error?.message || ""}`;
     const isChunkError =
       /ChunkLoadError|Loading chunk|dynamically imported module|module script failed|error loading dynamically/i.test(
         text,
       );
     if (isChunkError) {
-      let attempts = 0;
+      let attempts = reloadGuardAttempts("ghqcr");
       try {
-        attempts = Number(sessionStorage.getItem("chunk-reload-attempted") || "0") || 0;
+        attempts = Math.max(attempts, Number(sessionStorage.getItem("chunk-reload-attempted") || "0") || 0);
       } catch {}
       if (attempts < 2) {
         try {
@@ -221,10 +227,13 @@ class ErrorBoundary extends Component<
           } catch {}
         };
         // The 1.2s pause means even a worst-case recovery cycle can never
-        // rapid-flash the screen — and if storage is broken (attempt counter
-        // can't persist), the loop stays slow enough to see and report.
+        // rapid-flash the screen.
         nukeStaleLayers().finally(() => {
-          setTimeout(() => window.location.reload(), 1200);
+          setTimeout(() => {
+            if (!guardedReload("ghqcr")) {
+              (window as any).__ghqBeacon?.({ stage: "chunk-error-gaveup", message: text.slice(0, 300) });
+            }
+          }, 1200);
         });
       } else {
         (window as any).__ghqBeacon?.({ stage: "chunk-error-gaveup", message: text.slice(0, 300) });

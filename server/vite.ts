@@ -98,6 +98,12 @@ export function serveStatic(app: Express) {
   // service worker as the main bundle once and white-screened every load.
   app.use("*", (req, res) => {
     if (req.originalUrl.startsWith("/assets/")) {
+      // no-store, no validators: an HTTP cache (iOS WKWebView especially)
+      // that holds onto a mid-deploy 404 keeps failing that chunk long after
+      // the deploy finished — the webview reload-loop. Nothing may cache a
+      // missing asset.
+      res.setHeader("Cache-Control", "no-store");
+      res.removeHeader("ETag");
       return res.status(404).type("text/plain").send("Not found");
     }
     res.setHeader("Cache-Control", "no-store");
