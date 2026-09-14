@@ -340,9 +340,9 @@ function validateDiscountLineItem(
     return { valid: false, error: "Discount amount must be negative or zero" };
   }
 
-  // Check for duplicate discount kinds (promotion, maintenance) — scoped per
-  // option, so a multi-option quote may carry one line of a kind per option.
-  if (lineItem.discountKind === 'promotion' || lineItem.discountKind === 'maintenance') {
+  // Promotion discounts STACK (any number per option/quote). Maintenance is
+  // one per scope — the option (multi-option quotes) or the whole document.
+  if (lineItem.discountKind === 'maintenance') {
     const existingOfSameKind = existingLineItems.filter(item => {
       // Exclude current item when updating
       if (currentLineItemId && item.id === currentLineItemId) {
@@ -350,18 +350,13 @@ function validateDiscountLineItem(
       }
       const itemIsDiscount = item.isDiscountLine === true || item.lineType === 'discount';
       return itemIsDiscount
-        && item.discountKind === lineItem.discountKind
+        && item.discountKind === 'maintenance'
         && discountScopeKey(item.discountKind, item.optionTag) === discountScopeKey(lineItem.discountKind, lineItem.optionTag);
     });
 
     if (existingOfSameKind.length > 0) {
       const scope = lineItem.optionTag ? `${entityType} option` : entityType;
-      if (lineItem.discountKind === 'promotion') {
-        return { valid: false, error: `Only one promotion discount allowed per ${scope}` };
-      }
-      if (lineItem.discountKind === 'maintenance') {
-        return { valid: false, error: `Only one maintenance discount allowed per ${scope}` };
-      }
+      return { valid: false, error: `Only one maintenance discount allowed per ${scope}` };
     }
   }
 
@@ -374,13 +369,13 @@ function validateDiscountLineItems(
   existingLineItems: ExistingLineItem[] = [],
   entityType: 'quote' | 'invoice' = 'quote'
 ): { valid: boolean; error?: string } {
-  // Count promotion/maintenance discounts per (kind, option) scope — one of a
-  // kind per option (untagged lines share the "" scope).
+  // Promotions stack freely; maintenance is one per (option) scope —
+  // untagged lines share the "" scope.
   const scopeCounts = new Map<string, number>();
   const countScoped = (items: Array<DiscountLineItem | ExistingLineItem>) => {
     for (const item of items) {
       const isDiscount = item.isDiscountLine === true || item.lineType === 'discount';
-      if (!isDiscount || (item.discountKind !== 'promotion' && item.discountKind !== 'maintenance')) continue;
+      if (!isDiscount || item.discountKind !== 'maintenance') continue;
       const key = discountScopeKey(item.discountKind, item.optionTag);
       scopeCounts.set(key, (scopeCounts.get(key) || 0) + 1);
     }
@@ -390,9 +385,8 @@ function validateDiscountLineItems(
 
   for (const [key, count] of Array.from(scopeCounts.entries())) {
     if (count > 1) {
-      const kind = key.startsWith('promotion') ? 'promotion' : 'maintenance';
       const scope = key.endsWith('::') ? entityType : `${entityType} option`;
-      return { valid: false, error: `Only one ${kind} discount allowed per ${scope}` };
+      return { valid: false, error: `Only one maintenance discount allowed per ${scope}` };
     }
   }
 

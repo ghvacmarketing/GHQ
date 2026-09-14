@@ -1053,13 +1053,20 @@ export default function CrmQuoteDetail() {
       (item.optionTag === tag || !item.optionTag)
     ) || false;
 
+  // Promotions STACK — any number per option, so eligibility never runs out.
+  // Maintenance stays one per option: a customer either has the agreement
+  // discount or doesn't.
   const eligibleDiscountTags = (kind: "promotion" | "maintenance") =>
-    quoteOptionTags().filter(tag => !optionHasDiscountKind(tag, kind));
+    kind === "promotion"
+      ? quoteOptionTags()
+      : quoteOptionTags().filter(tag => !optionHasDiscountKind(tag, kind));
 
-  // A discount kind is exhausted when nothing can still take it: every option
-  // has one (options mode), or the quote has one (single mode).
-  const kindFullyApplied = (kind: "promotion" | "maintenance") =>
-    isOptionsQuote() ? eligibleDiscountTags(kind).length === 0 : hasExistingDiscount(kind);
+  // A discount kind is exhausted when nothing can still take it. Promotions
+  // never exhaust (they stack); maintenance follows the one-per-option rule.
+  const kindFullyApplied = (kind: "promotion" | "maintenance") => {
+    if (kind === "promotion") return false;
+    return isOptionsQuote() ? eligibleDiscountTags(kind).length === 0 : hasExistingDiscount(kind);
+  };
 
   // Compact name for a discount line in summaries ("Discount: Promotional
   // (20%)" → "Promotional (20%)").
@@ -1080,37 +1087,43 @@ export default function CrmQuoteDetail() {
 
   type DiscountLinePayload = { description: string; amount: number; optionTag?: string; discountKind: "promotion" | "maintenance" };
 
-  // The discount lines the current dialog inputs would create — one per option
-  // on a multi-option quote, a single line otherwise. Shared with the dialog
-  // preview so what's shown is exactly what gets applied.
-  const buildDiscountLines = (): DiscountLinePayload[] => {
+  // What the current dialog inputs take off a given pre-discount basis —
+  // shared by the option tiles' live preview and the actual apply, so what's
+  // shown is exactly what gets created.
+  const discountAmountForBasis = (basis: number): number => {
+    if (discountKind === "maintenance") return basis * 0.15;
     const value = parseFloat(discountValue) || 0;
-    const perBasis = (basis: number): { amount: number; description: string } => {
-      if (discountKind === "maintenance") {
-        return { amount: basis * 0.15, description: "Discount: Maintenance Agreement (15%)" };
-      }
-      if (discountMode === "amount") {
-        return { amount: value, description: "Discount: Promotional" };
-      }
-      return { amount: basis * value / 100, description: `Discount: Promotional (${discountValue}%)` };
-    };
+    return discountMode === "amount" ? value : (basis * value) / 100;
+  };
 
+  const discountLineDescription = () =>
+    discountKind === "maintenance"
+      ? "Discount: Maintenance Agreement (15%)"
+      : discountMode === "percentage"
+        ? `Discount: Promotional (${discountValue}%)`
+        : "Discount: Promotional";
+
+  // The discount lines the current dialog inputs would create — one per
+  // targeted option on a multi-option quote, a single line otherwise.
+  const buildDiscountLines = (): DiscountLinePayload[] => {
     if (isOptionsQuote()) {
-      // Only the options the user targeted (and that don't already carry
-      // this kind) get a line — so "Best" can take 20% while "Good" later
-      // gets $500 flat.
+      // Only the options the user targeted (and that can still take this
+      // kind) get a line — so "Best" can take 20% while "Good" gets $500
+      // flat, and promotions stack freely.
       const eligible = new Set(eligibleDiscountTags(discountKind));
       return quoteOptionTags()
         .filter(tag => discountOptionTags.includes(tag) && eligible.has(tag))
-        .map(tag => {
-          const { amount, description } = perBasis(calculateOptionSubtotal(tag));
-          return { description, amount, optionTag: tag, discountKind };
-        })
+        .map(tag => ({
+          description: discountLineDescription(),
+          amount: discountAmountForBasis(calculateOptionSubtotal(tag)),
+          optionTag: tag,
+          discountKind,
+        }))
         .filter(line => line.amount > 0);
     }
     const basis = discountKind === "maintenance" ? calculateQuoteSubtotal() : calculateEligibleSubtotal("promotion");
-    const { amount, description } = perBasis(basis);
-    return amount > 0 ? [{ description, amount, discountKind }] : [];
+    const amount = discountAmountForBasis(basis);
+    return amount > 0 ? [{ description: discountLineDescription(), amount, discountKind }] : [];
   };
 
   const addDiscountMutation = useMutation({
@@ -1131,10 +1144,12 @@ export default function CrmQuoteDetail() {
     },
     onSuccess: (_data, lines) => {
       // Keep the dialog open — it now lists the applied discounts and stays
-      // ready for the next one (or a removal). Just-discounted options drop
-      // out of the target selection.
+      // ready for the next one (or a removal). Promotions stack, so their
+      // targets stay selected; maintenance targets lock, so they drop out.
       setDiscountValue("");
-      setDiscountOptionTags(prev => prev.filter(t => !lines.some(l => l.optionTag === t)));
+      if (lines[0]?.discountKind === "maintenance") {
+        setDiscountOptionTags(prev => prev.filter(t => !lines.some(l => l.optionTag === t)));
+      }
       toast({
         title: "Discount added",
         description: lines.length > 1
@@ -1158,8 +1173,8 @@ export default function CrmQuoteDetail() {
         toast({ title: "No option selected", description: "Pick at least one option to apply the discount to.", variant: "destructive" });
         return;
       }
-    } else if (hasExistingDiscount(discountKind)) {
-      toast({ title: "Discount already exists", description: "Remove the existing discount first.", variant: "destructive" });
+    } else if (discountKind === "maintenance" && hasExistingDiscount("maintenance")) {
+      toast({ title: "Discount already exists", description: "Remove the existing maintenance discount first.", variant: "destructive" });
       return;
     }
 
@@ -1170,35 +1185,6 @@ export default function CrmQuoteDetail() {
     }
 
     addDiscountMutation.mutate(lines);
-  };
-
-  // Dialog preview for multi-option quotes: the exact per-option lines the
-  // current inputs would create (same math as buildDiscountLines).
-  const renderOptionDiscountPreview = () => {
-    if (isOptionsQuote() && discountOptionTags.length === 0) {
-      return <p className="mt-2 text-sm text-slate-500">Select at least one option above.</p>;
-    }
-    const lines = buildDiscountLines();
-    if (lines.length === 0) return null;
-    return (
-      <div className="mt-2 space-y-1.5" data-testid="discount-per-option-preview">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          {lines.length === quoteOptionTags().length ? "Applied to every option separately" : "Applied to the selected options separately"}
-        </p>
-        {lines.map((line) => (
-          <div key={line.optionTag} className="flex items-center justify-between gap-2 text-sm">
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
-              {line.optionTag}
-            </span>
-            <span className="text-slate-600 tabular-nums">
-              {formatCurrency(calculateOptionSubtotal(line.optionTag!))}
-              <span className="mx-1 text-slate-400">→</span>
-              <span className="font-medium text-emerald-700">−{formatCurrency(line.amount)}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    );
   };
 
   const handleStartEditLineItem = (item: CrmQuoteLineItem) => {
@@ -4319,8 +4305,8 @@ export default function CrmQuoteDetail() {
               <DialogTitle>Discounts</DialogTitle>
               <DialogDescription>
                 {isOptionsQuote()
-                  ? "Each discount is sized from the option's own price. Stack different discounts on different options, or remove one below."
-                  : "Add or remove discounts on this quote."}
+                  ? "Tap the options a discount should hit — each is sized from that option's own price, and discounts stack."
+                  : "Add or remove discounts on this quote. Promotions stack."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-5 py-2">
@@ -4388,8 +4374,8 @@ export default function CrmQuoteDetail() {
                 {/* Type: two selectable cards */}
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { kind: "promotion" as const, name: "Promotion", detail: "Custom $ or %" },
-                    { kind: "maintenance" as const, name: "Maintenance", detail: "Fixed 15%" },
+                    { kind: "promotion" as const, name: "Promotion", detail: "Custom $ or % — stacks" },
+                    { kind: "maintenance" as const, name: "Maintenance", detail: "Fixed 15%, once per option" },
                   ]).map(({ kind, name, detail }) => {
                     const exhausted = kindFullyApplied(kind);
                     const active = discountKind === kind;
@@ -4428,7 +4414,7 @@ export default function CrmQuoteDetail() {
                 </div>
 
                 {/* Amount: segmented $/% + value (promotion only) */}
-                {discountKind === "promotion" && !kindFullyApplied("promotion") && (
+                {discountKind === "promotion" && (
                   <div className="flex gap-2">
                     <div className="grid shrink-0 grid-cols-2 gap-0.5 rounded-[4px] border border-slate-200 p-0.5">
                       {([
@@ -4468,14 +4454,15 @@ export default function CrmQuoteDetail() {
                   </div>
                 )}
 
-                {/* Multi-option quotes: pick which options this discount targets.
-                    Everything eligible starts checked; uncheck to single out
-                    options — so one option can get 20% while another later gets
-                    $500 flat. Options already carrying this kind are locked. */}
+                {/* Multi-option quotes: tappable option tiles — each tile IS
+                    the preview. Selected tiles show live exactly what the
+                    current inputs take off that option's own price. Options
+                    that can't take the kind (maintenance already applied)
+                    are locked with the reason. */}
                 {isOptionsQuote() && !kindFullyApplied(discountKind) && (
                   <div className="space-y-2" data-testid="discount-option-targets">
                     <div className="flex items-center justify-between">
-                      <Label>Apply To</Label>
+                      <Label>Apply to</Label>
                       <div className="flex gap-3 text-xs">
                         <button
                           type="button"
@@ -4497,64 +4484,76 @@ export default function CrmQuoteDetail() {
                         </button>
                       </div>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {quoteOptionTags().map((tag) => {
                         const taken = optionHasDiscountKind(tag, discountKind);
-                        const checked = discountOptionTags.includes(tag);
+                        const selected = discountOptionTags.includes(tag);
+                        const subtotal = calculateOptionSubtotal(tag);
+                        const amount = discountAmountForBasis(subtotal);
+                        const showAmount = selected && !taken && amount > 0;
                         return (
-                          <label
+                          <button
                             key={tag}
+                            type="button"
+                            disabled={taken}
+                            onClick={() =>
+                              setDiscountOptionTags(prev =>
+                                prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
+                              )
+                            }
                             className={cn(
-                              "flex items-center gap-2.5 rounded-[4px] border p-2.5 text-sm transition-colors",
+                              "rounded-[4px] border p-2.5 text-left transition-all",
                               taken
-                                ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
-                                : checked
-                                  ? "border-[#711419]/40 bg-[#711419]/5 cursor-pointer"
-                                  : "border-slate-200 hover:border-slate-300 cursor-pointer",
+                                ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
+                                : selected
+                                  ? "border-[#711419]/50 bg-[#711419]/5 ring-1 ring-[#711419]/20"
+                                  : "border-slate-200 hover:border-slate-300",
                             )}
                             data-testid={`discount-target-${tag.toLowerCase().replace(/\s+/g, "-")}`}
                           >
-                            <Checkbox
-                              checked={checked}
-                              disabled={taken}
-                              onCheckedChange={(c) =>
-                                setDiscountOptionTags(prev =>
-                                  c === true ? [...prev, tag] : prev.filter(t => t !== tag),
-                                )
-                              }
-                            />
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
-                              {tag}
-                            </span>
-                            {taken && (
-                              <span className="text-xs text-slate-500">
-                                already has a {discountKind} discount
+                            <span className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                                  selected && !taken ? "border-[#711419] bg-[#711419]" : "border-slate-300 bg-white",
+                                )}
+                              >
+                                {selected && !taken && <Check className="h-3 w-3 text-white" />}
                               </span>
-                            )}
-                            <span className="ml-auto tabular-nums text-slate-500">
-                              {formatCurrency(calculateOptionSubtotal(tag))}
+                              <span className={cn("truncate text-sm font-semibold", selected && !taken ? "text-[#711419]" : "text-slate-800")}>
+                                {tag}
+                              </span>
                             </span>
-                          </label>
+                            <span className="mt-1 flex items-baseline justify-between gap-2 pl-[26px]">
+                              <span className={cn("tabular-nums text-xs", showAmount ? "text-slate-400 line-through" : "text-slate-500")}>
+                                {formatCurrency(subtotal)}
+                              </span>
+                              {taken ? (
+                                <span className="text-[11px] text-slate-500">has {discountKind === "maintenance" ? "maintenance" : "this"} discount</span>
+                              ) : showAmount ? (
+                                <span className="tabular-nums text-sm font-semibold text-emerald-700" data-testid={`discount-tile-amount-${tag.toLowerCase().replace(/\s+/g, "-")}`}>
+                                  −{formatCurrency(amount)}
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
                         );
                       })}
                     </div>
+                    {discountKind === "promotion" && discountMode === "amount" && discountOptionTags.length > 1 && (parseFloat(discountValue) || 0) > 0 && (
+                      <p className="text-xs text-slate-500">
+                        The same amount comes off each selected option — whichever one the customer picks.
+                      </p>
+                    )}
+                    {discountOptionTags.length === 0 && (
+                      <p className="text-xs text-slate-500">Tap at least one option above.</p>
+                    )}
                   </div>
                 )}
 
-                {/* Live preview of exactly what Apply creates */}
-                {!kindFullyApplied(discountKind) && (
-                  isOptionsQuote() ? (
-                    (discountKind === "maintenance" || discountValue) ? (
-                      <div className="rounded-[4px] border bg-slate-50 p-3">
-                        {discountKind === "promotion" && discountMode === "amount" && discountOptionTags.length > 0 && (
-                          <p className="mb-1 text-sm text-slate-500">
-                            The same amount comes off each selected option.
-                          </p>
-                        )}
-                        {renderOptionDiscountPreview()}
-                      </div>
-                    ) : null
-                  ) : discountKind === "maintenance" ? (
+                {/* Single-mode quotes: quick math preview */}
+                {!isOptionsQuote() && !kindFullyApplied(discountKind) && (
+                  discountKind === "maintenance" ? (
                     <p className="text-sm text-slate-500">
                       ≈ ${(calculateQuoteSubtotal() * 0.15).toFixed(2)} off ${calculateQuoteSubtotal().toFixed(2)} total
                     </p>
@@ -4590,6 +4589,8 @@ export default function CrmQuoteDetail() {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Applying...
                   </>
+                ) : isOptionsQuote() && discountOptionTags.length > 0 ? (
+                  `Apply to ${discountOptionTags.length} option${discountOptionTags.length === 1 ? "" : "s"}`
                 ) : (
                   "Apply Discount"
                 )}
