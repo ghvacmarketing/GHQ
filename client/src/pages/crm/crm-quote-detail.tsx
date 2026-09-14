@@ -94,7 +94,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
 import { generateQuotePdf } from "@/lib/quote-pdf";
@@ -1131,11 +1130,11 @@ export default function CrmQuoteDetail() {
       }
     },
     onSuccess: (_data, lines) => {
-      setShowDiscountDialog(false);
-      setDiscountKind("promotion");
-      setDiscountMode("amount");
+      // Keep the dialog open — it now lists the applied discounts and stays
+      // ready for the next one (or a removal). Just-discounted options drop
+      // out of the target selection.
       setDiscountValue("");
-      setDiscountOptionTags([]);
+      setDiscountOptionTags(prev => prev.filter(t => !lines.some(l => l.optionTag === t)));
       toast({
         title: "Discount added",
         description: lines.length > 1
@@ -3300,7 +3299,7 @@ export default function CrmQuoteDetail() {
                   data-testid="button-add-discount"
                 >
                   <Tag className="h-4 w-4 mr-1" />
-                  Add Discount
+                  Discounts
                 </Button>
                 <Button
                   size="sm"
@@ -4315,178 +4314,142 @@ export default function CrmQuoteDetail() {
 
         {/* Discount Dialog */}
         <Dialog open={showDiscountDialog} onOpenChange={setShowDiscountDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Add Discount</DialogTitle>
+              <DialogTitle>Discounts</DialogTitle>
+              <DialogDescription>
+                {isOptionsQuote()
+                  ? "Each discount is sized from the option's own price. Stack different discounts on different options, or remove one below."
+                  : "Add or remove discounts on this quote."}
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-6 py-4">
-              <div className="space-y-3">
-                <Label>Discount Type</Label>
-                <RadioGroup
-                  value={discountKind}
-                  onValueChange={(value) => {
-                    const kind = value as "promotion" | "maintenance";
-                    setDiscountKind(kind);
-                    // Eligibility differs per kind — retarget to every option
-                    // that can still take the newly chosen kind.
-                    if (isOptionsQuote()) setDiscountOptionTags(eligibleDiscountTags(kind));
-                  }}
-                  className="flex flex-col gap-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="promotion"
-                      id="detail-discount-promotion"
-                      disabled={kindFullyApplied("promotion")}
-                    />
-                    <Label
-                      htmlFor="detail-discount-promotion"
-                      className={cn(kindFullyApplied("promotion") && "text-slate-400")}
-                    >
-                      Promotion Discount
-                      {kindFullyApplied("promotion") && (
-                        <span className="text-xs ml-2">{isOptionsQuote() ? "(Every option has one)" : "(Already applied)"}</span>
-                      )}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="maintenance"
-                      id="detail-discount-maintenance"
-                      disabled={kindFullyApplied("maintenance")}
-                    />
-                    <Label
-                      htmlFor="detail-discount-maintenance"
-                      className={cn(kindFullyApplied("maintenance") && "text-slate-400")}
-                    >
-                      Maintenance Discount
-                      {kindFullyApplied("maintenance") && (
-                        <span className="text-xs ml-2">{isOptionsQuote() ? "(Every option has one)" : "(Already applied)"}</span>
-                      )}
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* Multi-option quotes: pick which options this discount targets.
-                  Everything eligible starts checked; uncheck to single out
-                  options — so one option can get 20% while another later gets
-                  $500 flat. Options already carrying this kind are locked. */}
-              {isOptionsQuote() && (
-                <div className="space-y-2" data-testid="discount-option-targets">
-                  <div className="flex items-center justify-between">
-                    <Label>Apply To</Label>
-                    <div className="flex gap-3 text-xs">
-                      <button
-                        type="button"
-                        className="text-[#711419] hover:underline disabled:text-slate-300 disabled:no-underline"
-                        disabled={discountOptionTags.length === eligibleDiscountTags(discountKind).length}
-                        onClick={() => setDiscountOptionTags(eligibleDiscountTags(discountKind))}
-                        data-testid="discount-targets-all"
-                      >
-                        All options
-                      </button>
-                      <button
-                        type="button"
-                        className="text-slate-500 hover:underline disabled:text-slate-300 disabled:no-underline"
-                        disabled={discountOptionTags.length === 0}
-                        onClick={() => setDiscountOptionTags([])}
-                        data-testid="discount-targets-none"
-                      >
-                        Clear
-                      </button>
+            <div className="space-y-5 py-2">
+              {/* Discounts already on the quote — removable right here */}
+              {(() => {
+                const currentDiscountLines = [...visibleLineItems.filter(isDiscountLineItem)].sort((a, b) => {
+                  const at = a.optionTag ? getOptionSortOrder(a.optionTag) : 999;
+                  const bt = b.optionTag ? getOptionSortOrder(b.optionTag) : 999;
+                  return at - bt;
+                });
+                if (currentDiscountLines.length === 0) return null;
+                return (
+                  <div className="space-y-2" data-testid="current-discounts">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      On this quote
+                    </p>
+                    <div className="divide-y divide-slate-100 rounded-[4px] border border-slate-200">
+                      {currentDiscountLines.map((line) => (
+                        <div key={line.id} className="flex items-center gap-2.5 px-3 py-2 text-sm" data-testid={`current-discount-${line.id}`}>
+                          {quote.quoteMode === "options" && (
+                            line.optionTag ? (
+                              <span className="inline-flex shrink-0 items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                                {line.optionTag}
+                              </span>
+                            ) : (
+                              <span className="inline-flex shrink-0 items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                                All options
+                              </span>
+                            )
+                          )}
+                          <span className="min-w-0 flex-1 truncate text-slate-700" title={line.description || "Discount"}>
+                            {discountShortLabel(line.description)}
+                          </span>
+                          <span className="shrink-0 tabular-nums font-medium text-emerald-700">
+                            −{formatCurrency(Math.abs(parseFloat(String(line.lineTotal || 0)) || 0))}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0 p-0"
+                            onClick={() => deleteLineItemMutation.mutate(line.id)}
+                            disabled={deleteLineItemMutation.isPending}
+                            title="Remove this discount"
+                            data-testid={`button-remove-discount-${line.id}`}
+                          >
+                            {deleteLineItemMutation.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 text-slate-400 hover:text-red-600" />
+                            )}
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    {quoteOptionTags().map((tag) => {
-                      const taken = optionHasDiscountKind(tag, discountKind);
-                      const checked = discountOptionTags.includes(tag);
-                      return (
-                        <label
-                          key={tag}
+                );
+              })()}
+
+              {/* Add a discount */}
+              <div className="space-y-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Add a discount
+                </p>
+
+                {/* Type: two selectable cards */}
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { kind: "promotion" as const, name: "Promotion", detail: "Custom $ or %" },
+                    { kind: "maintenance" as const, name: "Maintenance", detail: "Fixed 15%" },
+                  ]).map(({ kind, name, detail }) => {
+                    const exhausted = kindFullyApplied(kind);
+                    const active = discountKind === kind;
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        disabled={exhausted}
+                        onClick={() => {
+                          setDiscountKind(kind);
+                          // Eligibility differs per kind — retarget to every
+                          // option that can still take the new kind.
+                          if (isOptionsQuote()) setDiscountOptionTags(eligibleDiscountTags(kind));
+                        }}
+                        className={cn(
+                          "rounded-[4px] border p-2.5 text-left transition-colors",
+                          exhausted
+                            ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
+                            : active
+                              ? "border-[#711419]/50 bg-[#711419]/5 ring-1 ring-[#711419]/20"
+                              : "border-slate-200 hover:border-slate-300",
+                        )}
+                        data-testid={`discount-kind-${kind}`}
+                      >
+                        <span className={cn("block text-sm font-semibold", active && !exhausted ? "text-[#711419]" : "text-slate-800")}>
+                          {name}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {exhausted
+                            ? isOptionsQuote() ? "Every option has one — remove above to change it" : "Already applied — remove above to change it"
+                            : detail}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Amount: segmented $/% + value (promotion only) */}
+                {discountKind === "promotion" && !kindFullyApplied("promotion") && (
+                  <div className="flex gap-2">
+                    <div className="grid shrink-0 grid-cols-2 gap-0.5 rounded-[4px] border border-slate-200 p-0.5">
+                      {([
+                        { mode: "amount" as const, label: "$ off" },
+                        { mode: "percentage" as const, label: "% off" },
+                      ]).map(({ mode, label }) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setDiscountMode(mode)}
                           className={cn(
-                            "flex items-center gap-2.5 rounded-[4px] border p-2.5 text-sm transition-colors",
-                            taken
-                              ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
-                              : checked
-                                ? "border-[#711419]/40 bg-[#711419]/5 cursor-pointer"
-                                : "border-slate-200 hover:border-slate-300 cursor-pointer",
+                            "rounded-[3px] px-3 py-1.5 text-sm font-medium transition-colors",
+                            discountMode === mode ? "bg-[#711419] text-white" : "text-slate-600 hover:bg-slate-100",
                           )}
-                          data-testid={`discount-target-${tag.toLowerCase().replace(/\s+/g, "-")}`}
+                          data-testid={`discount-mode-${mode}`}
                         >
-                          <Checkbox
-                            checked={checked}
-                            disabled={taken}
-                            onCheckedChange={(c) =>
-                              setDiscountOptionTags(prev =>
-                                c === true ? [...prev, tag] : prev.filter(t => t !== tag),
-                              )
-                            }
-                          />
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
-                            {tag}
-                          </span>
-                          {taken && (
-                            <span className="text-xs text-slate-500">
-                              already has a {discountKind} discount
-                            </span>
-                          )}
-                          <span className="ml-auto tabular-nums text-slate-500">
-                            {formatCurrency(calculateOptionSubtotal(tag))}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {discountKind === "maintenance" ? (
-                <div className="p-4 bg-slate-50 rounded-lg border">
-                  <p className="text-sm font-medium text-slate-700">Fixed 15% Discount</p>
-                  {isOptionsQuote() ? (
-                    <>
-                      <p className="text-sm text-slate-500 mt-1">
-                        15% off each selected option — sized from that option's own price, never the combined total of all options.
-                      </p>
-                      {renderOptionDiscountPreview()}
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-slate-500 mt-1">
-                        Maintenance discount is always 15% of the total quote amount.
-                      </p>
-                      <p className="text-sm font-medium text-slate-800 mt-2">
-                        ≈ ${(calculateQuoteSubtotal() * 0.15).toFixed(2)} off ${calculateQuoteSubtotal().toFixed(2)} total
-                      </p>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    <Label>Discount Mode</Label>
-                    <RadioGroup
-                      value={discountMode}
-                      onValueChange={(value) => setDiscountMode(value as "amount" | "percentage")}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="amount" id="detail-mode-amount" />
-                        <Label htmlFor="detail-mode-amount">$ Amount</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="percentage" id="detail-mode-percentage" />
-                        <Label htmlFor="detail-mode-percentage">% Percentage</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="detail-discount-value">
-                      {discountMode === "amount" ? "Discount Amount ($)" : "Discount Percentage (%)"}
-                    </Label>
-                    <div className="relative">
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative flex-1">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
                         {discountMode === "amount" ? "$" : "%"}
                       </span>
@@ -4499,40 +4462,127 @@ export default function CrmQuoteDetail() {
                         onChange={(e) => setDiscountValue(e.target.value)}
                         placeholder={discountMode === "amount" ? "0.00" : "0"}
                         className="pl-8"
+                        autoFocus
                       />
                     </div>
-                    {isOptionsQuote() ? (
-                      discountValue ? (
-                        <div className="rounded-lg border bg-slate-50 p-3">
-                          {discountMode === "amount" && discountOptionTags.length > 0 && (
-                            <p className="text-sm text-slate-500 mb-1">
-                              The same amount comes off each selected option.
-                            </p>
-                          )}
-                          {renderOptionDiscountPreview()}
-                        </div>
-                      ) : null
-                    ) : (
-                      discountMode === "percentage" && discountValue && (
-                        <p className="text-sm text-slate-500">
-                          ≈ ${(calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal("promotion").toFixed(2)} eligible subtotal
-                        </p>
-                      )
-                    )}
                   </div>
-                </>
-              )}
+                )}
+
+                {/* Multi-option quotes: pick which options this discount targets.
+                    Everything eligible starts checked; uncheck to single out
+                    options — so one option can get 20% while another later gets
+                    $500 flat. Options already carrying this kind are locked. */}
+                {isOptionsQuote() && !kindFullyApplied(discountKind) && (
+                  <div className="space-y-2" data-testid="discount-option-targets">
+                    <div className="flex items-center justify-between">
+                      <Label>Apply To</Label>
+                      <div className="flex gap-3 text-xs">
+                        <button
+                          type="button"
+                          className="text-[#711419] hover:underline disabled:text-slate-300 disabled:no-underline"
+                          disabled={discountOptionTags.length === eligibleDiscountTags(discountKind).length}
+                          onClick={() => setDiscountOptionTags(eligibleDiscountTags(discountKind))}
+                          data-testid="discount-targets-all"
+                        >
+                          All options
+                        </button>
+                        <button
+                          type="button"
+                          className="text-slate-500 hover:underline disabled:text-slate-300 disabled:no-underline"
+                          disabled={discountOptionTags.length === 0}
+                          onClick={() => setDiscountOptionTags([])}
+                          data-testid="discount-targets-none"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {quoteOptionTags().map((tag) => {
+                        const taken = optionHasDiscountKind(tag, discountKind);
+                        const checked = discountOptionTags.includes(tag);
+                        return (
+                          <label
+                            key={tag}
+                            className={cn(
+                              "flex items-center gap-2.5 rounded-[4px] border p-2.5 text-sm transition-colors",
+                              taken
+                                ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                                : checked
+                                  ? "border-[#711419]/40 bg-[#711419]/5 cursor-pointer"
+                                  : "border-slate-200 hover:border-slate-300 cursor-pointer",
+                            )}
+                            data-testid={`discount-target-${tag.toLowerCase().replace(/\s+/g, "-")}`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={taken}
+                              onCheckedChange={(c) =>
+                                setDiscountOptionTags(prev =>
+                                  c === true ? [...prev, tag] : prev.filter(t => t !== tag),
+                                )
+                              }
+                            />
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                              {tag}
+                            </span>
+                            {taken && (
+                              <span className="text-xs text-slate-500">
+                                already has a {discountKind} discount
+                              </span>
+                            )}
+                            <span className="ml-auto tabular-nums text-slate-500">
+                              {formatCurrency(calculateOptionSubtotal(tag))}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Live preview of exactly what Apply creates */}
+                {!kindFullyApplied(discountKind) && (
+                  isOptionsQuote() ? (
+                    (discountKind === "maintenance" || discountValue) ? (
+                      <div className="rounded-[4px] border bg-slate-50 p-3">
+                        {discountKind === "promotion" && discountMode === "amount" && discountOptionTags.length > 0 && (
+                          <p className="mb-1 text-sm text-slate-500">
+                            The same amount comes off each selected option.
+                          </p>
+                        )}
+                        {renderOptionDiscountPreview()}
+                      </div>
+                    ) : null
+                  ) : discountKind === "maintenance" ? (
+                    <p className="text-sm text-slate-500">
+                      ≈ ${(calculateQuoteSubtotal() * 0.15).toFixed(2)} off ${calculateQuoteSubtotal().toFixed(2)} total
+                    </p>
+                  ) : (
+                    discountMode === "percentage" && discountValue && (
+                      <p className="text-sm text-slate-500">
+                        ≈ ${(calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal("promotion").toFixed(2)} eligible subtotal
+                      </p>
+                    )
+                  )
+                )}
+              </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowDiscountDialog(false)}
               >
-                Cancel
+                Close
               </Button>
               <Button
                 onClick={handleApplyDiscount}
-                disabled={addDiscountMutation.isPending || (isOptionsQuote() && discountOptionTags.length === 0)}
+                disabled={
+                  addDiscountMutation.isPending ||
+                  kindFullyApplied(discountKind) ||
+                  (isOptionsQuote() && discountOptionTags.length === 0) ||
+                  (discountKind === "promotion" && !(parseFloat(discountValue) > 0))
+                }
                 className="bg-[#d3b07d] hover:bg-[#b8944d] text-white"
               >
                 {addDiscountMutation.isPending ? (
