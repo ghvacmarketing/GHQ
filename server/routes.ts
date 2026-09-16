@@ -7880,9 +7880,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/crm/auth/logout - Destroy session
   app.post("/api/crm/auth/logout", async (req, res) => {
     try {
+      // Kill WHATEVER session authenticated this request. The iOS shell may
+      // be signed in by Bearer token with no live cookie — destroying only
+      // the cookie session would leave that phone's session alive
+      // server-side after "logging out".
       const sessionToken = req.cookies?.[CRM_SESSION_COOKIE];
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith("Bearer ")
+        ? authHeader.replace("Bearer ", "")
+        : null;
       if (sessionToken) {
         await destroyCrmSession(sessionToken);
+      }
+      if (bearerToken && bearerToken !== sessionToken) {
+        await destroyCrmSession(bearerToken);
       }
       res.clearCookie(CRM_SESSION_COOKIE);
       return res.json({ message: "Logged out successfully" });
