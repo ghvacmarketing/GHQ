@@ -244,17 +244,52 @@ export default function CrmInstallPlanner() {
     return cell?.dataset.day || null;
   };
 
+  // Hold-to-move: pressing a block does NOT start a drag — a quick click
+  // (however sloppy) opens the editor, and only holding still for HOLD_MS
+  // arms the move/resize. This is what keeps "I clicked it to edit" from
+  // being read as "I dragged it a day over".
+  const HOLD_MS = 300;
+  const HOLD_SLOP = 6; // px of drift allowed while the hold timer runs
   const startBlockOp = (e: React.PointerEvent, block: Block, mode: BlockOp["mode"]) => {
-    if (e.button !== 0 || block.status === "sold") return;
+    if (block.status === "sold") return;
+    if (e.pointerType !== "touch" && e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
-    const grabbed = dayUnderPointer(e.clientX, e.clientY) || block.startDate;
-    setBlockOp({
-      mode,
-      block,
-      grabOffset: differenceInCalendarDays(parseISO(grabbed), parseISO(block.startDate)),
-      moved: false,
-    });
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let armed = false;
+    const timer = window.setTimeout(() => {
+      cleanup();
+      armed = true;
+      const grabbed = dayUnderPointer(sx, sy) || block.startDate;
+      setBlockOp({
+        mode,
+        block,
+        grabOffset: differenceInCalendarDays(parseISO(grabbed), parseISO(block.startDate)),
+        moved: false,
+      });
+    }, HOLD_MS);
+    // Drift before the hold takes = this is a click, not a grab.
+    const onMove = (ev: PointerEvent) => {
+      if (Math.abs(ev.clientX - sx) > HOLD_SLOP || Math.abs(ev.clientY - sy) > HOLD_SLOP) clearTimeout(timer);
+    };
+    // Released before the hold armed = click → edit. Called directly instead
+    // of relying on the browser click event, which WebKit suppresses after
+    // preventDefault on pointerdown.
+    const onUp = () => {
+      cleanup();
+      if (!armed) openEdit(block);
+    };
+    const onCancel = () => cleanup();
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
   };
 
   const commitBlockDates = useMutation({
@@ -323,9 +358,12 @@ export default function CrmInstallPlanner() {
       const p = previewRef.current;
       setBlockOp(null);
       if (!op) return;
+      // Any armed release swallows the browser click that may follow — an
+      // aborted grab must not pop the editor (click-to-edit is handled
+      // before the hold arms).
+      justDraggedRef.current = true;
+      setTimeout(() => { justDraggedRef.current = false; }, 0);
       if (op.moved && p) {
-        justDraggedRef.current = true;
-        setTimeout(() => { justDraggedRef.current = false; }, 0);
         commitWithUndo(
           p.id,
           { startDate: p.startDate, endDate: p.endDate },
@@ -333,11 +371,6 @@ export default function CrmInstallPlanner() {
         );
       } else {
         setPreview(null);
-        // A press that never moved is a click — open the editor here rather
-        // than relying on the browser's click event: WebKit (the iOS shell)
-        // suppresses the compatibility click after preventDefault on
-        // pointerdown, which made tapping a block do nothing on the phone.
-        openEdit(op.block);
       }
     };
     window.addEventListener("pointermove", onMove);
@@ -583,6 +616,8 @@ export default function CrmInstallPlanner() {
             {visible.map((it) => {
               const b = it.block;
               const isPreviewed = preview?.id === b.id;
+              // Hold armed on this block (moved or not) — show it as grabbed.
+              const isGrabbed = blockOp?.block.id === b.id;
               const movable = b.status !== "sold";
               return (
                 <div
@@ -598,12 +633,12 @@ export default function CrmInstallPlanner() {
                       it.realStart && "rounded-l-md",
                       it.realEnd && "rounded-r-md",
                       barClass(b),
-                      isPreviewed && "z-10 shadow-lg ring-2 ring-[#711419]/60",
-                      dragActive && !isPreviewed && "opacity-50 saturate-50",
+                      (isPreviewed || isGrabbed) && "z-10 shadow-lg ring-2 ring-[#711419]/60",
+                      dragActive && !isPreviewed && !isGrabbed && "opacity-50 saturate-50",
                       dragActive ? "pointer-events-none" : cn("pointer-events-auto hover:brightness-95", movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"),
                     )}
                     style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 10 : 4, paddingRight: it.realEnd ? 10 : 4, touchAction: "none" }}
-                    title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — click to edit, drag to move, edges to resize" : " — click to edit"}`}
+                    title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — click to edit · hold, then drag to move (edges resize)" : " — click to edit"}`}
                     data-testid={`block-${b.id}`}
                   >
                     <span className="truncate">{b.title}</span>
@@ -645,8 +680,8 @@ export default function CrmInstallPlanner() {
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
             <p className="text-sm text-muted-foreground">
               {view === "calendar"
-                ? "Drag empty days to plan a hold · drag a block to move it · drag its edges to resize."
-                : "Gantt-style crew schedule · drag bars across dates and crews."}
+                ? "Drag empty days to plan a hold · click a block to edit it · hold, then drag to move or resize."
+                : "Gantt-style crew schedule · click a bar to edit · hold, then drag across dates and crews."}
             </p>
           </div>
           <div className="flex items-center gap-2">

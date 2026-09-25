@@ -342,8 +342,41 @@ export function InstallTimeline({
       window.addEventListener("pointerup", cleanup);
       window.addEventListener("pointercancel", cleanup);
     } else {
+      // Mouse gets the same hold-to-move contract as touch: a quick click
+      // (drift and all) edits, only holding still arms the drag — otherwise
+      // a sloppy click reads as "move the schedule a day over", which at
+      // week zoom (12px days) happened constantly.
       e.preventDefault();
-      beginDrag(b, mode, clientX, clientY);
+      let armed = false;
+      const timer = window.setTimeout(() => {
+        cleanup();
+        armed = true;
+        beginDrag(b, mode, clientX, clientY);
+      }, 300);
+      const cancelIfMoved = (ev: PointerEvent) => {
+        if (Math.abs(ev.clientX - clientX) > 6 || Math.abs(ev.clientY - clientY) > 6) clearTimeout(timer);
+      };
+      // Released before the hold armed = click → edit. Called directly:
+      // WebKit suppresses the compatibility click after preventDefault on
+      // pointerdown, so the bar's onClick can't be relied on here.
+      const onUpEarly = () => {
+        cleanup();
+        if (!armed) {
+          justDraggedRef.current = true; // swallow the browser click that may still follow
+          setTimeout(() => { justDraggedRef.current = false; }, 0);
+          onEdit(b);
+        }
+      };
+      const onCancelEarly = () => cleanup();
+      const cleanup = () => {
+        clearTimeout(timer);
+        window.removeEventListener("pointermove", cancelIfMoved);
+        window.removeEventListener("pointerup", onUpEarly);
+        window.removeEventListener("pointercancel", onCancelEarly);
+      };
+      window.addEventListener("pointermove", cancelIfMoved);
+      window.addEventListener("pointerup", onUpEarly);
+      window.addEventListener("pointercancel", onCancelEarly);
     }
   };
 
@@ -353,22 +386,18 @@ export function InstallTimeline({
       pointerRef.current = { x: e.clientX, y: e.clientY };
       recomputeProposal(e.clientX, e.clientY);
     };
-    const onUp = (e: PointerEvent) => {
+    const onUp = () => {
       const d = dragRef.current;
       setDrag(null);
       if (!d) return;
-      if (!d.moved) {
-        // A press that never moved is a click — open the editor here rather
-        // than relying on the browser's click event: WebKit suppresses the
-        // compatibility click after preventDefault on pointerdown. A
-        // cancelled gesture (scroll takeover) is not a click.
-        if (e.type !== "pointercancel") onEdit(d.block);
-        return;
-      }
-      const { origin, proposed } = d;
-      if (origin.startDate === proposed.startDate && origin.endDate === proposed.endDate && origin.crewId === proposed.crewId) return;
+      // Any armed release swallows the browser click that may follow — an
+      // aborted grab must not pop the editor (click-to-edit is handled
+      // before the hold arms).
       justDraggedRef.current = true;
       setTimeout(() => { justDraggedRef.current = false; }, 0);
+      if (!d.moved) return;
+      const { origin, proposed } = d;
+      if (origin.startDate === proposed.startDate && origin.endDate === proposed.endDate && origin.crewId === proposed.crewId) return;
       onCommit(d.id, proposed, origin);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrag(null); };
@@ -661,7 +690,7 @@ export function InstallTimeline({
           </PopoverContent>
         </Popover>
         <span className="ml-auto hidden text-[11px] text-muted-foreground sm:block">
-          Drag bars to reschedule · drag between crews to reassign · drag edges to resize
+          Click a bar to edit · hold, then drag to reschedule, cross crews, or resize edges
         </span>
       </div>
 
@@ -865,7 +894,7 @@ export function InstallTimeline({
                                       !geo.clipStart && "rounded-l-md",
                                       !geo.clipEnd && "rounded-r-md",
                                       cls,
-                                      isDragged && "opacity-40 saturate-50",
+                                      isDragged && (drag?.moved ? "opacity-40 saturate-50" : "z-10 shadow-lg ring-2 ring-[#711419]/60"),
                                       drag && "pointer-events-none",
                                       !drag && (movable ? "cursor-grab active:cursor-grabbing hover:brightness-95" : "cursor-pointer"),
                                     )}
