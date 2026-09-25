@@ -10352,13 +10352,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // exactRole takes precedence - filter by exact role only.
       // Validate against the known role set so untrusted query input never
       // reaches the SQL layer (previously interpolated via sql.raw).
-      // Supervisors carry sales duties, so "sales" always includes them —
-      // a supervisor can be assigned quotes like any salesperson.
+      // Supervisors carry sales duties and the OWNER can do anything a
+      // salesperson or admin can, so "sales" and "admin" both include the
+      // roles the quote-assignment validators accept — the assign dropdowns
+      // must offer everyone the write path would allow.
       if (exactRole) {
         if (!VALID_ROLES.includes(exactRole)) {
           return res.status(400).json({ message: "Invalid role filter" });
         }
-        allowedRoles = exactRole === "sales" ? ["sales", "supervisor"] : [exactRole];
+        allowedRoles =
+          exactRole === "sales"
+            ? ["sales", "supervisor", "owner"]
+            : exactRole === "admin"
+              ? ["admin", "owner"]
+              : [exactRole];
       } else if (minRole && roleHierarchy[minRole]) {
         allowedRoles = roleHierarchy[minRole];
       } else {
