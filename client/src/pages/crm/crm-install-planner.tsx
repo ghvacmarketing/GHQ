@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
 import {
-  ChevronDown, ChevronLeft, ChevronRight, Plus, CalendarRange, Loader2, Trash2, CheckCircle2, DollarSign,
+  ChevronDown, ChevronLeft, ChevronRight, Plus, CalendarRange, Loader2, Trash2, CheckCircle2, DollarSign, ExternalLink,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -333,6 +333,11 @@ export default function CrmInstallPlanner() {
         );
       } else {
         setPreview(null);
+        // A press that never moved is a click — open the editor here rather
+        // than relying on the browser's click event: WebKit (the iOS shell)
+        // suppresses the compatibility click after preventDefault on
+        // pointerdown, which made tapping a block do nothing on the phone.
+        openEdit(op.block);
       }
     };
     window.addEventListener("pointermove", onMove);
@@ -598,7 +603,7 @@ export default function CrmInstallPlanner() {
                       dragActive ? "pointer-events-none" : cn("pointer-events-auto hover:brightness-95", movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"),
                     )}
                     style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 10 : 4, paddingRight: it.realEnd ? 10 : 4, touchAction: "none" }}
-                    title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — drag to move, edges to resize" : ""}`}
+                    title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — click to edit, drag to move, edges to resize" : " — click to edit"}`}
                     data-testid={`block-${b.id}`}
                   >
                     <span className="truncate">{b.title}</span>
@@ -956,6 +961,14 @@ export default function CrmInstallPlanner() {
                   {form.status !== "sold" && (
                     <DropdownMenuItem onClick={() => sell.mutate()} disabled={sell.isPending} data-testid="button-sell-block">
                       {sell.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" />} Mark sold
+                    </DropdownMenuItem>
+                  )}
+                  {form.status === "sold" && form.projectId && (
+                    <DropdownMenuItem
+                      onClick={() => { setOpen(false); navigate(`/crm/projects/${form.projectId}`); }}
+                      data-testid="button-open-project"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" /> Open project
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => remove.mutate()} disabled={remove.isPending} data-testid="button-delete-block">

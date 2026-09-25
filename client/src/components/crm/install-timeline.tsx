@@ -353,10 +353,18 @@ export function InstallTimeline({
       pointerRef.current = { x: e.clientX, y: e.clientY };
       recomputeProposal(e.clientX, e.clientY);
     };
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
       const d = dragRef.current;
       setDrag(null);
-      if (!d || !d.moved) return;
+      if (!d) return;
+      if (!d.moved) {
+        // A press that never moved is a click — open the editor here rather
+        // than relying on the browser's click event: WebKit suppresses the
+        // compatibility click after preventDefault on pointerdown. A
+        // cancelled gesture (scroll takeover) is not a click.
+        if (e.type !== "pointercancel") onEdit(d.block);
+        return;
+      }
       const { origin, proposed } = d;
       if (origin.startDate === proposed.startDate && origin.endDate === proposed.endDate && origin.crewId === proposed.crewId) return;
       justDraggedRef.current = true;

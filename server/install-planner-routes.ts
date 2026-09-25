@@ -158,6 +158,23 @@ export function registerInstallPlannerRoutes(app: Express): void {
       }
       const [row] = await db.update(installPlanBlocks).set(updates).where(eq(installPlanBlocks.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ message: "Not found" });
+      // A sold block is mirrored by a project schedule (the /sell endpoint
+      // copies its dates into the project) — keep the project in step when
+      // the planner event's dates are edited, so editing a sold install from
+      // the planner is real, not cosmetic.
+      if (row.status === "sold" && row.projectId && (updates.startDate || updates.endDate)) {
+        try {
+          await db.update(crmProjects)
+            .set({
+              startDate: new Date(`${row.startDate}T00:00:00`),
+              endDate: new Date(`${row.endDate}T00:00:00`),
+              updatedAt: new Date(),
+            })
+            .where(eq(crmProjects.id, row.projectId));
+        } catch (err) {
+          console.error("[install-planner] project date sync failed:", err);
+        }
+      }
       res.json(row);
     } catch (e) {
       console.error("[install-planner] update error:", e);
