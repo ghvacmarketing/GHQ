@@ -2856,6 +2856,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   };
 
+  // SMS/email recipient resolver: customers AND staff. "Text Chandler" or
+  // "email Kylee" must reach a TEAM MEMBER — resolveAiCustomer only knows the
+  // customers table, so staff names either failed or fuzzy-matched a random
+  // customer. Same scoring/ambiguity contract; candidates from both pools
+  // (staff labeled) feed the existing pick list, whose resend puts the picked
+  // id back in customerId — so the id branch here checks both tables.
+  const resolveAiMessageRecipient = async (params: { customerId?: string; customerName: string }): Promise<
+    | { ok: true; recipient: { id: string; name: string; phone: string | null; email: string | null; kind: "customer" | "staff" } }
+    | { ok: false; status: number; body: Record<string, unknown> }
+  > => {
+    const staffRows = async () =>
+      db
+        .select({ id: crmUsers.id, name: crmUsers.name, phone: crmUsers.phone, email: crmUsers.email })
+        .from(crmUsers)
+        .where(eq(crmUsers.isActive, true));
+    if (params.customerId) {
+      const [picked] = await db
+        .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, email: crmCustomers.email })
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, params.customerId));
+      if (picked) return { ok: true, recipient: { ...picked, kind: "customer" } };
+      const [staff] = (await staffRows()).filter((u) => u.id === params.customerId);
+      if (staff) return { ok: true, recipient: { ...staff, kind: "staff" } };
+      return { ok: false, status: 422, body: { message: "That recipient no longer exists." } };
+    }
+    const customers = await db
+      .select({ id: crmCustomers.id, name: crmCustomers.name, phone: crmCustomers.phone, email: crmCustomers.email })
+      .from(crmCustomers);
+    const staff = await staffRows();
+    const scored = [
+      ...customers.map((c) => ({ ...c, kind: "customer" as const })),
+      ...staff.map((u) => ({ ...u, kind: "staff" as const })),
+    ]
+      .map((r) => ({ ...r, score: aiNameSimilarity(r.name || "", params.customerName) }))
+      .sort((x, y) => y.score - x.score);
+    const best = scored[0];
+    const second = scored[1];
+    if (!best || best.score < 0.5) {
+      return { ok: false, status: 422, body: { message: `No customer or team member found matching "${params.customerName}".` } };
+    }
+    if (best.score >= 0.85 && (!second || best.score - second.score >= 0.15)) {
+      return { ok: true, recipient: { id: best.id, name: best.name, phone: best.phone, email: best.email, kind: best.kind } };
+    }
+    return {
+      ok: false,
+      status: 422,
+      body: {
+        message: `Not sure who you meant by "${params.customerName}" — pick the right one:`,
+        candidateParam: "customerId",
+        candidates: scored
+          .filter((c) => c.score >= 0.4)
+          .slice(0, 5)
+          .map((c) => ({ id: c.id, name: c.kind === "staff" ? `${c.name} (team)` : c.name, phone: c.phone, email: c.email })),
+      },
+    };
+  };
+
   // Split a one-line "street, city, ST zip" into property fields. Falls back
   // to dumping the whole line into address1 (city/state/zip empty) so a
   // Gibbs-created customer can always take a work order — the dispatcher can
@@ -3412,12 +3469,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ ok: true, entity: "lead", id: updatedLead.id, label: updLabel, url: updUrl });
       }
 
-      // send_sms — text a customer through the CRM messaging line (Textline).
-      // The message text was reviewed on the approval card word for word.
+      // send_sms — text a customer OR a team member through the CRM messaging
+      // line (Textline). The message was reviewed on the approval card word
+      // for word.
       if (action.type === "send_sms") {
-        const resolved = await resolveAiCustomer(action.params);
+        const resolved = await resolveAiMessageRecipient(action.params);
         if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const smsCustomer = resolved.customer;
+        const smsCustomer = resolved.recipient;
         const phone = (smsCustomer.phone || "").replace(/[^\d+]/g, "");
         if (!phone || phone.length < 10) {
           return res.status(422).json({ message: `${smsCustomer.name} has no phone number on file.` });
@@ -3429,10 +3487,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!sendResult.success) {
           return res.status(500).json({ message: sendResult.errorMessage || "Failed to send the text." });
         }
+        // Conversations FK-link to CUSTOMERS — a staff thread keeps
+        // customerId null and is identified by name/phone instead.
+        const linkCustomerId = smsCustomer.kind === "customer" ? smsCustomer.id : null;
         let conversation = await storage.getMessagingConversationByPhone(phone);
         if (!conversation) {
           conversation = await storage.createMessagingConversation({
-            customerId: smsCustomer.id,
+            customerId: linkCustomerId,
             phoneNumber: phone,
             customerName: smsCustomer.name,
             subject: smsCustomer.name,
@@ -3447,7 +3508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updates.externalConversationId = sendResult.conversationUuid;
             updates.externalSource = "textline";
           }
-          if (!conversation.customerId) updates.customerId = smsCustomer.id;
+          if (!conversation.customerId && linkCustomerId) updates.customerId = linkCustomerId;
           await storage.updateMessagingConversation(conversation.id, updates);
         }
         // Only record the message locally when Textline returned the message
@@ -3466,7 +3527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sentAt: new Date(),
           });
         }
-        await logCrmAudit(user.id, "ai_action.send_sms", "messaging_conversation", conversation.id, { customerId: smsCustomer.id }, req.ip);
+        await logCrmAudit(user.id, "ai_action.send_sms", "messaging_conversation", conversation.id, { recipientId: smsCustomer.id, recipientKind: smsCustomer.kind }, req.ip);
         const smsLabel = `Text sent to ${smsCustomer.name}`;
         const smsUrl = `/crm/messaging?conversation=${conversation.id}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "sms", id: conversation.id, label: smsLabel, url: smsUrl });
@@ -3489,9 +3550,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emailEntityId = toAddress;
           emailLabel = `Email sent to ${toAddress}`;
         } else {
-          const resolved = await resolveAiCustomer(action.params as { customerName: string; customerId?: string });
+          // Customers AND team members — "email Kylee" reaches staff too.
+          const resolved = await resolveAiMessageRecipient(action.params as { customerName: string; customerId?: string });
           if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-          const emailCustomer = resolved.customer;
+          const emailCustomer = resolved.recipient;
           if (!emailCustomer.email) {
             return res.status(422).json({ message: `${emailCustomer.name} has no email address on file.` });
           }
