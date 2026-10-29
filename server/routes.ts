@@ -3392,7 +3392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const staff = await db
             .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
             .from(crmUsers)
-            .where(inArray(crmUsers.role, ["sales", "supervisor", "owner", "admin"]));
+            .where(and(eq(crmUsers.isActive, true), inArray(crmUsers.role, ["sales", "supervisor", "owner", "admin"])));
           const scored = staff
             .map((s) => ({ id: s.id, name: s.name, score: aiNameSimilarity(s.name || "", assignToName) }))
             .sort((x, y) => y.score - x.score);
@@ -3799,10 +3799,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!picked) return res.status(422).json({ message: "That teammate no longer exists." });
           updates.assignedTechId = picked.id;
         } else if (ch.assignTo) {
+          // Every ACTIVE teammate is assignable — admins/office staff carry
+          // jobs too ("assign it to Kylee"); former employees never match.
           const staff = await db
             .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
             .from(crmUsers)
-            .where(inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales"]));
+            .where(and(eq(crmUsers.isActive, true), inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales", "admin"])));
           const scored = staff
             .map((t) => ({ id: t.id, name: t.name, score: aiNameSimilarity(t.name || "", String(ch.assignTo)) }))
             .sort((x, y) => y.score - x.score);
@@ -4152,10 +4154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!picked) return res.status(422).json({ message: "That technician no longer exists." });
         assignedTech = picked;
       } else if (action.params.assignTo) {
+        // Every ACTIVE teammate is assignable — admins/office staff included;
+        // former employees never match.
         const staff = await db
           .select({ id: crmUsers.id, name: crmUsers.name, role: crmUsers.role })
           .from(crmUsers)
-          .where(inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales"]));
+          .where(and(eq(crmUsers.isActive, true), inArray(crmUsers.role, ["tech", "supervisor", "owner", "sales", "admin"])));
         const scored = staff
           .map((t) => ({ id: t.id, name: t.name, score: aiNameSimilarity(t.name || "", action.params.assignTo!) }))
           .sort((x, y) => y.score - x.score);
@@ -4166,7 +4170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           const shortlist = scored.some((s) => s.score >= 0.3) ? scored.filter((s) => s.score >= 0.3) : scored;
           return res.status(422).json({
-            message: `Not sure which technician you meant by "${action.params.assignTo}" — pick the right one:`,
+            message: `Not sure which teammate you meant by "${action.params.assignTo}" — pick the right one:`,
             candidateParam: "assignedTechId",
             candidates: shortlist.slice(0, 6).map((c) => ({ id: c.id, name: c.name })),
           });

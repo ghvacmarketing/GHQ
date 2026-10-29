@@ -570,7 +570,7 @@ Gibbs can add an entry to TODAY's call log as an approval-gated action (log_call
 
 ### Work orders through Gibbs (create, edit, checklists)
 - Gibbs sees EVERY checklist template live (a list_checklists lookup: name, visit type, subtype, including the "ANY" general bucket) and pins the right one onto work orders he creates — when several templates fit the job's type/subtype (e.g. "Repair AC" vs "No Cool") he asks which one, exactly like the dispatch UI does; he never silently picks the first
-- Gibbs can also EDIT existing work orders (update_work_order, approval-gated like everything else): retitle, reschedule (Eastern times), change priority or subtype, reassign (exact teammate pinned), swap the checklist, or update dispatch notes. Completed and cancelled work orders are frozen — the server refuses edits on them, matching the app's own rules. Schedule/assignee changes notify the assigned tech like normal dispatch moves
+- Gibbs can also EDIT existing work orders (update_work_order, approval-gated like everything else): retitle, reschedule (Eastern times), change priority or subtype, reassign (exact teammate pinned — ANY active teammate works, office/admin staff included), swap the checklist, or update dispatch notes. Completed and cancelled work orders are frozen — the server refuses edits on them, matching the app's own rules. Schedule/assignee changes notify the assigned tech like normal dispatch moves
 
 ### Sales leads through Gibbs
 Gibbs can put customers into the Lead Funnel and keep their leads current — both approval-gated:

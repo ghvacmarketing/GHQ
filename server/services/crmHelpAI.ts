@@ -613,7 +613,7 @@ async function executeCrmTool(name: string, input: Record<string, unknown>): Pro
     const rows = q ? staff.filter((u) => (u.name || "").toLowerCase().includes(q)) : staff;
     if (rows.length === 0) return `No staff member matches "${q}" — list the full roster (call again without a filter) and ask the user who they meant.`;
     return JSON.stringify({
-      note: "For assignments, pin the chosen person's id into assignedTechId (admins can't carry work orders). For send_sms/send_email to a team member, use their name as customerName and surface their phone/email on the card via customerPhone/customerEmail. If more than one row could be who the user meant, ask before proposing.",
+      note: "For assignments, pin the chosen person's id into assignedTechId — ANY active teammate can carry a work order or lead, office/admin staff included. For send_sms/send_email to a team member, use their name as customerName and surface their phone/email on the card via customerPhone/customerEmail. If more than one row could be who the user meant, ask before proposing.",
       staff: rows.map((u) => ({ id: u.id, name: u.name, role: u.role, phone: u.phone || null, email: u.email || null })),
     });
   }
