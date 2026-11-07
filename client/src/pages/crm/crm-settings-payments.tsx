@@ -119,7 +119,12 @@ export default function CrmSettingsPayments() {
   const [approvalEmails, setApprovalEmails] = useState<string[]>([]);
   const [approvalIsDefault, setApprovalIsDefault] = useState(true);
   const [approvalEmailInput, setApprovalEmailInput] = useState("");
-  const { data: approvalSettings } = useQuery<{ emails: string[] | null; effective: string[]; defaults: string[] }>({
+  const { data: approvalSettings } = useQuery<{
+    emails: string[] | null;
+    effective: string[];
+    defaults: string[];
+    recipients?: Array<{ email: string; name: string | null; role: string | null }>;
+  }>({
     queryKey: ["/api/app-settings/quote-approval-emails"],
     enabled: !!currentUser,
   });
@@ -410,6 +415,34 @@ export default function CrmSettingsPayments() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Who is receiving RIGHT NOW — the saved state, resolved to team
+                members, independent of any unsaved edits below. */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" data-testid="approval-current-recipients">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Currently receiving
+              </p>
+              {approvalSettings?.recipients && approvalSettings.recipients.length > 0 ? (
+                <div className="mt-2 space-y-1.5">
+                  {approvalSettings.recipients.map((r) => (
+                    <div key={r.email} className="flex items-center gap-2 text-sm" data-testid={`current-recipient-${r.email}`}>
+                      <span className="font-medium text-slate-900">{r.name || r.email}</span>
+                      {r.role && (
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                          {r.role}
+                        </span>
+                      )}
+                      {r.name && <span className="truncate text-xs text-slate-500">{r.email}</span>}
+                      {!r.name && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">not a CRM user</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-amber-700">Nobody — approval alerts are currently off.</p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Recipients</Label>

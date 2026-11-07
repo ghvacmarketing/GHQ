@@ -32651,10 +32651,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const { getStoredApprovalEmails, getDefaultApprovalEmails } = await import("./services/quoteApprovalNotify");
       const stored = await getStoredApprovalEmails();
       const defaults = await getDefaultApprovalEmails();
+      const effective = stored !== null ? stored : defaults;
+      // Resolve each receiving address to the team member it belongs to, so
+      // the settings card can show WHO is getting the alerts, not just raw
+      // emails. Non-staff addresses come back with name/role null.
+      const staff = await db
+        .select({ name: crmUsers.name, email: crmUsers.email, role: crmUsers.role })
+        .from(crmUsers)
+        .where(eq(crmUsers.isActive, true));
+      const byEmail = new Map(staff.filter((u) => u.email).map((u) => [u.email!.trim().toLowerCase(), u]));
+      const recipients = effective.map((email) => {
+        const u = byEmail.get(email.trim().toLowerCase());
+        return { email, name: u?.name ?? null, role: u?.role ?? null };
+      });
       res.json({
         emails: stored, // null = never saved (defaults apply)
-        effective: stored !== null ? stored : defaults,
+        effective,
         defaults,
+        recipients,
       });
     } catch (error) {
       console.error("Error fetching quote approval emails:", error);
