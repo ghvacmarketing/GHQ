@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { Tag } from "lucide-react";
@@ -162,7 +162,10 @@ export default function MobileQuoteEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       toast({ title: "Quote updated" });
-      navigate(detailPath);
+      // Ride the sheet down over the refreshed detail page (which also
+      // suppresses the detail's slide-in) instead of a hard navigate.
+      if (exitRef.current) exitRef.current(detailPath);
+      else navigate(detailPath);
     },
     onError: (e: any) => {
       // Some line ops may already be saved — refetch so the editor reopens on
@@ -183,6 +186,8 @@ export default function MobileQuoteEdit() {
     setRows((prev) => [...prev, { id: `new-${Date.now()}`, description: item.name, quantity: 1, unitPrice: item.rate, lineType }]);
   };
 
+  const exitRef = useRef<((dest?: string) => void) | null>(null);
+
   const validRows = rows.filter((r) => r.description.trim() && r.unitPrice !== 0);
   const canSave = dirty && validRows.length === rows.length && rows.length > 0 && !saveMutation.isPending;
 
@@ -197,6 +202,7 @@ export default function MobileQuoteEdit() {
       saveLabel="Save changes"
       saveDisabled={!canSave}
       saving={saveMutation.isPending}
+      exitRef={exitRef}
       testid="mobile-quote-edit-page"
     >
       {isLoading || (!quote && !initial) ? (

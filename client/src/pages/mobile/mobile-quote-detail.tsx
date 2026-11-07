@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { markSkipEntrance, usePushEntrance } from "@/lib/page-transitions";
+import { markSkipEntrance, skipEntranceOnce, usePushEntrance } from "@/lib/page-transitions";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import MobileQuotes from "./mobile-quotes";
 // Lazy so the job-detail chunk isn't bundled in here; when the quote was
@@ -76,6 +76,10 @@ export default function MobileQuoteDetail() {
   const { toast } = useToast();
   useRequireCrmAuth();
   const entered = usePushEntrance();
+  // Returning from the edit sheet (or any marked navigation) must NOT replay
+  // the push entrance — the page sliding right-to-left under the descending
+  // sheet read as "the quote is closing". Render that one arrival in place.
+  const [instantEnter] = useState(() => skipEntranceOnce());
   const [showPreview, setShowPreview] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
@@ -393,7 +397,7 @@ export default function MobileQuoteDetail() {
 
       <div
         ref={pageRef}
-        className={`${entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
+        className={`${instantEnter ? "" : entered ? "page-slide-in" : "translate-x-full"} relative z-10 h-full bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]`}
         style={{ touchAction: "pan-y" }}
         onPointerDown={onSwipeStart}
         onPointerMove={onSwipeMove}
