@@ -226,6 +226,12 @@ export class WebhookHandlers {
               const { recomputeQuoteStoredTotals } = await import("./services/quoteTotals");
               await recomputeQuoteStoredTotals(quoteId).catch(() => {});
               console.log(`[Webhook] Quote ${quote.quoteNumber} auto-accepted after deposit payment - amount: $${depositAmount}, option: ${selectedOption}`);
+              // Internal office alert — fire-and-forget, never blocks the webhook.
+              import("./services/quoteApprovalNotify")
+                .then(({ notifyQuoteApproved }) =>
+                  notifyQuoteApproved(quoteId, "deposit_paid", { approvedBy: quote.signerName, depositAmount }),
+                )
+                .catch(() => {});
             } else {
               console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}, option: ${selectedOption}`);
             }

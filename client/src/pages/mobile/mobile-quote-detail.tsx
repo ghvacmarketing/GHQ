@@ -17,6 +17,7 @@ import {
   Mail,
   Monitor,
   MessageSquare,
+  Pencil,
   X,
 } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -448,6 +449,16 @@ export default function MobileQuoteDetail() {
                 </div>
 
                 <div className="flex gap-2">
+                  {quote.quoteType === "quick" && ["draft", "sent", "viewed"].includes(quote.status) && (
+                    <button
+                      onClick={() => navigate(`/mobile/quotes/${id}/edit${fromJobId ? `?job=${fromJobId}` : ""}`)}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"
+                      data-testid="button-edit-quote"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Edit
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowPreview(true)}
                     className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border border-slate-300/70 bg-white text-sm font-semibold text-slate-700 transition-transform active:scale-[0.98]"

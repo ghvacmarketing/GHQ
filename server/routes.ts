@@ -15236,6 +15236,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmQuotes.id, quote.id));
 
+      // Internal office alert — fire-and-forget, never blocks the accept.
+      import("./services/quoteApprovalNotify")
+        .then(({ notifyQuoteApproved }) => notifyQuoteApproved(quote.id, "in_person", { approvedBy: signerName }))
+        .catch(() => {});
+
       const invoiceNumber = await generateInvoiceNumber();
       const [invoice] = await db.insert(crmInvoices).values({
         invoiceNumber,
@@ -23326,9 +23331,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/quotes/:id/line-items/:lineItemId - Update line item
-  app.patch("/api/crm/quotes/:id/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
+  // Tech-or-above to match line-item CREATE: a tech who can build a quick
+  // quote on mobile can fix its lines too (accepted/converted stay locked).
+  app.patch("/api/crm/quotes/:id/line-items/:lineItemId", requireCrmTechOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -23421,9 +23428,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/quotes/:id/line-items/:lineItemId - Delete line item
-  app.delete("/api/crm/quotes/:id/line-items/:lineItemId", requireCrmSalesOrAbove, async (req, res) => {
+  // Tech-or-above to match line-item CREATE (see PATCH above).
+  app.delete("/api/crm/quotes/:id/line-items/:lineItemId", requireCrmTechOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -23821,6 +23829,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
       await recomputeQuoteStoredTotals(req.params.id).catch(() => {});
+
+      // Internal office alert — fire-and-forget, never blocks the accept.
+      import("./services/quoteApprovalNotify")
+        .then(({ notifyQuoteApproved }) => notifyQuoteApproved(req.params.id, "in_person", { approvedBy: signerName.trim() }))
+        .catch(() => {});
 
       await logCrmAudit(
         user.id,
@@ -27891,6 +27904,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .where(eq(crmQuotes.id, quote.id))
         .returning();
       await recomputeQuoteStoredTotals(quote.id).catch(() => {});
+
+      // Internal office alert — fire-and-forget, never blocks the signature.
+      import("./services/quoteApprovalNotify")
+        .then(({ notifyQuoteApproved }) => notifyQuoteApproved(quote.id, "portal_signature", { approvedBy: signerName.trim() }))
+        .catch(() => {});
 
       // Log activity to projectActivities if quote has a projectId
       if (quote.projectId) {
@@ -32622,6 +32640,59 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error resetting financing link:", error);
       res.status(500).json({ message: "Failed to reset financing link" });
+    }
+  });
+
+  // ── Quote approval alert recipients (Settings → Payments) ──
+  // Who gets the internal email whenever ANY quote is approved. Unset =
+  // every active owner/admin with an email; saved empty = alerts off.
+  app.get("/api/app-settings/quote-approval-emails", requireCrmAuth, async (_req, res) => {
+    try {
+      const { getStoredApprovalEmails, getDefaultApprovalEmails } = await import("./services/quoteApprovalNotify");
+      const stored = await getStoredApprovalEmails();
+      const defaults = await getDefaultApprovalEmails();
+      res.json({
+        emails: stored, // null = never saved (defaults apply)
+        effective: stored !== null ? stored : defaults,
+        defaults,
+      });
+    } catch (error) {
+      console.error("Error fetching quote approval emails:", error);
+      res.status(500).json({ message: "Failed to load approval alert settings" });
+    }
+  });
+
+  app.put("/api/app-settings/quote-approval-emails", requireCrmAdmin, async (req, res) => {
+    try {
+      const raw = req.body?.emails;
+      if (!Array.isArray(raw)) return res.status(400).json({ message: "emails must be an array" });
+      const emails = Array.from(
+        new Set(raw.map((e: unknown) => String(e || "").trim().toLowerCase()).filter(Boolean)),
+      );
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const bad = emails.find((e) => !emailRe.test(e));
+      if (bad) return res.status(400).json({ message: `"${bad}" isn't a valid email address` });
+      if (emails.length > 20) return res.status(400).json({ message: "At most 20 recipients" });
+      const { QUOTE_APPROVAL_EMAILS_KEY } = await import("./services/quoteApprovalNotify");
+      await db.insert(appSettings)
+        .values({ key: QUOTE_APPROVAL_EMAILS_KEY, value: emails.join(","), updatedAt: new Date() })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: emails.join(","), updatedAt: new Date() } });
+      res.json({ success: true, emails });
+    } catch (error) {
+      console.error("Error updating quote approval emails:", error);
+      res.status(500).json({ message: "Failed to save approval alert settings" });
+    }
+  });
+
+  // Reset to the owner/admin default.
+  app.delete("/api/app-settings/quote-approval-emails", requireCrmAdmin, async (_req, res) => {
+    try {
+      const { QUOTE_APPROVAL_EMAILS_KEY, getDefaultApprovalEmails } = await import("./services/quoteApprovalNotify");
+      await db.delete(appSettings).where(eq(appSettings.key, QUOTE_APPROVAL_EMAILS_KEY));
+      res.json({ success: true, effective: await getDefaultApprovalEmails() });
+    } catch (error) {
+      console.error("Error resetting quote approval emails:", error);
+      res.status(500).json({ message: "Failed to reset approval alert settings" });
     }
   });
 

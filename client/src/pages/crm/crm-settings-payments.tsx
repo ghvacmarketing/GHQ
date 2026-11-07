@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, Loader2, DollarSign, RotateCcw } from "lucide-react";
+import { ArrowLeft, BellRing, CreditCard, Loader2, DollarSign, RotateCcw, X } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
@@ -114,6 +114,64 @@ export default function CrmSettingsPayments() {
       toast({ title: "Failed to reset", description: error.message, variant: "destructive" });
     },
   });
+
+  // ── Quote approval alerts — who gets emailed when any quote is approved ──
+  const [approvalEmails, setApprovalEmails] = useState<string[]>([]);
+  const [approvalIsDefault, setApprovalIsDefault] = useState(true);
+  const [approvalEmailInput, setApprovalEmailInput] = useState("");
+  const { data: approvalSettings } = useQuery<{ emails: string[] | null; effective: string[]; defaults: string[] }>({
+    queryKey: ["/api/app-settings/quote-approval-emails"],
+    enabled: !!currentUser,
+  });
+  useEffect(() => {
+    if (approvalSettings) {
+      setApprovalEmails(approvalSettings.effective);
+      setApprovalIsDefault(approvalSettings.emails === null);
+    }
+  }, [approvalSettings]);
+
+  const saveApprovalEmailsMutation = useMutation({
+    mutationFn: async (emails: string[]) => {
+      const res = await apiRequest("PUT", "/api/app-settings/quote-approval-emails", { emails });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-settings/quote-approval-emails"] });
+      toast({ title: "Settings saved", description: "Quote approval alert recipients updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetApprovalEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/app-settings/quote-approval-emails");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-settings/quote-approval-emails"] });
+      toast({ title: "Settings reset", description: "Back to the default — all owners and admins." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reset", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addApprovalEmail = () => {
+    const email = approvalEmailInput.trim().toLowerCase();
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: "Invalid email", description: `"${email}" isn't a valid email address.`, variant: "destructive" });
+      return;
+    }
+    if (approvalEmails.includes(email)) {
+      setApprovalEmailInput("");
+      return;
+    }
+    setApprovalEmails((prev) => [...prev, email]);
+    setApprovalEmailInput("");
+  };
 
   if (authLoading || settingsLoading || financingLoading) {
     return (
@@ -335,6 +393,106 @@ export default function CrmSettingsPayments() {
                       Reset to Default
                     </>
                   )}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6" data-testid="card-approval-alerts">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BellRing className="h-5 w-5" />
+              Quote Approval Alerts
+            </CardTitle>
+            <CardDescription>
+              Who gets an email the moment any quote is approved — signed online, deposit paid, or accepted in person
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Recipients</Label>
+                {approvalIsDefault ? (
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">Default — all owners &amp; admins</span>
+                ) : (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Custom list</span>
+                )}
+              </div>
+              {approvalEmails.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {approvalEmails.map((email) => (
+                    <span
+                      key={email}
+                      className="inline-flex items-center gap-1 rounded-[4px] border border-slate-300/70 bg-slate-50 px-2 py-1 text-sm text-slate-700"
+                      data-testid={`approval-email-${email}`}
+                    >
+                      {email}
+                      <button
+                        onClick={() => setApprovalEmails((prev) => prev.filter((e) => e !== email))}
+                        className="text-slate-400 hover:text-red-600"
+                        aria-label={`Remove ${email}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-amber-700">
+                  No recipients — approval alerts are off. Add an email or reset to the default.
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <Input
+                  type="email"
+                  placeholder="name@ghvacinc.com"
+                  value={approvalEmailInput}
+                  onChange={(e) => setApprovalEmailInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addApprovalEmail();
+                    }
+                  }}
+                  className="max-w-xs"
+                  data-testid="input-approval-email"
+                />
+                <Button variant="outline" onClick={addApprovalEmail} data-testid="button-add-approval-email">
+                  Add
+                </Button>
+              </div>
+              <p className="text-sm text-slate-500">
+                Alerts fire on every approval path: accepted in the CRM or presentation mode, the customer signing the
+                public quote page, or a paid deposit auto-accepting the quote.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => saveApprovalEmailsMutation.mutate(approvalEmails)}
+                disabled={saveApprovalEmailsMutation.isPending}
+                className="bg-[#d3b07d] hover:bg-[#c4a06e]"
+                data-testid="button-save-approval-emails"
+              >
+                {saveApprovalEmailsMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Recipients"
+                )}
+              </Button>
+              {!approvalIsDefault && (
+                <Button
+                  variant="outline"
+                  onClick={() => resetApprovalEmailsMutation.mutate()}
+                  disabled={resetApprovalEmailsMutation.isPending}
+                  data-testid="button-reset-approval-emails"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset to Default
                 </Button>
               )}
             </div>
