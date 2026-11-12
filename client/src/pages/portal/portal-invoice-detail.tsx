@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, FileText, CheckCircle2, MapPin, Calendar, CreditCard, Loader2, User } from "lucide-react";
 import ghvacLogo from "@assets/ghvac-logo.png";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 
 const BRAND_COLOR = "#711419";
 
@@ -395,6 +396,14 @@ export default function PortalInvoiceDetail() {
                     {paymentError}
                   </div>
                 )}
+                {!ONLINE_PAYMENTS_ENABLED ? (
+                  <div
+                    className="p-3 bg-amber-50 border border-amber-200 rounded-[4px] text-amber-800 text-sm text-center"
+                    data-testid="notice-online-payments-off"
+                  >
+                    {ONLINE_PAYMENTS_OFF_MESSAGE}
+                  </div>
+                ) : (
                 <Button 
                   onClick={handlePayNow}
                   disabled={isGeneratingPayment}
@@ -414,6 +423,7 @@ export default function PortalInvoiceDetail() {
                     </>
                   )}
                 </Button>
+                )}
               </div>
             )}
 

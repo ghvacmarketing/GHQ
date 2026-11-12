@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_STAFF_MESSAGE } from "@shared/online-payments";
 import { queryClient } from "@/lib/queryClient";
 import { useRequireCrmAuth } from "@/hooks/use-require-crm-auth";
 import ghvacLogo from "@assets/ghvac-logo.png";
@@ -326,6 +327,10 @@ export default function MobileQuotePresent() {
 
   const handlePayDeposit = async () => {
     if (!quote?.id) return;
+    if (!ONLINE_PAYMENTS_ENABLED) {
+      toast({ title: "Online payments are off", description: ONLINE_PAYMENTS_OFF_STAFF_MESSAGE, variant: "destructive" });
+      return;
+    }
     
     // Validate signature and name before proceeding to payment
     if (!signature) {

@@ -7,9 +7,25 @@
  *  missing here means Gibbs will deny it exists.
  */
 
+import { ONLINE_PAYMENTS_ENABLED, OFFICE_PHONE } from "@shared/online-payments";
+
+// Injected at the top of the KB only while the kill switch in
+// shared/online-payments.ts is off — disappears by itself on re-enable.
+const ONLINE_PAYMENTS_OFF_NOTICE = ONLINE_PAYMENTS_ENABLED
+  ? ""
+  : `
+## CURRENT STATUS: ONLINE (STRIPE) PAYMENTS ARE TURNED OFF (overrides every payment description below)
+- All online card and bank-transfer (ACH) payments through Stripe are temporarily DISABLED company-wide.
+- Customers CANNOT pay online right now: the invoice pay page, the Customer Portal "Pay Now" button, quote deposit payment, and e-sign document deposits all show an "online payments are temporarily unavailable — call ${OFFICE_PHONE}" notice instead of a pay button. Payment links that were already sent no longer work.
+- Staff CANNOT generate payment links or use "Take Card Payment" in the Field app, and the "Payment Link" button is hidden in the CRM.
+- What still works: invoices and quotes can still be sent and viewed; payments by cash or check are recorded manually ("Record Cash/Check" / Record Payment on the invoice); financing applications still work.
+- Quotes that need a deposit (Custom Install, Proposal, Custom Service) and e-sign documents with a deposit cannot be completed online by the customer until payments are back — the customer should call the office.
+- NEVER tell anyone to pay online, send a payment link, or take a card payment while this notice is here. Do not guess when payments will return.
+`;
+
 export const CRM_FUNCTIONALITY_KNOWLEDGE = `
 # GHVAC CRM System - Complete Feature Guide
-
+${ONLINE_PAYMENTS_OFF_NOTICE}
 ## INVOICES
 
 ### Invoice Types

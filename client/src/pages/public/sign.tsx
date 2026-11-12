@@ -15,6 +15,7 @@ import { SignaturePad } from "@/components/esign/signature-pad";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, PenTool, Type, Calendar, UserSquare, Hash, CheckCircle2, AlertCircle, FileSignature } from "lucide-react";
 import type { SignatureField } from "@shared/schema";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -119,10 +120,21 @@ export default function PublicSign() {
       // Persist the drawn signatures first so nothing is lost across the
       // redirect to Stripe, then request the payment link.
       await apiRequest("POST", `/api/sign/${token}/save-draft`, { values });
+      // Online payments switched off: keep the signer's work, skip Stripe.
+      if (!ONLINE_PAYMENTS_ENABLED) return { paymentsOff: true };
       const res = await apiRequest("POST", `/api/sign/${token}/payment-link`, {});
       return res.json();
     },
     onSuccess: (r: any) => {
+      if (r?.paymentsOff) {
+        leavingForPaymentRef.current = true; // saved — don't warn on leaving
+        toast({
+          title: "Your signature is saved",
+          description: `A deposit is required to finish this document. ${ONLINE_PAYMENTS_OFF_MESSAGE}`,
+          duration: 20000,
+        });
+        return;
+      }
       if (r?.paid) { setDepositPaid(true); return; }
       if (r?.paymentLinkUrl) { leavingForPaymentRef.current = true; window.location.href = r.paymentLinkUrl; }
     },
@@ -249,16 +261,24 @@ export default function PublicSign() {
                     <span className="font-semibold text-foreground">${dep.amount.toFixed(2)}</span>
                     {dep.mode === "percent" && dep.percentage ? ` (${dep.percentage}% of the contract)` : ""} is due.
                   </p>
-                  <Button
-                    onClick={() => payDeposit.mutate()}
-                    disabled={payDeposit.isPending}
-                    className="mt-3 w-full bg-[#711419] text-white hover:bg-[#5a1014]"
-                    data-testid="button-pay-deposit"
-                  >
-                    {payDeposit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Pay deposit of ${dep.amount.toFixed(2)}
-                  </Button>
-                  <p className="mt-2 text-[11px] text-muted-foreground">Secure payment powered by Stripe.</p>
+                  {!ONLINE_PAYMENTS_ENABLED ? (
+                    <p className="mt-3 text-sm font-medium text-amber-800" data-testid="notice-online-payments-off">
+                      {ONLINE_PAYMENTS_OFF_MESSAGE}
+                    </p>
+                  ) : (
+                    <>
+                      <Button
+                        onClick={() => payDeposit.mutate()}
+                        disabled={payDeposit.isPending}
+                        className="mt-3 w-full bg-[#711419] text-white hover:bg-[#5a1014]"
+                        data-testid="button-pay-deposit"
+                      >
+                        {payDeposit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Pay deposit of ${dep.amount.toFixed(2)}
+                      </Button>
+                      <p className="mt-2 text-[11px] text-muted-foreground">Secure payment powered by Stripe.</p>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -308,7 +328,9 @@ export default function PublicSign() {
                   data-testid="button-pay-deposit-header"
                 >
                   {payDeposit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Pay deposit of ${data.deposit!.amount.toFixed(2)}
+                  {ONLINE_PAYMENTS_ENABLED
+                    ? `Pay deposit of $${data.deposit!.amount.toFixed(2)}`
+                    : "Save signature"}
                 </Button>
               );
             }
@@ -391,6 +413,8 @@ export default function PublicSign() {
                               <><CheckCircle2 className="h-3.5 w-3.5" /> Paid</>
                             ) : requiredRemaining > 0 ? (
                               "Sign to pay"
+                            ) : !ONLINE_PAYMENTS_ENABLED ? (
+                              "Call to pay"
                             ) : (
                               `Pay $${amount.toFixed(2)}`
                             )}

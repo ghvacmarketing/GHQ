@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, Landmark, MapPin, Calendar } from "lucide-react";
 import { surchargeFor, surchargeLabel } from "@shared/payment-fees";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 import type { CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -417,6 +418,14 @@ export default function PublicInvoiceView() {
             {isPending && balanceDue > 0 && (
               <>
                 <Separator />
+                {!ONLINE_PAYMENTS_ENABLED ? (
+                  <div
+                    className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800"
+                    data-testid="notice-online-payments-off"
+                  >
+                    {ONLINE_PAYMENTS_OFF_MESSAGE}
+                  </div>
+                ) : (
                 <div className="space-y-4">
                   {paymentError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
@@ -462,6 +471,7 @@ export default function PublicInvoiceView() {
                     Secure payment powered by Stripe
                   </p>
                 </div>
+                )}
               </>
             )}
           </CardContent>

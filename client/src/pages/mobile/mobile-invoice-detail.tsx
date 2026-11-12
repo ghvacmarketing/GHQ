@@ -52,6 +52,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_STAFF_MESSAGE } from "@shared/online-payments";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import MobileShell from "./mobile-shell";
 import type { CrmInvoice, CrmInvoiceLineItem, CrmUser } from "@shared/schema";
@@ -282,6 +283,10 @@ export default function MobileInvoiceDetail() {
 
   const handleTakePayment = async () => {
     if (!invoice || !id) return;
+    if (!ONLINE_PAYMENTS_ENABLED) {
+      toast({ title: "Card payments are off", description: ONLINE_PAYMENTS_OFF_STAFF_MESSAGE, variant: "destructive" });
+      return;
+    }
     
     const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
     if (balanceDue <= 0) {

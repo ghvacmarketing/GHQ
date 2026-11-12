@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ONLINE_PAYMENTS_ENABLED } from "@shared/online-payments";
 
 interface PaymentLinkButtonProps {
   type: "quote" | "invoice";
@@ -48,6 +49,11 @@ export function PaymentLinkButton({
   // Allow payment links for these quote categories
   const paymentLinkCategories = ["custom install", "proposal builder", "custom service", "install"];
   const hasPaymentLinkCategory = isQuote && paymentLinkCategories.includes(quoteCategory || "");
+
+  // Online payments switched off (shared/online-payments.ts): no link to hand out.
+  if (!ONLINE_PAYMENTS_ENABLED) {
+    return null;
+  }
 
   if (isQuote && !hasPaymentLinkCategory) {
     return null;

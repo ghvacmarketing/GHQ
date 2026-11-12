@@ -1,4 +1,5 @@
 import type { CrmInvoice, CrmInvoiceLineItem, CrmUser } from "@shared/schema";
+import { ONLINE_PAYMENTS_ENABLED } from "@shared/online-payments";
 import { crmInvoices, crmUsers } from "@shared/schema";
 import { db } from "../db";
 import { eq, isNotNull } from "drizzle-orm";
@@ -292,7 +293,7 @@ function buildTextBody(
   lines.push("");
 
   if (paymentLinkUrl) {
-    lines.push(`PAY ONLINE: ${paymentLinkUrl}`);
+    lines.push(`${ONLINE_PAYMENTS_ENABLED ? "PAY ONLINE" : "VIEW INVOICE"}: ${paymentLinkUrl}`);
     lines.push("");
   }
 
@@ -479,8 +480,10 @@ function buildHtmlBody(
           ${paymentLinkUrl && balanceDue > 0 ? `
           <tr>
             <td class="px-24" style="padding:0 20px 16px 20px;text-align:center;">
-              <a href="${esc(paymentLinkUrl)}" style="display:inline-block;background:#22c55e;color:#ffffff;padding:18px 48px;border-radius:10px;text-decoration:none;font-weight:800;font-size:18px;box-shadow:0 4px 14px rgba(34,197,94,0.3);">Pay Now - ${esc(asCurrency(balanceDue))}</a>
-              <p style="margin:12px 0 0 0;font-size:13px;color:#6b7280;">Secure payment powered by Stripe</p>
+              <a href="${esc(paymentLinkUrl)}" style="display:inline-block;background:#22c55e;color:#ffffff;padding:18px 48px;border-radius:10px;text-decoration:none;font-weight:800;font-size:18px;box-shadow:0 4px 14px rgba(34,197,94,0.3);">${ONLINE_PAYMENTS_ENABLED ? "Pay Now" : "View Invoice"} - ${esc(asCurrency(balanceDue))}</a>
+              ${ONLINE_PAYMENTS_ENABLED
+                ? `<p style="margin:12px 0 0 0;font-size:13px;color:#6b7280;">Secure payment powered by Stripe</p>`
+                : `<p style="margin:12px 0 0 0;font-size:13px;color:#6b7280;">Online payments are temporarily unavailable. Please call us to arrange payment.</p>`}
             </td>
           </tr>
           ` : ""}

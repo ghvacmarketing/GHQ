@@ -13,6 +13,7 @@ import { sanitizeHtml } from "@/lib/sanitize-html";
 import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink, Landmark, Tag } from "lucide-react";
 import { isDiscountLineItem, summarizeOptionItems } from "@/components/quote-presentation";
 import { surchargeFor, surchargeLabel, type PaymentMethod } from "@shared/payment-fees";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -1105,6 +1106,34 @@ export default function PublicQuoteView() {
                     <p className="text-xs text-slate-500 text-center mt-2">
                       The remaining balance will be due upon completion of the installation.
                     </p>
+                  </div>
+                ) : !ONLINE_PAYMENTS_ENABLED ? (
+                  <div
+                    className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center"
+                    data-testid="notice-online-payments-off"
+                  >
+                    <h4 className="font-semibold text-amber-800 mb-2">{depositPercentage}% Deposit Required</h4>
+                    <p className="text-sm text-amber-700">
+                      A {depositPercentage}% deposit is required to accept this quote. {ONLINE_PAYMENTS_OFF_MESSAGE}
+                    </p>
+                    {financingData?.financingLink && (
+                      <>
+                        <div className="flex items-center gap-3 my-4">
+                          <div className="flex-1 h-px bg-amber-300" />
+                          <span className="text-sm font-medium text-amber-700">OR</span>
+                          <div className="flex-1 h-px bg-amber-300" />
+                        </div>
+                        <Button
+                          onClick={() => window.open(financingData.financingLink, '_blank')}
+                          variant="outline"
+                          className="w-full sm:w-auto border-blue-500 text-blue-700 hover:bg-blue-50 px-8 py-3 text-lg font-semibold"
+                          data-testid="button-apply-financing"
+                        >
+                          <ExternalLink className="mr-2 h-5 w-5" />
+                          Apply for Financing
+                        </Button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">

@@ -99,6 +99,7 @@ import { jsPDF } from "jspdf";
 import { generateQuotePdf } from "@/lib/quote-pdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_STAFF_MESSAGE } from "@shared/online-payments";
 import { format } from "date-fns";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog, CrmItem } from "@shared/schema";
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
@@ -1439,6 +1440,10 @@ export default function CrmQuoteDetail() {
     const requiresDeposit = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
 
     if (requiresDeposit) {
+      if (!ONLINE_PAYMENTS_ENABLED) {
+        toast({ title: "Online payments are off", description: ONLINE_PAYMENTS_OFF_STAFF_MESSAGE, variant: "destructive" });
+        return;
+      }
       // Generate payment link and redirect to Stripe
       setIsGeneratingPaymentLink(true);
       try {

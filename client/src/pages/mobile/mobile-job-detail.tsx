@@ -72,6 +72,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_STAFF_MESSAGE } from "@shared/online-payments";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { markSkipEntrance, skipEntranceOnce, usePushEntrance } from "@/lib/page-transitions";
@@ -1681,6 +1682,10 @@ function InvoiceTab({
   };
 
   const handleTakePayment = async (invoice: CrmInvoice) => {
+    if (!ONLINE_PAYMENTS_ENABLED) {
+      toast({ title: "Card payments are off", description: ONLINE_PAYMENTS_OFF_STAFF_MESSAGE, variant: "destructive" });
+      return;
+    }
     const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
     if (balanceDue <= 0) {
       toast({ title: "No Balance Due", description: "This invoice has already been paid.", variant: "destructive" });
