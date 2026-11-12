@@ -1,12 +1,21 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { getUncachableStripeClient } from "./stripeClient";
 import { storage } from "./storage";
 import { db } from "./db";
 import { crmQuotes, crmInvoices, crmQuoteLineItems } from "@shared/schema";
 import { surchargeFor, surchargeLabel, surchargeLineDescription, type PaymentMethod } from "@shared/payment-fees";
 import { eq } from "drizzle-orm";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 
 const router = Router();
+
+// Kill switch (shared/online-payments.ts): while online payments are off, no
+// route may hand out a Stripe link. Verify-payment / verify-deposit and the
+// webhook are deliberately NOT gated, so in-flight payments still get booked.
+const requireOnlinePayments: RequestHandler = (_req, res, next) => {
+  if (ONLINE_PAYMENTS_ENABLED) return next();
+  res.status(503).json({ error: ONLINE_PAYMENTS_OFF_MESSAGE, onlinePaymentsDisabled: true });
+};
 
 // Public host for customer-facing redirect links (post-payment bounce-back).
 // REPLIT_DOMAINS is honored only as a legacy override; off Replit the real
@@ -33,7 +42,7 @@ async function getDepositPercentage(): Promise<number> {
 const PAYMENT_LINK_TYPES = ["custom_install", "proposal", "custom_service"];
 
 // Generate a payment link for a quote (specific types only, with deposit)
-router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
+router.post("/api/stripe/quote/:quoteId/payment-link", requireOnlinePayments, async (req, res) => {
   try {
     const { quoteId } = req.params;
     const { depositOverride, selectedOption, signatureImage, signerName } = req.body;
@@ -180,7 +189,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
 });
 
 // Generate a payment link for an invoice (full amount)
-router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
+router.post("/api/stripe/invoice/:invoiceId/payment-link", requireOnlinePayments, async (req, res) => {
   try {
     const { invoiceId } = req.params;
     // Chosen payment method drives the surcharge and which method the link
@@ -677,7 +686,7 @@ router.get("/api/stripe/config", async (_req, res) => {
 });
 
 // Send payment link via SMS
-router.post("/api/stripe/send-payment-link-sms", async (req, res) => {
+router.post("/api/stripe/send-payment-link-sms", requireOnlinePayments, async (req, res) => {
   try {
     const { to, message } = req.body;
     

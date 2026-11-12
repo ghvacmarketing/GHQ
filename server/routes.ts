@@ -109,6 +109,7 @@ import { registerEsignRoutes } from "./esign-routes";
 import { registerInstallPlannerRoutes } from "./install-planner-routes";
 import { registerPortalAccountRoutes } from "./portal-account-routes";
 import stripePaymentsRouter from "./stripe-payments";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
 import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice, autoDeleteInvoice, autoSyncPayment } from "./services/quickbooksService";
@@ -32512,6 +32513,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // Track click on invoice payment link and redirect to Stripe
   app.get("/api/public/invoice/:invoiceId/pay", async (req, res) => {
     try {
+      // Kill switch (shared/online-payments.ts): never forward to Stripe while off.
+      if (!ONLINE_PAYMENTS_ENABLED) {
+        return res.status(503).type("text/plain").send(ONLINE_PAYMENTS_OFF_MESSAGE);
+      }
       const { invoiceId } = req.params;
       
       // Get the invoice

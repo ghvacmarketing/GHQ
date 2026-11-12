@@ -6,6 +6,7 @@ import { requireCrmAuth, getCurrentCrmUser } from "./crm-auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./replit_integrations/object_storage/objectStorage";
 import { flattenSignedPdf, getPdfPageCount } from "./services/esign-pdf";
 import { getUncachableStripeClient } from "./stripeClient";
+import { ONLINE_PAYMENTS_ENABLED, ONLINE_PAYMENTS_OFF_MESSAGE } from "@shared/online-payments";
 import type { InsertSignatureField, SignatureDocument } from "@shared/schema";
 
 const objectStorageService = new ObjectStorageService();
@@ -585,11 +586,21 @@ export function registerEsignRoutes(app: Express): void {
       if (doc.depositPaidAt) {
         return res.json({ paid: true, paymentLinkUrl: null });
       }
-      if (doc.stripePaymentLinkUrl) {
-        return res.json({ paymentLinkUrl: doc.stripePaymentLinkUrl, amount: doc.depositAmountCents / 100 });
+      // Kill switch (shared/online-payments.ts): no Stripe links while off.
+      if (!ONLINE_PAYMENTS_ENABLED) {
+        return res.status(503).json({ message: ONLINE_PAYMENTS_OFF_MESSAGE, onlinePaymentsDisabled: true });
       }
 
       const stripe = await getUncachableStripeClient();
+      // Reuse the stored link only while Stripe still has it active — a link
+      // deactivated by the kill switch (or by hand) is replaced with a new one.
+      if (doc.stripePaymentLinkUrl && doc.stripePaymentLinkId) {
+        const existing = await stripe.paymentLinks.retrieve(doc.stripePaymentLinkId).catch(() => null);
+        if (existing?.active) {
+          return res.json({ paymentLinkUrl: doc.stripePaymentLinkUrl, amount: doc.depositAmountCents / 100 });
+        }
+      }
+
       const amount = Math.max(50, doc.depositAmountCents);
       const link = await stripe.paymentLinks.create({
         line_items: [

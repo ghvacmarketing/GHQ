@@ -5,6 +5,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { startStripeKillSwitch } from "./stripeKillSwitch";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
 import { scheduleBookingReminders } from "./services/bookingEmail";
 import { startGoveeBackgroundSync } from "./services/goveeService";
@@ -70,6 +71,10 @@ async function initStripe() {
 
 // Initialize Stripe (don't await - let server start)
 initStripe();
+
+// While online payments are switched off (shared/online-payments.ts), shut
+// the payment links customers already hold. No-op when payments are enabled.
+startStripeKillSwitch();
 
 // Immediate health check endpoint - must be first to pass Cloud Run health checks
 app.get("/health", (_req, res) => {
